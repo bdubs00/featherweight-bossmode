@@ -566,10 +566,6 @@ a.people-title:hover {
   gap: var(--s-2);
   min-height: var(--h-small);
 }
-/* Remove workers sits at the end of the section of the workers, for an owner. */
-.workers-remove {
-  margin-top: var(--s-3);
-}
 .liked {
   display: flex;
   flex-direction: column;

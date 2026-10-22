@@ -18,7 +18,7 @@ import { phaseOf } from '../lib/presence';
 import { hrefOf } from '../lib/route';
 import { since } from '../lib/words';
 import { attempt, showError } from './notice';
-import { Confirm, InlineMarkdown } from './common';
+import { Confirm, InlineMarkdown, Menu } from './common';
 import { Glyph } from './icons';
 import { Button, Chip, Field, Help, Input, Led, Mark, PaneHeader } from './primitives';
 
@@ -170,6 +170,7 @@ function Workers({ agent, owner, pool, setPool }: { agent: string; owner: boolea
         <Help label="What is a worker">{WORKER_HELP}</Help>
         <span class="grow" />
         {pool !== undefined && <KeepField agent={agent} value={pool ? pool.wanted : 0} owner={owner} onSaved={setPool} />}
+        {owner && pool && <RemoveWorkers agent={agent} onDone={() => setPool(null)} />}
       </div>
       {tasks.length > 0 && (
         <ul class="workers">
@@ -195,20 +196,21 @@ function Workers({ agent, owner, pool, setPool }: { agent: string; owner: boolea
           ))}
         </ul>
       )}
-      {owner && pool && <RemoveWorkers agent={agent} onDone={() => setPool(null)} />}
     </section>
   );
 }
 
-/** RemoveWorkers removes every worker of an agent, for an owner, after Confirm. */
+/**
+ * RemoveWorkers is the More menu of the section of the workers, for an
+ * owner. It holds Remove workers, which removes every worker of the agent
+ * after Confirm, so no destructive key sits in plain sight on the profile.
+ */
 function RemoveWorkers({ agent, onDone }: { agent: string; onDone: () => void }) {
   const [ask, setAsk] = useState(false);
   const [busy, setBusy] = useState(false);
   return (
-    <div class="workers-remove">
-      <Button size="s" kind="danger" onClick={() => setAsk(true)}>
-        Remove workers
-      </Button>
+    <>
+      <Menu label="More for workers" items={[{ label: 'Remove workers', danger: true, onSelect: () => setAsk(true) }]} />
       {ask && (
         <Confirm
           title={'Remove the workers of ' + agent + '?'}
@@ -227,7 +229,7 @@ function RemoveWorkers({ agent, onDone }: { agent: string; onDone: () => void })
           <p>Every worker of {agent} stops. A seat of {agent} waits for a worker.</p>
         </Confirm>
       )}
-    </div>
+    </>
   );
 }
 

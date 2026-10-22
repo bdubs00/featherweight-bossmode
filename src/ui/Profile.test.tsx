@@ -93,13 +93,27 @@ describe('the profile', () => {
     expect(calls.some((c) => c.path === '/v1/pools/crew')).toBe(true);
   });
 
-  it('removes the workers of an agent for an owner, after Confirm', async () => {
+  it('keeps Remove workers in the More menu of the workers, for an owner, and removes them after Confirm', async () => {
     const el = mount(<Profile agent="migrator" />);
     await vi.waitFor(() => expect(el.querySelectorAll('.workers li').length).toBe(2));
-    act(() => ([...el.querySelectorAll('button')].find((b) => b.textContent === 'Remove workers') as HTMLButtonElement).click());
+    // No destructive key sits in plain sight on the profile.
+    expect([...el.querySelectorAll('button')].some((b) => b.textContent === 'Remove workers')).toBe(false);
+    expect(el.querySelector('.key-danger')).toBeNull();
+    const more = el.querySelector('button[aria-label="More for workers"]') as HTMLButtonElement;
+    expect(more.getAttribute('aria-haspopup')).toBe('menu');
+    act(() => more.click());
+    const item = el.querySelector('[role="menu"] button.danger') as HTMLButtonElement;
+    expect(item.textContent).toBe('Remove workers');
+    act(() => item.click());
     expect(document.querySelector('dialog.confirm h2')!.textContent).toBe('Remove the workers of migrator?');
     act(() => ([...document.querySelectorAll('dialog.confirm button')].find((b) => b.textContent === 'Remove workers') as HTMLButtonElement).click());
     await vi.waitFor(() => expect(calls.some((c) => c.method === 'DELETE' && c.path === '/v1/pools/crew')).toBe(true));
+  });
+
+  it('gives the workers no More menu for a person who is not an owner', async () => {
+    const el = mount(<Profile agent="reviewer" />);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(el.querySelector('button[aria-label="More for workers"]')).toBeNull();
   });
 
   it('offers Edit and New face to an owner only', () => {
