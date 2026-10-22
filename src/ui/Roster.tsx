@@ -20,7 +20,7 @@ import { Confirm, Empty, Menu } from './common';
 import { Picker } from './Picker';
 import { draftOf, seatReason, type Draft } from './seats';
 import { pagesOfBridge } from './Channel';
-import { Button, Field, Input, Led, Mark, PaneHeader, TextArea, buttonClass } from './primitives';
+import { Button, Chip, Field, Input, Led, Mark, PaneHeader, TextArea, buttonClass } from './primitives';
 
 const DRAG_TYPE = 'application/x-fw-member';
 
@@ -75,7 +75,7 @@ const MemberRow = memo(function MemberRow({ bridge, handle, onAsk, current }: { 
           <span class="t">
             <span class="handle">{m.handle}</span>
             <Led tone={light.tone} word={light.word} struck={light.struck} label={light.label} />
-            {m.muted && !m.fired && <span class="tag">muted</span>}
+            {m.muted && !m.fired && <Chip>muted</Chip>}
           </span>
           <span class="task">{m.task}</span>
           {phrase && (

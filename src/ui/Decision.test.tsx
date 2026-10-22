@@ -29,8 +29,8 @@ describe('the card that waits', () => {
     expect(card.querySelector('.card-title .led-amber.breathe')).not.toBeNull();
     expect(card.textContent).toContain('migrator-2 wants to run a command.');
     expect(card.querySelector('pre.command')!.textContent).toBe('git push origin migrate/nginx');
-    expect(card.querySelector('.why')!.textContent).toBe('Rule: ask before git push');
-    expect(card.querySelector('.why code')!.textContent).toBe('git push');
+    expect(card.querySelector('.rule')!.textContent).toBe('Rule: ask before git push');
+    expect(card.querySelector('.rule code')!.textContent).toBe('git push');
     expect(card.querySelector('.details-key')!.textContent).toBe('Details');
     expect((card.querySelector('input[placeholder="Optional"]') as HTMLInputElement).closest('label')!.textContent).toContain('Note');
     expect(keys(el)).toEqual(['Deny', 'Always allow', 'Run command']);

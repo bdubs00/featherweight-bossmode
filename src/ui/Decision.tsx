@@ -37,7 +37,7 @@ function RuleWords({ reason }: { reason?: string }) {
   const why = whyWords(reason);
   if (!why) return null;
   const pattern = /^rule: ask [a-z0-9_.-]+: (.+)$/i.test(reason || '') && why.startsWith('Rule: ask before ') ? why.slice('Rule: ask before '.length) : '';
-  return <span class="why">{pattern ? <>Rule: ask before <code>{pattern}</code></> : why}</span>;
+  return <span class="rule">{pattern ? <>Rule: ask before <code>{pattern}</code></> : why}</span>;
 }
 
 /** Details shows the tool, the reason, and the raw input of a call behind a key. */

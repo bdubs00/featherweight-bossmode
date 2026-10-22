@@ -240,7 +240,7 @@ export function Composer(p: ComposerProps) {
           onBlur={() => setTimeout(() => setComp(null), 120)}
         />
         <div class="tools">
-          <span class="hint">{hint}</span>
+          <span class="address">{hint}</span>
           <span class="keys" aria-hidden="true">
             {keyWords()}
           </span>

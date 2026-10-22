@@ -78,7 +78,7 @@ describe('the members', () => {
     expect(status(el, 'migrator-2').classList.contains('needs')).toBe(true);
     expect(status(el, 'migrator-1').querySelector('.act')!.textContent).toBe('Ran ansible-lint roles/cron');
     expect(status(el, 'migrator-1').querySelector('.act code')!.textContent).toBe('ansible-lint roles/cron');
-    expect(status(el, 'tester').querySelector('.tag')!.textContent).toBe('muted');
+    expect(status(el, 'tester').querySelector('.chip')!.textContent).toBe('muted');
     expect(status(el, 'writer').querySelector('.act.err')!.textContent).toBe('Stopped at 40 turns');
     expect(status(el, 'migrator-1').querySelector('a.open')!.getAttribute('href')).toBe('#member/b-roster/migrator-1');
     expect(status(el, 'migrator-1').querySelector('a.open')!.getAttribute('aria-label')).toBe('migrator-1, working. Do the work of migrator-1. Open its conversation.');

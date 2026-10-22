@@ -28,9 +28,9 @@ describe('the address line', () => {
     expect(addressWords(['reviewer'])).toBe('To reviewer');
     expect(addressWords(['a', 'b'])).toBe('To a and b');
     const el = mount(<Composer draft="c1" label="Message the bridge" placeholder="Message the bridge" members={members} onSend={async () => true} />);
-    expect(el.querySelector('.hint')!.textContent).toBe('To everyone');
+    expect(el.querySelector('.address')!.textContent).toBe('To everyone');
     type(el, 'Hello @reviewer and @migrator-1');
-    expect(el.querySelector('.hint')!.textContent).toBe('To reviewer and migrator-1');
+    expect(el.querySelector('.address')!.textContent).toBe('To reviewer and migrator-1');
   });
 
   it('names the key that sends', () => {
@@ -40,7 +40,7 @@ describe('the address line', () => {
 
   it('shows no address line where no member takes the message', () => {
     const el = mount(<Composer draft="c2" label="Message to the manager" placeholder="Ask the manager" onSend={async () => true} />);
-    expect(el.querySelector('.hint')!.textContent).toBe('');
+    expect(el.querySelector('.address')!.textContent).toBe('');
   });
 });
 
@@ -51,7 +51,7 @@ describe('the reply chip', () => {
     const chip = el.querySelector('.replying.slidein .reply-to')!;
     expect(chip.textContent).toBe('Replying to reviewer');
     expect(el.querySelector('textarea')!.getAttribute('placeholder')).toBe('Message reviewer');
-    expect(el.querySelector('.hint')!.textContent).toBe('To reviewer');
+    expect(el.querySelector('.address')!.textContent).toBe('To reviewer');
     act(() => (chip.querySelector('button[aria-label="Stop replying"]') as HTMLButtonElement).click());
     expect(clear).toHaveBeenCalledOnce();
   });
@@ -59,7 +59,7 @@ describe('the reply chip', () => {
   it('sends the reply to the addressees that the text names', async () => {
     const send = vi.fn(async () => true);
     const el = mount(<Composer draft="c4" label="Message the bridge" placeholder="Message the bridge" members={members} reply={{ seq: 7, who: 'Alice', text: 'Check it.' }} onSend={send} />);
-    expect(el.querySelector('.hint')!.textContent).toBe('To everyone');
+    expect(el.querySelector('.address')!.textContent).toBe('To everyone');
     type(el, '@migrator-1 take it');
     await act(async () => {
       (el.querySelector('form') as HTMLFormElement).dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
