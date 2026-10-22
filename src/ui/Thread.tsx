@@ -122,6 +122,11 @@ export function HeartNote({ onSave, onCancel }: { onSave: (note: string) => void
           e.stopPropagation();
           onCancel();
         }
+        // Ctrl+Enter, or Cmd+Enter on a Mac, saves the heart, as it sends in a composer.
+        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+          e.preventDefault();
+          onSave(note.trim());
+        }
       }}
     >
       <label class="field">
