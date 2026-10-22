@@ -687,6 +687,13 @@ The last screen adds the Chat place and the live answer. The files are
 so the answer stops near its middle while it streams in. Each name says the
 theme, the width, and the screen: `final-<light|graphite>-<width>-<screen>.png`.
 
+After a walk of the page on a real fleet, the light shots of `channel`,
+`channel-picker`, `fleet`, `chat`, and `chat-new` show the fixes of that
+walk: the agents of the fleet in the picker, the lines of the channel in
+the words of the page, the person as You, the room of the title, the tool
+chips and the hearts of the profile, and the picks of the profile in a new
+chat. The graphite shots of these screens show the page before the walk.
+
 | Screen | What | Widths and themes |
 |---|---|---|
 | `channel-picker` | The first board: a decision that waits, the reply chip, the picker of Add open, and a new seat row | 1440, both |
