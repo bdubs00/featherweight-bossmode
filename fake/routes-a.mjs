@@ -34,7 +34,7 @@ function addRun(S, { id, agentName, handle, bridge, task, state, minutes, activi
     id, agent: agentName, title: task, state, input: task, seq: 1, origin: 'http', principal: ALICE,
     metadata: { 'fw.batch': 'bridge:' + bridge, 'fw.bridge.member': handle },
     createdAt: ago(minutes), updatedAt: ago(Math.max(0, minutes - 2)), member: state === 'queued' ? '' : 'default/crew-0',
-    activity, reactions: { up: 0, down: 0, heart: 0 }, usage: state === 'queued' ? undefined : { turns: 3, toolCalls: 2 },
+    activity, reactions: { up: 0, down: 0, heart: 0 }, usage: state === 'queued' ? undefined : { turns: 3, toolCalls: 2, costUSD: 0.06 },
   };
   if (error) run.error = error;
   S.runs.set(id, run);

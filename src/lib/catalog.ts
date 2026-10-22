@@ -95,9 +95,9 @@ function loadersOf(skillsOf: Record<string, string[]>): Map<string, string[]> {
   return out;
 }
 
-/** toolUsersOf names the agents whose profile names a tool, by its name or its id. */
+/** toolUsersOf names the agents whose profile names a tool: by its name, its id, or its whole server. */
 function toolUsersOf(t: CatalogTool, agents: Agent[]): string[] {
-  return agents.filter((a) => (a.tools || []).some((x) => x === t.name || x === t.id)).map((a) => a.name).sort();
+  return agents.filter((a) => (a.tools || []).some((x) => x === t.name || x === t.id || (!!t.server && x === t.server))).map((a) => a.name).sort();
 }
 
 /** catalogOf reads the skills of the front and the tools, with the agents that can load each one. */

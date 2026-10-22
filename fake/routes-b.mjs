@@ -5,14 +5,14 @@
 // AGENTS and FLEET are the sample data.
 //
 // The routes:
-//   GET    /v1/pools/{name}                     the workers of an agent
+//   GET    /v1/pools/{name}                     the workers of an agent, as the fleet view names a pool
 //   PATCH  /v1/pools/{name}                     {"replicas": n} changes Keep, for an owner
 //   DELETE /v1/pools/{name}                     removes the workers, for an owner
-//   GET    /v1/bossmode/agents/{agent}/today    {"runs", "costUSD", "decisions"} of the day
-//   POST   /v1/bossmode/runs/{id}/skill         {"name", "args"} runs a skill in a run
+//   GET    /v1/bossmode/agents/{agent}/today    {"runs", "costUSD", "decisions", "partial"?} of the day
 //
-// The name of a pool is the name of its agent in lower case, with a hyphen
-// for each character that is not a letter or a digit.
+// A pool goes by its name, such as crew. The pool that the front makes for
+// a new agent has the name of the agent in lower case, with a hyphen for
+// each character that is not a letter or a digit, so that name finds it too.
 
 /** poolName is the name of the pool of an agent. */
 const poolName = (agent) => String(agent).toLowerCase().replace(/[^a-z0-9]/g, '-');
@@ -27,9 +27,6 @@ const WORKER_OF_RUN = {
   'run-scribe': 'default/crew-1',
   'run-reviewer-2': 'default/review-0',
 };
-
-/** The cost of a sample turn, so Today shows a cost. */
-const TURN_USD = 0.05;
 
 export function register({ on, refuse, readJson, publish, S, now, AGENTS, FLEET }) {
   for (const [id, member] of Object.entries(WORKER_OF_RUN)) {
@@ -62,17 +59,22 @@ export function register({ on, refuse, readJson, publish, S, now, AGENTS, FLEET 
     add(4, alice, 'Go ahead with logrotate. Keep the template names as they are in the manifest.', { to: ['migrator-1'] });
   }
 
-  const poolOf = (name) => FLEET.pools.find((p) => poolName(p.agent) === name);
+  const poolOf = (name) => FLEET.pools.find((p) => p.name === name) || FLEET.pools.find((p) => poolName(p.agent) === name);
+  // The status of a pool, as GET /v1/pools/{name} of the backend answers it.
   const view = (p) => ({
-    name: poolName(p.agent),
+    name: p.name,
+    source: p.source || 'config',
+    ...(p.template ? { template: p.template } : {}),
+    atespace: p.atespace,
     agent: p.agent,
+    intake: p.intake,
     wanted: p.wanted,
     actual: p.tasks.length,
     ready: p.tasks.filter((t) => t.phase === 'Running' || t.phase === 'Suspended').length,
+    hash: p.hash || '',
     tasks: p.tasks.map((t) => ({ name: t.name, phase: t.phase, current: t.current !== false, ...(t.note ? { note: t.note } : {}) })),
     gaps: p.gaps || [],
-    source: 'config',
-    template: 'default',
+    checkedAt: now(),
   });
   const ownerOnly = (c, agent) => {
     const a = AGENTS.find((x) => x.name === agent);
@@ -136,40 +138,17 @@ export function register({ on, refuse, readJson, publish, S, now, AGENTS, FLEET 
     // The fake counts the last 24 hours, so its sample runs count at any hour.
     const day = Date.now() - 24 * 3600_000;
     const runs = [...S.runs.values()].filter((r) => r.agent === agent && new Date(r.createdAt).getTime() >= day);
-    let turns = 0;
+    let cost = 0;
     let decisions = 0;
+    let partial = false;
     for (const r of runs) {
-      turns += (r.usage && r.usage.turns) || 0;
+      if (r.usage && typeof r.usage.costUSD === 'number') cost += r.usage.costUSD;
+      else partial = true;
       decisions += (S.transcripts.get(r.id) || []).filter((x) => x.kind === 'ask').length;
     }
-    return { runs: runs.length, costUSD: Math.round(turns * TURN_USD * 100) / 100, decisions };
+    const out = { runs: runs.length, costUSD: Math.round(cost * 100) / 100, decisions };
+    // A run that reports no cost leaves the sum short, and partial says so.
+    return partial ? { ...out, partial: true } : out;
   });
 
-  on('POST', '/v1/bossmode/runs/([^/]+)/skill', async (c, id) => {
-    const run = S.runs.get(id);
-    if (!run) refuse(404, `no run ${id}`);
-    const body = await readJson(c.req);
-    for (const k of Object.keys(body)) if (k !== 'name' && k !== 'args') refuse(400, `unknown field ${k}`);
-    const name = String(body.name || '');
-    if (!/^[A-Za-z0-9._-]+$/.test(name)) refuse(400, 'a skill needs a name');
-    if (run.state === 'failed' || run.state === 'canceled') refuse(409, `the run ${id} ended, so it takes no skill`);
-    const items = S.transcripts.get(id);
-    const args = String(body.args || '');
-    let seq = items[items.length - 1].seq + 1;
-    items.push({ seq, time: now(), kind: 'user', text: '/' + name + (args ? ' ' + args : ''), who: c.person.subject });
-    Object.assign(run, { state: 'running', seq, updatedAt: now(), activity: { turn: 1, phrase: 'Read the skill ' + name, since: now() } });
-    publish('run', run);
-    setTimeout(() => {
-      seq = items[items.length - 1].seq + 1;
-      items.push({ seq, time: now(), kind: 'tool', tool: 'files', callId: 'sk' + seq, input: { op: 'read', path: 'skills/' + name + '/SKILL.md' } });
-      items.push({ seq: seq + 1, time: now(), kind: 'result', tool: 'files', callId: 'sk' + seq, text: 'Read.' });
-      const text = `I followed the skill **${name}**${args ? ` for \`${args}\`` : ''}. The plan is in the wiki.`;
-      items.push({ seq: seq + 2, time: now(), kind: 'assistant', text });
-      items.push({ seq: seq + 3, time: now(), kind: 'end', text: 'completed' });
-      Object.assign(run, { state: 'completed', output: text, seq: seq + 3, updatedAt: now(), activity: null });
-      publish('run', run);
-    }, 2500);
-    c.status = 202;
-    return { run: id, seq };
-  });
 }

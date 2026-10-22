@@ -107,7 +107,7 @@ function memberRun({ id, agent, handle, bridge, task, shape, start }) {
     createdAt: minutesAgo(start),
     updatedAt: minutesAgo(start - 5),
     member: 'default/crew-' + (handle.length % 3),
-    usage: { turns: 7, toolCalls: 4 },
+    usage: { turns: 7, toolCalls: 4, costUSD: 0.14 },
     reactions: { up: 0, down: 0, heart: 0 },
   };
   const result = {
@@ -259,7 +259,7 @@ export function seed() {
   ];
   const mRun = {
     id: 'run-manager-1', agent: 'manager', title: 'What is the fleet doing right now?', state: 'completed', input: 'What is the fleet doing right now?',
-    output: mItems[10].text, seq: 12, origin: 'http', principal: ALICE, createdAt: minutesAgo(40), updatedAt: minutesAgo(29), member: 'default/manager-0', usage: { turns: 4 },
+    output: mItems[10].text, seq: 12, origin: 'http', principal: ALICE, createdAt: minutesAgo(40), updatedAt: minutesAgo(29), member: 'default/manager-0', usage: { turns: 4, costUSD: 0.08 },
   };
   runs.set(mRun.id, mRun);
   transcripts.set(mRun.id, mItems);

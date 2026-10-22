@@ -10,11 +10,13 @@
 //   FAKE_QUIET=1       no timers
 //   FAKE_TICK=5000     the time between two timer steps, in milliseconds
 //   FAKE_STREAM_MS     the life of one stream before the server closes it, 15 minutes by default
-//   FAKE_THEME=0       GET /v1/bossmode carries no theme
+//   FAKE_THEME=0       the theme of GET /v1/bossmode names no organization, as a deployment without a theme
 //   FAKE_ACCENT        the accent of the theme, #FF4D00 by default
 //   FAKE_ORG           the name of the organization of the theme, Example Org by default
 //   FAKE_LOGO=1        the theme names a logo, served at /v1/bossmode/logo
 //   FAKE_PARTIAL=1     a stream event of a card carries a partial entry, so the page reads it again
+//   FAKE_ADMIN=1       whoami says that the person is an admin, who can add and remove skills
+//   FAKE_A=1           the sample data shows each state of the bridges screen (routes-a.mjs)
 
 import http from 'node:http';
 import fs from 'node:fs';
@@ -22,6 +24,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { AGENTS, FLEET, hash, seed, wiki } from './data.mjs';
 import { checkSvg, identicon } from './faces.mjs';
+import { TEMPLATES } from './routes-c.mjs';
+import { TOOLS_OF, allowlistOf } from './skills.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const DIST = path.resolve(here, '..', 'dist');
@@ -32,6 +36,7 @@ const TICK = Number(process.env.FAKE_TICK || 5000);
 const STREAM_MS = Number(process.env.FAKE_STREAM_MS || 15 * 60_000);
 const THEME = process.env.FAKE_THEME !== '0';
 const PARTIAL = process.env.FAKE_PARTIAL === '1';
+const ADMIN = process.env.FAKE_ADMIN === '1';
 
 const S = seed();
 
@@ -195,7 +200,7 @@ const record = (b, subject) => ({ ...listItem(b, subject), members: b.members })
 
 /** usageOf sums the usage of the runs of a bridge, with the partial mark of the tool batch. */
 function usageOf(b) {
-  const u = { turns: 0, toolCalls: 0, reported: 0, final: 0, missing: 0, partial: false };
+  const u = { turns: 0, toolCalls: 0, costUSD: 0, reported: 0, final: 0, missing: 0, partial: false };
   for (const m of b.members) {
     for (const id of m.runs) {
       const r = S.runs.get(id);
@@ -205,11 +210,13 @@ function usageOf(b) {
       }
       u.turns += r.usage.turns || 0;
       u.toolCalls += r.usage.toolCalls || 0;
+      u.costUSD += r.usage.costUSD || 0;
       u.reported++;
       if (['completed', 'failed', 'canceled'].includes(r.state)) u.final++;
     }
   }
   u.partial = u.missing > 0;
+  u.costUSD = Math.round(u.costUSD * 100) / 100;
   return u;
 }
 
@@ -237,7 +244,7 @@ function dropCards(bridgeId, runIds, note) {
 function post(bridgeId, from, text, more = {}) {
   const ch = S.channels.get(bridgeId);
   const seq = ch.length ? ch[ch.length - 1].seq + 1 : 1;
-  const e = { seq, at: now(), from, to: [], replyTo: null, text: String(text).slice(0, 4096), mirrors: null, reactions: { up: [], down: [], heart: [] }, decision: null, ...more };
+  const e = { seq, at: now(), from, to: [], replyTo: null, text: String(text).slice(0, 4096), mirrors: null, reactions: { up: [], down: [], heart: [] }, decision: null, pinned: false, ...more };
   if (String(text).length > 4096) e.cut = true;
   ch.push(e);
   publish('bridge.message', { bridge: bridgeId, message: e });
@@ -423,6 +430,10 @@ function managerAnswer(run, text) {
   publish('run', run);
 }
 
+/** The answers of an agent that is not the manager, in a conversation outside a bridge. */
+const AGENT_ANSWERS = ['I read that. I start now and post what I find.', 'Done. The change is in the branch, and the checks pass.'];
+let agentN = 0;
+
 const MANAGER_ANSWERS = [
   'Two bridges are open. **migrator-2** waits for you to allow a push, and **scribe** waits for an answer about the audience of the notes.',
   'The `crew` pool has 3 Tasks: two are up, and one sleeps. Nothing failed in the last hour, except **writer**, which reached its limit of 40 turns.',
@@ -430,14 +441,18 @@ const MANAGER_ANSWERS = [
 ];
 let managerN = 0;
 
-/** managerTurn runs one turn of the manager: it wakes, works, and answers. */
+/** managerTurn runs one turn of the manager, or of another agent outside a bridge: it wakes, works, and answers. */
 function managerTurn(run, first) {
   const wake = first ? 3500 : 800;
+  const manager = run.agent === 'manager';
   setTimeout(() => {
-    Object.assign(run, { state: 'running', updatedAt: now(), activity: { turn: 1, tool: 'front.fleet', phrase: 'Read the fleet', since: now() } });
+    Object.assign(run, { state: 'running', updatedAt: now(), activity: manager ? { turn: 1, tool: 'front.fleet', phrase: 'Read the fleet', since: now() } : { turn: 1, tool: 'files', phrase: 'Read index.md', since: now() } });
     publish('run', run);
   }, wake);
-  setTimeout(() => managerAnswer(run, MANAGER_ANSWERS[managerN++ % MANAGER_ANSWERS.length]), wake + 2500);
+  setTimeout(() => {
+    if (run.usage) run.usage = { ...run.usage, turns: (run.usage.turns || 0) + 1, costUSD: Math.round(((run.usage.costUSD || 0) + 0.04) * 100) / 100 };
+    managerAnswer(run, manager ? MANAGER_ANSWERS[managerN++ % MANAGER_ANSWERS.length] : AGENT_ANSWERS[agentN++ % AGENT_ANSWERS.length]);
+  }, wake + 2500);
 }
 
 /* ---------- pages ---------- */
@@ -552,15 +567,19 @@ function stamp(f, person) {
 const routes = [];
 const on = (method, pattern, h, open = false) => routes.push({ method, re: new RegExp('^' + pattern + '$'), h, open });
 
-on('GET', '/v1/whoami', (c) => ({ principal: c.person, roles: Object.fromEntries(AGENTS.map((a) => [a.name, a.role])), admin: false, canCreate: true, teams: ['team-platform'], fleet: 'front-0' }));
+on('GET', '/v1/whoami', (c) => ({ principal: c.person, roles: Object.fromEntries(AGENTS.map((a) => [a.name, a.role])), admin: ADMIN, canCreate: true, teams: ['team-platform'], fleet: 'front-0' }));
+// The settings in the order of the keys of the backend. The backend sends
+// every key of the theme, with "" for a key that the deployment leaves out.
 on('GET', '/v1/bossmode', (c) => {
   const latest = [...S.runs.values()].filter((r) => r.agent === 'manager' && r.principal === c.person.subject).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))[0];
-  const out = { manager: { agent: 'manager', member: MANAGER_MEMBER, run: latest ? latest.id : '' }, placement: 'queue', maxMembers: 16 };
-  if (THEME) {
-    out.theme = { accent: process.env.FAKE_ACCENT || '#FF4D00', name: process.env.FAKE_ORG || 'Example Org' };
-    if (process.env.FAKE_LOGO === '1') out.theme.logo = '/v1/bossmode/logo';
-  }
-  return out;
+  return {
+    manager: { agent: 'manager', member: MANAGER_MEMBER, run: latest ? latest.id : '' },
+    placement: 'queue',
+    maxMembers: 16,
+    theme: { accent: process.env.FAKE_ACCENT || '#FF4D00', name: THEME ? process.env.FAKE_ORG || 'Example Org' : '', logo: process.env.FAKE_LOGO === '1' ? '/v1/bossmode/logo' : '' },
+    templates: TEMPLATES,
+    chat: { agent: 'manager', member: MANAGER_MEMBER },
+  };
 });
 on('GET', '/v1/bossmode/logo', (c) => {
   c.headers['Content-Type'] = 'image/svg+xml';
@@ -661,7 +680,11 @@ on('POST', '/v1/bridges/([^/]+)/messages', async (c, id) => {
   const b = bridgeOr404(id);
   if (b.state !== 'open') refuse(409, 'the bridge is closed, so it takes no message');
   const body = await readJson(c.req);
-  const text = String(body.text || '').trim();
+  for (const k of Object.keys(body)) if (!['text', 'to', 'replyTo', 'pinned', 'skill'].includes(k)) refuse(400, `json: unknown field "${k}"`);
+  const skill = body.skill && typeof body.skill === 'object' ? { name: String(body.skill.name || ''), ...(body.skill.args ? { args: String(body.skill.args) } : {}) } : null;
+  if (body.skill !== undefined && (!skill || !skill.name)) refuse(400, 'a slash command names a skill');
+  // A slash command can come without a text: the skill and its arguments say it.
+  const text = String(body.text || '').trim() || (skill ? '/' + skill.name + (skill.args ? ' ' + skill.args : '') : '');
   if (!text) refuse(400, 'a message needs a text');
   const to = Array.isArray(body.to) ? body.to.map(String) : [];
   if (to.includes('operator')) refuse(400, 'a person does not address the operator; the operator reads the channel');
@@ -672,7 +695,7 @@ on('POST', '/v1/bridges/([^/]+)/messages', async (c, id) => {
   }
   const ch = S.channels.get(id);
   if (body.replyTo != null && !ch.some((e) => e.seq === Number(body.replyTo))) refuse(400, `no entry ${body.replyTo} to reply to`);
-  const e = post(id, { kind: 'person', name: c.person.subject, display: c.person.name }, text, { to, replyTo: body.replyTo != null ? Number(body.replyTo) : null });
+  const e = post(id, { kind: 'person', name: c.person.subject, display: c.person.name }, text, { to, replyTo: body.replyTo != null ? Number(body.replyTo) : null, pinned: !!body.pinned || !!skill, ...(skill ? { skill } : {}) });
   S.reads.set(id + '|' + c.person.subject, e.seq);
   fanOut(id, e);
   c.status = 201;
@@ -763,21 +786,26 @@ on('PATCH', '/v1/bridges/([^/]+)/members/([^/]+)', async (c, id, handle) => {
 });
 
 on('GET', '/v1/fleet', () => FLEET);
-on('GET', '/v1/agents', () => ({ agents: AGENTS.map(({ name, description, role }) => ({ name, description, role })) }));
+// An agent of the view carries the parts of its profile that the page shows: the tools, the skills that it allows, and its rules.
+on('GET', '/v1/agents', () => ({ agents: AGENTS.map(({ name, description, role }) => ({ name, description, role, tools: TOOLS_OF[name] || [], skills: allowlistOf(name), policy: name === 'migrator' ? { ask: ['bash: git push*'] } : name === 'reviewer' ? { ask: ['destructive'] } : undefined })) }));
 
 const runOr404 = (id) => {
   const r = S.runs.get(id);
   if (!r) refuse(404, `no run ${id}`);
   return r;
 };
+// A run starts on any member of the fleet whose agents hold the agent of the body.
 on('POST', '/v1/runs', async (c) => {
   const member = c.url.searchParams.get('member') || '';
   const body = await readJson(c.req);
-  if (member !== MANAGER_MEMBER) refuse(400, `the fake server starts runs on ${MANAGER_MEMBER} only`);
+  const agent = String(body.agent || '');
+  const fm = FLEET.members.find((m) => m.name === member);
+  if (!fm) refuse(400, `no fleet member ${member}`);
+  if (!agent || !fm.agents.some((a) => a.name === agent)) refuse(400, `the fleet member ${member} runs no agent ${agent || '""'}`);
   const input = String(body.input || '').trim();
   if (!input) refuse(400, 'a run needs an input');
-  const id = 'run-manager-' + Date.now().toString(36);
-  const run = { id, agent: body.agent || 'manager', title: input.slice(0, 80), state: 'queued', input, seq: 1, origin: 'http', principal: c.person.subject, createdAt: now(), updatedAt: now(), member, usage: { turns: 0 } };
+  const id = 'run-' + agent + '-' + Date.now().toString(36);
+  const run = { id, agent, title: input.slice(0, 80), state: 'queued', input, seq: 1, origin: 'http', principal: c.person.subject, createdAt: now(), updatedAt: now(), member, usage: { turns: 0, costUSD: 0 } };
   S.runs.set(id, run);
   S.transcripts.set(id, [{ seq: 1, time: now(), kind: 'user', text: input, who: c.person.subject }]);
   S.results.set(id, { runId: id, title: run.title, agent: run.agent, status: 'working', started: run.createdAt, changed: run.updatedAt, next: [] });
@@ -828,7 +856,7 @@ on('POST', '/v1/runs/([^/]+)/messages', async (c, id) => {
   items.push({ seq, time: now(), kind: 'user', text: content, who: c.person.subject });
   Object.assign(run, { state: 'running', seq, updatedAt: now() });
   publish('run', run);
-  if (run.agent === 'manager') managerTurn(run, false);
+  if (!run.metadata || !run.metadata['fw.bridge.member']) managerTurn(run, false);
   c.status = 202;
   return { run: id, seq };
 });
@@ -1147,7 +1175,7 @@ function tick() {
 // skills.mjs serves the Skills place.
 for (const name of ['skills.mjs', 'routes-a.mjs', 'routes-b.mjs', 'routes-c.mjs']) {
   const mod = await import('./' + name);
-  mod.register({ on, refuse, readJson, readBody, publish, S, now, AGENTS, FLEET });
+  mod.register({ on, refuse, readJson, readBody, publish, S, now, AGENTS, FLEET, admin: () => ADMIN });
 }
 
 server.listen(PORT, '127.0.0.1', () => {
