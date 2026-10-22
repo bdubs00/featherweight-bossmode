@@ -22,7 +22,7 @@ import { attempt, showError } from './notice';
 import { Confirm, Markdown } from './common';
 import { Button, Chip, Find, Mark, PaneHeader } from './primitives';
 import { EmptyPane } from './Shell';
-import { AddSkill, closeAddSkill, openAddSkill, useAddSkillOpen } from './AddSkill';
+import { AddSkill, openAddSkill, useAddSkillOpen } from './AddSkill';
 
 /* ---------- the catalog ---------- */
 
@@ -151,7 +151,7 @@ export function SkillList({ current }: { current?: SkillItem }) {
         countLabel={cat ? cat.skills.length + ' skills' : undefined}
         actions={
           admin ? (
-            <Button size="s" class="collapsed-only" onClick={openAddSkill}>
+            <Button size="s" class="collapsed-only" href={ADD_SKILL}>
               Add skill
             </Button>
           ) : undefined
@@ -167,7 +167,7 @@ export function SkillList({ current }: { current?: SkillItem }) {
         {cat && cat.skills.length === 0 && (
           <div class="empty">
             <p>No skill yet.</p>
-            {admin && <Button onClick={openAddSkill}>Add skill</Button>}
+            {admin && <Button href={ADD_SKILL}>Add skill</Button>}
           </div>
         )}
         {skillGroups(skills).map((g) => (
@@ -272,6 +272,9 @@ function ItemMenu({ s, admin, onRemove }: { s: CatalogSkill; admin: boolean; onR
     </span>
   );
 }
+
+/** The address of Add skill. A key that opens the chooser links there, so the address names the chooser. */
+const ADD_SKILL = hrefOf({ place: 'skills', add: true });
 
 /** SkillMain is the main pane of Skills. With add, from the address #skills/add, it opens the chooser. */
 export function SkillMain({ item, add }: { item?: SkillItem; add?: boolean }) {
@@ -409,7 +412,7 @@ export function SkillActions({ item }: { item?: SkillItem }) {
         title={adding ? 'Skills' : skill ? 'Skill' : tool ? 'Tool' : 'Skills'}
         actions={
           admin ? (
-            <Button size="s" aria-pressed={adding} onClick={() => (adding ? closeAddSkill() : openAddSkill())}>
+            <Button size="s" href={ADD_SKILL} aria-current={adding ? 'page' : undefined}>
               Add skill
             </Button>
           ) : undefined
