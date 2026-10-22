@@ -1,0 +1,462 @@
+# The copy of the page
+
+This file audits every string of the page, file by file. Each row says to
+keep a string, to change it, or to remove it, and gives the new text. The
+column Who names the screen that applies the change (section 11 of
+`docs/DESIGN.md` assigns the files), or Lead for a file of the lead. A row
+marked done is in the code already.
+
+## 1. The rules
+
+1. A status is a word, such as `working`, `needs you`, or `waiting for a
+   worker`. A light repeats the word and never replaces it.
+2. A time in a list is a short meta, such as `14 min`, from `since()` in
+   `src/lib/words.ts`. A message shows its clock time. The full time sits in
+   a tooltip.
+3. No sentence of instruction or explanation sits in the chrome. A limit
+   shows in the error at the moment the person hits it. A definition sits
+   behind a question mark, in the `Help` primitive. These strings, and any
+   like them, go: `To fire a member, drag it out of the roster, or pick Fire
+   in its menu.`, `The member starts a run on the queue of the pool of its
+   agent, as you.`, `Drop or paste files here · 20 files, 32 MiB total. Agent
+   workspace limits also apply.`, `Your conversation`, `Checked 2 minutes
+   ago`, and `Asleep since 14 minutes. A request wakes it.`
+4. An action keeps its name through the flow. The key that says Seat makes a
+   seat, and the channel then says seated. The key that says Fire leads to a
+   dialog whose key says Fire, and the channel says fired.
+5. An error says what happened and what to do, in one or two short
+   sentences, with no apology.
+6. An empty screen invites an action, with the key that does it.
+7. Sentence case everywhere. No uppercase label, no middle dot between the
+   parts of a meta string, and no arrow after a link or a key.
+8. The word pool never appears for an operator. An agent has workers. Keep is
+   the number of workers that an agent keeps. A worker is awake or asleep.
+   The word Task, for a worker, also stays out of the page.
+
+## 2. The words
+
+| Thing | The word on the page | Never |
+|---|---|---|
+| A job split into seats, with one channel | bridge | room, project, job |
+| One seat on a bridge | seat, and the handle of the seat, such as migrator-2 | slot, instance |
+| The agent behind a seat | member, in a roster | bot |
+| A profile that workers run | agent | profile |
+| A Task that runs the work of an agent | worker | pool, Task, crew, pod |
+| The number of workers an agent keeps | Keep | wanted, replicas |
+| A placement `queue` | keep warm workers | queue, intake |
+| A placement `spawn` | fresh sandbox per seat | spawn, child Task |
+| An approval or a question that waits | decision | permission, approval request |
+| What the operator asks of a member | task | prompt |
+| A Markdown file of the wiki | page | doc, note |
+| A SKILL.md that an agent can load | skill | plugin, extension |
+| A function that an agent can call | tool | function, capability |
+| The person who runs the page | you | the operator, the user |
+
+The statuses of a seat: `working`, `needs you`, `waiting for a worker`,
+`idle`, `asleep`, `error`, and `fired`. The statuses of a worker: `awake`,
+`asleep`, `starting`, `failed`, and `stopping`. The statuses of a run:
+`waiting for a worker`, `working`, `needs you`, `ready`, `ended`, `failed`,
+and `stopped`.
+
+Capacity shows where seating happens:
+
+- The picker of Add shows each agent with `1 free`, `2 free`, or `waiting
+  for a worker`.
+- A seat past capacity shows the status `waiting for a worker`.
+- The profile of an agent shows Keep with its number, inline, and changes it
+  in place.
+- A bridge with more seats than workers gets one system line in its channel:
+  `Runs in waves: 5 seats share 3 workers.`
+
+## 3. The shell and the files of the lead
+
+### index.html
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `bossmode` (title) | keep | | Lead |
+| `Bossmode needs JavaScript.` | keep | | Lead |
+
+### src/ui/App.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `Loading bossmode.` | keep | | done |
+| `No bridge is open. Open a bridge, or ask the manager to open one.` | change | `No bridge is open. Open one, or ask the manager to open one.` and the key `Open a bridge` | done |
+| `Pick a bridge in the rail.` | remove | the main pane opens a bridge where two panes show | done |
+| `Pick a page in the tree, or search the wiki.` | change | `Pick a page in the list, or search the wiki.` and the key `New page` | done |
+| `That access token did not work.` | change | `That access token did not work. Check it, or sign in.` | done |
+| `The workbench did not answer.` | change | `The workbench did not answer. Check the connection, then try again.` | done |
+| `Bossmode` (heading of a failed boot) | keep | | done |
+| `Try again` | keep | | done |
+| `Dismiss` | keep | | done |
+| `Failed` (the word of the notice) | keep | | done |
+
+### src/ui/Shell.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `Activity`, `Bridges`, `Fleet`, `Skills`, `Wiki`, `Manager` | keep | | done |
+| `1 member needs you`, `N members need you` (count of Activity) | keep | | done |
+| `<name>, account` (account key) | keep | | done |
+| `Match the system`, `Light`, `Graphite` | keep | | done |
+| `Connections`, `Sign out` | keep | | done |
+| `Live`, `Connecting`, `Offline` | keep | | done |
+| `Live updates arrive.` (tooltip) | change | `Updates arrive as they happen.` | done |
+| `N workers awake` | keep | replaces `4 Tasks awake` of the mockup | done |
+| `<name>, home` (logo well) | keep | | done |
+
+### src/ui/Signin.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `Sign in` | keep | `Sign in to <name>` for a theme with a name | done |
+| `Your sign-in ended. Sign in again to go on. Your drafts stay.` | change | `Your sign-in ended. Sign in again, and your drafts stay.` | done |
+| `Sign in to run your fleet.` | keep | | done |
+| `Paste your access token to run your fleet.` | keep | | done |
+| `Use an access token` | keep | | done |
+| `Access token` | keep | | done |
+| `Continue` | keep | | done |
+
+### src/ui/common.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `Cancel` (dialog) | keep | | done |
+| `Back to <place>` (back link) | keep | the old back link said only the place, beside an arrow | done |
+
+### src/ui/notice.ts, src/api/client.ts
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `Something failed.` | change | `The action failed. Try it again.` | done |
+| `Your access token did not work.` | keep | | Lead |
+| `The workbench did not answer. Check the connection and try again.` | keep | | Lead |
+| `The workbench answered with something that is not JSON.` | change | `The workbench answered with something that is not JSON. Reload the page.` | done |
+
+### src/lib/presence.ts
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `Works on its task now.` | keep | | done |
+| `Waits for an approval, an answer, or a connection.` | change | `Waits for your approval, your answer, or a connection.` | done |
+| `Finished its turn. Its Task is live.` | change | `Finished its turn. A message starts the next one.` | done |
+| `Its Task sleeps. A message wakes it.` | change | `Its worker sleeps. A message wakes it.` | done |
+| `Its newest run failed, or its Task stopped.` | change | `Its newest run failed, or its worker stopped.` | done |
+| `Its seat is fired. It gets no message.` | change | `Fired. It gets no message.` | done |
+| `running` (phase) | change | `awake` | done |
+| `The Task is up.`, `The Task sleeps. A request wakes it.`, `The Task starts.` | change | `The worker is up.`, `The worker sleeps. A request wakes it.`, `The worker starts.` | done |
+| `canceled` (run) | change | `stopped`, the word of the Stop key | done |
+| `Is queued, running, or paused.` | change | `waiting for a worker` for queued, and `Runs, or pauses between two steps.` for running | done |
+| new | add | `waiting for a worker`, with `Every worker of its agent is busy. It starts when one is free.` | done |
+
+### src/lib/words.ts
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `This tool can change things, so it waits for you.` | change | `Rule: ask before a tool that changes things` | done |
+| `A rule of this agent asks you first.` | change | `Rule: ask before git push`, from the rule itself | done |
+| `The policy of this agent asks you first.` | change | `Rule: ask first` | done |
+| `3 minutes ago` (ago) | change | `since()` gives `14 min`, `3 h`, and `2 d` | done, and the screens move to it |
+| `<who> wants to run a command` | keep | | Lead |
+| `<who> asks for your permission` | change | `<who> asks for your decision` | done |
+| `Today`, `Yesterday` | keep | | Lead |
+| `someone`, `bossmode` (sender of a system line) | keep | | Lead |
+
+### src/lib/handles.ts, src/lib/pagepath.ts
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| the reasons of a handle | keep | they show only in the error of a bad handle | done |
+| `The handle <h> is reserved. Pick another.` | keep | | done |
+| `A page needs a path, such as notes/plan.md.` and the other reasons of a path | keep | they show only in the error | Lead |
+
+## 4. Screen A
+
+### src/ui/BridgeList.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `Bridges` with the count chip | keep | | done |
+| `New` | keep | | done |
+| `N members` | keep | | done |
+| `closed`, `1 needs you`, `N need you` | keep | | done |
+| `No bridge is open.` | keep | with the key `Open a bridge` | done |
+| `Loading the bridges.` | keep | | A |
+| `Closed` with the count chip | keep | | done |
+| `Manager` row and `Your conversation` | remove | Manager is a place of the app bar | done |
+| `Places`, `Fleet`, `Pages` rows | remove | places of the app bar | done |
+
+### src/ui/Channel.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| the goal under the title | remove from the header | the goal opens the channel, at its first entry | done |
+| `Closed. ` before the goal | change | the status `closed` beside the title | done |
+| `The start of the bridge <title>.` | change | the goal of the bridge | done |
+| `Members` key with the count | keep | it shows only where the members pane is out of sight | done |
+| `Bridge settings` | change | `Close bridge` as a key on the header, and `What the manager can do` in the menu of More | A |
+| `What the manager can do here` (dialog title) | keep | | A |
+| `Approve the calls of members` | change | `Decide for members` | A |
+| `Change the budgets of members` | keep | | A |
+| `Add and remove members` | keep | | A |
+| `Write a report to the wiki when the bridge closes` | change | `Write a report on close` | A |
+| `The manager acts for you only where you let it. A decision of the manager shows in the channel.` | remove | | A |
+| `Save` | keep | | A |
+| `Open the bridge again` | change | `Reopen` | A |
+| `Close the bridge` | change | `Close bridge`, the same on the key, the dialog, and its last key | A |
+| `Close <title>?` | keep | | A |
+| `A close cancels nothing. The members finish what they do, and the channel takes no new message. The manager writes a report to the wiki.` | change | `Members finish what they do. The channel takes no new message.` and, with the report, `The manager writes a report.` | A |
+| `Load earlier messages` | change | `Earlier messages` | A |
+| `Loading` | keep | | A |
+| `Loading the channel.` | keep | | A |
+| `This bridge is not here, or you cannot see it.` | change | `This bridge is not here. It was removed, or you cannot see it.` and the key `Bridges` | A |
+| `New messages below` | change | `New messages` | A |
+| `Message the bridge` (placeholder) | keep | was `Message every member, or @ one member` | done |
+| `This bridge is closed. Open it again to send.` | change | `Closed. Reopen it to send.` | A |
+| `Messages of <title>` (log label) | keep | | A |
+| new | add | the tabs `Posts`, `Wiki`, `Decisions` with the count of decisions | A |
+| new | add | the system line `Runs in waves: N seats share M workers.` once per bridge | A |
+
+### src/ui/Message.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `Thumb up`, `Thumb down`, `Heart` | keep | | A |
+| `Thumb up: <label>`, `Thumb down: Deny` | keep | | A |
+| `Heart: keep this in the wiki` (tooltip) | keep | | A |
+| `What made this useful? The wiki keeps the heart with your note. The note is optional.` | change | `What made this useful?` with the placeholder `Optional` | A |
+| `Save heart` | change | `Heart`, the name of the reaction | A |
+| `Cancel` | keep | | A |
+| `Reply`, `Reply to <who>` | keep | | A |
+| `Go to the message`, `Load earlier messages to see it` | change | `Go to the message`, `Earlier messages hold it` | A |
+| `An earlier message` | keep | | A |
+| `The channel holds the first 4 KB. The run holds the whole text.` | change | `Cut at 4 KB.` with the link `Whole text` to the run | A |
+| `to @a, @b` (address line) | change | `to a and b` | A |
+| `Question from <who>`, `Permission for <who>` (labels) | change | `Question from <who>`, `Decision for <who>` | A |
+| system lines: the icon before the line | change | the light of the event: green for started, amber for needs you, red for failed, grey for the rest | A |
+
+### src/ui/Decision.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `Permission` (kicker) | remove | `Needs your decision` with the amber light | done |
+| `<who> wants to run a command` (title) | change | the first line of the card, as a sentence | done |
+| `Details`, `Tool:`, `Reason:` | keep | | A |
+| `Note for <who>, if you want` | change | `Note` with the placeholder `Optional` | done |
+| `Deny`, `Always allow`, `<label>` or `Allow` | keep | | done |
+| `Allow this call, and let <who> use <tool> from now on without asking` | change | `Allow <tool> for <who> from now on` | A |
+| `No decision: <note>` | keep | | A |
+| `<who> answered: <answer>`, `<who> declined the question`, `<who> allowed this`, `<who> denied this` | keep | | A |
+| `. Note: <note>` | change | the note on a line of its own | A |
+| `Question from <who>` (kicker) | change | `Needs your answer` with the amber light, and `<who> asks: <question>` | done |
+| `A question for you` | keep | | A |
+| `Your answer`, `None`, `Decline`, `Answer` | keep | | A |
+
+### src/ui/Composer.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `Reply to <who>: <excerpt>` | change | the chip `Replying to <who>` with `Stop replying` | done |
+| `Cancel the reply` | change | `Stop replying` | done |
+| `To every active member`, `To @a and @b` | change | `To everyone`, `To a and b` | A |
+| `Ctrl+Enter`, `⌘+Enter` | keep | | A |
+| `Send` | keep | | done |
+| `Members` (list label) | keep | and `Commands` for the slash menu | done |
+| `Message <who>` (placeholder of a reply) | keep | | done |
+
+### src/ui/Roster.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `Roster` | change | `Members` | done |
+| `N members` under the heading | change | the count chip on the heading line | done |
+| `Add` | keep | it opens the picker | done |
+| `<handle>, <word>. <task>. <phrase>. Open its run.` (label) | change | `<handle>, <word>. <task>. Open its conversation.` | A |
+| `muted` (tag) | keep | | A |
+| `More for <handle>` | keep | | A |
+| `Open its run` | change | `Open conversation` | A |
+| `Mute`, `Unmute` | keep | | A |
+| `It gets the messages of the channel again.`, `It gets no broadcast, only a message to it.` | remove | | A |
+| `Seat again` | keep | | A |
+| `Its newest run stopped, so it gets no message. A new run starts with its task.` | remove | the status `error` says it | A |
+| `Change its task` | change | `Change task` | A |
+| `Fire` | keep | | A |
+| `Its open runs stop. Its Task stays in its pool.` | remove | | A |
+| `Add a member` (dialog) | change | the picker: the field `Who` with the placeholder `Who?`, the groups `On this bridge` and `Everyone else`, and the links `Advanced` and `New agent` | A |
+| `Handle, such as reviewer or migrator-3` | change | `Handle`, in Advanced | A |
+| `Agent`, `Task` | keep | in Advanced | A |
+| `Add and start` | change | `Seat` | A |
+| `The member starts a run on the queue of the pool of its agent, as you.` | remove | | A |
+| new seat row | add | `<handle>` with `new seat`, the task field, `Seat`, and `Cancel` | A |
+| `Seat <handle> again`, `A new task for <handle>` | change | `Seat <handle> again`, `Change the task of <handle>` | A |
+| `Seat again`, `Save the task` | change | `Seat again`, `Change task` | A |
+| `A new run of <handle> starts with this task, and the channel reaches it again. You can change the task first.` | remove | | A |
+| `This bridge has no member.` | change | `No one has a seat yet.` with the key `Add` | A |
+| `Loading the roster.` | change | `Loading the members.` | A |
+| `To fire a member, drag it out of the roster, or pick Fire in its menu.` | remove | the drag target says `Fire` while a member drags | done |
+| `Fire <handle>?`, `Fire <handle>` | keep | | A |
+| `The open runs of <handle> in this bridge stop, and its seat gets no more messages. Its Task stays in its pool, so other bridges can still use it.` | change | `Its open runs stop, and it gets no more messages.` | A |
+| `Drop here to fire` | change | `Fire` | done |
+| new | add | the footer `This bridge` with turns, cost, and pages, from `usage`, for a bridge whose runs report usage | A |
+
+## 5. Screen B
+
+### src/ui/Activity.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `Activity` with the count chip | keep | | done |
+| `New messages` (meta of a row) | change | the sender and an excerpt of the newest entry | B |
+| `Nothing needs you. New decisions and messages land here first.` | change | `Nothing needs you.` | B |
+| `Pick an item in the list to decide or to read it.` | change | `Pick an item to decide or to read it.` | B |
+
+### src/ui/Fleet.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `Fleet` with the count chip, `New agent` | keep | | done |
+| `Pools` | remove | | done |
+| `N pools, N Tasks, N agents` | remove | the count chip | done |
+| `Runs <agent> from the queue <intake>` | change | `Keep <n>` | done |
+| `N of M ready` | change | `N ready` | done |
+| `The fleet has no pool that you can see.` | change | `No agent has a worker that you can see.` | done |
+| `older configuration` (tag) | change | `old setup` | B |
+| `Checked 2 minutes ago` | remove | | B |
+| `Read again` | remove | the stream keeps the fleet current | B |
+| `Agents`, `Tasks` (sections) | remove | the people list grouped by bridge, then `Not on a bridge` | B |
+| `You are <role>` | remove | | B |
+| `N waiting for input` | change | the status `needs you` | B |
+| `You can see no agent.` | change | `No agent yet.` with the key `New agent` | B |
+| `A person drew this face.`, `A pattern from the name. No model drew it.` | remove | | B |
+| `Display name, at most 64 characters` | change | `Name` | B |
+| `Tagline, at most 140 characters` | change | `Tagline` | B |
+| `A new face: an SVG file of at most 32 KB. The workbench refuses a face with a script, a link, or an image inside.` | change | the key `New face`, and the limit in the error | B |
+| `A face holds at most 32 KB.` | change | `This face is over 32 KB. Pick a smaller SVG.` | B |
+| `Use the pattern again` | change | `Use the mark` | B |
+| `Only an owner of <agent> can change its face.` | remove | the Edit key does not show | B |
+| `Saved.`, `The new face is up.` | keep | | B |
+| new | add | the profile: `Workers` with its chip, `Keep`, and the question mark `What is a worker` with `A worker runs the work of one agent, one seat at a time. Keep is how many it keeps ready.` | B |
+| new | add | `What people liked` with its chip and `Open page` | B |
+| new | add | `Today` with runs, cost, and decisions | B |
+| new | add | `N skills`, the one line of the profile that counts them | B |
+
+### src/ui/RunPane.tsx and src/ui/Conversation.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `Roster` (back) | change | `Members` | done |
+| `Stop`, `Stop the run of <who>?`, `Stop the run` | change | `Stop`, `Stop <who>?`, `Stop` | B |
+| `The run stops now. The seat stays on the roster, and a message to it starts a new turn.` | change | `The seat stays. A message starts a new turn.` | B |
+| `The run` | keep | | B |
+| ` · started <time>` | change | the clock time alone, without the middle dot | B |
+| `Files`, `What it did`, `N steps` | change | the tabs `Chat`, `Run`, `Files` of the member | B |
+| `Error`, `Done`, `No result` | keep | | B |
+| `Close the file` | keep | | B |
+| `Loading the file.`, `The file does not exist now.` | keep | | B |
+| `This file is not text, or it is too large to show here.` | change | `This file is not text, or it is too large to show.` | B |
+| `The view shows the first part of the file.` | change | `The first part of the file.` | B |
+| `Was this useful?` | remove | the reaction chips say it | B |
+| `Thumb up: accept the result`, `Thumb down: reject the result` | keep | | B |
+| `What made this useful? The note is optional.` | change | `What made this useful?` with `Optional` | B |
+| `Your heart is recorded.`, `Your thumb is recorded.` | change | `Heart recorded.`, `Thumb recorded.` | B |
+| `Took N steps` | keep | | B |
+| `Ran "<command>"`, `Created`, `Edited`, `Removed`, `Used <tool>` | keep | | B |
+| `Asked you a question`, `Asked for permission` | change | `Asked you`, `Asked for a decision` | B |
+| `<who> allowed it`, `<who> denied it` | keep | | B |
+| `The turn failed`, `The turn ended` | keep | | B |
+| `Load earlier messages` | change | `Earlier messages` | B |
+| `Loading the conversation.` | keep | | B |
+
+### src/ui/Member.tsx and src/ui/Board.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `<handle> has no seat on this bridge, or no run yet.` | keep | | B |
+| `Loading the member.` | keep | | B |
+| `Board` | keep | | B |
+| `The board shows one light per member. It comes with the next stage.` | remove | the board | B |
+
+## 6. Screen C
+
+### src/ui/Pages.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `Pages` and its line `The wiki of the fleet. Agents write it, and people read it.` | change | `Wiki` with the count chip | done |
+| `New` | keep | | done |
+| `Search the wiki` | keep | | C |
+| `<name> · <time>` (row meta) | change | `<name>` and `14 min`, with a gap and no dot | C |
+| `No page holds those words.` | change | `No page holds those words. Try fewer words.` | C |
+| `The search read part of the wiki. Use more words to find the rest.` | change | `Partial: more words find the rest.` | C |
+| `The wiki has no page.` | change | `The wiki is empty.` with the key `New page` | C |
+| `Loading the pages.`, `Loading the page.`, `Loading the history.` | keep | | C |
+| `No page <path> is here.`, `Create <path>` | keep | | C |
+| `History`, `Edit` | keep | | done |
+| `This is version N, by <by>, <time>. Read the current page.` | change | `Version N, by <by>, 14 min.` and the link `Current page` | C |
+| `<by> saved a newer version. The page shows it.` | change | `<by> saved a newer version.` | C |
+| `Version N by <by>, 3 hours ago: <summary>` | change | `Version N`, `<by>`, `3 h`, and the summary, as parts with gaps | C |
+| `History` (heading) | change | `History of <page>` | done |
+| `Version N, the current one: <title>` | change | `Version N`, with the chip `current` | C |
+| `Removed` | keep | | C |
+| `New page`, `Edit` (heading) | change | `New page`, `Edit <page>` | done |
+| `<by> saved this page while you edited it, <time>. Your text is still here, and nothing is lost.` | change | `<by> saved this page while you edited it. Your text is still here.` | C |
+| `See their version` | keep | | C |
+| `Drop my text and take theirs`, `Save mine over theirs` | change | `Take theirs`, `Keep mine` | C |
+| `Path, such as runbooks/deploy.md. The page adds .md when you leave it out.` | change | `Path` with the placeholder `runbooks/deploy.md` | C |
+| `The page will be <path>.` | keep | | C |
+| `Markdown`, `What changed, in a few words` | change | `Text`, `What changed` | C |
+| `Cancel`, `Create the page`, `Save` | change | `Cancel`, `Create page`, `Save` | C |
+| `Cmd or Ctrl+Enter saves. A save that meets a newer version stops and asks you.` | change | `Ctrl+Enter` beside the key, as in the composer | C |
+| `A page with this path exists already. Pick another path, or edit that page.` | keep | | C |
+| `the fleet token`, `run <id>` (writers) | keep | | C |
+
+### src/ui/Manager.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `Manager` | keep | | done |
+| `It reads the fleet, opens bridges, and decides only what you delegate.` | remove | | done |
+| `New conversation` | keep | | done |
+| `This workbench has no manager. An operator sets the profile of the manager in workbench.bossmode.manager.` | change | `No manager is set up.` with a question mark that names `workbench.bossmode.manager` | C |
+| `Ask the manager about the fleet, or ask it to open a bridge. The first answer takes a few seconds, because its Task wakes for it.` | change | `Ask about the fleet, or ask for a bridge.` | C |
+| `Waking the manager. Its Task sleeps between messages, so the first answer takes a few seconds.` | change | the status `waking` with a grey light | C |
+| `The manager works: <phrase>.`, `The manager works on an answer.` | change | the status `working` with the phrase beside it | C |
+| `This conversation stopped. Your next message starts a new one.` | change | `Stopped. Your next message starts a new conversation.` | C |
+| `Ask the manager` (placeholder) | keep | | C |
+| `Message to the manager` (label) | keep | | C |
+
+### src/ui/NewBridge.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `Open a bridge` and its line `One job, split into tasks, with one agent on each.` | change | `Open a bridge`, and the one question first: `What is the job?` | C |
+| `Title`, `Goal` | change | `Goal` first, and `Title` in Advanced, filled from the goal | C |
+| `Members`, `Handle`, `Agent`, `Task`, `Add a member`, `Remove member N` | change | the picker of screen A, then `Seat` | C |
+| `Placement` with `Queue. Each member runs on a worker of the pool of its agent.` and `Spawn. The manager seats each member in a child Task of its own, and its budget bounds the whole bridge.` | change | a visible choice with two options: `Keep warm workers` (the default) and `Fresh sandbox per seat` | C |
+| `What the manager can do here` and its four rows | change | in Advanced, with the words of screen A | C |
+| `Each member starts a run as you. A bridge spends through the budgets of the pools of its members.` | remove | | C |
+| `Cancel`, `Open the bridge` | change | `Cancel`, `Open bridge` | C |
+| `The bridge needs a title.`, `The bridge needs a goal.` | change | `Write the goal of the bridge.` | C |
+| `Member N needs a handle of lower-case letters, digits, dots, dashes, or underscores.` | change | the reason of `handleReason()` | C |
+| `The handle <h> is there twice.` | change | `<h> has a seat on this bridge already. Pick another handle.` | C |
+| `Member N needs an agent.`, `Member N needs a task.` | keep | | C |
+| `A spawn bridge needs a manager, and this workbench has none.` | change | `A fresh sandbox per seat needs a manager. Pick keep warm workers, or set up a manager.` | C |
+
+### src/ui/NewAgent.tsx, src/ui/Appearance.tsx, src/ui/Skills.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `New agent` | keep | | C |
+| `A new agent starts with a name and the number of workers it keeps. The form comes with the next stage.` | remove | the form: `Name` first, then `How many can work at once?` with 2 as the default, and Advanced | C |
+| `Appearance`, `Theme`, `Match the system`, `Light`, `Graphite` | keep | | C |
+| `<name> sets the accent <hex>.`, `The accent is <hex>.` | keep | | C |
+| `Skills` with the count chip, `Imported`, `Local`, `<server>`, `Tools`, `Built in` | keep | | done |
+| `Agents that can load it` with the count chip | keep | | done |
+| `Pick a skill or a tool in the list.` | keep | | done |
+| `This skill is not here. It can be removed, or it was renamed.` | keep | | done |
+| `No skill yet. Add one from a marketplace, an address, or a SKILL.md.` | change | `No skill yet.` with the key `Add skill` | C |
+| `Copy /<name>`, `Copied /<name>` | keep | | done |
+| `Remove`, `Remove <name>?`, `Remove <name>` | keep | | done |
+| `No agent can load it after this.` | keep | | done |
+| new | add | `Add skill` and its chooser: `From a marketplace`, `From an address`, `Paste a SKILL.md`, `Upload files`, then the preview and `Install` | C |

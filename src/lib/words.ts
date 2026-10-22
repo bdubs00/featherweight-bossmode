@@ -38,6 +38,25 @@ export function dayWords(iso: string, now = new Date()): string {
   return d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
 }
 
+/**
+ * since is the short meta of a moment in a list: "now", "14 min", "3 h",
+ * "2 d", or a date for a moment older than a week. The full time belongs
+ * in a tooltip.
+ */
+export function since(iso: string, now = Date.now()): string {
+  const t = new Date(iso).getTime();
+  if (isNaN(t)) return '';
+  const s = Math.max(0, Math.round((now - t) / 1000));
+  if (s < 45) return 'now';
+  const m = Math.max(1, Math.round(s / 60));
+  if (m < 60) return m + ' min';
+  const h = Math.round(m / 60);
+  if (h < 24) return h + ' h';
+  const d = Math.round(h / 24);
+  if (d < 7) return d + ' d';
+  return new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
 /** ago says how long ago a moment was, such as "3 minutes ago". */
 export function ago(iso: string, now = Date.now()): string {
   const t = new Date(iso).getTime();
@@ -85,15 +104,21 @@ export function decisionTitle(who: string, d: Decision | ResultDecision): string
   if (e) return `${who} wants to ${e.what}`;
   if (commandOf(d.input)) return `${who} wants to run a command`;
   if (d.label && d.label !== 'Allow') return `${who} wants to ${d.label.toLowerCase()}`;
-  return `${who} asks for your permission`;
+  return `${who} asks for your decision`;
 }
 
-/** whyWords says in plain words why a call waits for a person. */
+/**
+ * whyWords names the rule that holds a call for a person, as a short label:
+ * "rule: ask bash: git push*" becomes "Rule: ask before git push".
+ */
 export function whyWords(reason: string | undefined): string {
   const r = reason || '';
-  if (/^rule: ask destructive/.test(r)) return 'This tool can change things, so it waits for you.';
-  if (/^rule: /.test(r)) return 'A rule of this agent asks you first.';
-  if (r === 'default') return 'The policy of this agent asks you first.';
+  const m = /^rule: ask [a-z0-9_.-]+: (.+)$/i.exec(r);
+  if (m) return 'Rule: ask before ' + m[1].replace(/\*+$/, '').trim();
+  if (/^rule: ask (destructive|readonly|read-only|idempotent|parallel|parallelsafe)$/i.test(r)) return 'Rule: ask before a tool that changes things';
+  const t = /^rule: ask ([a-z0-9_.-]+)$/i.exec(r);
+  if (t) return 'Rule: ask before ' + t[1];
+  if (r === 'default') return 'Rule: ask first';
   return r ? cap(r) : '';
 }
 

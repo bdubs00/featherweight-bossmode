@@ -198,7 +198,7 @@ export async function call<T>(path: string, opts: CallOptions = {}): Promise<T> 
   try {
     return JSON.parse(raw) as T;
   } catch {
-    throw new ApiError(res.status, { detail: 'The workbench answered with something that is not JSON.' });
+    throw new ApiError(res.status, { detail: 'The workbench answered with something that is not JSON. Reload the page.' });
   }
 }
 

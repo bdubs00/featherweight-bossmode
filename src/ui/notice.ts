@@ -16,7 +16,7 @@ export function showError(e: unknown): void {
   if (e instanceof SigninNeeded) return;
   if (e instanceof DOMException && e.name === 'AbortError') return;
   console.error(e);
-  text = e instanceof ApiError ? e.message : e instanceof Error && e.message ? e.message : 'Something failed.';
+  text = e instanceof ApiError ? e.message : e instanceof Error && e.message ? e.message : 'The action failed. Try it again.';
   tell();
 }
 
