@@ -1,7 +1,9 @@
-// The wiki: the tree of pages with a search, a page rendered through the
-// sanitizer, its history, and an editor. A save is a compare-and-swap with
-// If-Match, and a 412 shows a conflict message that keeps the text of the
-// person.
+// The wiki: the tree of pages with its folders as groups and a search, a
+// page rendered through the sanitizer with its meta as parts, its history,
+// and the editor. A save is a compare-and-swap with If-Match, and a 412
+// shows a conflict that keeps the text of the person. The tree shows names
+// without .md, a new page gets .md when the person leaves it out, and
+// _index.md, which the wiki writes on its own, has no Edit.
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { ApiError } from '../api/client';
@@ -11,13 +13,13 @@ import { useSelect } from '../state/store';
 import { loadPages } from '../state/actions';
 import { stripFrontMatter } from '../lib/markdown';
 import { INDEX_PATH, pageName, pageReason, withSuffix } from '../lib/pagepath';
-import { ago, personName } from '../lib/words';
+import { personName, since } from '../lib/words';
 import { go, hrefOf } from '../lib/route';
 import { useRoving } from './keys';
 import { attempt, showError } from './notice';
-import { Empty, Markdown, When } from './common';
-import { Button, PaneHeader } from './primitives';
-import { Icon } from './icons';
+import { Markdown } from './common';
+import { Glyph } from './icons';
+import { Button, Card, Chip, Command, Field, Input, PaneHeader, TextArea } from './primitives';
 
 /** byName names the writer of a page: a person, an agent, a run, the fleet token, or bossmode. */
 export function byName(by: string): string {
@@ -28,62 +30,50 @@ export function byName(by: string): string {
   return personName(by);
 }
 
-interface Folder {
-  name: string;
+/** One folder of the wiki: its path, and the pages right in it. The root has the path "". */
+export interface Folder {
   path: string;
-  folders: Folder[];
   pages: PageMeta[];
 }
 
-/** treeOf builds the folders of the wiki from the paths of its pages. */
-export function treeOf(pages: PageMeta[]): Folder {
-  const root: Folder = { name: '', path: '', folders: [], pages: [] };
-  for (const p of [...pages].sort((a, b) => (a.path < b.path ? -1 : 1))) {
-    const parts = p.path.split('/');
-    let f = root;
-    for (let i = 0; i < parts.length - 1; i++) {
-      let next = f.folders.find((x) => x.name === parts[i]);
-      if (!next) {
-        next = { name: parts[i], path: parts.slice(0, i + 1).join('/'), folders: [], pages: [] };
-        f.folders.push(next);
-      }
-      f = next;
-    }
-    f.pages.push(p);
+/** foldersOf groups the pages by folder: the pages at the root first, then each folder by its path. */
+export function foldersOf(pages: PageMeta[]): Folder[] {
+  const by = new Map<string, PageMeta[]>();
+  for (const p of pages) {
+    const i = p.path.lastIndexOf('/');
+    const dir = i < 0 ? '' : p.path.slice(0, i);
+    if (!by.has(dir)) by.set(dir, []);
+    by.get(dir)!.push(p);
   }
-  return root;
+  return [...by.keys()]
+    .sort((a, b) => (a === '' ? -1 : b === '' ? 1 : a < b ? -1 : a > b ? 1 : 0))
+    .map((path) => ({ path, pages: by.get(path)!.sort((a, b) => (a.path < b.path ? -1 : 1)) }));
 }
 
-function FolderView({ f, current }: { f: Folder; current?: string }) {
+/** Since is a short meta of a moment, with the full time in a tooltip. */
+function Since({ at }: { at: string }) {
+  const d = new Date(at);
+  if (isNaN(d.getTime())) return null;
   return (
-    <>
-      {f.pages.map((p) => (
-        <li>
-          <a class={'prow' + (p.path === current ? ' sel' : '')} href={hrefOf({ place: 'pages', path: p.path, mode: 'read' })} data-item aria-current={p.path === current ? 'page' : undefined}>
-            <Icon name="page" />
-            <span class="main">
-              <span class="t">{p.title || pageName(p.path)}</span>
-              <span class="s">
-                {pageName(p.path)} {'·'} {ago(p.at)}
-              </span>
-            </span>
-          </a>
-        </li>
-      ))}
-      {f.folders.map((sub) => (
-        <li>
-          <details open>
-            <summary>
-              <Icon name="chev" />
-              {sub.name}
-            </summary>
-            <ul>
-              <FolderView f={sub} current={current} />
-            </ul>
-          </details>
-        </li>
-      ))}
-    </>
+    <time dateTime={at} title={d.toLocaleString()}>
+      {since(at)}
+    </time>
+  );
+}
+
+function PageRow({ p, current }: { p: PageMeta; current?: string }) {
+  const on = p.path === current;
+  const name = pageName(p.path);
+  return (
+    <div role="listitem">
+      <a class={'prow' + (on ? ' sel' : '')} href={hrefOf({ place: 'pages', path: p.path, mode: 'read' })} data-item aria-current={on ? 'page' : undefined}>
+        <span class="t-sub clip">{p.title || name}</span>
+        <span class="meta">
+          <span>{name}</span>
+          <Since at={p.at} />
+        </span>
+      </a>
+    </div>
   );
 }
 
@@ -93,8 +83,10 @@ export function PageTree({ current }: { current?: string }) {
   const [q, setQ] = useState('');
   const [hits, setHits] = useState<SearchHit[] | null>(null);
   const [cut, setCut] = useState(false);
-  const tree = useMemo(() => treeOf(Object.values(byPath)), [byPath]);
-  const list = useRoving<HTMLUListElement>();
+  const [shut, setShut] = useState<Record<string, boolean>>({});
+  const folders = useMemo(() => foldersOf(Object.values(byPath)), [byPath]);
+  const list = useRoving<HTMLDivElement>();
+  const count = Object.keys(byPath).length;
   useEffect(() => {
     if (!loaded) attempt(loadPages);
   }, []);
@@ -124,44 +116,86 @@ export function PageTree({ current }: { current?: string }) {
       <PaneHeader
         id="pages-title"
         title="Wiki"
-        count={loaded ? Object.keys(byPath).length : undefined}
-        countLabel={Object.keys(byPath).length + ' pages'}
+        count={loaded ? count : undefined}
+        countLabel={count === 1 ? '1 page' : count + ' pages'}
         actions={
           <Button href="#create" size="s">
             New
           </Button>
         }
       />
-      <div class="scroll">
-        <form class="search" role="search" onSubmit={(e) => e.preventDefault()}>
-          <Icon name="search" />
+      <div class="scroll" ref={list}>
+        <form class="find recess" role="search" onSubmit={(e) => e.preventDefault()}>
+          <Glyph name="search" size={16} />
           <input type="search" placeholder="Search the wiki" aria-label="Search the wiki" value={q} onInput={(e) => setQ((e.target as HTMLInputElement).value)} />
         </form>
         {hits ? (
-          <ul class="tree hits" ref={list}>
+          <div class="c-rows hits" role="list" aria-label="Pages that hold the words">
             {hits.map((h) => (
-              <li>
-                <a class="prow" href={hrefOf({ place: 'pages', path: h.path, mode: 'read' })} data-item>
-                  <Icon name="page" />
-                  <span class="main">
-                    <span class="t">{h.title || h.path}</span>
-                    <span class="s">{h.snippet}</span>
-                  </span>
+              <div role="listitem">
+                <a class={'prow' + (h.path === current ? ' sel' : '')} href={hrefOf({ place: 'pages', path: h.path, mode: 'read' })} data-item>
+                  <span class="t-sub clip">{h.title || pageName(h.path)}</span>
+                  <span class="snippet">{h.snippet}</span>
                 </a>
-              </li>
+              </div>
             ))}
-            {hits.length === 0 && <Empty>No page holds those words.</Empty>}
-            {cut && <p class="hint">The search read part of the wiki. Use more words to find the rest.</p>}
-          </ul>
+            {hits.length === 0 && <p class="empty">No page holds those words. Try fewer words.</p>}
+            {cut && <p class="tree-foot">Partial: more words find the rest.</p>}
+          </div>
         ) : (
-          <ul class="tree" ref={list}>
-            <FolderView f={tree} current={current} />
-            {loaded && Object.keys(byPath).length === 0 && <Empty>The wiki has no page.</Empty>}
-            {!loaded && <Empty>Loading the pages.</Empty>}
-          </ul>
+          <>
+            {!loaded && <p class="empty">Loading the pages.</p>}
+            {loaded && count === 0 && (
+              <div class="empty">
+                <p>The wiki is empty.</p>
+                <Button href="#create">New page</Button>
+              </div>
+            )}
+            {folders.map((f) => {
+              const open = !shut[f.path];
+              const id = 'folder-' + (f.path || 'root');
+              return (
+                <div class="group" role="group" aria-labelledby={f.path ? id : undefined} aria-label={f.path ? undefined : 'Pages'}>
+                  {f.path && (
+                    <button type="button" class="group-head" id={id} aria-expanded={open} onClick={() => setShut({ ...shut, [f.path]: open })}>
+                      <Glyph name="back" size={14} class="fold" />
+                      <span class="clip">{f.path}</span>
+                      <Chip>{f.pages.length}</Chip>
+                    </button>
+                  )}
+                  {open && (
+                    <div class="c-rows" role="list">
+                      {f.pages.map((p) => (
+                        <PageRow p={p} current={current} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </>
         )}
       </div>
     </section>
+  );
+}
+
+/** Parts is the meta of a page: its version, its writer, its time, its summary, and its tags. */
+function Parts({ page, tags }: { page: Page; tags: string[] }) {
+  return (
+    <p class="parts">
+      <span>Version {page.version}</span>
+      <span class="by">{byName(page.by)}</span>
+      <Since at={page.at} />
+      {page.summary && <span>{page.summary}</span>}
+      {tags.length > 0 && (
+        <span class="tags">
+          {tags.map((t) => (
+            <Chip>{t}</Chip>
+          ))}
+        </span>
+      )}
+    </p>
   );
 }
 
@@ -197,15 +231,14 @@ export function PageView({ path, version }: { path: string; version?: number }) 
   useEffect(() => {
     if (page && heading.current) heading.current.focus();
   }, [page && page.path]);
+  const back = { href: '#pages', label: 'Wiki', to: 'list' as const };
   if (missing) {
     return (
-      <section class="screen pageview">
-        <PaneHeader title={pageName(path)} size="title" level={1} back={{ href: '#pages', label: 'Wiki', to: 'list' }} />
-        <div class="scroll pad">
-          <Empty>No page {path} is here.</Empty>
-          <a class="btn" href={hrefOf({ place: 'pages', path, mode: 'create' })}>
-            Create {path}
-          </a>
+      <section class="screen pageview" aria-labelledby="page-title">
+        <PaneHeader id="page-title" title={pageName(path)} size="title" level={1} back={back} />
+        <div class="empty">
+          <p>No page {path} is here.</p>
+          <Button href={hrefOf({ place: 'pages', path, mode: 'create' })}>Create {path}</Button>
         </div>
       </section>
     );
@@ -220,7 +253,7 @@ export function PageView({ path, version }: { path: string; version?: number }) 
         level={1}
         headingRef={heading}
         focusable
-        back={{ href: '#pages', label: 'Wiki', to: 'list' }}
+        back={back}
         actions={
           <>
             <Button href={hrefOf({ place: 'pages', path, mode: 'history' })} size="s">
@@ -236,24 +269,23 @@ export function PageView({ path, version }: { path: string; version?: number }) 
       />
       <div class="scroll pad">
         {version && page && (
-          <p class="banner">
-            This is version {page.version}, by {byName(page.by)}, <When at={page.at} />. <a href={hrefOf({ place: 'pages', path, mode: 'read' })}>Read the current page</a>.
+          <p class="note-line">
+            <span>
+              Version {page.version}, by {byName(page.by)}, <Since at={page.at} />.
+            </span>
+            <a href={hrefOf({ place: 'pages', path, mode: 'read' })}>Current page</a>
           </p>
         )}
-        {changed && !version && (
-          <p class="banner" role="status">
-            {page ? byName(page.by) : 'Someone'} saved a newer version. The page shows it.
+        {changed && !version && page && (
+          <p class="note-line" role="status">
+            {byName(page.by)} saved a newer version.
           </p>
         )}
         {!page ? (
-          <Empty>Loading the page.</Empty>
+          <p class="t-meta">Loading the page.</p>
         ) : (
           <>
-            <p class="meta-line">
-              Version {page.version} by {byName(page.by)}, {ago(page.at)}
-              {page.summary ? ': ' + page.summary : ''}
-              {fm && fm.tags.length > 0 && <span class="tags">{fm.tags.map((t) => <span class="tag">{t}</span>)}</span>}
-            </p>
+            <Parts page={page} tags={fm!.tags} />
             <Markdown text={fm!.body} base={path} class="article" />
           </>
         )}
@@ -272,32 +304,32 @@ export function PageHistory({ path }: { path: string }) {
   }, [path, meta && meta.hash]);
   return (
     <section class="screen pagehistory" aria-labelledby="history-title">
-      <PaneHeader id="history-title" title={'History of ' + pageName(path)} size="title" level={1} back={{ href: hrefOf({ place: 'pages', path, mode: 'read' }), label: 'the page', to: 'here' }} />
+      <PaneHeader id="history-title" title={'History of ' + pageName(path)} size="title" level={1} back={{ href: hrefOf({ place: 'pages', path, mode: 'read' }), label: pageName(path), to: 'here' }} />
       <div class="scroll pad">
-        {!versions && <Empty>Loading the history.</Empty>}
+        {!versions && <p class="t-meta">Loading the history.</p>}
         <ol class="versions" ref={list}>
           {versions &&
             versions.map((v, i) =>
               v.deleted ? (
                 <li>
-                  <p class="vrow gone" data-item>
-                    <b>Removed</b>
-                    <span class="s">
-                      <When at={v.at} />
+                  <p class="vrow gone" data-item tabIndex={-1}>
+                    <span class="head t-sub">Removed</span>
+                    <span class="meta">
+                      <Since at={v.at} />
                     </span>
                   </p>
                 </li>
               ) : (
                 <li>
                   <a class="vrow" data-item href={i === 0 ? hrefOf({ place: 'pages', path, mode: 'read' }) : hrefOf({ place: 'pages', path, mode: 'read', version: v.version })}>
-                    <b>
-                      Version {v.version}
-                      {i === 0 ? ', the current one' : ''}
-                      {v.title ? ': ' + v.title : ''}
-                    </b>
-                    <span class="s">
-                      {byName(v.by)}, <When at={v.at} />
-                      {v.summary ? ': ' + v.summary : ''}
+                    <span class="head">
+                      <span class="t-sub">Version {v.version}</span>
+                      {i === 0 && <Chip>current</Chip>}
+                    </span>
+                    <span class="meta">
+                      <span>{byName(v.by)}</span>
+                      <Since at={v.at} />
+                      {v.summary && <span>{v.summary}</span>}
                     </span>
                   </a>
                 </li>
@@ -334,6 +366,8 @@ function writeDraft(p: string, d: Draft | null): void {
     // No storage: the draft lives in memory only.
   }
 }
+
+const SAVE_KEY = typeof navigator !== 'undefined' && navigator.platform && /Mac/.test(navigator.platform) ? '⌘+Enter' : 'Ctrl+Enter';
 
 /** PageEditor edits a page, or creates one when create is set. */
 export function PageEditor({ path: initial, create }: { path?: string; create?: boolean }) {
@@ -406,17 +440,12 @@ export function PageEditor({ path: initial, create }: { path?: string; create?: 
 
   const target = create ? withSuffix(path) : initial || '';
   const why = create && path.trim() ? pageReason(target) : '';
+  const cancelHref = create ? '#pages' : hrefOf({ place: 'pages', path: initial || '', mode: 'read' });
   return (
     <section class="screen pageedit" aria-labelledby="edit-title">
-      <PaneHeader
-        id="edit-title"
-        title={create ? 'New page' : 'Edit ' + pageName(initial || '')}
-        size="title"
-        level={1}
-        back={{ href: create ? '#pages' : hrefOf({ place: 'pages', path: initial || '', mode: 'read' }), label: create ? 'Wiki' : 'the page', to: 'here' }}
-      />
+      <PaneHeader id="edit-title" title={create ? 'New page' : 'Edit ' + pageName(initial || '')} size="title" level={1} back={{ href: cancelHref, label: create ? 'Wiki' : pageName(initial || ''), to: 'here' }} />
       <form
-        class="scroll pad form editor"
+        class="scroll pad editor"
         onSubmit={(e) => {
           e.preventDefault();
           save();
@@ -429,55 +458,52 @@ export function PageEditor({ path: initial, create }: { path?: string; create?: 
         }}
       >
         {conflict && (
-          <div class="conflict" role="alert">
-            <p>
-              <b>{byName(conflict.by)} saved this page while you edited it</b>, <When at={conflict.at} />. Your text is still here, and nothing is lost.
-            </p>
+          <Card
+            class="conflict"
+            tone="amber"
+            title={byName(conflict.by) + ' saved this page while you edited it.'}
+            actions={
+              <>
+                <Button
+                  onClick={() => {
+                    setText(conflict.text);
+                    setBase(conflict.hash);
+                    setConflict(null);
+                    writeDraft(initial || '', null);
+                  }}
+                >
+                  Take theirs
+                </Button>
+                <Button
+                  kind="primary"
+                  disabled={busy}
+                  onClick={() => {
+                    setBase(conflict.hash);
+                    save(conflict.hash);
+                  }}
+                >
+                  Keep mine
+                </Button>
+              </>
+            }
+          >
+            <p>Your text is still here.</p>
             <details>
               <summary>See their version</summary>
-              <pre class="code">{conflict.text}</pre>
+              <Command>{conflict.text}</Command>
             </details>
-            <div class="do">
-              <button
-                type="button"
-                class="btn"
-                onClick={() => {
-                  setText(conflict.text);
-                  setBase(conflict.hash);
-                  setConflict(null);
-                  writeDraft(initial || '', null);
-                }}
-              >
-                Drop my text and take theirs
-              </button>
-              <button
-                type="button"
-                class="btn danger"
-                disabled={busy}
-                onClick={() => {
-                  setBase(conflict.hash);
-                  save(conflict.hash);
-                }}
-              >
-                Save mine over theirs
-              </button>
-            </div>
-          </div>
+          </Card>
         )}
         {create && (
-          <label class="fld">
-            <span>Path, such as runbooks/deploy.md. The page adds .md when you leave it out.</span>
-            <input value={path} required aria-invalid={!!why} aria-describedby="path-why" onInput={(e) => setPath((e.target as HTMLInputElement).value)} />
-            <span id="path-why" class={why ? 'field-why bad' : 'field-why'}>
-              {why || (target ? 'The page will be ' + target + '.' : '')}
-            </span>
-          </label>
+          <Field label="Path" error={why}>
+            <Input value={path} required invalid={!!why} placeholder="runbooks/deploy.md" spellcheck={false} onInput={(e) => setPath((e.target as HTMLInputElement).value)} />
+            {!why && target && <span class="t-meta">The page will be {target}.</span>}
+          </Field>
         )}
-        <label class="fld grow">
-          <span>Markdown</span>
-          <textarea
+        <Field label="Text" class="grow">
+          <TextArea
             ref={box}
-            class="mono"
+            class="code-area"
             value={text}
             disabled={!ready}
             onInput={(e) => {
@@ -486,10 +512,9 @@ export function PageEditor({ path: initial, create }: { path?: string; create?: 
               keep(v, summary);
             }}
           />
-        </label>
-        <label class="fld">
-          <span>What changed, in a few words</span>
-          <input
+        </Field>
+        <Field label="What changed">
+          <Input
             value={summary}
             maxLength={200}
             onInput={(e) => {
@@ -498,16 +523,18 @@ export function PageEditor({ path: initial, create }: { path?: string; create?: 
               keep(text, v);
             }}
           />
-        </label>
-        <div class="do end">
-          <a class="btn" href={create ? '#pages' : hrefOf({ place: 'pages', path: initial || '', mode: 'read' })} onClick={() => !create && writeDraft(initial || '', null)}>
+        </Field>
+        <div class="form-end">
+          <span class="kbd" aria-hidden="true">
+            {SAVE_KEY}
+          </span>
+          <Button href={cancelHref} onClick={() => !create && writeDraft(initial || '', null)}>
             Cancel
-          </a>
-          <button type="submit" class="btn primary" disabled={busy || !ready}>
-            {create ? 'Create the page' : 'Save'}
-          </button>
+          </Button>
+          <Button type="submit" kind="primary" disabled={busy || !ready}>
+            {create ? 'Create page' : 'Save'}
+          </Button>
         </div>
-        <p class="why">Cmd or Ctrl+Enter saves. A save that meets a newer version stops and asks you.</p>
       </form>
     </section>
   );
