@@ -670,8 +670,10 @@ worker that holds it. A worker that sleeps or starts counts as asleep, and
 a worker that fails, stops, or says that it is blocked counts as an error.
 The `presence` of a member of a bridge stands only where the page lacks
 the facts. That is a newest run that the page does not hold, or a finished
-run on a worker whose phase the page does not know. A worker is busy while
-it holds an open run. Until the page reads the open runs, the `active`
+run on a worker whose phase the page does not know. A run that the fleet
+lost counts as missing: a line of `event: lost` names it, or a read of it
+answers 404. So does a run on a worker that left the fleet view, as after
+a roll of the workers. A worker is busy while it holds an open run. Until the page reads the open runs, the `active`
 count of `GET /v1/fleet` stands in.
 
 A read of the result, the transcript, or the files of a run wakes a worker

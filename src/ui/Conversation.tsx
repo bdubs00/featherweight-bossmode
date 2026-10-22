@@ -117,7 +117,10 @@ export function useTranscript(runId: string, load = true): TranscriptState {
       .catch((e) => {
         // A read that the page starts on its own never raises the notice of the page: the view says it in place.
         if (!live) return;
-        if (e instanceof ApiError && e.status === 404) setGone(true);
+        if (e instanceof ApiError && e.status === 404) {
+          setGone(true);
+          store.dispatch({ type: 'run-lost', id: runId });
+        }
         else setProblem(e instanceof Error && e.message ? e.message : 'The conversation did not load.');
       })
       .finally(() => live && setLoading(false));

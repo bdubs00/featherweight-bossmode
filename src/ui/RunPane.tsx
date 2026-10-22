@@ -14,6 +14,7 @@ import { runStatus } from '../lib/presence';
 import { awakeFor, seatPresence, statusOf } from '../lib/status';
 import { selectFacts } from '../state/reducer';
 import { hrefOf } from '../lib/route';
+import { noteLost } from '../state/actions';
 import { attempt, showError } from './notice';
 import { Confirm, Light, Markdown, When } from './common';
 import { Button, Chip, IconButton, Mark, PaneHeader, ReactionChip } from './primitives';
@@ -36,7 +37,11 @@ export function useResult(runId: string, load = true): Result | null {
   }, [runId]);
   useEffect(() => {
     // A run that the fleet does not hold shows no result and raises no notice.
-    if (load && runId && !store.get().runs[runId]) api.run(runId).then((r) => store.dispatch({ type: 'run', run: r })).catch(() => {});
+    if (load && runId && !store.get().runs[runId])
+      api
+        .run(runId)
+        .then((r) => store.dispatch({ type: 'run', run: r }))
+        .catch((e) => noteLost(runId, e));
   }, [runId, load]);
   const key = run ? run.state + '|' + (run.pending ? run.pending.id : '') + '|' + (run.output || '').length : '';
   useEffect(() => {

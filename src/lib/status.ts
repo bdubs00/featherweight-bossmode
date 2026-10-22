@@ -21,6 +21,8 @@ export interface Facts {
   runs: Record<string, Run>;
   /** True once the page read the open runs of the fleet, so an open run that it does not hold does not exist. */
   openRuns: boolean;
+  /** The runs that the fleet lost, by id: a lost line named them, or a read answered 404. */
+  lost?: Record<string, true>;
 }
 
 /** The state of one worker: a Task of the workers of an agent, or a member of the fleet with no Task. */
@@ -48,8 +50,14 @@ export interface WorkerState {
 }
 
 /** factsOf puts the facts together. Without the open runs, the count of active runs of the fleet view stands in. */
-export function factsOf(fleet: Fleet | null | undefined, runs: Record<string, Run> = {}, openRuns = false): Facts {
-  return { fleet: fleet || null, runs, openRuns };
+export function factsOf(fleet: Fleet | null | undefined, runs: Record<string, Run> = {}, openRuns = false, lost: Record<string, true> = {}): Facts {
+  return { fleet: fleet || null, runs, openRuns, lost };
+}
+
+/** runOf is a run that the page holds and the fleet did not lose. */
+function runOf(f: Facts, id: string): Run | undefined {
+  if (!id || (f.lost && f.lost[id])) return undefined;
+  return f.runs[id];
 }
 
 /** The run states that are not finished: a worker that holds such a run is busy. */
@@ -99,7 +107,7 @@ function indexOf(f: Facts): Index {
   if (fleet) {
     const held = new Map<string, string[]>();
     for (const r of Object.values(f.runs)) {
-      if (!r || !r.member || !OPEN.has(r.state)) continue;
+      if (!r || !r.member || !OPEN.has(r.state) || (f.lost && f.lost[r.id])) continue;
       const k = shortName(r.member);
       held.set(k, [...(held.get(k) || []), r.id]);
     }
@@ -154,13 +162,15 @@ const newestRun = (m: Pick<Member, 'runs'>): string => (m.runs && m.runs.length 
  * seatPresence is the presence of a seat, from derivePresence of the newest
  * run of the seat and the phase of the worker that holds it. Where the page
  * lacks the run, or lacks the phase for a finished run, the presence of the
- * bridge stands.
+ * bridge stands. A run that the fleet lost counts as missing, and so does a
+ * run on a worker that left the fleet view, as after a roll of the workers.
  */
 export function seatPresence(f: Facts, m: Pick<Member, 'fired' | 'presence' | 'runs'>): Presence {
   if (m.fired) return 'fired';
-  const run = f.runs[newestRun(m)];
+  const run = runOf(f, newestRun(m));
   if (!run) return m.presence;
   const w = run.member ? workerOf(f, run.member) : undefined;
+  if (run.member && !w && f.fleet) return m.presence;
   if (w && w.phase) return derivePresence({ run, taskPhase: w.phase, blocked: w.blocked });
   // A finished run on a worker whose phase the page does not know: idle or asleep, the bridge says which.
   if (DECIDES.has(run.state)) return derivePresence({ run, blocked: !!(w && w.blocked) });
@@ -190,7 +200,7 @@ export type Subject = { seat: Pick<Member, 'fired' | 'presence' | 'runs'> } | { 
  */
 export function statusOf(f: Facts, s: Subject): Light | null {
   if ('seat' in s) {
-    const run = f.runs[newestRun(s.seat)];
+    const run = runOf(f, newestRun(s.seat));
     return seatLight(seatPresence(f, s.seat), run ? run.state : undefined);
   }
   if ('worker' in s) {

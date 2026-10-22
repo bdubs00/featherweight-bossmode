@@ -773,7 +773,9 @@ moment.
   the queue shows waiting for a worker.
 - The presence that a bridge sends stands only where the page lacks the
   facts. That is a newest run that the page does not hold, or a finished
-  run on a worker whose phase the page does not know.
+  run on a worker whose phase the page does not know. A run that the fleet
+  lost counts as missing, and so does a run on a worker that left the
+  fleet view.
 - A worker is busy while it holds an open run. Until the page reads the
   open runs, the count of active runs of the fleet view stands in.
 

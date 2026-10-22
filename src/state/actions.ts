@@ -185,8 +185,9 @@ export async function loadOpenRuns(): Promise<void> {
     api
       .run(id)
       .then((r) => store.dispatch({ type: 'run', run: r }))
-      .catch(() => {
+      .catch((e) => {
         // The next run event of the run brings its state.
+        noteLost(id, e);
       });
   }
 }
@@ -225,6 +226,11 @@ export async function loadSkills(): Promise<void> {
 
 const askedRuns = new Set<string>();
 
+/** noteLost notes a run that the fleet does not hold, after a read of it answered 404, so its old object says nothing about its seat. */
+export function noteLost(id: string, e: unknown): void {
+  if (e instanceof ApiError && e.status === 404) store.dispatch({ type: 'run-lost', id });
+}
+
 /**
  * loadRunOnce reads a run that the store does not hold, once per page
  * load. A row needs its state: a queued run shows waiting for a worker,
@@ -237,8 +243,9 @@ export async function loadRunOnce(id: string): Promise<void> {
   try {
     const run = await api.run(id);
     store.dispatch({ type: 'run', run });
-  } catch {
+  } catch (e) {
     // The row shows the presence alone. The next stream event of the run fills it.
+    noteLost(id, e);
   }
 }
 

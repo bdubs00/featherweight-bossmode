@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Entry } from '../api/types';
-import { decidedRuns, hiddenLine, isMe, lineWords, napOf, napRuns, napWords, whoName, type Nap } from './lines';
+import { decidedRuns, hiddenLine, isMe, lineWords, lostRunOf, napOf, napRuns, napWords, whoName, type Nap } from './lines';
 
 const TOKEN = { subject: 'token', kind: 'token' };
 const ALICE = { subject: 'alice@example.com', name: 'Alice Example' };
@@ -75,9 +75,11 @@ describe('the plain facts of a later front', () => {
     expect(lineWords({ event: 'decided', text: "token declined scribe's question" }, ALICE)).toEqual({ text: "token declined scribe's question" });
   });
 
-  it('says that a seat lost its worker, with the id of the run in the tooltip', () => {
+  it('says that a seat lost its worker, with the id of the run in the tooltip, and names the run', () => {
     const text = 'migrator-1 lost its run 01RUN9: no worker of the fleet holds it';
     expect(line('lost', text)).toEqual({ text: 'migrator-1 lost its worker', title: text });
+    expect(lostRunOf({ from: { kind: 'system' }, event: 'lost', text })).toBe('01RUN9');
+    expect(lostRunOf({ from: { kind: 'system' }, event: 'asleep', text: 'migrator-1 went to sleep' })).toBe('');
   });
 
   it('reads the lines that only lose their end mark', () => {

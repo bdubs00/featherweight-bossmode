@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import { api } from '../api/routes';
 import type { Result } from '../api/types';
-import { forgetRuns, loadBridge, loadChannel, loadRunOnce } from './actions';
+import { forgetRuns, loadBridge, loadChannel, loadRunOnce, noteLost } from './actions';
 import { store } from './store';
 
 /** pool runs the loads of a list with at most n at a time. */
@@ -130,6 +130,10 @@ export function refreshAfterReset(): void {
     }
   }
   void pool(runs, 3, async (id) => {
-    store.dispatch({ type: 'run', run: await api.run(id) });
+    try {
+      store.dispatch({ type: 'run', run: await api.run(id) });
+    } catch (e) {
+      noteLost(id, e);
+    }
   });
 }

@@ -113,6 +113,16 @@ describe('statusOf', () => {
     expect(seatPresence(factsOf(null, { r: run('r', 'input-required') }), seat('idle', ['r']))).toBe('needs-you');
   });
 
+  it('takes the presence of the bridge for a run that the fleet lost, or whose worker left the view', () => {
+    // After a roll of the workers, the page can still hold an open run of a worker that is gone.
+    const rolled = factsOf(fleet, { r: run('r', 'running', 'default/crew-9') }, true);
+    expect(statusOf(rolled, { seat: seat('idle', ['r']) })).toBe(PRESENCE.idle);
+    const lost = factsOf(fleet, { r: run('r', 'running', 'default/crew-0') }, true, { r: true });
+    expect(statusOf(lost, { seat: seat('error', ['r']) })).toBe(PRESENCE.error);
+    // A lost run keeps no worker busy.
+    expect(workerOf(lost, 'crew-0')!.busy).toBe(false);
+  });
+
   it('counts the awake workers for the headers', () => {
     expect(awakeCount(factsOf(fleet))).toBe(2);
     expect(awakeCount(factsOf(null))).toBe(0);
@@ -134,6 +144,18 @@ describe('one state from the stream', () => {
     expect(words(s)).toEqual([2, 'asleep', 'asleep']);
     s = apply(s, ['task', { kind: 'task', member: 'default/crew-1', phase: 'Running', time: '' }]);
     expect(words(s)).toEqual([3, 'idle', 'awake']);
+  });
+
+  it('notes a run that a lost line names, and forgets it once the run changes', () => {
+    let s: State = reduce(initialState, { type: 'fleet', fleet });
+    s = reduce(s, { type: 'run', run: run('r', 'running', 'default/crew-0') });
+    s = reduce(s, { type: 'bridges', bridges: [] });
+    s = apply(s, ['bridge.message', { bridge: 'b1', message: { seq: 1, at: '', from: { kind: 'system' }, text: 'migrator-1 lost its run r: no worker of the fleet holds it', event: 'lost' } }]);
+    expect(s.lost).toEqual({ r: true });
+    expect(statusOf(selectFacts(s), { seat: seat('idle', ['r']) })!.word).toBe('idle');
+    s = reduce(s, { type: 'run', run: { ...run('r', 'completed', 'default/crew-0'), seq: 2 } });
+    expect(s.lost).toEqual({});
+    expect(statusOf(selectFacts(s), { seat: seat('working', ['r']) })!.word).toBe('idle');
   });
 
   it('keeps the facts as one object while they stay the same', () => {

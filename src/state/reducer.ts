@@ -25,6 +25,7 @@ import type {
 } from '../api/types';
 import type { StreamStatus } from '../api/stream';
 import type { Facts } from '../lib/status';
+import { lostRunOf } from '../lib/lines';
 
 /** The loaded part of the channel of one bridge. seqs is sorted. */
 export interface Channel {
@@ -59,6 +60,12 @@ export interface State {
    * that, so the page knows the runs that each worker holds.
    */
   openRuns: boolean;
+  /**
+   * The runs that the fleet lost, by id: a system line of the event lost
+   * named them, or a read of the run answered 404. A run object that the
+   * page still holds for such a run says nothing about its seat.
+   */
+  lost: Record<string, true>;
   /** The skills of the front, from GET /v1/bossmode/skills. */
   skills: SkillsList | null;
   /** The names of the skills that each agent can load, from GET /v1/agents/{name}/skills, for the agents that the page read. */
@@ -95,6 +102,7 @@ export const initialState: State = {
   agents: null,
   fleet: null,
   openRuns: false,
+  lost: {},
   skills: null,
   agentSkills: {},
   managerPick: null,
@@ -120,6 +128,7 @@ export type Action =
   | { type: 'agents'; agents: Agent[] }
   | { type: 'fleet'; fleet: Fleet }
   | { type: 'open-runs'; runs: Run[] }
+  | { type: 'run-lost'; id: string }
   | { type: 'skills'; skills: SkillsList | null }
   | { type: 'agent-skills'; agent: string; skills: string[] }
   | { type: 'agent-skills-forget' }
@@ -233,9 +242,19 @@ function putEntry(ch: Channel, e: Entry): Channel {
   return { ...ch, seqs: has ? ch.seqs : insertSeq(ch.seqs, e.seq), bySeq: { ...ch.bySeq, [e.seq]: e } };
 }
 
+/** markLost notes the runs that lines of the event lost name, so their run objects say nothing about a seat. */
+function markLost(state: State, entries: Entry[]): State {
+  let lost = state.lost;
+  for (const e of entries) {
+    const id = lostRunOf(e);
+    if (id && !lost[id]) lost = { ...lost, [id]: true };
+  }
+  return lost === state.lost ? state : { ...state, lost };
+}
+
 /** applyEntry puts an entry into the state: the channel, the counts, and the record. */
 function applyEntry(state: State, bridgeId: string, e: Entry): State {
-  let next = state;
+  let next = markLost(state, [e]);
   const ch = state.channels[bridgeId];
   const isNew = ch ? ch.bySeq[e.seq] === undefined : true;
   if (ch) {
@@ -429,7 +448,7 @@ export function reduce(state: State, a: Action): State {
           ch = putEntry(ch, e);
         }
       }
-      let next: State = { ...state, channels: { ...state.channels, [a.bridge]: ch } };
+      let next: State = markLost({ ...state, channels: { ...state.channels, [a.bridge]: ch } }, a.page.messages);
       const b = next.bridges.byId[a.bridge];
       const last = ch.seqs.length ? ch.seqs[ch.seqs.length - 1] : 0;
       if (b && last > b.lastSeq) next = { ...next, bridges: { ...next.bridges, byId: { ...next.bridges.byId, [a.bridge]: { ...b, lastSeq: last } } } };
@@ -450,7 +469,13 @@ export function reduce(state: State, a: Action): State {
       const old = state.runs[a.run.id];
       if (old && old.seq > a.run.seq) return state;
       if (old && JSON.stringify(old) === JSON.stringify(a.run)) return state;
-      return { ...state, runs: { ...state.runs, [a.run.id]: a.run } };
+      // A run that changes is a run that the fleet holds again.
+      let lost = state.lost;
+      if (lost[a.run.id]) {
+        lost = { ...lost };
+        delete lost[a.run.id];
+      }
+      return { ...state, runs: { ...state.runs, [a.run.id]: a.run }, lost };
     }
     case 'pages': {
       const byPath: Record<string, PageMeta> = {};
@@ -463,6 +488,8 @@ export function reduce(state: State, a: Action): State {
       return { ...state, agents: a.agents };
     case 'fleet':
       return { ...state, fleet: a.fleet };
+    case 'run-lost':
+      return !a.id || state.lost[a.id] ? state : { ...state, lost: { ...state.lost, [a.id]: true } };
     case 'open-runs': {
       let next: State = state.openRuns ? state : { ...state, openRuns: true };
       for (const r of a.runs) if (r && typeof r.id === 'string') next = reduce(next, { type: 'run', run: r });
@@ -510,9 +537,9 @@ let lastFacts: Facts | null = null;
  * the open runs. It keeps its identity while these stay the same, so the
  * statuses derive once per change.
  */
-export function selectFacts(s: Pick<State, 'fleet' | 'runs' | 'openRuns'>): Facts {
-  if (lastFacts && lastFacts.fleet === s.fleet && lastFacts.runs === s.runs && lastFacts.openRuns === s.openRuns) return lastFacts;
-  lastFacts = { fleet: s.fleet, runs: s.runs, openRuns: s.openRuns };
+export function selectFacts(s: Pick<State, 'fleet' | 'runs' | 'openRuns' | 'lost'>): Facts {
+  if (lastFacts && lastFacts.fleet === s.fleet && lastFacts.runs === s.runs && lastFacts.openRuns === s.openRuns && lastFacts.lost === s.lost) return lastFacts;
+  lastFacts = { fleet: s.fleet, runs: s.runs, openRuns: s.openRuns, lost: s.lost };
   return lastFacts;
 }
 

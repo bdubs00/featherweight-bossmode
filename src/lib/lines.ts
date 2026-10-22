@@ -236,6 +236,14 @@ export function napWords(handle: string, pairs: number): string {
   return pairs > 1 ? `${handle} slept and woke up ${pairs} times` : `${handle} slept and woke up`;
 }
 
+/** lostRunOf names the run of a line of the event lost, whose run the fleet lost, or "" for any other line. */
+export function lostRunOf(e: Pick<Entry, 'from' | 'event' | 'text' | 'mirrors'>): string {
+  if (e.from.kind !== 'system' || e.event !== 'lost') return '';
+  const m = /\blost its run (\S+?):/.exec(String(e.text || ''));
+  if (m) return m[1];
+  return e.mirrors && e.mirrors.run ? e.mirrors.run : '';
+}
+
 /** decidedRuns names the runs whose decision a card of the entries shows: a card that waits for nothing now. */
 export function decidedRuns(entries: Iterable<Pick<Entry, 'decision'>>): Set<string> {
   const out = new Set<string>();
