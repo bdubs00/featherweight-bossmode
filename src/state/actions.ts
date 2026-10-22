@@ -120,7 +120,15 @@ export async function decide(run: string, approval: string, decision: 'allow' | 
 }
 
 export async function alwaysAllow(run: string, approval: string, note?: string): Promise<void> {
-  await api.alwaysAllow(run, approval, note);
+  try {
+    await api.alwaysAllow(run, approval, note);
+  } catch (e) {
+    // The rule lands on the profile of the agent, which only its owner or
+    // an admin changes. The backend says so with the subject of the caller
+    // in front, which the page words instead.
+    if (e instanceof ApiError && e.status === 403) throw new Error('Always allow needs an owner of the agent. Allow once instead.');
+    throw e;
+  }
 }
 
 export async function fire(id: string, handle: string): Promise<void> {

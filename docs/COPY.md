@@ -290,6 +290,7 @@ Capacity shows where seating happens:
 | `Details`, `Tool:`, `Reason:` | keep | | A |
 | `Note for <who>, if you want` | change | `Note` with the placeholder `Optional` | done |
 | `Deny`, `Always allow`, `<label>` or `Allow` | keep | | done |
+| `Always allow needs an owner of the agent. Allow once instead.` | new | the notice when the backend refuses the rule with 403, in place of its sentence with the subject of the caller | done |
 | `Allow this call, and let <who> use <tool> from now on without asking` | change | `Allow <tool> for <who> from now on` | A |
 | `No decision: <note>` | keep | | A |
 | `<who> answered: <answer>`, `<who> declined the question`, `<who> allowed this`, `<who> denied this` | keep | | A |

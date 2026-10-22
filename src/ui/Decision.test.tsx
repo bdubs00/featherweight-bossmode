@@ -1,8 +1,9 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'preact/test-utils';
 import type { Decision } from '../api/types';
 import { DecisionCard, canAlways } from './Decision';
 import { fakeFetch, mount, settle, unmountAll } from './testkit-a';
+import { clearNotice, currentNotice } from './notice';
 
 afterEach(unmountAll);
 
@@ -143,5 +144,30 @@ describe('the question', () => {
   it('says the answer once decided', () => {
     const el = mount(<DecisionCard d={{ ...q, state: 'allow', decidedBy: 'alice@example.com', answer: 'Operators' }} who="scribe" />);
     expect(el.querySelector('.decided p')!.textContent).toBe('alice answered: Operators');
+  });
+});
+
+describe('Always allow for a person who does not own the agent', () => {
+  it('words the refusal of the backend instead of showing its sentence with the subject', async () => {
+    clearNotice();
+    const real = globalThis.fetch;
+    globalThis.fetch = vi.fn(async () =>
+      new Response(JSON.stringify({ title: 'Forbidden', status: 403, detail: 'fd1e8a14-ac12: agent.edit needs an owner entry on the agent chat' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/problem+json' },
+      }),
+    ) as typeof fetch;
+    try {
+      const el = mount(<DecisionCard d={push} who="migrator-2" />);
+      const key = [...el.querySelectorAll('.card-actions button')].find((b) => b.textContent === 'Always allow') as HTMLButtonElement;
+      await act(async () => {
+        key.click();
+        await settle();
+      });
+      expect(currentNotice()).toBe('Always allow needs an owner of the agent. Allow once instead.');
+      expect(el.querySelector('.card-title h3')!.textContent).toBe('Needs your decision');
+    } finally {
+      globalThis.fetch = real;
+    }
   });
 });
