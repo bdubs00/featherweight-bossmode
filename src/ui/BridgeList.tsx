@@ -1,6 +1,7 @@
 // The list pane of the Bridges place: the open bridges, newest first, each
 // with its unread count and the light of what needs you, then the closed
-// bridges behind a toggle. The foot holds the state of the stream.
+// bridges behind a toggle. A filter field shows above the list once it
+// holds more than ten bridges. The foot holds the state of the stream.
 
 import { memo } from 'preact/compat';
 import { useState } from 'preact/hooks';
@@ -9,18 +10,38 @@ import { hrefOf } from '../lib/route';
 import { useRoving } from './keys';
 import { LiveStatus } from './Shell';
 import { Glyph } from './icons';
-import { Button, Chip, Led, PaneHeader, countText } from './primitives';
+import { unreadText, type BridgeA } from '../state/bridges-a';
+import { Button, Chip, Input, Led, PaneHeader } from './primitives';
+
+/** The number of bridges above which the list shows its filter field. */
+export const FILTER_FROM = 10;
+
+/** matches reports whether a bridge title holds every word of a filter. */
+export function matches(title: string, filter: string): boolean {
+  const t = title.toLowerCase();
+  return filter
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .every((w) => t.includes(w));
+}
 
 const BridgeRow = memo(function BridgeRow({ id, current }: { id: string; current: boolean }) {
-  const b = useSelect((s) => s.bridges.byId[id]);
+  const b = useSelect((s) => s.bridges.byId[id] as BridgeA | undefined);
+  // A roster that the page holds shows whether a member works. The list loads no roster for it.
+  const working = useSelect((s) => {
+    const r = s.rosters[id];
+    return !!r && r.order.some((h) => r.byHandle[h].presence === 'working');
+  });
   if (!b) return null;
   const closed = b.state === 'closed';
   const needs = b.needsYou || 0;
   const members = b.memberCount || 0;
-  const label = [b.title, closed ? 'closed' : '', b.unread ? b.unread + ' unread' : '', needs ? needs + (needs === 1 ? ' member needs' : ' members need') + ' you' : ''].filter(Boolean).join(', ');
+  const unread = b.unread > 0 || b.unreadMore;
+  const label = [b.title, closed ? 'closed' : '', unread ? unreadText(b) + ' unread' : '', needs ? needs + (needs === 1 ? ' member needs' : ' members need') + ' you' : ''].filter(Boolean).join(', ');
   return (
     <a
-      class={'brow' + (current ? ' sel' : '') + (closed ? ' closed' : '') + (b.unread || current ? ' strong' : '')}
+      class={'brow' + (current ? ' sel' : '') + (closed ? ' closed' : '') + (unread || current ? ' strong' : '')}
       href={hrefOf({ place: 'bridge', id, pane: 'none' })}
       data-item
       aria-current={current ? 'page' : undefined}
@@ -28,15 +49,15 @@ const BridgeRow = memo(function BridgeRow({ id, current }: { id: string; current
     >
       <span class="brow-top">
         <span class="brow-title clip">{b.title}</span>
-        {b.unread > 0 && (
+        {unread && (
           <Chip tone="ink" class="brow-unread">
-            {countText(b.unread)}
+            {unreadText(b)}
           </Chip>
         )}
       </span>
       <span class="brow-meta">
         <span>{members === 1 ? '1 member' : members + ' members'}</span>
-        {closed ? <Led tone="grey" word="closed" /> : needs > 0 ? <Led tone="amber" word={needs === 1 ? '1 needs you' : needs + ' need you'} /> : null}
+        {closed ? <Led tone="grey" word="closed" /> : needs > 0 ? <Led tone="amber" word={needs === 1 ? '1 needs you' : needs + ' need you'} /> : working ? <Led tone="green" word="working" /> : null}
       </span>
     </a>
   );
@@ -49,22 +70,33 @@ export function BridgeList({ current }: { current: string }) {
   const closedIds = useSelect((s) => s.bridges.order.filter((id) => s.bridges.byId[id].state === 'closed').join('\n'));
   const loaded = useSelect((s) => s.bridges.loaded);
   const [showClosed, setShowClosed] = useState(false);
+  const [filter, setFilter] = useState('');
   const list = useRoving<HTMLDivElement>();
-  const open = openIds ? openIds.split('\n') : [];
-  const closed = closedIds ? closedIds.split('\n') : [];
+  const allOpen = openIds ? openIds.split('\n') : [];
+  const allClosed = closedIds ? closedIds.split('\n') : [];
+  const many = allOpen.length + allClosed.length > FILTER_FROM;
+  const titles = useSelect((s) => (many && filter.trim() ? s.bridges.byId : null));
+  const keep = (id: string) => !titles || (!!titles[id] && matches(titles[id].title, filter));
+  const open = allOpen.filter(keep);
+  const closed = allClosed.filter(keep);
   return (
     <section class="screen bridge-list" aria-labelledby="bridges-title">
       <PaneHeader
         id="bridges-title"
         title="Bridges"
-        count={loaded ? open.length : undefined}
-        countLabel={open.length === 1 ? '1 open bridge' : open.length + ' open bridges'}
+        count={loaded ? allOpen.length : undefined}
+        countLabel={allOpen.length === 1 ? '1 open bridge' : allOpen.length + ' open bridges'}
         actions={
           <Button href="#new" size="s">
             New
           </Button>
         }
       />
+      {many && (
+        <div class="list-filter">
+          <Input type="search" aria-label="Find a bridge" placeholder="Find a bridge" value={filter} onInput={(e) => setFilter((e.target as HTMLInputElement).value)} />
+        </div>
+      )}
       <div class="scroll" ref={list}>
         <div role="list" aria-labelledby="bridges-title" class="rows">
           {open.map((id) => (
@@ -73,7 +105,7 @@ export function BridgeList({ current }: { current: string }) {
             </div>
           ))}
         </div>
-        {loaded && open.length === 0 && (
+        {loaded && allOpen.length === 0 && (
           <div class="empty">
             <p>No bridge is open.</p>
             <Button href="#new" kind="primary">
@@ -84,12 +116,12 @@ export function BridgeList({ current }: { current: string }) {
         {!loaded && <p class="empty">Loading the bridges.</p>}
         {closed.length > 0 && (
           <>
-            <button type="button" class="group-toggle" aria-expanded={showClosed} onClick={() => setShowClosed(!showClosed)}>
+            <button type="button" class="group-toggle" aria-expanded={showClosed || (many && !!filter.trim())} onClick={() => setShowClosed(!showClosed)}>
               <Glyph name="back" size={14} class={showClosed ? 'turn-down' : 'turn-right'} />
               <span>Closed</span>
               <Chip>{closed.length}</Chip>
             </button>
-            {showClosed && (
+            {(showClosed || (many && !!filter.trim())) && (
               <div role="list" class="rows">
                 {closed.map((id) => (
                   <div role="listitem">
