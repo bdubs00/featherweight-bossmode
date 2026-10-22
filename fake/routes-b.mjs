@@ -37,15 +37,29 @@ export function register({ on, refuse, readJson, publish, S, now, AGENTS, FLEET 
     if (r) r.member = member;
   }
 
-  // A recent step of migrator-1, so its thread holds a quiet step line between its messages.
+  // A direct exchange with migrator-1 at the end of the first channel: a
+  // question of alice to the seat, its answer, a quiet step of its run, its
+  // report with a heart, and the next task.
+  const ch = S.channels.get('br-puppet');
   const items = S.transcripts.get('run-migrator-1');
   const run = S.runs.get('run-migrator-1');
-  if (items && run) {
-    const at = new Date(Date.now() - 44 * 60_000).toISOString();
+  if (ch && items && run) {
+    const ago = (m) => new Date(Date.now() - m * 60_000).toISOString();
+    const alice = { kind: 'person', name: 'alice@example.com', display: 'Alice' };
+    const m1 = { kind: 'agent', handle: 'migrator-1', run: 'run-migrator-1' };
+    const add = (min, from, text, more = {}) => {
+      const e = { seq: ch[ch.length - 1].seq + 1, at: ago(min), from, to: [], replyTo: null, text, mirrors: null, reactions: { up: [], down: [], heart: [] }, decision: null, ...more };
+      ch.push(e);
+      return e;
+    };
+    const q = add(30, alice, 'How far is cron? The bridge wants it before nginx lands.', { to: ['migrator-1'] });
+    add(29, m1, 'The role is written and lints clean. Two things are left: the handler for the cron service, and the molecule scenario. About twenty minutes.', { replyTo: q.seq });
     const seq = items[items.length - 1].seq + 1;
-    items.push({ seq, time: at, kind: 'tool', tool: 'bash', callId: 'c9', input: { command: 'ansible-lint roles/cron' } });
-    items.push({ seq: seq + 1, time: at, kind: 'result', tool: 'bash', callId: 'c9', text: 'Passed.' });
+    items.push({ seq, time: ago(12), kind: 'tool', tool: 'bash', callId: 'c9', input: { command: 'ansible-lint roles/cron' } });
+    items.push({ seq: seq + 1, time: ago(12), kind: 'result', tool: 'bash', callId: 'c9', text: 'Passed.' });
     run.seq = seq + 1;
+    add(6, m1, 'Cron is done: handler added, molecule converges twice without a change. Notes are on the wiki at [modules/cron.md](modules/cron.md). I move to logrotate unless you want something else first.', { reactions: { up: [], down: [], heart: ['alice@example.com'] } });
+    add(4, alice, 'Go ahead with logrotate. Keep the template names as they are in the manifest.', { to: ['migrator-1'] });
   }
 
   const poolOf = (name) => FLEET.pools.find((p) => poolName(p.agent) === name);

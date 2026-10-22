@@ -73,7 +73,7 @@ function useSeat(bridge: string, handle: string) {
   return { m, loaded };
 }
 
-/** stoppedOf reports how the newest run of a seat stopped: failed, stopped, or "" when it takes messages. */
+/** useStopped reports how the newest run of a seat stopped: failed, stopped, or "" when it takes messages. */
 function useStopped(m: MemberT | undefined): '' | 'failed' | 'stopped' {
   const state = useSelect((s) => (m && s.runs[newestRun(m)] ? s.runs[newestRun(m)].state : ''));
   if (!m || m.fired) return '';

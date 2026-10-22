@@ -109,7 +109,7 @@ export function forgetLoads(): void {
 }
 
 /**
- * refreshAfterReset reads again what the stream could not resume: the
+ * refreshAfterReset reads again what the stream did not resume: the
  * record of each open bridge, and the newest run of each seat that works
  * or waits for you, whose state the people list and the inbox show.
  */
