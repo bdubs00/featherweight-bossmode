@@ -71,6 +71,13 @@ through the style object of the DOM, which the policy allows.
 }
 ```
 
+- `theme` is optional, and each of its fields is optional:
+  `{"accent": "#FF4D00", "name": "Example Org", "logo": "/v1/bossmode/logo"}`.
+  The page takes an accent of 3 or 6 hex digits and keeps signal orange for
+  any other value. The logo must be a path on this origin under `/v1/`. The
+  page reads it with the bearer token, as an image: SVG, PNG, WebP, JPEG, or
+  GIF. Without a theme, the page keeps its defaults. `src/lib/theme.ts`
+  holds the checks.
 - `manager` is null when `workbench.bossmode.manager` is empty.
 - `manager.member` is the fleet member that runs the manager Task, for
   `POST /v1/runs?member=`.
@@ -225,9 +232,13 @@ The plan gives the entry. The page reads four more fields:
     `<handle> woke up.`.
   - After a close, the link to the report of the manager comes with
     `event: changed`. The text can hold a Markdown link, such as
-    `[bridges/<id>/report.md](bridges/<id>/report.md)`. The page shows every
-    system line as one line of Markdown through the sanitizer, so the link
-    opens the page of the wiki.
+    `[bridges/<id>/report.md](bridges/<id>/report.md)` or
+    `[bridges/<id>/report.md](#page/bridges/<id>/report.md)`. The page shows
+    every system line as one line of Markdown through the sanitizer. A link
+    `#page/<path>` is the route of the page at `/ui`. The page maps it to its
+    own route of the wiki, and the link opens the page of the wiki here.
+  - The finished answer of a member can also come as a system line with
+    `event: finished`.
   - A delivery that fails for good posts `event: failed`.
 - **New.** `cut` is true when the channel holds only the first 4 KB of the
   text.
@@ -421,7 +432,7 @@ stream route takes the same `Authorization` header as every route.
 
 | Kind | Data |
 |---|---|
-| `bridge.message` | `{"bridge": "<id>", "message": <entry>}`. A new entry, or a changed one with the same seq. |
+| `bridge.message` | `{"bridge": "<id>", "message": <entry>}`. A new entry, or a changed one with the same seq. An entry with `"partial": true` lacks `decision.input` and `decision.schema`: the page reads it again with `?from=<seq>&limit=1` and never shows the cut card. |
 | `bridge.member` | `{"bridge": "<id>", "member": <member>}`. A new seat, or a change of a seat: its presence, its activity, its task, muted, or fired. |
 | `run` | The run object, with `member`, `activity`, and `reactions`. One event per change of a run that the caller can see. |
 | `page` | `{"path", "title", "hash", "by", "at", "size"}`, plus `"deleted": true` for a removed page |
@@ -429,7 +440,11 @@ stream route takes the same `Authorization` header as every route.
 | `member` | `{"kind": "member", "member": "default/crew-2", "state": "live", "time"}`, or `"gone": true` in place of `state` for a member that left the view |
 | `task` | `{"kind": "task", "member": "default/crew-2", "phase": "Running", "time"}`, or `"gone": true` |
 
-The `activity` of a `run` event carries `phrase`. The page uses `member` and
+The `activity` of a `run` event carries `phrase`. The `activity` of
+`GET /v1/runs/{id}` has no `phrase`, so a screen takes the phrase from the
+stream or from the member of a bridge. `run` events come only for the runs
+of other fleet members: a run of the front itself, such as a manager that
+runs on the front, needs a poll of `GET /v1/runs/{id}`. The page uses `member` and
 `task` on the Fleet screen: a `member` event changes the state of a fleet
 member, and a `task` event changes the phase of the Task of a pool whose
 `atespace/name` is `member`. A Task that is gone leaves its pool on the
@@ -440,7 +455,64 @@ A `bridge.message` or `bridge.member` event for a bridge that the page does
 not know makes the page read that bridge with `GET /v1/bridges/{id}`. A
 bridge that the manager opens therefore shows in the rail.
 
-## 11. What the page does not call yet
+## 11. Rules of the backend that the page follows
+
+- The sign-in takes a `next` that starts with `/bossmode/`. The page writes
+  its own address with the slash, so `/bossmode` becomes `/bossmode/`.
+- The handles `operator` and `manager` are reserved, and a handle starts
+  with a letter or a digit. `src/lib/handles.ts` checks both before a seat
+  goes out.
+- An entry can come from the handle `manager`, which is not on the roster.
+  The page draws the mark of the manager for it.
+- An unknown field in a JSON body answers 400, so the page sends only the
+  fields of this contract.
+
+## 12. Skills and tools
+
+**New.** The backend serves these routes from its own branch. The page and
+the fake server use the shapes below, and they follow the backend where it
+differs.
+
+| Route | Answer |
+|---|---|
+| `GET /v1/bossmode/skills` | `{"skills": [<skill>], "tools": [<tool>]}` |
+| `GET /v1/bossmode/skills/{name}` | `<skill>` plus `"text"`, the SKILL.md, and `"files"`, each with `path` and `size` |
+| `DELETE /v1/bossmode/skills/{name}` | 204. Only an imported skill can go. Another skill answers 409. |
+| `GET /v1/bossmode/marketplaces` | `{"marketplaces": [{"name", "url", "skills": [{"name", "description"}]}]}` |
+| `POST /v1/bossmode/skills/preview` | Takes `{"source": <source>}` and answers `{"token", "skill", "text", "files"}`. Nothing is installed yet. |
+| `POST /v1/bossmode/skills/install` | Takes `{"token"}` of a preview and answers 201 with the skill |
+
+A skill carries the keys of the front matter of its SKILL.md and where it
+comes from:
+
+```json
+{
+  "name": "ansible-style", "description": "Write Ansible roles the way this team writes them.",
+  "origin": "imported", "source": "team-skills", "license": "MIT", "allowed-tools": ["bash", "files"],
+  "agents": ["migrator", "reviewer"], "slash": "/ansible-style"
+}
+```
+
+`origin` is `imported`, `local`, or `server`, and a skill of a server names
+it in `server`. A tool has `id`, unique over the fleet, `name`,
+`description`, `origin` (`builtin` or `server`), `server`, and `agents`.
+
+A source is one of the four avenues of Add skill:
+
+```json
+{"kind": "marketplace", "marketplace": "team-skills", "skill": "molecule-ci"}
+{"kind": "url", "url": "https://skills.example.com/release-notes/SKILL.md"}
+{"kind": "text", "text": "---\nname: ...\ndescription: ...\n---\n..."}
+{"kind": "files", "files": [{"path": "SKILL.md", "text": "..."}]}
+```
+
+A preview of a SKILL.md without front matter, a name, or a description
+answers 422 with the reason in `detail`. A name that exists answers 409.
+
+Open: the picker of skills on the new-agent screen and on the profile needs
+a route that sets the skills of an agent. The backend names it.
+
+## 13. What the page does not call yet
 
 - `files` on a message of the channel.
 - The budget of a run. The plan offers a button to raise the budget of a
