@@ -3,18 +3,22 @@
 // and one group per server). The main pane shows the skill or the tool that
 // the person picked, and the agents that can load it. The details pane
 // holds Add skill and the actions on the item. Screen C builds the place
-// out (docs/DESIGN.md, section 11): the text of a skill, the chooser of Add
-// skill with its four avenues and the preview before Install, Remove, and
-// Copy of the slash command. This first cut lists and shows.
+// out (docs/DESIGN.md, section 11): the text of a skill, and the chooser of
+// Add skill with its four avenues and the preview before Install. This
+// first cut lists, shows, copies the slash command, and removes an
+// imported skill.
 
-import { useEffect } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
+import { api } from '../api/routes';
 import type { Skill, Tool } from '../api/types';
 import { useSelect } from '../state/store';
 import { loadSkills } from '../state/actions';
-import { hrefOf, type SkillItem } from '../lib/route';
+import { go, hrefOf, type SkillItem } from '../lib/route';
 import { useRoving } from './keys';
 import { attempt } from './notice';
+import { Confirm } from './common';
 import { Button, Chip, Mark, PaneHeader } from './primitives';
+import { EmptyPane } from './Shell';
 
 interface Group<T> {
   key: string;
@@ -117,11 +121,9 @@ export function SkillMain({ item }: { item?: SkillItem }) {
   const it = itemOf(all, item);
   if (!item || !it) {
     return (
-      <section class="screen">
-        <div class="empty center">
-          <p>{item && all ? 'This skill is not here.' : 'Pick a skill or a tool in the list.'}</p>
-        </div>
-      </section>
+      <EmptyPane back={{ href: '#skills', label: 'Skills' }}>
+        <p>{item && all ? 'This skill is not here. It can be removed, or it was renamed.' : 'Pick a skill or a tool in the list.'}</p>
+      </EmptyPane>
     );
   }
   return (
@@ -148,14 +150,59 @@ export function SkillMain({ item }: { item?: SkillItem }) {
 }
 
 export function SkillActions({ item }: { item?: SkillItem }) {
+  const all = useSkills();
+  const it = itemOf(all, item);
+  const skill = it && item && item.kind === 'skill' ? (it as Skill) : undefined;
+  const [ask, setAsk] = useState(false);
+  const [copied, setCopied] = useState('');
+  const copy = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied('Copied ' + text);
+    } catch {
+      setCopied('');
+    }
+  };
   return (
     <section class="screen skill-actions" aria-labelledby="skill-actions-title">
-      <PaneHeader id="skill-actions-title" title={item ? (item.kind === 'skill' ? 'Skill' : 'Tool') : 'Add'} back={item ? { href: hrefOf({ place: 'skills', item }), label: item.id, to: 'main' } : undefined} />
-      <div class="pad">
-        <Button kind="primary" disabled>
-          Add skill
-        </Button>
+      <PaneHeader id="skill-actions-title" title={item ? (item.kind === 'skill' ? 'Skill' : 'Tool') : 'Skills'} back={item ? { href: hrefOf({ place: 'skills', item }), label: item.id, to: 'main' } : undefined} />
+      <div class="pad actions-col">
+        {skill && skill.slash && (
+          <Button onClick={() => copy(skill.slash!)} title={'Copy ' + skill.slash}>
+            Copy {skill.slash}
+          </Button>
+        )}
+        {skill && skill.origin === 'imported' && (
+          <Button kind="danger" onClick={() => setAsk(true)}>
+            Remove
+          </Button>
+        )}
+        {copied && (
+          <p class="t-meta" role="status">
+            {copied}
+          </p>
+        )}
       </div>
+      {ask && skill && (
+        <Confirm
+          title={'Remove ' + skill.name + '?'}
+          confirm={'Remove ' + skill.name}
+          danger
+          onCancel={() => setAsk(false)}
+          onConfirm={async () => {
+            const ok = await attempt(async () => {
+              await api.removeSkill(skill.name);
+              await loadSkills();
+            });
+            if (ok) {
+              setAsk(false);
+              go({ place: 'skills' });
+            }
+          }}
+        >
+          <p>No agent can load it after this.</p>
+        </Confirm>
+      )}
     </section>
   );
 }

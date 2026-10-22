@@ -243,6 +243,9 @@
   .collapsed-only {
     display: inline-flex !important;
   }
+  .shell[data-show='details'] .collapsed-only {
+    display: none !important;
+  }
 }
 
 /* ---------- narrow: one pane, the places at the bottom ---------- */

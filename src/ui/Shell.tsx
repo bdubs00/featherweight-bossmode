@@ -219,6 +219,29 @@ export function LiveStatus() {
   );
 }
 
+/* ---------- an empty pane ---------- */
+
+/**
+ * EmptyPane is a pane with nothing picked: the header row and its groove
+ * band, so the bands of the panes stay in one line, and the invitation to
+ * act in the middle.
+ */
+export function EmptyPane({ children, back }: { children: ComponentChildren; back?: { href: string; label: string } }) {
+  return (
+    <section class="screen empty-pane">
+      <header class="pane-head" aria-hidden={back ? undefined : 'true'}>
+        {back && (
+          <a class="back to-list" href={back.href} aria-label={'Back to ' + back.label} title={'Back to ' + back.label}>
+            <Glyph name="back" size={20} />
+          </a>
+        )}
+      </header>
+      <div class="groove groove-paper" aria-hidden="true" />
+      <div class="empty center">{children}</div>
+    </section>
+  );
+}
+
 /* ---------- the shell ---------- */
 
 export interface ShellProps {

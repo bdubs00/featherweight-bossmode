@@ -297,3 +297,9 @@
     min-height: var(--h-row);
   }
 }
+.actions-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-2);
+}

@@ -97,8 +97,7 @@ export function Fleet() {
         }
       />
       <div class="scroll pad">
-        <h2 class="sec">Pools</h2>
-        {fleet && (fleet.pools || []).length === 0 && <Empty>The fleet has no pool that you can see.</Empty>}
+        {fleet && (fleet.pools || []).length === 0 && <Empty>No agent has a worker that you can see.</Empty>}
         <div class="pools">
           {fleet &&
             (fleet.pools || []).map((p) => (
@@ -106,14 +105,10 @@ export function Fleet() {
                 <header>
                   <Face agent={p.agent} size={40} />
                   <div>
-                    <h3 id={'pool-' + p.name}>{p.name}</h3>
-                    <p class="s">
-                      Runs <b>{p.agent}</b> from the queue <code>{p.intake}</code>
-                    </p>
+                    <h3 id={'pool-' + p.name}>{(faces[p.agent] && faces[p.agent].displayName) || p.agent}</h3>
+                    <p class="s">Keep {p.wanted}</p>
                   </div>
-                  <span class={'ready ' + (p.ready >= p.wanted ? 'ok' : 'need')}>
-                    {p.ready} of {p.wanted} ready
-                  </span>
+                  <span class={'ready ' + (p.ready >= p.wanted ? 'ok' : 'need')}>{p.ready} ready</span>
                 </header>
                 <ul class="tasks">
                   {p.tasks.map((t) => (

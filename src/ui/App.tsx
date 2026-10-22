@@ -19,7 +19,7 @@ import { applyTheme, themeOf } from '../lib/theme';
 import { canonicalPath, columnOf, go, parentOf, parseRoute, type Route } from '../lib/route';
 import { isTyping } from './keys';
 import { clearNotice, showError, useNotice } from './notice';
-import { Shell, shownOf } from './Shell';
+import { EmptyPane, Shell, shownOf } from './Shell';
 import { BridgeList } from './BridgeList';
 import { Channel } from './Channel';
 import { Roster } from './Roster';
@@ -71,31 +71,27 @@ function Home() {
     if (first && window.matchMedia(TWO_PANES).matches) go({ place: 'bridge', id: first, pane: 'none' }, true);
   }, [first]);
   return (
-    <section class="screen home">
+    <EmptyPane back={{ href: '#', label: 'Bridges' }}>
       {loaded && !first ? (
-        <div class="empty center">
+        <>
           <p>No bridge is open. Open one, or ask the manager to open one.</p>
           <Button href="#new" kind="primary">
             Open a bridge
           </Button>
-        </div>
+        </>
       ) : (
-        <div class="empty center">
-          <p>Loading the bridges.</p>
-        </div>
+        <p>Loading the bridges.</p>
       )}
-    </section>
+    </EmptyPane>
   );
 }
 
 function PageHint() {
   return (
-    <section class="screen">
-      <div class="empty center">
-        <p>Pick a page in the list, or search the wiki.</p>
-        <Button href="#create">New page</Button>
-      </div>
-    </section>
+    <EmptyPane back={{ href: '#pages', label: 'Wiki' }}>
+      <p>Pick a page in the list, or search the wiki.</p>
+      <Button href="#create">New page</Button>
+    </EmptyPane>
   );
 }
 

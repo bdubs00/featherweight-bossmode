@@ -8,6 +8,7 @@ import { useSelect } from '../state/store';
 import { hrefOf } from '../lib/route';
 import { useRoving } from './keys';
 import { Chip, Led, PaneHeader, countText } from './primitives';
+import { EmptyPane } from './Shell';
 
 export function ActivityList() {
   const ids = useSelect((s) =>
@@ -54,10 +55,8 @@ export function ActivityList() {
 
 export function ActivityMain() {
   return (
-    <section class="screen">
-      <div class="empty center">
-        <p>Pick an item in the list to decide or to read it.</p>
-      </div>
-    </section>
+    <EmptyPane back={{ href: '#activity', label: 'Activity' }}>
+      <p>Pick an item in the list to decide or to read it.</p>
+    </EmptyPane>
   );
 }
