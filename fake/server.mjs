@@ -10,6 +10,11 @@
 //   FAKE_QUIET=1       no timers
 //   FAKE_TICK=5000     the time between two timer steps, in milliseconds
 //   FAKE_STREAM_MS     the life of one stream before the server closes it, 15 minutes by default
+//   FAKE_THEME=0       GET /v1/bossmode carries no theme
+//   FAKE_ACCENT        the accent of the theme, #FF4D00 by default
+//   FAKE_ORG           the name of the organization of the theme, Example Org by default
+//   FAKE_LOGO=1        the theme names a logo, served at /v1/bossmode/logo
+//   FAKE_PARTIAL=1     a stream event of a card carries a partial entry, so the page reads it again
 
 import http from 'node:http';
 import fs from 'node:fs';
@@ -25,8 +30,13 @@ const SIGNIN = process.env.FAKE_SIGNIN !== '0';
 const QUIET = process.env.FAKE_QUIET === '1';
 const TICK = Number(process.env.FAKE_TICK || 5000);
 const STREAM_MS = Number(process.env.FAKE_STREAM_MS || 15 * 60_000);
+const THEME = process.env.FAKE_THEME !== '0';
+const PARTIAL = process.env.FAKE_PARTIAL === '1';
 
 const S = seed();
+
+/** The logo of the organization of the theme, with FAKE_LOGO=1. */
+const LOGO = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 44 44" width="44" height="44"><title>Example Org</title><rect width="44" height="44" fill="#111"/><path d="M10 12h24v5H16v3h14v5H16v3h18v5H10z" fill="#f3f3ef"/></svg>`;
 const now = () => new Date().toISOString();
 const MANAGER_MEMBER = 'default/manager-0';
 
@@ -112,7 +122,19 @@ function publish(kind, data) {
 }
 
 function write(res, ev) {
-  res.write(`id: ${ev.id}\nevent: ${ev.kind}\ndata: ${JSON.stringify(ev.data)}\n\n`);
+  res.write(`id: ${ev.id}\nevent: ${ev.kind}\ndata: ${JSON.stringify(wire(ev))}\n\n`);
+}
+
+/**
+ * wire is the data of an event as the stream sends it. With FAKE_PARTIAL=1,
+ * an entry with a decision goes out cut, as the backend can send it: with
+ * partial set and without the input and the schema of the decision. The
+ * page reads the entry again with ?from=<seq>&limit=1.
+ */
+function wire(ev) {
+  if (!PARTIAL || ev.kind !== 'bridge.message' || !ev.data || !ev.data.message || !ev.data.message.decision) return ev.data;
+  const { input: _i, schema: _s, ...decision } = ev.data.message.decision;
+  return { bridge: ev.data.bridge, message: { ...ev.data.message, partial: true, decision } };
 }
 
 function stream(req, res) {
@@ -533,7 +555,17 @@ const on = (method, pattern, h, open = false) => routes.push({ method, re: new R
 on('GET', '/v1/whoami', (c) => ({ principal: c.person, roles: Object.fromEntries(AGENTS.map((a) => [a.name, a.role])), admin: false, canCreate: true, teams: ['team-platform'], fleet: 'front-0' }));
 on('GET', '/v1/bossmode', (c) => {
   const latest = [...S.runs.values()].filter((r) => r.agent === 'manager' && r.principal === c.person.subject).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))[0];
-  return { manager: { agent: 'manager', member: MANAGER_MEMBER, run: latest ? latest.id : '' }, placement: 'queue', maxMembers: 16 };
+  const out = { manager: { agent: 'manager', member: MANAGER_MEMBER, run: latest ? latest.id : '' }, placement: 'queue', maxMembers: 16 };
+  if (THEME) {
+    out.theme = { accent: process.env.FAKE_ACCENT || '#FF4D00', name: process.env.FAKE_ORG || 'Example Org' };
+    if (process.env.FAKE_LOGO === '1') out.theme.logo = '/v1/bossmode/logo';
+  }
+  return out;
+});
+on('GET', '/v1/bossmode/logo', (c) => {
+  c.headers['Content-Type'] = 'image/svg+xml';
+  c.headers['Content-Security-Policy'] = "default-src 'none'; style-src 'unsafe-inline'; sandbox";
+  return LOGO;
 });
 on('GET', '/v1/bossmode/stream', (c) => {
   stream(c.req, c.res);
@@ -1108,6 +1140,14 @@ function tick() {
   const [handle, text] = CHATTER[chatN++ % CHATTER.length];
   const m = b.members.find((x) => x.handle === handle);
   if (m && !m.fired) post(b.id, { kind: 'agent', handle, run: m.runs[m.runs.length - 1] }, text, { to: (text.match(/@([a-z0-9-]+)/g) || []).map((x) => x.slice(1)) });
+}
+
+// The routes of the next stage. Each screen of docs/DESIGN.md, section 11,
+// adds its routes in its own file, so two screens never edit one file.
+// skills.mjs serves the Skills place.
+for (const name of ['skills.mjs', 'routes-a.mjs', 'routes-b.mjs', 'routes-c.mjs']) {
+  const mod = await import('./' + name);
+  mod.register({ on, refuse, readJson, readBody, publish, S, now, AGENTS, FLEET });
 }
 
 server.listen(PORT, '127.0.0.1', () => {

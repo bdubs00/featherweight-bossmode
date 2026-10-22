@@ -1,6 +1,7 @@
 // The sample data of the fake server: two bridges, one with five members in
 // five presences and a channel of forty entries, a manager conversation, a
-// fleet with two pools, a wiki of eight pages, and a face for every agent.
+// fleet with workers for five agents, a wiki of eight pages, and a face for
+// every agent.
 
 import crypto from 'node:crypto';
 import { identicon, FOX, MANAGER } from './faces.mjs';
@@ -403,9 +404,18 @@ export const FLEET = {
     { name: 'default/crew-1', self: false, state: 'live', lastSeen: minutesAgo(0), canForward: true, accessMode: 'static', agents: [{ name: 'writer', role: 'operator' }, { name: 'scribe', role: 'operator' }], active: 1, inputRequired: 1 },
     { name: 'default/crew-2', self: false, state: 'suspended', lastSeen: minutesAgo(14), canForward: true, accessMode: 'static', agents: [{ name: 'tester', role: 'operator' }], active: 0, inputRequired: 0 },
     { name: 'default/manager-0', self: false, state: 'live', lastSeen: minutesAgo(1), canForward: true, accessMode: 'static', agents: [{ name: 'manager', role: 'operator' }], active: 0, inputRequired: 0 },
+    { name: 'default/review-0', self: false, state: 'live', lastSeen: minutesAgo(0), canForward: true, accessMode: 'static', agents: [{ name: 'reviewer', role: 'owner' }], active: 1, inputRequired: 0 },
+    { name: 'default/test-0', self: false, state: 'suspended', lastSeen: minutesAgo(30), canForward: true, accessMode: 'static', agents: [{ name: 'tester', role: 'operator' }], active: 0, inputRequired: 0 },
+    { name: 'default/test-1', self: false, state: 'suspended', lastSeen: minutesAgo(30), canForward: true, accessMode: 'static', agents: [{ name: 'tester', role: 'operator' }], active: 0, inputRequired: 0 },
+    { name: 'default/notes-0', self: false, state: 'live', lastSeen: minutesAgo(0), canForward: true, accessMode: 'static', agents: [{ name: 'writer', role: 'operator' }], active: 0, inputRequired: 0 },
   ],
   pools: [
-    { name: 'crew', atespace: 'default', agent: 'migrator', intake: 'fw.jobs.migrator', wanted: 3, actual: 3, ready: 2, hash: 'a1b2c3', generation: 4, tasks: [{ name: 'crew-0', phase: 'Running', current: true }, { name: 'crew-1', phase: 'Running', current: true }, { name: 'crew-2', phase: 'Suspended', current: true, note: 'Asleep since 14 minutes. A request wakes it.' }], gaps: [], checkedAt: minutesAgo(0) },
+    { name: 'crew', atespace: 'default', agent: 'migrator', intake: 'fw.jobs.migrator', wanted: 3, actual: 3, ready: 2, hash: 'a1b2c3', generation: 4, tasks: [{ name: 'crew-0', phase: 'Running', current: true }, { name: 'crew-1', phase: 'Running', current: true }, { name: 'crew-2', phase: 'Suspended', current: true, note: '' }], gaps: [], checkedAt: minutesAgo(0) },
     { name: 'manager', atespace: 'default', agent: 'manager', intake: 'fw.jobs.manager', wanted: 1, actual: 1, ready: 1, hash: 'd4e5f6', generation: 1, tasks: [{ name: 'manager-0', phase: 'Running', current: true }], gaps: [], checkedAt: minutesAgo(0) },
+    // One worker for the reviewer, busy. The picker shows it as waiting for a worker.
+    { name: 'review', atespace: 'default', agent: 'reviewer', intake: 'fw.jobs.reviewer', wanted: 1, actual: 1, ready: 1, hash: 'r1', generation: 1, tasks: [{ name: 'review-0', phase: 'Running', current: true }], gaps: [], checkedAt: minutesAgo(0) },
+    // Two workers for the tester and the writer, asleep and free.
+    { name: 'test', atespace: 'default', agent: 'tester', intake: 'fw.jobs.tester', wanted: 2, actual: 2, ready: 2, hash: 't1', generation: 1, tasks: [{ name: 'test-0', phase: 'Suspended', current: true }, { name: 'test-1', phase: 'Suspended', current: true }], gaps: [], checkedAt: minutesAgo(0) },
+    { name: 'notes', atespace: 'default', agent: 'writer', intake: 'fw.jobs.writer', wanted: 1, actual: 1, ready: 1, hash: 'w1', generation: 1, tasks: [{ name: 'notes-0', phase: 'Running', current: true }], gaps: [], checkedAt: minutesAgo(0) },
   ],
 };
