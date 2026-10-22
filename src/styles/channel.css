@@ -82,10 +82,13 @@
 .channel .pane-head {
   gap: var(--s-5);
 }
+/* The title takes the width that the tabs and the keys leave, and the tabs never shrink. */
 .channel .pane-head > h1 {
   flex: 0 1 auto;
+  min-width: 0;
 }
 .channel .pane-head .tabs {
+  flex: none;
   margin-left: auto;
 }
 .channel .pane-head .pane-actions {

@@ -111,6 +111,9 @@ function channelShape(ch: ChannelState | undefined): string | undefined {
   return shapeKey(out);
 }
 
+/** The width of the window from which Close bridge sits on the header, beside the title and the tabs. */
+const ROOMY = '(min-width: 1500px)';
+
 /** The width of the channel under which its tabs leave the header for a strip. */
 const CRAMPED = 560;
 
@@ -426,10 +429,11 @@ export function Channel({ id, tab: tabProp }: { id: string; tab?: BridgeTab }) {
   const firstLoaded = useSelect((s) => (s.channels[id] ? s.channels[id].prev === 0 : false));
   const tab: BridgeTab = tabProp || 'posts';
   const [confirm, setConfirm] = useState<'close' | 'delegation' | null>(null);
-  // Where the window is not wide, Close bridge moves into More. In a
-  // narrow window, or where the members pane leaves the channel cramped,
-  // the tabs take a strip of their own, so the title stays in sight.
-  const wide = useMedia('(min-width: 1200px)');
+  // Below 1500 pixels, Close bridge moves into More, so the title keeps
+  // the room beside the tabs. In a narrow window, or where the members
+  // pane leaves the channel cramped, the tabs take a strip of their own,
+  // so the title stays in sight.
+  const wide = useMedia(ROOMY);
   const narrow = useMedia('(max-width: 799px)');
   // The channel can first draw its loading state, so a callback ref finds the section once it is there.
   const [box, setBox] = useState<HTMLElement | null>(null);

@@ -506,7 +506,10 @@ The work:
   above the list once it holds more than ten bridges.
 - The header of the channel. The title, the tabs Posts, Wiki, and Decisions
   with the amber count of the decisions that wait, the key Close bridge, and
-  the More menu with What the manager can do and Reopen. The tab Wiki lists
+  the More menu with What the manager can do and Reopen. The title takes
+  the width that the tabs and the keys leave, and the tabs never shrink.
+  Below 1500 pixels, Close bridge moves into More, so the title keeps its
+  room. The tab Wiki lists
   the pages under `bridges/<id>/`. The tab Decisions lists the cards of the
   bridge, waiting first. The routes are `#bridge/<id>/wiki` and
   `#bridge/<id>/decisions`.

@@ -30,7 +30,7 @@ const fleet: Fleet = {
 
 let f: ReturnType<typeof fakeFetch>;
 /** The width of the window that the stub of matchMedia reports. */
-let width = 1440;
+let width = 1600;
 
 beforeAll(() => {
   window.matchMedia = ((q: string) => {
@@ -54,7 +54,7 @@ beforeAll(() => {
 });
 afterEach(() => {
   unmountAll();
-  width = 1440;
+  width = 1600;
 });
 afterAll(() => f.restore());
 
@@ -155,8 +155,8 @@ describe('the channel', () => {
     expect([...dialog.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Cancel', 'Close bridge']);
   });
 
-  it('moves Close bridge into More where the window is not wide, and the tabs to a strip where it is narrow', async () => {
-    width = 1024;
+  it('moves Close bridge into More below 1500 pixels, so the title keeps its room, and the tabs to a strip where the window is narrow', async () => {
+    width = 1440;
     let el = mount(<Channel id={B} />);
     await settle();
     expect([...el.querySelectorAll('.pane-actions button')].map((b) => b.textContent || b.getAttribute('aria-label'))).toEqual(['More']);

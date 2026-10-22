@@ -233,7 +233,7 @@ Capacity shows where seating happens:
 | `Bridge` (the name of the screen for a screen reader, and the title of a bridge that is not here) | add | | done |
 | `N updates`, `N failed` (a fold of system lines, with a red light for the failures) | add | | done |
 | `<a> and <b>: N messages` (a fold of the chatter of agents) | add | | done |
-| `More` (the menu of the header) | add | it holds `What the manager can do`, `Reopen`, and, below 1200 pixels, `Close bridge` | done |
+| `More` (the menu of the header) | add | it holds `What the manager can do`, `Reopen`, and, below 1500 pixels, `Close bridge`, so the title keeps its room | done |
 | the empty tab Decisions | add | `Nothing needs you.`, the words of Activity | done |
 | the tab Wiki | add | `Loading the pages.` and `New page`, the words of the wiki | done |
 

@@ -96,13 +96,19 @@ a.people-title:hover {
 .member-main .pane-actions {
   gap: var(--s-3);
 }
-/* The handle keeps its place, and the bridge clips first. */
+/* The handle and the bridge link take the width that the tabs and the
+   menu leave, and the tabs never shrink. The bridge link gives up its
+   width first, and the handle cuts only when the link has none left. */
 .member-main .pane-head > h1 {
-  flex: 0 0 auto;
-  max-width: 50%;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 .member-where {
-  flex: 0 1 auto;
+  flex: 0 1000 auto;
+  min-width: 0;
+}
+.member-main .pane-actions .tabs {
+  flex: none;
 }
 .member-where a {
   font-weight: 600;
