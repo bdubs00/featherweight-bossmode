@@ -1,129 +1,30 @@
-// The run of a member in the pane, as /ui shows a run: the result first
-// (the title, the status, the decision that waits, the answer, the files,
-// what it did, and the limits), then the conversation.
+// The run of a seat: the result first (the title, the status, the answer,
+// what it did, the limits, and the reactions), and the files that it
+// changed with a viewer. The member conversation shows these on its tabs
+// Run and Files. The run pane of a bridge shows the result and the
+// conversation of the run in the details pane.
 
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import { api } from '../api/routes';
-import type { FileView, ReactionKind, Result } from '../api/types';
+import type { FileView, Member, ReactionKind, Result } from '../api/types';
 import { store, useSelect } from '../state/store';
-import { runStatus, presenceOf } from '../lib/presence';
+import { presenceOf, runStatus } from '../lib/presence';
 import { hrefOf } from '../lib/route';
 import { attempt, showError } from './notice';
 import { Confirm, Light, Markdown, When } from './common';
-import { Button, Mark, PaneHeader } from './primitives';
+import { Button, Chip, IconButton, Mark, PaneHeader, ReactionChip } from './primitives';
 import { Conversation, useTranscript } from './Conversation';
+import { HeartNote } from './Thread';
 import { Icon } from './icons';
 
-function FileBox({ run, path, onClose }: { run: string; path: string; onClose: () => void }) {
-  const [f, setF] = useState<FileView | null>(null);
-  useEffect(() => {
-    api.file(run, path).then(setF).catch(showError);
-  }, [run, path]);
-  return (
-    <div class="filebox">
-      <header>
-        <b>{path}</b>
-        <button type="button" class="icon-btn" aria-label="Close the file" onClick={onClose}>
-          <Icon name="close" />
-        </button>
-      </header>
-      {!f ? (
-        <p class="empty">Loading the file.</p>
-      ) : f.gone ? (
-        <p class="empty">The file does not exist now.</p>
-      ) : f.binary || f.large || f.text === undefined ? (
-        <p class="empty">This file is not text, or it is too large to show here.</p>
-      ) : (
-        <pre class="lines">
-          {f.text.split('\n').map((l) => (
-            <span>{l + '\n'}</span>
-          ))}
-        </pre>
-      )}
-      {f && f.cut && <p class="why">The view shows the first part of the file.</p>}
-    </div>
-  );
-}
-
-/** ResultThumbs records a reaction on the result of the run (K2), with the seq of its fw.run.finished. */
-function ResultThumbs({ run, seq }: { run: string; seq: number }) {
-  const counts = useSelect((s) => (s.runs[run] && s.runs[run].reactions) || {});
-  const [done, setDone] = useState<string>('');
-  const [heart, setHeart] = useState(false);
-  const [note, setNote] = useState('');
-  // The route answers the run with its counts, which replace the counts here.
-  const send = async (k: ReactionKind, n?: string) => {
-    const ok = await attempt(async () => {
-      const r = await api.reactRun(run, seq, k, n);
-      if (r && typeof r.id === 'string') store.dispatch({ type: 'run', run: r });
-    });
-    if (ok) setDone(k === 'heart' ? 'Your heart is recorded.' : 'Your thumb is recorded.');
-  };
-  return (
-    <div class="result-thumbs">
-      <span class="lbl">Was this useful?</span>
-      <div class="reacts open inline" role="group" aria-label="Reactions on the result">
-        {(['up', 'down'] as ReactionKind[]).map((k) => (
-          <button type="button" class="icon-btn" aria-label={k === 'up' ? 'Thumb up: accept the result' : 'Thumb down: reject the result'} onClick={() => send(k)}>
-            <Icon name={k} />
-            {counts[k] ? <span class="n">{counts[k]}</span> : null}
-          </button>
-        ))}
-        <button type="button" class="icon-btn" aria-label="Heart" aria-expanded={heart} onClick={() => setHeart(!heart)}>
-          <Icon name="heart" />
-          {counts.heart ? <span class="n">{counts.heart}</span> : null}
-        </button>
-      </div>
-      {heart && (
-        <form
-          class="heart-note"
-          onSubmit={(e) => {
-            e.preventDefault();
-            setHeart(false);
-            send('heart', note.trim() || undefined);
-            setNote('');
-          }}
-        >
-          <label>
-            <span>What made this useful? The note is optional.</span>
-            <textarea value={note} maxLength={1024} onInput={(e) => setNote((e.target as HTMLTextAreaElement).value)} />
-          </label>
-          <div class="do">
-            <button type="button" class="btn small" onClick={() => setHeart(false)}>
-              Cancel
-            </button>
-            <button type="submit" class="btn small primary">
-              Save heart
-            </button>
-          </div>
-        </form>
-      )}
-      {done && (
-        <p class="why" role="status">
-          {done}
-        </p>
-      )}
-    </div>
-  );
-}
-
-export function RunPane({ bridge, runId, handle }: { bridge: string; runId: string; handle?: string }) {
-  const run = useSelect((s) => s.runs[runId]);
-  const member = useSelect((s) => (handle && s.rosters[bridge] ? s.rosters[bridge].byHandle[handle] : undefined));
+/** useResult reads the result of a run, and reads it again when the run changes its state, its decision, or its answer. */
+export function useResult(runId: string): Result | null {
+  const run = useSelect((s) => (runId ? s.runs[runId] : undefined));
   const [res, setRes] = useState<Result | null>(null);
-  const [file, setFile] = useState('');
-  const [stop, setStop] = useState(false);
-  const t = useTranscript(runId);
-  const heading = useRef<HTMLHeadingElement>(null);
-
   useEffect(() => {
     setRes(null);
-    setFile('');
-    if (!store.get().runs[runId]) api.run(runId).then((r) => store.dispatch({ type: 'run', run: r })).catch(showError);
-    if (heading.current) heading.current.focus();
+    if (runId && !store.get().runs[runId]) api.run(runId).then((r) => store.dispatch({ type: 'run', run: r })).catch(showError);
   }, [runId]);
-
-  // The result follows the run: a new state or a new decision reads it again.
   const key = run ? run.state + '|' + (run.pending ? run.pending.id : '') + '|' + (run.output || '').length : '';
   useEffect(() => {
     if (!runId) return;
@@ -136,104 +37,203 @@ export function RunPane({ bridge, runId, handle }: { bridge: string; runId: stri
       live = false;
     };
   }, [runId, key]);
+  return res;
+}
 
+/** FileBox shows one file that a run changed, as numbered lines of text. */
+function FileBox({ run, path, onClose }: { run: string; path: string; onClose: () => void }) {
+  const [f, setF] = useState<FileView | null>(null);
+  useEffect(() => {
+    setF(null);
+    api.file(run, path).then(setF).catch(showError);
+  }, [run, path]);
+  return (
+    <div class="filebox">
+      <header>
+        <b class="clip">{path}</b>
+        <IconButton icon="close" label="Close the file" onClick={onClose} />
+      </header>
+      {!f ? (
+        <p class="filebox-note">Loading the file.</p>
+      ) : f.gone ? (
+        <p class="filebox-note">The file does not exist now.</p>
+      ) : f.binary || f.large || f.text === undefined ? (
+        <p class="filebox-note">This file is not text, or it is too large to show.</p>
+      ) : (
+        <pre class="lines">
+          {f.text.split('\n').map((l) => (
+            <span>{l + '\n'}</span>
+          ))}
+        </pre>
+      )}
+      {f && f.cut && <p class="filebox-note">The first part of the file.</p>}
+    </div>
+  );
+}
+
+/** FilesView lists the files that a run changed, and opens one in place. */
+export function FilesView({ runId, result }: { runId: string; result: Result | null }) {
+  const [file, setFile] = useState('');
+  useEffect(() => setFile(''), [runId]);
+  const files = (result && result.files) || [];
+  if (!result) return <p class="run-note">Loading the conversation.</p>;
+  return (
+    <div class="files-view">
+      <div class="files" role="list">
+        {files.map((f) => (
+          <div role="listitem">
+            <button type="button" class={'file' + (f.op === 'deleted' ? ' gone' : '') + (file === f.path ? ' on' : '')} aria-expanded={file === f.path} onClick={() => setFile(file === f.path ? '' : f.path)}>
+              <Icon name="file" />
+              <span class="fn">
+                <b>{f.path.split('/').pop()}</b>
+                <small>{f.path}</small>
+              </span>
+              <span class="fo">{f.op}</span>
+            </button>
+          </div>
+        ))}
+      </div>
+      {file && <FileBox run={runId} path={file} onClose={() => setFile('')} />}
+    </div>
+  );
+}
+
+/** ResultReactions records a reaction on the result of the run (K2), with the seq of its fw.run.finished. */
+function ResultReactions({ run, seq }: { run: string; seq: number }) {
+  const counts = useSelect((s) => (s.runs[run] && s.runs[run].reactions) || {});
+  const [done, setDone] = useState('');
+  const [heart, setHeart] = useState(false);
+  const send = async (k: ReactionKind, n?: string) => {
+    const ok = await attempt(async () => {
+      const r = await api.reactRun(run, seq, k, n);
+      if (r && typeof r.id === 'string') store.dispatch({ type: 'run', run: r });
+    });
+    if (ok) setDone(k === 'heart' ? 'Heart recorded.' : 'Thumb recorded.');
+  };
+  return (
+    <div class="run-react">
+      <div class="run-react-keys" role="group" aria-label="Reactions on the result">
+        <ReactionChip kind="up" count={counts.up || 0} names="Thumb up: accept the result" onClick={() => send('up')} />
+        <ReactionChip kind="down" count={counts.down || 0} names="Thumb down: reject the result" onClick={() => send('down')} />
+        <ReactionChip kind="heart" count={counts.heart || 0} names="Heart" onClick={() => setHeart(!heart)} />
+        {done && (
+          <span class="run-note" role="status">
+            {done}
+          </span>
+        )}
+      </div>
+      {heart && (
+        <HeartNote
+          onCancel={() => setHeart(false)}
+          onSave={(note) => {
+            setHeart(false);
+            send('heart', note || undefined);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/** StopKey stops a run that works, after the dialog asks. The seat stays. */
+export function StopKey({ runId, who }: { runId: string; who: string }) {
+  const run = useSelect((s) => s.runs[runId]);
+  const [ask, setAsk] = useState(false);
+  const ended = !run || ['completed', 'failed', 'canceled'].includes(run.state);
+  if (ended) return null;
+  return (
+    <>
+      <Button size="s" kind="danger" onClick={() => setAsk(true)}>
+        Stop
+      </Button>
+      {ask && (
+        <Confirm
+          title={'Stop ' + who + '?'}
+          confirm="Stop"
+          danger
+          onCancel={() => setAsk(false)}
+          onConfirm={async () => {
+            const ok = await attempt(() => api.cancel(runId));
+            if (ok) setAsk(false);
+          }}
+        >
+          <p>The seat stays. A message starts a new turn.</p>
+        </Confirm>
+      )}
+    </>
+  );
+}
+
+/** RunView is the result of a run: the title, the status, the answer, what it did, the limits, and the reactions. */
+export function RunView({ runId, result, member, who, endSeq }: { runId: string; result: Result | null; member?: Member; who: string; endSeq?: number }) {
+  const run = useSelect((s) => s.runs[runId]);
+  const res = result;
+  const phrase = member && member.presence === 'working' && member.activity ? member.activity.phrase : '';
+  return (
+    <div class="run-view">
+      <div class="run-head">
+        <h3 class="t-heading">{(res && res.title) || (run && run.title) || 'The run'}</h3>
+        <StopKey runId={runId} who={who} />
+      </div>
+      <p class="run-status">
+        {run && <Light light={runStatus(run)} />}
+        {run && <When at={run.createdAt} />}
+        {phrase && <span class="clip">{phrase}</span>}
+      </p>
+      {res && res.error && <p class="run-error">{res.error}</p>}
+      {res && res.summary && <Markdown text={res.summary} class="run-summary" />}
+      {res && res.steps && res.steps.length > 0 && (
+        <section class="run-sec" aria-labelledby={'did-' + runId}>
+          <div class="run-sec-head">
+            <h4 class="t-sub" id={'did-' + runId}>
+              What it did
+            </h4>
+            <Chip label={res.steps.length === 1 ? '1 step' : res.steps.length + ' steps'}>{res.steps.length}</Chip>
+          </div>
+          <ol class="run-steps">
+            {res.steps.map((s) => (
+              <li class={s.isError ? 'err' : ''}>
+                <span>{s.text}</span>
+                <small>{s.isError ? 'Error' : s.done ? 'Done' : 'No result'}</small>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
+      {res && res.limits && res.limits.length > 0 && (
+        <ul class="run-limits">
+          {res.limits.map((l) => (
+            <li>{l}</li>
+          ))}
+        </ul>
+      )}
+      {run && run.state === 'completed' && endSeq ? <ResultReactions run={runId} seq={endSeq} /> : null}
+    </div>
+  );
+}
+
+/** RunPane is the run of a member in the details pane of a bridge: the result, then the conversation of the run. */
+export function RunPane({ bridge, runId, handle }: { bridge: string; runId: string; handle?: string }) {
+  const run = useSelect((s) => s.runs[runId]);
+  const member = useSelect((s) => (handle && s.rosters[bridge] ? s.rosters[bridge].byHandle[handle] : undefined));
+  const res = useResult(runId);
+  const t = useTranscript(runId);
   const light = member ? presenceOf(member.presence) : run ? runStatus(run) : null;
-  const ended = run && ['completed', 'failed', 'canceled'].includes(run.state);
-  const endSeq = [...t.items].reverse().find((x) => x.kind === 'end');
   const who = handle || (run ? run.agent : 'the agent');
+  const end = [...t.items].reverse().find((x) => x.kind === 'end');
   return (
     <section class="screen runpane" aria-labelledby="run-title">
       <PaneHeader
         id="run-title"
         title={who}
-        headingRef={heading}
         focusable
         back={{ href: hrefOf({ place: 'bridge', id: bridge, pane: 'roster' }), label: 'Members', to: 'here' }}
         lead={run ? <Mark agent={run.agent} size={32} halo={light ? { tone: light.tone, word: light.word } : undefined} label={who} /> : undefined}
-        actions={
-          run &&
-          !ended && (
-            <Button size="s" kind="danger" onClick={() => setStop(true)}>
-              Stop
-            </Button>
-          )
-        }
       />
       <div class="scroll">
-        <div class="result">
-          <h3 class="work">{(res && res.title) || (run && run.title) || 'The run'}</h3>
-          <p class="status">
-            {run && <Light light={runStatus(run)} />}
-            {run && (
-              <>
-                {' · started '}
-                <When at={run.createdAt} />
-              </>
-            )}
-            {member && member.activity && member.activity.phrase && member.presence === 'working' ? ' · ' + member.activity.phrase : ''}
-          </p>
-          {res && res.error && <p class="err-note">{res.error}</p>}
-          {res && res.summary && <Markdown text={res.summary} class="summary" />}
-          {res && res.files && res.files.length > 0 && (
-            <>
-              <p class="lbl">Files</p>
-              <div class="files">
-                {res.files.map((f) => (
-                  <button type="button" class={'file' + (f.op === 'deleted' ? ' gone' : '')} aria-expanded={file === f.path} onClick={() => setFile(file === f.path ? '' : f.path)}>
-                    <Icon name="file" />
-                    <span class="fn">
-                      <b>{f.path.split('/').pop()}</b>
-                      <small>{f.path}</small>
-                    </span>
-                    <span class="fo">{f.op}</span>
-                  </button>
-                ))}
-              </div>
-              {file && <FileBox run={runId} path={file} onClose={() => setFile('')} />}
-            </>
-          )}
-          {res && res.steps && res.steps.length > 0 && (
-            <details class="did">
-              <summary>
-                <Icon name="chev" />
-                <b>What it did</b> <span>{res.steps.length} steps</span>
-              </summary>
-              <ol>
-                {res.steps.map((s) => (
-                  <li class={s.isError ? 'err' : ''}>
-                    <span>{s.text}</span>
-                    <small>{s.isError ? 'Error' : s.done ? 'Done' : 'No result'}</small>
-                  </li>
-                ))}
-              </ol>
-            </details>
-          )}
-          {res && res.limits && res.limits.length > 0 && (
-            <ul class="limits">
-              {res.limits.map((l) => (
-                <li>{l}</li>
-              ))}
-            </ul>
-          )}
-          {run && run.state === 'completed' && endSeq && <ResultThumbs run={runId} seq={endSeq.seq} />}
-        </div>
-        <h3 class="sec">Conversation</h3>
+        <RunView runId={runId} result={res} member={member} who={who} endSeq={end ? end.seq : undefined} />
         <Conversation run={run} result={res} t={t} agentLabel={who} />
       </div>
-      {stop && run && (
-        <Confirm
-          title={'Stop the run of ' + who + '?'}
-          confirm="Stop the run"
-          danger
-          onCancel={() => setStop(false)}
-          onConfirm={async () => {
-            const ok = await attempt(() => api.cancel(runId));
-            if (ok) setStop(false);
-          }}
-        >
-          <p>The run stops now. The seat stays on the roster, and a message to it starts a new turn.</p>
-        </Confirm>
-      )}
     </section>
   );
 }

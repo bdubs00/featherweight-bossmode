@@ -1,62 +1,335 @@
-// The Activity place: the inbox of what needs the operator. This first cut
-// lists the open bridges with members that need you, then the bridges with
-// unread entries, attention first. Screen B reworks it into the inbox of
-// docs/DESIGN.md, section 11: the decisions themselves, in order of
-// attention, with keyboard decisions.
+// The Activity place: the inbox of what needs you, across every open
+// bridge. One row per decision, question, failed seat, stopped seat, and
+// new message, in the order of attention: needs you first, the oldest wait
+// first, then the errors, then the rest by the status of the sender. The
+// thumbs decide in the row. j and k move, Enter opens, a allows, d denies,
+// r replies, and s seats a stopped seat again. The main pane shows the row
+// that has the focus: a decision as its card.
 
+import { useEffect, useMemo, useState } from 'preact/hooks';
+import type { Decision, Member } from '../api/types';
+import { go, hrefOf } from '../lib/route';
+import { decisionTitle, excerpt, personName, senderName, since, commandOf } from '../lib/words';
+import { alwaysAllow, decide } from '../state/actions';
+import { ensureChannels, ensureResults, ensureRosters, ensureRuns, useResults } from '../state/fetchers';
+import { inboxRows, keyAction, sortInbox, type InboxRow } from '../state/inbox';
+import { newestRun } from '../state/people';
 import { useSelect } from '../state/store';
-import { hrefOf } from '../lib/route';
+import { canAlways, DecisionCard } from './Decision';
 import { useRoving } from './keys';
-import { Chip, Led, PaneHeader, countText } from './primitives';
+import { attempt } from './notice';
+import { Markdown, When } from './common';
+import { TaskDialog } from './Member';
 import { EmptyPane } from './Shell';
+import { Avatar, Button, IconButton, Led, Mark, PaneHeader } from './primitives';
 
-export function ActivityList() {
-  const ids = useSelect((s) =>
-    s.bridges.order
-      .filter((id) => s.bridges.byId[id].state === 'open' && ((s.bridges.byId[id].needsYou || 0) > 0 || s.bridges.byId[id].unread > 0))
-      .sort((a, b) => (s.bridges.byId[b].needsYou || 0) - (s.bridges.byId[a].needsYou || 0))
-      .join('\n'),
-  );
-  const loaded = useSelect((s) => s.bridges.loaded);
-  const byId = useSelect((s) => s.bridges.byId);
-  const list = useRoving<HTMLDivElement>();
-  const items = ids ? ids.split('\n') : [];
-  const needs = items.reduce((n, id) => n + (byId[id].needsYou || 0), 0);
+const TWO_PANES = '(min-width: 800px)';
+
+/* ---------- the row that the main pane shows ---------- */
+
+let pickedKey = '';
+const pickListeners = new Set<() => void>();
+
+/** pick shows a row of the inbox in the main pane. */
+export function pick(key: string): void {
+  if (key === pickedKey) return;
+  pickedKey = key;
+  for (const f of [...pickListeners]) f();
+}
+
+function usePicked(): string {
+  const [k, setK] = useState(pickedKey);
+  useEffect(() => {
+    const f = () => setK(pickedKey);
+    pickListeners.add(f);
+    return () => {
+      pickListeners.delete(f);
+    };
+  }, []);
+  return k;
+}
+
+/* ---------- the rows ---------- */
+
+/** useInbox builds the rows of the inbox from the store, and loads the runs, the results, and the channels that they need. */
+export function useInbox(): { rows: InboxRow[]; loaded: boolean } {
+  const bridges = useSelect((s) => s.bridges);
+  const rosters = useSelect((s) => s.rosters);
+  const runs = useSelect((s) => s.runs);
+  const channels = useSelect((s) => s.channels);
+  const me = useSelect((s) => (s.me && s.me.principal ? s.me.principal.subject : ''));
+  const results = useResults();
+  const open = useMemo(() => bridges.order.map((id) => bridges.byId[id]).filter((b) => b.state === 'open'), [bridges]);
+  useEffect(() => {
+    if (bridges.loaded) ensureRosters();
+  }, [bridges]);
+  // The newest run of a seat that needs you, that failed, or that rests, so a stop shows.
+  const want = open
+    .flatMap((b) => {
+      const r = rosters[b.id];
+      return r ? r.order.map((h) => r.byHandle[h]).filter((m: Member) => m && !m.fired && m.presence !== 'working' && m.presence !== 'asleep') : [];
+    })
+    .map((m) => newestRun(m))
+    .join(',');
+  useEffect(() => {
+    if (want) ensureRuns(want.split(','));
+  }, [want]);
+  const unread = open
+    .filter((b) => b.unread > 0)
+    .map((b) => b.id)
+    .join(',');
+  useEffect(() => {
+    if (unread) ensureChannels(unread.split(','));
+  }, [unread]);
+  const rows = sortInbox(inboxRows({ bridges: open, rosters, runs, channels, results, me }));
+  const waiting = rows
+    .filter((r) => r.run && (r.status === 'needs-you' || r.status === 'error'))
+    .map((r) => r.run!)
+    .join(',');
+  useEffect(() => {
+    if (waiting) ensureResults(waiting.split(','));
+  }, [waiting, runs]);
+  return { rows, loaded: bridges.loaded && open.every((b) => !!rosters[b.id]) };
+}
+
+/** openRow goes to the place of a row: the conversation of the seat, or the channel of the bridge. */
+function openRow(r: InboxRow, focusComposer = false): void {
+  if (r.handle && (r.kind !== 'message' || r.entry?.from.kind === 'agent')) go({ place: 'member', bridge: r.bridge, handle: r.handle, tab: 'chat' });
+  else go({ place: 'bridge', id: r.bridge, pane: 'none' });
+  if (focusComposer) {
+    setTimeout(() => {
+      const b = document.getElementById('composer') as HTMLTextAreaElement | null;
+      if (b && !b.disabled) b.focus();
+    }, 80);
+  }
+}
+
+/** Thumbs decide a decision in its row: thumb up allows with the label of the decision, thumb down denies, and Always allow as on a card. */
+function Thumbs({ d, who }: { d: Decision; who: string }) {
+  const [busy, setBusy] = useState(false);
+  const run = async (f: () => Promise<void>) => {
+    setBusy(true);
+    await attempt(f);
+    setBusy(false);
+  };
   return (
-    <section class="screen activity" aria-labelledby="activity-title">
-      <PaneHeader id="activity-title" title="Activity" count={loaded ? needs : undefined} countLabel={needs === 1 ? '1 member needs you' : needs + ' members need you'} />
-      <div class="scroll" ref={list}>
-        <div class="rows" role="list">
-          {items.map((id) => {
-            const b = byId[id];
-            const n = b.needsYou || 0;
-            return (
-              <div role="listitem">
-                <a class={'brow' + (b.unread ? ' strong' : '')} href={hrefOf({ place: 'bridge', id, pane: 'none' })} data-item>
-                  <span class="brow-top">
-                    <span class="brow-title clip">{b.title}</span>
-                    {b.unread > 0 && <Chip tone="ink" label={b.unread + ' unread'}>{countText(b.unread)}</Chip>}
-                  </span>
-                  <span class="brow-meta">{n > 0 ? <Led tone="amber" word={n === 1 ? '1 needs you' : n + ' need you'} /> : <span>New messages</span>}</span>
-                </a>
-              </div>
-            );
-          })}
+    <div class="inbox-do" role="group" aria-label={'Decide for ' + who}>
+      <IconButton kind="secondary" icon="thumb-up" label={'Thumb up: ' + (d.label || 'Allow')} disabled={busy} onClick={() => run(() => decide(d.run, d.id, 'allow'))} />
+      <IconButton kind="secondary" icon="thumb-down" label="Thumb down: Deny" disabled={busy} onClick={() => run(() => decide(d.run, d.id, 'deny'))} />
+      {canAlways(d) && (
+        <Button size="s" disabled={busy} title={'Allow ' + d.tool + ' for ' + who + ' from now on'} onClick={() => run(() => alwaysAllow(d.run, d.id))}>
+          Always allow
+        </Button>
+      )}
+    </div>
+  );
+}
+
+function RowFace({ r }: { r: InboxRow }) {
+  if (r.kind === 'message' && r.entry && r.entry.from.kind === 'person') return <Avatar subject={r.entry.from.name || ''} display={r.entry.from.display} size={32} />;
+  return <Mark agent={r.agent || (r.handle || '').replace(/-\d+$/, '')} size={32} />;
+}
+
+/** RowStatus is the light and the word of a row. */
+function RowStatus({ r }: { r: InboxRow }) {
+  if (r.status === 'needs-you') return <Led tone="amber" word="needs you" />;
+  if (r.kind === 'stopped') return <Led tone="grey" word="stopped" />;
+  if (r.status === 'error') return <Led tone="red" word="error" />;
+  return null;
+}
+
+function rowText(r: InboxRow): string {
+  if (r.decision && r.kind === 'question') return (r.handle || '') + ' asks: ' + (r.decision.reason || 'A question for you');
+  if (r.decision) return decisionTitle(r.handle || '', r.decision);
+  if (r.entry) return excerpt(r.entry.text.replace(/[*_`#>|\[\]]/g, ''), 90);
+  return r.reason || '';
+}
+
+function rowName(r: InboxRow): string {
+  if (r.kind === 'message' && r.entry) return senderName(r.entry.from);
+  return r.handle || '';
+}
+
+/** InboxItem is one row of the inbox. */
+function InboxItem({ r, on }: { r: InboxRow; on: boolean }) {
+  const [seat, setSeat] = useState(false);
+  const m = useSelect((s) => (r.handle && s.rosters[r.bridge] ? s.rosters[r.bridge].byHandle[r.handle] : undefined));
+  const cmd = r.decision ? commandOf(r.decision.input) : '';
+  return (
+    <div
+      class={'inbox-row' + (r.status === 'needs-you' ? ' need' : '') + (on ? ' sel' : '')}
+      data-item
+      data-key={r.key}
+      tabIndex={-1}
+      aria-label={rowName(r) + ', ' + rowText(r)}
+      onFocus={(e) => {
+        if (e.target === e.currentTarget) pick(r.key);
+      }}
+      onClick={(e) => {
+        if ((e.target as HTMLElement).closest('button, a')) return;
+        if (window.matchMedia(TWO_PANES).matches) pick(r.key);
+        else openRow(r);
+      }}
+    >
+      <RowFace r={r} />
+      <div class="inbox-main">
+        <div class="inbox-top">
+          <b class="clip">{rowName(r)}</b>
+          <RowStatus r={r} />
+          <span class="grow" />
+          {r.at && (
+            <time class="inbox-meta" dateTime={r.at} title={new Date(r.at).toLocaleString()}>
+              {since(r.at)}
+            </time>
+          )}
         </div>
-        {loaded && items.length === 0 && (
-          <div class="empty">
-            <p>Nothing needs you. New decisions and messages land here first.</p>
+        <div class="inbox-text clip">{rowText(r)}</div>
+        {cmd && <code class="inbox-cmd clip">{cmd}</code>}
+        <div class="inbox-where clip">{r.bridgeTitle}</div>
+        {r.kind === 'decision' && r.decision && <Thumbs d={r.decision} who={r.handle || ''} />}
+        {(r.kind === 'failed' || r.kind === 'stopped') && m && (
+          <div class="inbox-do">
+            <Button size="s" onClick={() => setSeat(true)}>
+              Seat again
+            </Button>
           </div>
         )}
       </div>
+      {seat && m && <TaskDialog bridge={r.bridge} m={m} again onClose={() => setSeat(false)} />}
+    </div>
+  );
+}
+
+export function ActivityList() {
+  const { rows, loaded } = useInbox();
+  const picked = usePicked();
+  const needs = useSelect((s) => s.bridges.order.reduce((n, id) => n + (s.bridges.byId[id].state === 'open' ? s.bridges.byId[id].needsYou || 0 : 0), 0));
+  const bridgesLoaded = useSelect((s) => s.bridges.loaded);
+  const [seatKey, setSeatKey] = useState('');
+  const seatRow = rows.find((r) => r.key === seatKey);
+  const seatMember = useSelect((s) => (seatRow && seatRow.handle && s.rosters[seatRow.bridge] ? s.rosters[seatRow.bridge].byHandle[seatRow.handle] : undefined));
+  const list = useRoving<HTMLDivElement>({
+    onEnter: (el) => {
+      const r = rows.find((x) => x.key === el.getAttribute('data-key'));
+      if (r) openRow(r);
+    },
+  });
+  const onKey = (e: KeyboardEvent) => {
+    if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) return;
+    const el = e.target as HTMLElement;
+    if (!el.hasAttribute || !el.hasAttribute('data-item')) return;
+    const r = rows.find((x) => x.key === el.getAttribute('data-key'));
+    if (!r || e.key === 'Enter') return;
+    const act = keyAction(e.key, r);
+    if (!act) return;
+    e.preventDefault();
+    const d = r.decision;
+    if (act === 'allow' && d) attempt(() => decide(d.run, d.id, 'allow'));
+    else if (act === 'deny' && d) attempt(() => decide(d.run, d.id, 'deny'));
+    else if (act === 'answer') {
+      pick(r.key);
+      if (window.matchMedia(TWO_PANES).matches) {
+        setTimeout(() => {
+          const f = document.querySelector('.inbox-main-pane .card input, .inbox-main-pane .card textarea, .inbox-main-pane .card select, .inbox-main-pane .card button') as HTMLElement | null;
+          if (f) f.focus();
+        }, 40);
+      } else openRow(r);
+    } else if (act === 'reply') openRow(r, true);
+    else if (act === 'seat') setSeatKey(r.key);
+  };
+  return (
+    <section class="screen activity" aria-labelledby="activity-title">
+      <PaneHeader id="activity-title" title="Activity" count={bridgesLoaded ? needs : undefined} countLabel={needs === 1 ? '1 member needs you' : needs + ' members need you'} />
+      <div class="scroll" ref={list} onKeyDown={onKey}>
+        <div class="inbox" role="list" aria-label="Activity">
+          {rows.map((r) => (
+            <div role="listitem">
+              <InboxItem r={r} on={r.key === picked} />
+            </div>
+          ))}
+        </div>
+        {loaded && rows.length === 0 && (
+          <div class="empty">
+            <p>Nothing needs you.</p>
+          </div>
+        )}
+      </div>
+      {seatRow && seatMember && <TaskDialog bridge={seatRow.bridge} m={seatMember} again onClose={() => setSeatKey('')} />}
     </section>
   );
 }
 
 export function ActivityMain() {
+  const picked = usePicked();
+  const { rows } = useInbox();
+  const r = rows.find((x) => x.key === picked);
+  const m = useSelect((s) => (r && r.handle && s.rosters[r.bridge] ? s.rosters[r.bridge].byHandle[r.handle] : undefined));
+  const [seat, setSeat] = useState(false);
+  if (!r) {
+    return (
+      <EmptyPane back={{ href: '#activity', label: 'Activity' }}>
+        <p>Pick an item to decide or to read it.</p>
+      </EmptyPane>
+    );
+  }
+  const where = (
+    <span class="meta clip member-where">
+      in <a href={hrefOf({ place: 'bridge', id: r.bridge, pane: 'none' })}>{r.bridgeTitle}</a>
+    </span>
+  );
+  const name = rowName(r);
+  const tone = r.status === 'needs-you' ? 'amber' : r.kind === 'stopped' ? 'grey' : r.status === 'error' ? 'red' : undefined;
+  const word = r.status === 'needs-you' ? 'needs you' : r.kind === 'stopped' ? 'stopped' : r.status === 'error' ? 'error' : '';
+  const convo = r.handle && (r.kind !== 'message' || (r.entry && r.entry.from.kind === 'agent')) ? hrefOf({ place: 'member', bridge: r.bridge, handle: r.handle, tab: 'chat' }) : '';
   return (
-    <EmptyPane back={{ href: '#activity', label: 'Activity' }}>
-      <p>Pick an item in the list to decide or to read it.</p>
-    </EmptyPane>
+    <section class="screen inbox-main-pane" aria-labelledby="inbox-title">
+      <PaneHeader
+        id="inbox-title"
+        title={name}
+        size="title"
+        level={1}
+        back={{ href: '#activity', label: 'Activity', to: 'list' }}
+        lead={r.kind === 'message' && r.entry && r.entry.from.kind === 'person' ? <Avatar subject={r.entry.from.name || ''} display={r.entry.from.display} size={36} /> : <Mark agent={r.agent || name} size={36} label={name} halo={tone ? { tone, word } : undefined} />}
+        actions={
+          convo ? (
+            <Button size="s" href={convo}>
+              Open conversation
+            </Button>
+          ) : undefined
+        }
+      >
+        {where}
+      </PaneHeader>
+      <div class="scroll pad">
+        {r.decision && <DecisionCard d={r.decision} who={r.handle || name} />}
+        {(r.kind === 'failed' || r.kind === 'stopped') && (
+          <div class="inbox-stop">
+            <p class="inbox-stop-line">
+              <Led tone={r.kind === 'stopped' ? 'grey' : 'red'} word={r.kind === 'stopped' ? 'stopped' : 'error'} />
+              {r.reason && <span>{r.reason}</span>}
+            </p>
+            {m && <p class="inbox-task">{m.task}</p>}
+            {m && (
+              <Button onClick={() => setSeat(true)} kind="primary">
+                Seat again
+              </Button>
+            )}
+            {seat && m && <TaskDialog bridge={r.bridge} m={m} again onClose={() => setSeat(false)} />}
+          </div>
+        )}
+        {r.kind === 'message' && r.entry && (
+          <article class="inbox-msg">
+            <p class="inbox-msg-head">
+              <b>{r.entry.from.kind === 'person' ? personName(r.entry.from.name, r.entry.from.display) : name}</b>
+              <When at={r.entry.at} />
+            </p>
+            <Markdown text={r.entry.text} />
+            <Button size="s" onClick={() => openRow(r, true)}>
+              Reply
+            </Button>
+          </article>
+        )}
+      </div>
+    </section>
   );
 }
