@@ -50,7 +50,7 @@ export interface State {
   /** The bridge that the person reads now, or "". */
   open: string;
   stream: { status: StreamStatus; lastId: string };
-  /** Grows when the stream could not resume, so the page loads again. */
+  /** Grows when the stream cannot resume, so the page loads again. */
   resets: number;
 }
 
@@ -220,8 +220,8 @@ function applyEntry(state: State, bridgeId: string, e: Entry): State {
 
 /**
  * applyMember puts one member into the roster of its bridge. A roster that
- * the page has not loaded stays out: one member alone would make a wrong
- * roster. The actions load the record first.
+ * the page has not loaded stays out, because one member alone makes a
+ * wrong roster. The actions load the record first.
  */
 function applyMember(state: State, bridgeId: string, m: Member): State {
   const r = state.rosters[bridgeId];

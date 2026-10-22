@@ -243,7 +243,7 @@ const REPLIES = [
 ];
 let replyN = 0;
 
-/** fanOut answers a message of a person, as the members would. */
+/** fanOut answers a message of a person in the place of the members. */
 function fanOut(bridgeId, e) {
   const b = S.bridges.get(bridgeId);
   if (!b || b.state !== 'open') return;

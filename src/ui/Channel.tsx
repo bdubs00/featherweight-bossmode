@@ -62,7 +62,8 @@ export function Channel({ id }: { id: string }) {
   const [fresh, setFresh] = useState(false);
   const [older, setOlder] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
-  const list = useRoving<HTMLDivElement>({ start: 'last', onEnter: (el) => setReply(Number(el.dataset.seq) || null) });
+  // Enter on a message of a person or an agent starts a reply to it.
+  const list = useRoving<HTMLDivElement>({ start: 'last', onEnter: (el) => el.dataset.reply && setReply(Number(el.dataset.seq) || null) });
   const members = useMemo(() => membersOf(roster).filter((m) => !m.fired), [roster]);
 
   // Open the bridge: its record, its roster, and the recent end of its channel.

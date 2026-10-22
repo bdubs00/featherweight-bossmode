@@ -73,7 +73,7 @@ export class SigninNeeded extends ApiError {
 
 /**
  * safeSignin keeps a sign-in route only when it is a path on this origin.
- * A full address or a path that starts with two slashes could send the
+ * A full address or a path that starts with two slashes can send the
  * person to another site, so the page ignores it.
  */
 export function safeSignin(value: unknown): string {

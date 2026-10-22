@@ -162,7 +162,7 @@ async function onEvent(e: StreamEvent): Promise<void> {
   if (e.kind === 'reset') await reload();
 }
 
-/** reload reads the lists again, after the stream could not resume. */
+/** reload reads the lists again, when the stream cannot resume. */
 async function reload(): Promise<void> {
   const s = store.get();
   await Promise.allSettled([loadBridges(), loadFaces(), s.pages.loaded ? loadPages() : Promise.resolve()]);

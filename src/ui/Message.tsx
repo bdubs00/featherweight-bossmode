@@ -13,6 +13,9 @@ import { Avatar, Face, Markdown, When } from './common';
 import { DecisionCard } from './Decision';
 import { Icon, type IconName } from './icons';
 
+/** plain drops the marks of Markdown from a text, for a label. */
+const plain = (t: string) => t.replace(/```[\s\S]*?```/g, ' code ').replace(/[*_`#>|\[\]]/g, '');
+
 /** agentOf finds the agent behind a handle, from the roster or the handle itself. */
 export function agentOf(roster: Record<string, Member> | undefined, handle: string): string {
   const m = roster && roster[handle];
@@ -232,7 +235,7 @@ export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, onReply }
   return (
     <>
       {day && <p class="day" role="separator">{day}</p>}
-      <article class={'msg' + (sameAsPrev ? ' compact' : '') + (mine ? ' by-person' : ' by-agent')} id={id} data-item data-seq={seq} aria-label={name + ', ' + excerpt(e.text, 60)}>
+      <article class={'msg' + (sameAsPrev ? ' compact' : '') + (mine ? ' by-person' : ' by-agent')} id={id} data-item data-seq={seq} data-reply="1" aria-label={name + ', ' + excerpt(plain(e.text), 60)}>
         {sameAsPrev ? <span class="gutter" /> : e.from.kind === 'agent' ? <Face agent={agentOf(roster, e.from.handle || '')} size={32} /> : <Avatar subject={e.from.name || ''} display={e.from.display} size={32} />}
         <div class="body">
           {!sameAsPrev && (

@@ -13,8 +13,8 @@ export const SIGNED_OUT_KEY = 'fw.bossmode.signedOut';
 
 /**
  * LOOP_MS is how long the page waits before it goes to sign-in again on its
- * own. A sign-in that comes back with a token that fails at once would
- * otherwise send the page back and forth.
+ * own. Without the wait, a sign-in that comes back with a token that fails
+ * at once sends the page back and forth.
  */
 export const LOOP_MS = 60_000;
 
