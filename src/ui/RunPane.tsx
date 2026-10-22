@@ -2,14 +2,16 @@
 // what it did, the limits, and the reactions), and the files that it
 // changed with a viewer. The member conversation shows these on its tabs
 // Run and Files. The run pane of a bridge shows the result and the
-// conversation of the run in the details pane.
+// conversation of the run in the details pane. A read of a run goes to its
+// worker and wakes a worker that sleeps, so these views read only when the
+// person opens them, and say so in place when the read wakes the worker.
 
 import { useEffect, useState } from 'preact/hooks';
 import { api } from '../api/routes';
 import type { FileView, Member, ReactionKind, Result } from '../api/types';
 import { store, useSelect } from '../state/store';
 import { runStatus } from '../lib/presence';
-import { seatPresence, statusOf } from '../lib/status';
+import { awakeFor, seatPresence, statusOf } from '../lib/status';
 import { selectFacts } from '../state/reducer';
 import { hrefOf } from '../lib/route';
 import { attempt, showError } from './notice';
@@ -19,18 +21,26 @@ import { Conversation, useTranscript } from './Conversation';
 import { HeartNote } from './Thread';
 import { Icon } from './icons';
 
-/** useResult reads the result of a run, and reads it again when the run changes its state, its decision, or its answer. */
-export function useResult(runId: string): Result | null {
+/**
+ * useResult reads the result of a run, and reads it again when the run
+ * changes its state, its decision, or its answer. With load false, it
+ * reads nothing, because a read goes to the worker of the run and wakes
+ * it. A view passes false for a run of a sleeping worker that the person
+ * did not ask for, and keeps the result that it read before.
+ */
+export function useResult(runId: string, load = true): Result | null {
   const run = useSelect((s) => (runId ? s.runs[runId] : undefined));
   const [res, setRes] = useState<Result | null>(null);
   useEffect(() => {
     setRes(null);
-    // A run that the fleet does not hold shows no result and raises no notice.
-    if (runId && !store.get().runs[runId]) api.run(runId).then((r) => store.dispatch({ type: 'run', run: r })).catch(() => {});
   }, [runId]);
+  useEffect(() => {
+    // A run that the fleet does not hold shows no result and raises no notice.
+    if (load && runId && !store.get().runs[runId]) api.run(runId).then((r) => store.dispatch({ type: 'run', run: r })).catch(() => {});
+  }, [runId, load]);
   const key = run ? run.state + '|' + (run.pending ? run.pending.id : '') + '|' + (run.output || '').length : '';
   useEffect(() => {
-    if (!runId) return;
+    if (!runId || !load) return;
     let live = true;
     api
       .result(runId)
@@ -39,8 +49,13 @@ export function useResult(runId: string): Result | null {
     return () => {
       live = false;
     };
-  }, [runId, key]);
+  }, [runId, key, load]);
   return res;
+}
+
+/** WakeNote says in place that a read of a run wakes its worker. */
+export function WakeNote() {
+  return <p class="run-note wake-note">This read wakes the worker.</p>;
 }
 
 /** FileBox shows one file that a run changed, as numbered lines of text. */
@@ -74,14 +89,23 @@ function FileBox({ run, path, onClose }: { run: string; path: string; onClose: (
   );
 }
 
-/** FilesView lists the files that a run changed, and opens one in place. */
-export function FilesView({ runId, result }: { runId: string; result: Result | null }) {
+/** FilesView lists the files that a run changed, and opens one in place. wakes says that the read wakes the worker of the run. */
+export function FilesView({ runId, result, wakes }: { runId: string; result: Result | null; wakes?: boolean }) {
   const [file, setFile] = useState('');
   useEffect(() => setFile(''), [runId]);
   const files = (result && result.files) || [];
-  if (!result) return <p class="run-note">Loading the conversation.</p>;
+  if (!result)
+    return wakes ? (
+      <div class="files-view">
+        <WakeNote />
+        <p class="run-note">Loading the conversation.</p>
+      </div>
+    ) : (
+      <p class="run-note">Loading the conversation.</p>
+    );
   return (
     <div class="files-view">
+      {wakes && <WakeNote />}
       <div class="files" role="list">
         {files.map((f) => (
           <div role="listitem">
@@ -167,8 +191,12 @@ export function StopKey({ runId, who }: { runId: string; who: string }) {
   );
 }
 
-/** RunView is the result of a run: the title, the status, the answer, what it did, the limits, and the reactions. */
-export function RunView({ runId, result, member, who, endSeq, gone }: { runId: string; result: Result | null; member?: Member; who: string; endSeq?: number; gone?: boolean }) {
+/**
+ * RunView is the result of a run: the title, the status, the answer, what
+ * it did, the limits, and the reactions. wakes says that the read wakes
+ * the worker of the run.
+ */
+export function RunView({ runId, result, member, who, endSeq, gone, wakes }: { runId: string; result: Result | null; member?: Member; who: string; endSeq?: number; gone?: boolean; wakes?: boolean }) {
   const run = useSelect((s) => s.runs[runId]);
   const presence = useSelect((s) => (member ? seatPresence(selectFacts(s), member) : ''));
   const res = result;
@@ -179,6 +207,7 @@ export function RunView({ runId, result, member, who, endSeq, gone }: { runId: s
         <h3 class="t-heading">{(res && res.title) || (run && run.title) || 'The run'}</h3>
         {!gone && <StopKey runId={runId} who={who} />}
       </div>
+      {wakes && !gone && <WakeNote />}
       {gone && <p class="run-note">This run is gone.</p>}
       <p class="run-status">
         {run && <Light light={runStatus(run)} />}
@@ -221,8 +250,10 @@ export function RunView({ runId, result, member, who, endSeq, gone }: { runId: s
 export function RunPane({ bridge, runId, handle }: { bridge: string; runId: string; handle?: string }) {
   const run = useSelect((s) => s.runs[runId]);
   const member = useSelect((s) => (handle && s.rosters[bridge] ? s.rosters[bridge].byHandle[handle] : undefined));
+  // The person opened the run, so the pane reads it, and says so when the read wakes its worker.
   const res = useResult(runId);
   const t = useTranscript(runId);
+  const wakes = useSelect((s) => awakeFor(selectFacts(s), s.runs[runId]) === false);
   const seatLight = useSelect((s) => (member ? statusOf(selectFacts(s), { seat: member }) : null));
   const light = seatLight || (run ? runStatus(run) : null);
   const who = handle || (run ? run.agent : 'the agent');
@@ -237,7 +268,7 @@ export function RunPane({ bridge, runId, handle }: { bridge: string; runId: stri
         lead={run ? <Mark agent={run.agent} size={32} halo={light ? { tone: light.tone, word: light.word } : undefined} label={who} /> : undefined}
       />
       <div class="scroll">
-        <RunView runId={runId} result={res} member={member} who={who} endSeq={end ? end.seq : undefined} />
+        <RunView runId={runId} result={res} member={member} who={who} endSeq={end ? end.seq : undefined} wakes={wakes} />
         {res && res.files && res.files.length > 0 && <FilesView runId={runId} result={res} />}
         <Conversation run={run} result={res} t={t} agentLabel={who} />
       </div>

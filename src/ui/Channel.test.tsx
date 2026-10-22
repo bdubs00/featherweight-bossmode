@@ -122,6 +122,34 @@ describe('the channel', () => {
     }
   });
 
+  it('folds the sleep and wake lines of a seat with nothing between them into one quiet line', async () => {
+    const N = 'b-nap';
+    const alice = { kind: 'person' as const, name: 'alice@example.com', display: 'Alice' };
+    const naps: Entry[] = [
+      entryOf(1, { from: alice, text: 'Start with cron.' }),
+      sys(2, 'asleep', 'migrator-1 went to sleep. A message wakes its Task.'),
+      sys(3, 'started', 'migrator-1 woke up.'),
+      sys(4, 'asleep', 'migrator-1 went to sleep'),
+      sys(5, 'started', 'migrator-1 woke up'),
+      entryOf(6, { from: alice, text: 'How far is cron?' }),
+      sys(7, 'asleep', 'migrator-1 went to sleep.'),
+    ];
+    const g = fakeFetch([
+      ['GET', /^\/v1\/bridges\/b-nap$/, () => ({ ...bridgeOf(N, { lastSeq: 7, read: 7 }), members: [memberOf('migrator-1')] })],
+      ['GET', /^\/v1\/bridges\/b-nap\/messages/, () => ({ bridge: N, messages: naps, next: 0, prev: 0 })],
+      ['PUT', /\/read$/, () => null],
+    ]);
+    try {
+      act(() => store.dispatch({ type: 'bridges', bridges: [bridgeOf(B, { title: 'Migrate the remaining Puppet modules', lastSeq: 9, read: 9 }), bridgeOf(N, { lastSeq: 7, read: 7 })] }));
+      const el = mount(<Channel id={N} />);
+      await settle();
+      expect([...el.querySelectorAll('.sys .sys-text')].map((x) => x.textContent)).toEqual(['migrator-1 slept and woke up 2 times', 'migrator-1 went to sleep']);
+      expect(el.querySelector('.fold-key')).toBeNull();
+    } finally {
+      g.restore();
+    }
+  });
+
   it('says once that the seats run in waves', async () => {
     const el = mount(<Channel id={B} />);
     await settle();

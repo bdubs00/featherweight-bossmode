@@ -10,7 +10,7 @@ import type { Entry, Member, ReactionKind } from '../api/types';
 import { useSelect } from '../state/store';
 import { dayWords, excerpt, list, personName, senderName } from '../lib/words';
 import { hrefOf } from '../lib/route';
-import { lineWords, whoName } from '../lib/lines';
+import { lineWords, napWords, whoName } from '../lib/lines';
 import type { Tone } from '../lib/presence';
 import { decide, react } from '../state/actions';
 import { attempt } from './notice';
@@ -186,6 +186,36 @@ function ReplyChip({ bridge, seq }: { bridge: string; seq: number }) {
 }
 
 /* ---------- one entry ---------- */
+
+/**
+ * NapRow is the one quiet line of a run of sleep and wake pairs of one
+ * seat, such as "migrator-1 slept and woke up 4 times", with the clock time
+ * of its last line. The pairs say nothing that a person acts on, so the
+ * line does not open.
+ */
+export const NapRow = memo(function NapRow({ bridge, seqs, handle, pairs, prevSeq }: { bridge: string; seqs: number[]; handle: string; pairs: number; prevSeq: number }) {
+  const first = useSelect((s) => (s.channels[bridge] ? (s.channels[bridge].bySeq[seqs[0]] as Entry | undefined) : undefined));
+  const lastOne = useSelect((s) => (s.channels[bridge] ? (s.channels[bridge].bySeq[seqs[seqs.length - 1]] as Entry | undefined) : undefined));
+  const prev = useSelect((s) => (prevSeq && s.channels[bridge] ? (s.channels[bridge].bySeq[prevSeq] as Entry | undefined) : undefined));
+  if (!first || !lastOne) return null;
+  const day = !prev || dayWords(prev.at) !== dayWords(first.at) ? dayWords(first.at) : '';
+  return (
+    <>
+      {day && (
+        <p class="day" role="separator">
+          {day}
+        </p>
+      )}
+      <div class="sys ev-naps" id={'entry-' + bridge + '-' + seqs[0]} data-item data-seq={seqs[0]}>
+        <p>
+          <LineLed tone="grey" />
+          <span class="sys-text">{napWords(handle, pairs)}</span>
+          <When at={lastOne.at} />
+        </p>
+      </div>
+    </>
+  );
+});
 
 export interface EntryProps {
   bridge: string;

@@ -4,7 +4,8 @@ import type { Entry } from '../api/types';
 import { store } from '../state/store';
 import { MemberMain } from './Member';
 import { currentNotice } from './notice';
-import { at, fakeFetch, mount, seedFleet, unmountAll, type Call } from './testkit-b';
+import { forgetTranscripts } from './Conversation';
+import { FLEET, at, fakeFetch, mount, seedFleet, unmountAll, type Call } from './testkit-b';
 
 let calls: Call[] = [];
 let restore = () => {};
@@ -39,9 +40,12 @@ beforeEach(() => {
     ['GET', /^\/v1\/runs\/run-migrator-1\/transcript/, () => ({ run: { id: 'run-migrator-1', agent: 'migrator', state: 'running', seq: 3, createdAt: at(0), updatedAt: at(0) }, items: [{ seq: 3, time: at(2), kind: 'tool', tool: 'bash', callId: 'c1', input: { command: 'ansible-lint roles/cron' } }], next: 0, prev: 0 })],
     ['GET', /^\/v1\/runs\/run-migrator-1\/live$/, liveStream],
     ['GET', /^\/v1\/runs\/run-migrator-1\/result$/, () => ({ runId: 'run-migrator-1', title: 'Migrate cron', agent: 'migrator', status: 'working', files: [{ path: 'a.yml', op: 'created', seq: 1 }], started: at(0), changed: at(0) })],
+    ['GET', /^\/v1\/runs\/run-tester\/result$/, () => ({ runId: 'run-tester', title: 'Run molecule', agent: 'tester', status: 'ready', summary: 'Molecule passed.', files: [], started: at(0), changed: at(0) })],
+    ['GET', /^\/v1\/runs\/run-tester\/transcript/, () => ({ run: { id: 'run-tester', agent: 'tester', state: 'completed', seq: 2, createdAt: at(0), updatedAt: at(0), member: 'default/crew-1' }, items: [], next: 0, prev: 0 })],
   ]);
   calls = f.calls;
   restore = f.restore;
+  forgetTranscripts();
   try {
     sessionStorage.clear();
   } catch {
@@ -68,6 +72,16 @@ afterEach(() => {
   unmountAll();
   restore();
 });
+
+/** seatAsleep seats tester, whose newest run finished on crew-1, a worker that sleeps. The bridge still calls it idle. */
+function seatAsleep(): void {
+  act(() => {
+    store.dispatch({ type: 'fleet', fleet: { ...FLEET, members: [...FLEET.members, { name: 'default/crew-1', state: 'quiet', lastSeen: at(3), canForward: true, accessMode: '', agents: [{ name: 'tester' }], active: 0, inputRequired: 0 }], pools: [...FLEET.pools!, { name: 'test', atespace: 'default', agent: 'tester', intake: '', wanted: 1, actual: 1, ready: 1, hash: '', tasks: [{ name: 'crew-1', phase: 'Suspended', current: true }], checkedAt: '' }] } });
+    store.dispatch({ type: 'member', bridge: 'b1', member: { handle: 'tester', agent: 'tester', task: 'Run molecule', runs: ['run-tester'], fired: false, muted: false, presence: 'idle' } });
+    store.dispatch({ type: 'run', run: { id: 'run-tester', agent: 'tester', state: 'completed', seq: 2, createdAt: at(0), updatedAt: at(3), member: 'default/crew-1' } });
+    store.dispatch({ type: 'entry', bridge: 'b1', entry: { seq: 7, at: at(7), from: alice, to: ['tester'], text: 'Run molecule now.' } });
+  });
+}
 
 const type = (box: HTMLTextAreaElement, v: string) =>
   act(() => {
@@ -182,6 +196,47 @@ describe('the member conversation', () => {
     act(() => (other.querySelector('button[aria-label="More for reviewer"]') as HTMLButtonElement).click());
     expect([...other.querySelectorAll('[role="menuitem"]')].map((b) => b.textContent)).toEqual(['Profile', 'Mute', 'Seat again', 'Change task', 'Fire']);
     expect(other.querySelector('.seat-bar .status-word')!.textContent).toBe('stopped');
+  });
+
+  it('reads nothing of a sleeping worker on the Chat tab, and shows what the channel holds', async () => {
+    seatAsleep();
+    const el = mount(<MemberMain bridge="b1" handle="tester" tab="chat" />);
+    await vi.waitFor(() => expect(el.querySelector('[role="log"]')!.textContent).toContain('Run molecule now.'));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(calls.filter((c) => c.path.startsWith('/v1/runs/run-tester')).map((c) => c.path)).toEqual([]);
+    expect(el.textContent).not.toContain('This read wakes the worker.');
+    // The halo says the status of the worker on the page, not the word of the bridge.
+    expect(el.querySelector('header .mark')!.getAttribute('aria-label')).toBe('tester, asleep');
+  });
+
+  it('reads the run of a sleeping worker when the person opens Run or Files, and says that the read wakes it', async () => {
+    seatAsleep();
+    const run = mount(<MemberMain bridge="b1" handle="tester" tab="run" />);
+    await vi.waitFor(() => expect(run.textContent).toContain('Molecule passed.'));
+    expect(run.querySelector('.wake-note')!.textContent).toBe('This read wakes the worker.');
+    expect(calls.some((c) => c.path === '/v1/runs/run-tester/result')).toBe(true);
+    const files = mount(<MemberMain bridge="b1" handle="tester" tab="files" />);
+    await vi.waitFor(() => expect(files.querySelector('.files-view')).not.toBeNull());
+    expect(files.querySelector('.wake-note')!.textContent).toBe('This read wakes the worker.');
+    // The worker wakes, and the line goes.
+    act(() => store.dispatch({ type: 'stream', event: { id: '', kind: 'task', data: { kind: 'task', member: 'default/crew-1', phase: 'Running', time: at(9) } } }));
+    expect(run.querySelector('.wake-note')).toBeNull();
+    expect(files.querySelector('.wake-note')).toBeNull();
+  });
+
+  it('keeps the steps that it read while the run worked, once the worker sleeps', async () => {
+    const el = mount(<MemberMain bridge="b1" handle="migrator-1" tab="chat" />);
+    await vi.waitFor(() => expect(el.querySelector('.tline code')).not.toBeNull());
+    unmountAll();
+    act(() => {
+      store.dispatch({ type: 'fleet', fleet: { ...FLEET, pools: FLEET.pools!.map((p) => (p.name === 'crew' ? { ...p, tasks: [{ name: 'crew-0', phase: 'Suspended', current: true }] } : p)) } });
+      store.dispatch({ type: 'run', run: { id: 'run-migrator-1', agent: 'migrator', state: 'completed', seq: 9, createdAt: at(0), updatedAt: at(9), member: 'default/crew-0' } });
+    });
+    const reads = calls.filter((c) => c.path.startsWith('/v1/runs/run-migrator-1/transcript')).length;
+    const again = mount(<MemberMain bridge="b1" handle="migrator-1" tab="chat" />);
+    await vi.waitFor(() => expect(again.querySelector('.tline code')).not.toBeNull());
+    expect(again.querySelector('.tline code')!.textContent).toBe('ansible-lint roles/cron');
+    expect(calls.filter((c) => c.path.startsWith('/v1/runs/run-migrator-1/transcript')).length).toBe(reads);
   });
 
   it('says so for a seat that is not on the bridge', () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Entry, Item } from '../api/types';
-import { directEntries, sameSender, stepsOf, threadOf, withLive } from './thread';
+import { directEntries, foldNaps, sameSender, stepsOf, threadOf, withLive } from './thread';
 
 const at = (min: number) => new Date(Date.UTC(2026, 9, 21, 20, min)).toISOString();
 
@@ -92,5 +92,26 @@ describe('the direct thread', () => {
     expect(sameSender(a, entry(2, 1, agent('r'), 'two'))).toBe(false);
     expect(sameSender(a, entry(2, 1, agent('m'), 'two', { replyTo: 1 }))).toBe(false);
     expect(sameSender(undefined, a)).toBe(false);
+  });
+});
+
+describe('the sleep and wake lines of a seat', () => {
+  it('fold into one quiet line, and a last sleep line stays', () => {
+    const lines = [
+      entry(20, 19, sys, 'migrator-1 went to sleep. A message wakes its Task.', { event: 'asleep' }),
+      entry(21, 20, sys, 'migrator-1 woke up.', { event: 'started' }),
+      entry(22, 21, sys, 'migrator-1 went to sleep.', { event: 'asleep' }),
+      entry(23, 22, sys, 'migrator-1 woke up.', { event: 'started' }),
+      entry(24, 23, sys, 'migrator-1 went to sleep.', { event: 'asleep' }),
+    ];
+    const rows = foldNaps(threadOf([entry(19, 18, agent('migrator-1'), 'Done.'), ...lines], []));
+    expect(rows.map((r) => r.kind)).toEqual(['entry', 'naps', 'entry']);
+    expect(rows[1]).toMatchObject({ kind: 'naps', handle: 'migrator-1', pairs: 2, at: at(22) });
+    expect((rows[2] as Extract<typeof rows[number], { kind: 'entry' }>).entry.seq).toBe(24);
+  });
+
+  it('stay apart with a step or a message between them', () => {
+    const rows = threadOf([entry(30, 30, sys, 'migrator-1 went to sleep.', { event: 'asleep' }), entry(32, 32, sys, 'migrator-1 woke up.', { event: 'started' })], [{ key: 's', at: at(31), text: 'Ran', cmd: 'ls' }]);
+    expect(foldNaps(rows).map((r) => r.kind)).toEqual(['entry', 'step', 'entry']);
   });
 });

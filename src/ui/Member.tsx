@@ -8,6 +8,12 @@
 // skill of its agent. The tab is one-on-one, so the answer of the newest
 // run streams in from its live route while the run works, and the finished
 // answer of the channel takes its place.
+//
+// A read of a run goes to its worker and wakes a worker that sleeps. Chat
+// shows what the page has from the channel and the stream, and reads the
+// steps and the files of the run only while its worker is awake. Run and
+// Files read the run when the person opens them, and say in place when the
+// read wakes the worker.
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { Member as MemberT } from '../api/types';
@@ -20,8 +26,9 @@ import { fire, loadAgentSkills, loadBridge, loadOlder, patchMember, sendMessage 
 import { ensureChannels, ensureRuns } from '../state/fetchers';
 import { newestRun, slashCommands } from '../state/people';
 import { selectFacts } from '../state/reducer';
-import { seatPresence, statusOf } from '../lib/status';
-import { directEntries, stepsOf, threadOf, withLive } from '../state/thread';
+import { awakeFor, seatPresence, statusOf } from '../lib/status';
+import { errorReason } from '../lib/words';
+import { directEntries, foldNaps, stepsOf, threadOf, withLive } from '../state/thread';
 import { attempt } from './notice';
 import { Confirm, Menu, type MenuItem } from './common';
 import { Composer } from './Composer';
@@ -158,7 +165,7 @@ function Chat({ bridge, m, items, closed, stopped, reason }: { bridge: string; m
     // Steps older than the loaded part of the channel wait for Earlier messages.
     const from = ch && ch.prev > 0 && entries.length ? new Date(entries[0].at).getTime() : 0;
     const steps = stepsOf(items).filter((x) => new Date(x.at).getTime() >= from);
-    return withLive(threadOf(mine, steps), m.handle, live.text, new Date().toISOString());
+    return withLive(foldNaps(threadOf(mine, steps)), m.handle, live.text, new Date().toISOString());
   }, [entries, items, m.handle, m.runs, live.text]);
   const commands = useMemo(() => slashCommands(skills, loadable), [skills, loadable]);
   const names = useMemo(() => commands.map((c) => c.name), [commands]);
@@ -212,9 +219,14 @@ export function MemberMain({ bridge, handle, tab }: { bridge: string; handle: st
   const b = useSelect((s) => s.bridges.byId[bridge]);
   const runId = m ? newestRun(m) : '';
   const light = useSelect((s) => (m ? statusOf(selectFacts(s), { seat: m }) : null));
+  const runObj = useSelect((s) => (runId ? s.runs[runId] : undefined));
   const stopped = useStopped(m);
-  const res = useResult(runId);
-  const t = useTranscript(runId);
+  // A worker that the page knows awake can take a read. Run and Files read when the person opens them, and say so when the read wakes the worker.
+  const awake = useSelect((s) => (runId ? awakeFor(selectFacts(s), s.runs[runId]) : null));
+  const opened = tab === 'run' || tab === 'files';
+  const wakes = opened && awake === false;
+  const res = useResult(runId, opened || awake === true);
+  const t = useTranscript(runId, tab === 'run' || awake === true);
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     if (runId) ensureRuns([runId]);
@@ -237,7 +249,7 @@ export function MemberMain({ bridge, handle, tab }: { bridge: string; handle: st
   const files = (res && res.files) || [];
   const base = { place: 'member' as const, bridge, handle };
   const end = [...t.items].reverse().find((x) => x.kind === 'end');
-  const reason = res ? (res.limits && res.limits[0]) || res.error || '' : '';
+  const reason = res ? (res.limits && res.limits[0]) || res.error || '' : errorReason(runObj);
   return (
     <section class="screen member-main" aria-labelledby="member-title">
       <PaneHeader
@@ -273,10 +285,10 @@ export function MemberMain({ bridge, handle, tab }: { bridge: string; handle: st
       {tab === 'chat' && <Chat bridge={bridge} m={m} items={t.items} closed={!!b && b.state === 'closed'} stopped={stopped} reason={reason} />}
       {tab === 'run' && (
         <div class="scroll">
-          {runId ? <RunView runId={runId} result={res} member={m} who={handle} endSeq={end ? end.seq : undefined} gone={t.gone} /> : <p class="run-note">{handle + ' has no seat on this bridge, or no run yet.'}</p>}
+          {runId ? <RunView runId={runId} result={res} member={m} who={handle} endSeq={end ? end.seq : undefined} gone={t.gone} wakes={wakes} /> : <p class="run-note">{handle + ' has no seat on this bridge, or no run yet.'}</p>}
         </div>
       )}
-      {tab === 'files' && <div class="scroll">{runId && <FilesView runId={runId} result={res} />}</div>}
+      {tab === 'files' && <div class="scroll">{runId && <FilesView runId={runId} result={res} wakes={wakes} />}</div>}
     </section>
   );
 }

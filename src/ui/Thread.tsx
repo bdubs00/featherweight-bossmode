@@ -12,7 +12,7 @@ import { sameSender } from '../state/thread';
 import { react } from '../state/actions';
 import { useSelect } from '../state/store';
 import { dayWords, personName } from '../lib/words';
-import { lineWords, whoName } from '../lib/lines';
+import { lineWords, napWords, whoName } from '../lib/lines';
 import { hrefOf } from '../lib/route';
 import type { Tone } from '../lib/presence';
 import { attempt } from './notice';
@@ -266,6 +266,12 @@ export function ThreadView({ rows, bridge, agentOf, handles, runHref }: ThreadVi
               </Quiet>
             );
           else if (r.kind === 'steps') node = <StepsFold steps={r.steps} />;
+          else if (r.kind === 'naps')
+            node = (
+              <Quiet tone="grey" at={r.at}>
+                {napWords(r.handle, r.pairs)}
+              </Quiet>
+            );
           else
             node = (
               <Msg face={<Mark agent={agentOf(r.handle)} size={32} />} name={r.handle} pending>

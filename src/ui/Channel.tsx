@@ -16,9 +16,9 @@ import { hrefOf, type BridgeTab } from '../lib/route';
 import { useRoving, smooth } from './keys';
 import { attempt } from './notice';
 import { Confirm, Empty, Menu } from './common';
-import { EntryRow, markLoaded } from './Message';
+import { EntryRow, NapRow, markLoaded } from './Message';
 import { Composer } from './Composer';
-import { foldOf, foldShapes, foldWords, shapeKey, shapeOf, shapesOf, type Item, type Shape } from './fold';
+import { foldOf, foldShapes, foldWords, shapeKey, shapeOf, shapesOf, type Item, type Part, type Shape } from './fold';
 import { wavesLine } from './seats';
 import { Button, Chip, Led, LineLed, PaneHeader, Tabs, countText } from './primitives';
 import { Glyph } from './icons';
@@ -133,6 +133,9 @@ function useMedia(query: string): boolean {
 }
 
 /* ---------- Posts ---------- */
+
+/** partEnd is the seq of the last entry of a part of a fold. */
+const partEnd = (p: Part): number => (p.kind === 'naps' ? p.seqs[p.seqs.length - 1] : p.seq);
 
 function FoldLine({ f, open, onToggle }: { f: Extract<Item, { kind: 'fold' }>; open: boolean; onToggle: () => void }) {
   return (
@@ -268,11 +271,17 @@ function Posts({ id, closed }: { id: string; closed: boolean }) {
           {seqs &&
             items.map((it) => {
               if (it.kind === 'entry') return <EntryRow key={it.seq} bridge={id} seq={it.seq} prevSeq={it.prevSeq} fresh={it.fresh} onReply={onReply} />;
+              if (it.kind === 'naps') return <NapRow key={it.key} bridge={id} seqs={it.seqs} handle={it.handle} pairs={it.pairs} prevSeq={it.prevSeq} />;
               const isOpen = open.has(it.key);
               return (
                 <div class={'fold-group' + (isOpen ? ' open' : '')} key={it.key}>
                   <FoldLine f={it} open={isOpen} onToggle={() => toggle(it.key)} />
-                  {isOpen && it.seqs.map((seq, i) => <EntryRow key={seq} bridge={id} seq={seq} prevSeq={i === 0 ? it.prevSeq : it.seqs[i - 1]} fresh={i === 0} onReply={onReply} />)}
+                  {isOpen &&
+                    it.parts.map((p, i) => {
+                      const prevSeq = i === 0 ? it.prevSeq : partEnd(it.parts[i - 1]);
+                      if (p.kind === 'naps') return <NapRow key={p.key} bridge={id} seqs={p.seqs} handle={p.handle} pairs={p.pairs} prevSeq={prevSeq} />;
+                      return <EntryRow key={p.seq} bridge={id} seq={p.seq} prevSeq={prevSeq} fresh={i === 0} onReply={onReply} />;
+                    })}
                 </div>
               );
             })}

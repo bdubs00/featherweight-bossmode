@@ -5,7 +5,7 @@
 
 import type { Entry, Item } from '../api/types';
 import { commandOf } from '../lib/words';
-import { decidedRuns, hiddenLine } from '../lib/lines';
+import { decidedRuns, hiddenLine, napOf, napRuns } from '../lib/lines';
 
 /** One quiet line for one tool call of a run, such as Ran "ls" or Created a/b.yml. */
 export interface Step {
@@ -22,7 +22,9 @@ export type ThreadRow =
   | { kind: 'entry'; key: string; at: string; entry: Entry }
   | { kind: 'step'; key: string; at: string; step: Step }
   | { kind: 'steps'; key: string; at: string; steps: Step[] }
-  | { kind: 'live'; key: string; at: string; handle: string; text: string };
+  | { kind: 'live'; key: string; at: string; handle: string; text: string }
+  /** The one quiet line of a run of sleep and wake pairs of one seat, at the time of its last line. */
+  | { kind: 'naps'; key: string; at: string; handle: string; pairs: number; entries: Entry[] };
 
 /** aboutHandle reports whether a system line is about a handle: it starts with the handle as a word. */
 function aboutHandle(text: string, handle: string): boolean {
@@ -109,6 +111,35 @@ export function threadOf(entries: Entry[], steps: Step[], fold = 3): ThreadRow[]
     out.push(r);
   }
   flush();
+  return out;
+}
+
+/**
+ * foldNaps folds a sleep line and a wake line of one seat with nothing
+ * between them into one quiet row, and a run of such pairs too. A sleep
+ * line that no wake line follows stays, because it says where the worker
+ * is now. A fold never crosses the line of a new day.
+ */
+export function foldNaps(rows: ThreadRow[]): ThreadRow[] {
+  const day = (r: ThreadRow) => new Date(r.at).toDateString();
+  const runs = napRuns(
+    rows.map((r) => (r.kind === 'entry' ? napOf(r.entry) : null)),
+    (i, j) => day(rows[i]) === day(rows[j]),
+  );
+  if (!runs.length) return rows;
+  const starts = new Map(runs.map((r) => [r[0], r]));
+  const out: ThreadRow[] = [];
+  for (let i = 0; i < rows.length; i++) {
+    const run = starts.get(i);
+    if (!run) {
+      out.push(rows[i]);
+      continue;
+    }
+    const entries = run.map((k) => (rows[k] as Extract<ThreadRow, { kind: 'entry' }>).entry);
+    const end = rows[run[run.length - 1]];
+    out.push({ kind: 'naps', key: 'naps-' + entries[0].seq, at: end.at, handle: napOf(entries[0])!.handle, pairs: run.length / 2, entries });
+    i += run.length - 1;
+  }
   return out;
 }
 

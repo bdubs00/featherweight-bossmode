@@ -160,6 +160,67 @@ export function lineWords(e: Pick<Entry, 'event' | 'text' | 'page'>, me: Me): Li
   return { text: t, raw: true };
 }
 
+/** A line that says that a worker went to sleep or woke up, with the handle of its seat. */
+export interface Nap {
+  nap: 'sleep' | 'wake';
+  handle: string;
+}
+
+/**
+ * napOf reads a line that says that the worker of a seat went to sleep or
+ * woke up, from its event: asleep, or started with the words woke up. The
+ * sentence of the backend names the handle first, with or without a second
+ * sentence, so the plain facts of a later backend read the same.
+ */
+export function napOf(e: Pick<Entry, 'from' | 'event' | 'text' | 'decision'>): Nap | null {
+  if (e.from.kind !== 'system' || e.decision) return null;
+  const t = String(e.text || '').replace(/\s+/g, ' ').trim();
+  let m: RegExpExecArray | null;
+  if (e.event === 'asleep') {
+    const handle = (m = /^(\S+) went to sleep\b/.exec(t)) ? handleOf(m[1]) : firstWord(t);
+    return handle ? { nap: 'sleep', handle } : null;
+  }
+  if (e.event === 'started' && (m = /^(\S+) woke up\b/.exec(t))) return { nap: 'wake', handle: handleOf(m[1]) };
+  return null;
+}
+
+/**
+ * napRuns finds the sleep lines that a wake line of the same handle
+ * follows with nothing between them, and the runs of such pairs. Each
+ * run is the indexes of its lines, two per pair. A sleep line that no
+ * wake line follows stays out, because it says where the worker is now.
+ */
+export function napRuns(naps: (Nap | null)[], same: (i: number, j: number) => boolean = () => true): number[][] {
+  const out: number[][] = [];
+  let i = 0;
+  while (i < naps.length) {
+    const handle = naps[i] ? naps[i]!.handle : '';
+    const pair = (k: number) => {
+      const a = naps[k];
+      const b = naps[k + 1];
+      return !!a && !!b && a.nap === 'sleep' && b.nap === 'wake' && a.handle === handle && b.handle === handle && same(k, k + 1);
+    };
+    if (!handle || !pair(i)) {
+      i++;
+      continue;
+    }
+    const run: number[] = [];
+    let k = i;
+    while (pair(k) && (k === i || same(k - 1, k))) {
+      run.push(k, k + 1);
+      k += 2;
+    }
+    out.push(run);
+    i = k;
+  }
+  return out;
+}
+
+/** napWords is the one quiet line of a run of pairs: "migrator-1 slept and woke up", or "migrator-1 slept and woke up 4 times". */
+export function napWords(handle: string, pairs: number): string {
+  return pairs > 1 ? `${handle} slept and woke up ${pairs} times` : `${handle} slept and woke up`;
+}
+
 /** decidedRuns names the runs whose decision a card of the entries shows: a card that waits for nothing now. */
 export function decidedRuns(entries: Iterable<Pick<Entry, 'decision'>>): Set<string> {
   const out = new Set<string>();

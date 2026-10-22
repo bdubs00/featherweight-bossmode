@@ -11,6 +11,9 @@ function line(event = 'started', at = '2026-10-21T10:00:00Z'): Entry {
 function chat(from: string, to: string[], at = '2026-10-21T10:00:00Z'): Entry {
   return { seq: ++seq, at, from: { kind: 'agent', handle: from, run: 'r' }, to, text: 'hello' };
 }
+function nap(kind: 'sleep' | 'wake', handle = 'migrator-1', at = '2026-10-21T10:00:00Z'): Entry {
+  return kind === 'sleep' ? { seq: ++seq, at, from: { kind: 'system' }, text: handle + ' went to sleep. A message wakes its Task.', event: 'asleep' } : { seq: ++seq, at, from: { kind: 'system' }, text: handle + ' woke up.', event: 'started' };
+}
 function msg(at = '2026-10-21T10:00:00Z'): Entry {
   return { seq: ++seq, at, from: { kind: 'person', name: 'alice@example.com' }, text: 'hi' };
 }
@@ -19,7 +22,7 @@ function card(): Entry {
 }
 
 const fold = (entries: Entry[]): Item[] => foldShapes(shapesOf(shapeKey(entries.map((e) => shapeOf(e, NOW)))));
-const kinds = (items: Item[]) => items.map((i) => (i.kind === 'fold' ? 'fold:' + i.seqs.length : 'entry'));
+const kinds = (items: Item[]) => items.map((i) => (i.kind === 'fold' ? 'fold:' + i.seqs.length : i.kind === 'naps' ? 'naps:' + i.pairs : 'entry'));
 
 describe('shapeOf', () => {
   it('names lines, chatter, cards, and other messages', () => {
@@ -84,6 +87,27 @@ describe('foldShapes', () => {
     expect(items[0]).toEqual({ kind: 'entry', seq: a.seq, prevSeq: 0, fresh: false });
     expect(items[1]).toMatchObject({ kind: 'fold', prevSeq: a.seq, key: 'line:' + l[0].seq });
     expect(items[2]).toEqual({ kind: 'entry', seq: b.seq, prevSeq: l[2].seq, fresh: true });
+  });
+
+  it('folds a sleep line and a wake line of one seat into one quiet line, and a run of pairs too', () => {
+    const pair = [nap('sleep'), nap('wake')];
+    const items = fold([msg(), ...pair, msg()]);
+    expect(kinds(items)).toEqual(['entry', 'naps:1', 'entry']);
+    expect(items[1]).toMatchObject({ handle: 'migrator-1', pairs: 1, seqs: pair.map((e) => e.seq), prevSeq: items[0].kind === 'entry' ? items[0].seq : -1 });
+    const flap = [nap('sleep'), nap('wake'), nap('sleep'), nap('wake'), nap('sleep'), nap('wake'), nap('sleep')];
+    const many = fold([msg(), ...flap, msg()]);
+    // Three pairs and the last sleep line make two lines, not seven.
+    expect(kinds(many)).toEqual(['entry', 'naps:3', 'entry', 'entry']);
+    expect(many[2]).toMatchObject({ kind: 'entry', seq: flap[6].seq, prevSeq: flap[5].seq });
+  });
+
+  it('counts the quiet line of the pairs as one update of a fold of lines, and keeps lines of two seats apart', () => {
+    const items = fold([msg(), line(), nap('sleep'), nap('wake'), line(), msg()]);
+    expect(kinds(items)).toEqual(['entry', 'fold:4', 'entry']);
+    const f = items[1] as Extract<Item, { kind: 'fold' }>;
+    expect(foldWords(f)).toBe('3 updates');
+    expect(f.parts.map((p) => p.kind)).toEqual(['entry', 'naps', 'entry']);
+    expect(kinds(fold([msg(), nap('sleep', 'a'), nap('wake', 'b'), msg()]))).toEqual(['entry', 'entry', 'entry', 'entry']);
   });
 
   it('finds the fold that holds a seq', () => {

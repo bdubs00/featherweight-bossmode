@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Entry } from '../api/types';
-import { decidedRuns, hiddenLine, isMe, lineWords, whoName } from './lines';
+import { decidedRuns, hiddenLine, isMe, lineWords, napOf, napRuns, napWords, whoName, type Nap } from './lines';
 
 const TOKEN = { subject: 'token', kind: 'token' };
 const ALICE = { subject: 'alice@example.com', name: 'Alice Example' };
@@ -85,5 +85,33 @@ describe('hiddenLine', () => {
     expect(hiddenLine(decided('r1'), decidedRuns([card('r1', 'pending')]))).toBe(false);
     expect(hiddenLine(decided('r1'), decidedRuns([card('r2', 'allow')]))).toBe(false);
     expect(hiddenLine(card('r1', 'deny'), decidedRuns([card('r1', 'deny')]))).toBe(false);
+  });
+});
+
+describe('the sleep and wake lines', () => {
+  const sys = { kind: 'system' as const };
+  it('reads a line that says that a worker went to sleep or woke up, in the sentence of today and the plain fact of later', () => {
+    expect(napOf({ from: sys, event: 'asleep', text: 'migrator-1 went to sleep. A message wakes its Task.' })).toEqual({ nap: 'sleep', handle: 'migrator-1' });
+    expect(napOf({ from: sys, event: 'asleep', text: 'migrator-1 went to sleep' })).toEqual({ nap: 'sleep', handle: 'migrator-1' });
+    expect(napOf({ from: sys, event: 'started', text: 'migrator-1 woke up.' })).toEqual({ nap: 'wake', handle: 'migrator-1' });
+    expect(napOf({ from: sys, event: 'started', text: 'migrator-1 started: Migrate cron.' })).toBeNull();
+    expect(napOf({ from: { kind: 'agent', handle: 'migrator-1', run: 'r' }, event: 'asleep', text: 'migrator-1 went to sleep.' })).toBeNull();
+  });
+
+  it('pairs a sleep line with the wake line after it, joins a run of pairs, and leaves a last sleep line alone', () => {
+    const S = (h = 'm'): Nap => ({ nap: 'sleep', handle: h });
+    const W = (h = 'm'): Nap => ({ nap: 'wake', handle: h });
+    expect(napRuns([S(), W(), S(), W(), S(), W(), S(), W()])).toEqual([[0, 1, 2, 3, 4, 5, 6, 7]]);
+    expect(napRuns([S(), W(), S()])).toEqual([[0, 1]]);
+    expect(napRuns([W(), S(), W(), S()])).toEqual([[1, 2]]);
+    // Something between them, another seat, or another day keeps the lines apart.
+    expect(napRuns([S(), null, W()])).toEqual([]);
+    expect(napRuns([S('a'), W('b')])).toEqual([]);
+    expect(napRuns([S(), W(), S(), W()], (i, j) => !(i === 1 && j === 2))).toEqual([[0, 1], [2, 3]]);
+  });
+
+  it('words a run of pairs as one quiet line', () => {
+    expect(napWords('migrator-1', 1)).toBe('migrator-1 slept and woke up');
+    expect(napWords('migrator-1', 4)).toBe('migrator-1 slept and woke up 4 times');
   });
 });

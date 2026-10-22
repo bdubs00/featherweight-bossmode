@@ -17,7 +17,7 @@ import { inboxRows, keyAction, sortInbox, type InboxRow } from '../state/inbox';
 import { newestRun } from '../state/people';
 import { useSelect } from '../state/store';
 import { selectFacts } from '../state/reducer';
-import { seatPresence } from '../lib/status';
+import { awakeFor, seatPresence } from '../lib/status';
 import { canAlways, DecisionCard } from './Decision';
 import { useRoving } from './keys';
 import { attempt } from './notice';
@@ -97,8 +97,9 @@ export function useInbox(): { rows: InboxRow[]; loaded: boolean } {
     if (unread) ensureChannels(unread.split(','));
   }, [unread]);
   const rows = sortInbox(inboxRows({ bridges: open, rosters, runs, channels, results, me, facts }));
+  // A read of the result goes to the worker of the run, so the inbox never reads the result of a worker that sleeps.
   const waiting = rows
-    .filter((r) => r.run && (r.status === 'needs-you' || r.status === 'error'))
+    .filter((r) => r.run && (r.status === 'needs-you' || r.status === 'error') && awakeFor(facts, runs[r.run]) !== false)
     .map((r) => r.run!)
     .join(',');
   useEffect(() => {

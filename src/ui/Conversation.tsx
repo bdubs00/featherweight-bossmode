@@ -34,26 +34,77 @@ export interface TranscriptState {
   earlier: () => Promise<void>;
 }
 
-/** useTranscript reads the conversation of a run and follows the run on the stream. */
-export function useTranscript(runId: string): TranscriptState {
-  const [items, setItems] = useState<Item[]>([]);
-  const [prev, setPrev] = useState(0);
-  const [loading, setLoading] = useState(true);
+/** The transcripts that the page read, by run, so a view that may not read its worker shows what the page has. */
+const read = new Map<string, { items: Item[]; prev: number }>();
+
+/** forgetTranscripts drops the transcripts that the page read, for the tests. */
+export function forgetTranscripts(): void {
+  read.clear();
+}
+
+/**
+ * useTranscript reads the conversation of a run and follows the run on the
+ * stream. With load false, it reads nothing, because a read goes to the
+ * worker of the run and wakes it, and it shows the items that the page
+ * read before. A view passes false for a run of a sleeping worker that the
+ * person did not ask for.
+ */
+export function useTranscript(runId: string, load = true): TranscriptState {
+  const known = runId ? read.get(runId) : undefined;
+  const [items, setItems] = useState<Item[]>(known ? known.items : []);
+  const [prev, setPrev] = useState(known ? known.prev : 0);
+  const [loading, setLoading] = useState(!!runId && load && !known);
   const [gone, setGone] = useState(false);
   const [problem, setProblem] = useState('');
   const run = useSelect((s) => (runId ? s.runs[runId] : undefined));
-  const last = useRef(0);
+  const last = useRef(known && known.items.length ? known.items[known.items.length - 1].seq : 0);
   const busy = useRef(false);
+  // The run whose items the state holds, so the page never keeps the items of one run for another.
+  const owner = useRef(runId);
+
+  // The page keeps what it read, for the next view of the run.
+  useEffect(() => {
+    if (runId && owner.current === runId && (items.length || prev)) read.set(runId, { items, prev });
+  }, [runId, items, prev]);
+
+  /** newer reads the items after the last one, for the run that the state still holds. */
+  const newer = (id: string) => {
+    if (busy.current) return;
+    busy.current = true;
+    api
+      .transcript(id, { from: last.current + 1, limit: 500 })
+      .then((t) => {
+        if (owner.current !== id) return;
+        const more = t.items.filter((x) => x.seq > last.current);
+        if (more.length) {
+          last.current = more[more.length - 1].seq;
+          setItems((old) => [...old, ...more]);
+        }
+      })
+      .catch(() => {
+        // The next change of the run reads again.
+      })
+      .finally(() => {
+        busy.current = false;
+      });
+  };
 
   useEffect(() => {
     let live = true;
-    setItems([]);
-    setPrev(0);
-    setLoading(!!runId);
+    const had = runId ? read.get(runId) : undefined;
+    owner.current = runId;
+    setItems(had ? had.items : []);
+    setPrev(had ? had.prev : 0);
     setGone(false);
     setProblem('');
-    last.current = 0;
-    if (!runId) return;
+    last.current = had && had.items.length ? had.items[had.items.length - 1].seq : 0;
+    setLoading(!!runId && load && !had);
+    if (!runId || !load) return;
+    // A transcript that the page read before needs only its newer items.
+    if (had) {
+      newer(runId);
+      return;
+    }
     api
       .transcript(runId, { limit: 200 })
       .then((t) => {
@@ -73,29 +124,14 @@ export function useTranscript(runId: string): TranscriptState {
     return () => {
       live = false;
     };
-  }, [runId]);
+  }, [runId, load]);
 
   // A newer run on the stream, or from a poll, brings the items after the last one.
   const seq = run ? run.seq : 0;
   useEffect(() => {
-    if (!runId || loading || busy.current || seq <= last.current) return;
-    busy.current = true;
-    api
-      .transcript(runId, { from: last.current + 1, limit: 500 })
-      .then((t) => {
-        const fresh = t.items.filter((x) => x.seq > last.current);
-        if (fresh.length) {
-          last.current = fresh[fresh.length - 1].seq;
-          setItems((old) => [...old, ...fresh]);
-        }
-      })
-      .catch(() => {
-        // The next change of the run reads again.
-      })
-      .finally(() => {
-        busy.current = false;
-      });
-  }, [runId, seq, loading]);
+    if (!runId || !load || loading || seq <= last.current) return;
+    newer(runId);
+  }, [runId, seq, loading, load]);
 
   const earlier = async () => {
     if (!prev) return;
@@ -117,12 +153,13 @@ export const POLL_MS = 3000;
  * usePoll reads a run again every POLL_MS while it works, and while also
  * is true, such as while an answer to a message is on its way. A run of the
  * front itself, such as a manager on the front, sends no run event on the
- * stream, so its conversation polls it while it is open. A hidden tab
- * skips a read.
+ * stream, so its conversation polls it while it is open. A run that does
+ * not work gets no poll, because a read of it can wake its worker. A
+ * hidden tab skips a read.
  */
 export function usePoll(runId: string, also = false): void {
   const state = useSelect((s) => (runId && s.runs[runId] ? s.runs[runId].state : ''));
-  const active = !!runId && (also || !['completed', 'failed', 'canceled', 'input-required'].includes(state));
+  const active = !!runId && (also || state === 'queued' || state === 'running');
   useEffect(() => {
     if (!active) return;
     const t = setInterval(() => {
