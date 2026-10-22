@@ -107,6 +107,19 @@ describe('the reducer', () => {
     expect(s.bridges.byId.b2.read).toBe(3);
   });
 
+  it('keeps the open bridge at zero when a record of the server arrives', () => {
+    let s = setup();
+    s = reduce(s, { type: 'open', bridge: 'b1' });
+    s = reduce(s, { type: 'bridge', bridge: bridge('b1', { lastSeq: 12, read: 2, unread: 10 }) });
+    expect(s.bridges.byId.b1.unread).toBe(0);
+    expect(s.bridges.byId.b1.read).toBe(12);
+    // Another bridge keeps the count of the server, and a read mark never moves back.
+    s = reduce(s, { type: 'read', bridge: 'b2', seq: 5 });
+    s = reduce(s, { type: 'bridges', bridges: [bridge('b1', { lastSeq: 12 }), bridge('b2', { lastSeq: 5, read: 2, unread: 3 })] });
+    expect(s.bridges.byId.b2.read).toBe(5);
+    expect(s.bridges.byId.b2.unread).toBe(0);
+  });
+
   it('keeps an old entry out of a channel that has earlier pages to load', () => {
     let s = reduce(initialState, { type: 'bridges', bridges: [bridge('b1', { lastSeq: 60 })] });
     s = reduce(s, { type: 'channel', bridge: 'b1', mode: 'latest', page: { bridge: 'b1', messages: [entry(50), entry(60)], next: 0, prev: 50 } });
@@ -135,6 +148,13 @@ describe('the reducer', () => {
     const s2 = reduce(s1, { type: 'stream', event: ev('bridge.member', { bridge: 'b1', member: member('tester') }) });
     expect(membersOf(s2.rosters.b1).map((m) => m.handle)).toEqual(['migrator-1', 'reviewer', 'tester']);
     expect(s2.bridges.byId.b1.memberCount).toBe(3);
+  });
+
+  it('keeps a member out of a roster that the page has not loaded', () => {
+    const s0 = setup();
+    const s1 = reduce(s0, { type: 'stream', event: ev('bridge.member', { bridge: 'b2', member: member('scribe') }, '') });
+    expect(s1).toBe(s0);
+    expect(s1.bridges.byId.b2.memberCount).toBe(s0.bridges.byId.b2.memberCount);
   });
 
   it('changes nothing for an equal member', () => {

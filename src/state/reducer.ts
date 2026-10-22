@@ -5,6 +5,7 @@
 // no list redraws on a tick.
 
 import type {
+  Agent,
   BossConfig,
   Bridge,
   Entry,
@@ -44,6 +45,8 @@ export interface State {
   runs: Record<string, Run>;
   pages: { byPath: Record<string, PageMeta>; loaded: boolean };
   faces: Record<string, FaceMeta>;
+  /** The agents that the caller can see, from GET /v1/agents. */
+  agents: Agent[] | null;
   /** The bridge that the person reads now, or "". */
   open: string;
   stream: { status: StreamStatus; lastId: string };
@@ -60,6 +63,7 @@ export const initialState: State = {
   runs: {},
   pages: { byPath: {}, loaded: false },
   faces: {},
+  agents: null,
   open: '',
   stream: { status: 'connecting', lastId: '' },
   resets: 0,
@@ -78,6 +82,7 @@ export type Action =
   | { type: 'run'; run: Run }
   | { type: 'pages'; pages: PageMeta[] }
   | { type: 'page'; page: PageEventData }
+  | { type: 'agents'; agents: Agent[] }
   | { type: 'faces'; faces: FaceMeta[] }
   | { type: 'face'; face: FaceMeta }
   | { type: 'stream'; event: StreamEvent }
@@ -100,10 +105,23 @@ export function counts(state: State, e: Entry): boolean {
   return true;
 }
 
-/** bridgeOf strips the members of a record. The roster holds them. */
-function bridgeOf(b: Bridge, old?: Bridge): Bridge {
+/**
+ * bridgeOf strips the members of a record, which the roster holds. A read
+ * mark never moves back: the page can know a newer one than the server,
+ * because it tells the server a moment later. The open bridge has no
+ * unread entry.
+ */
+function bridgeOf(b: Bridge, old: Bridge | undefined, open: string): Bridge {
   const { members, ...rest } = b;
   const next: Bridge = { ...rest, members: undefined };
+  if (old && old.read > next.read) {
+    next.read = old.read;
+    if (next.lastSeq <= old.read) next.unread = 0;
+  }
+  if (b.id === open) {
+    next.read = Math.max(next.read, next.lastSeq);
+    next.unread = 0;
+  }
   if (members) {
     next.memberCount = members.length;
     next.needsYou = members.filter((m) => m.presence === 'needs-you').length;
@@ -132,7 +150,7 @@ function sameOrder(a: string[], b: string[]): boolean {
 
 function putBridge(state: State, b: Bridge): State {
   const old = state.bridges.byId[b.id];
-  const byId = { ...state.bridges.byId, [b.id]: bridgeOf(b, old) };
+  const byId = { ...state.bridges.byId, [b.id]: bridgeOf(b, old, state.open) };
   const order = sortBridges(byId);
   return { ...state, bridges: { ...state.bridges, byId, order: sameOrder(order, state.bridges.order) ? state.bridges.order : order } };
 }
@@ -200,9 +218,14 @@ function applyEntry(state: State, bridgeId: string, e: Entry): State {
   return next;
 }
 
-/** applyMember puts one member into the roster of its bridge. */
+/**
+ * applyMember puts one member into the roster of its bridge. A roster that
+ * the page has not loaded stays out: one member alone would make a wrong
+ * roster. The actions load the record first.
+ */
 function applyMember(state: State, bridgeId: string, m: Member): State {
-  const r = state.rosters[bridgeId] || { order: [], byHandle: {} };
+  const r = state.rosters[bridgeId];
+  if (!r) return state;
   const old = r.byHandle[m.handle];
   if (old && JSON.stringify(old) === JSON.stringify(m)) return state;
   const roster: Roster = { order: old ? r.order : [...r.order, m.handle], byHandle: { ...r.byHandle, [m.handle]: m } };
@@ -280,7 +303,7 @@ export function reduce(state: State, a: Action): State {
       return { ...state, config: a.config };
     case 'bridges': {
       const byId: Record<string, Bridge> = {};
-      for (const b of a.bridges) byId[b.id] = bridgeOf(b, state.bridges.byId[b.id]);
+      for (const b of a.bridges) byId[b.id] = bridgeOf(b, state.bridges.byId[b.id], state.open);
       const order = sortBridges(byId);
       return { ...state, bridges: { byId, order: sameOrder(order, state.bridges.order) ? state.bridges.order : order, loaded: true } };
     }
@@ -339,6 +362,8 @@ export function reduce(state: State, a: Action): State {
     }
     case 'page':
       return applyPage(state, a.page);
+    case 'agents':
+      return { ...state, agents: a.agents };
     case 'faces': {
       const faces: Record<string, FaceMeta> = {};
       for (const f of a.faces) faces[f.agent] = state.faces[f.agent] && state.faces[f.agent].hash === f.hash && JSON.stringify(state.faces[f.agent]) === JSON.stringify(f) ? state.faces[f.agent] : f;
