@@ -14,6 +14,8 @@ export interface Completion {
   query: string;
   /** The handles that match, the best first. */
   matches: string[];
+  /** The sign before the word: @ for a handle, / for a command. @ when left out. */
+  sigil?: '@' | '/';
 }
 
 /** MAX_MATCHES bounds the list of the completion. */
@@ -49,7 +51,7 @@ export function completionAt(text: string, caret: number, handles: string[]): Co
 export function applyCompletion(text: string, c: Completion, handle: string): { text: string; caret: number } {
   const after = text.slice(c.end);
   const space = after.startsWith(' ') ? '' : ' ';
-  const head = text.slice(0, c.start) + '@' + handle + space;
+  const head = text.slice(0, c.start) + (c.sigil || '@') + handle + space;
   return { text: head + after, caret: head.length + (space ? 0 : 1) };
 }
 
@@ -73,4 +75,23 @@ export function mentionsIn(text: string, handles: string[]): string[] {
     if (h && !out.includes(h)) out.push(h);
   }
   return out;
+}
+
+/**
+ * slashAt returns the completion of a slash command at the caret, or null.
+ * A command counts only as the first word of the text, as in a one-on-one
+ * composer: /ansible-style runs the skill of that name.
+ */
+export function slashAt(text: string, caret: number, names: string[]): Completion | null {
+  if (caret < 1 || caret > text.length || text[0] !== '/') return null;
+  const word = text.slice(1, caret);
+  if (!/^[A-Za-z0-9._-]*$/.test(word)) return null;
+  let end = caret;
+  while (end < text.length && HANDLE.test(text[end])) end++;
+  const q = word.toLowerCase();
+  const starts = names.filter((n) => n.toLowerCase().startsWith(q));
+  const inside = q ? names.filter((n) => !n.toLowerCase().startsWith(q) && n.toLowerCase().includes(q)) : [];
+  const matches = [...starts, ...inside].slice(0, MAX_MATCHES);
+  if (matches.length === 0) return null;
+  return { start: 0, end, query: word, matches, sigil: '/' };
 }

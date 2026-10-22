@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyCompletion, completionAt, mentionsIn, MAX_MATCHES } from './mention';
+import { applyCompletion, completionAt, mentionsIn, slashAt, MAX_MATCHES } from './mention';
 
 const roster = ['migrator-1', 'migrator-2', 'reviewer', 'tester', 'writer'];
 
@@ -59,5 +59,21 @@ describe('mentionsIn', () => {
     expect(mentionsIn('mail a@reviewer.com or @nobody', roster)).toEqual([]);
     expect(mentionsIn('thanks @tester.', roster)).toEqual(['tester']);
     expect(mentionsIn('ok @Writer!', roster)).toEqual(['writer']);
+  });
+});
+
+describe('slashAt', () => {
+  const names = ['ansible-style', 'release-notes', 'review'];
+
+  it('completes a command at the start of the text', () => {
+    const c = slashAt('/re', 3, names)!;
+    expect(c.matches).toEqual(['release-notes', 'review']);
+    expect(applyCompletion('/re', c, 'review')).toEqual({ text: '/review ', caret: 8 });
+  });
+
+  it('opens on a bare slash and never in the middle of a text', () => {
+    expect(slashAt('/', 1, names)!.matches).toEqual(names);
+    expect(slashAt('see /re', 7, names)).toBeNull();
+    expect(slashAt('/re view', 8, names)).toBeNull();
   });
 });

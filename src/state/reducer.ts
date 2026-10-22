@@ -19,6 +19,7 @@ import type {
   PageEventData,
   PageMeta,
   Run,
+  SkillsList,
   StreamEvent,
   Whoami,
 } from '../api/types';
@@ -51,6 +52,8 @@ export interface State {
   agents: Agent[] | null;
   /** The members and the pools of the fleet, from GET /v1/fleet and the member and task events. */
   fleet: Fleet | null;
+  /** The skills and the tools of the fleet, from GET /v1/bossmode/skills. */
+  skills: SkillsList | null;
   /** The bridge that the person reads now, or "". */
   open: string;
   stream: { status: StreamStatus; lastId: string };
@@ -69,6 +72,7 @@ export const initialState: State = {
   faces: {},
   agents: null,
   fleet: null,
+  skills: null,
   open: '',
   stream: { status: 'connecting', lastId: '' },
   resets: 0,
@@ -89,6 +93,7 @@ export type Action =
   | { type: 'page'; page: PageEventData }
   | { type: 'agents'; agents: Agent[] }
   | { type: 'fleet'; fleet: Fleet }
+  | { type: 'skills'; skills: SkillsList | null }
   | { type: 'faces'; faces: FaceMeta[] }
   | { type: 'face'; face: FaceMeta }
   | { type: 'stream'; event: StreamEvent }
@@ -340,6 +345,10 @@ export function applyStream(state: State, ev: StreamEvent): State {
     case 'reset':
       next = { ...state, resets: state.resets + 1 };
       break;
+    // An event that the page read and dropped, such as a partial entry that
+    // it could not read again. Only its id moves.
+    case 'skipped':
+      break;
     default:
       return state;
   }
@@ -419,6 +428,8 @@ export function reduce(state: State, a: Action): State {
       return { ...state, agents: a.agents };
     case 'fleet':
       return { ...state, fleet: a.fleet };
+    case 'skills':
+      return { ...state, skills: a.skills };
     case 'faces': {
       const faces: Record<string, FaceMeta> = {};
       for (const f of a.faces) faces[f.agent] = state.faces[f.agent] && state.faces[f.agent].hash === f.hash && JSON.stringify(state.faces[f.agent]) === JSON.stringify(f) ? state.faces[f.agent] : f;

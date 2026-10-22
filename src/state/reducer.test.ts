@@ -209,6 +209,13 @@ describe('the reducer', () => {
     expect(s.resets).toBe(1);
   });
 
+  it('moves only the id for an event that the page dropped', () => {
+    const s0 = setup();
+    const s1 = reduce(s0, { type: 'stream', event: ev('skipped', null, '77') });
+    expect(s1.stream.lastId).toBe('77');
+    expect(s1.channels).toBe(s0.channels);
+  });
+
   it('ignores an unknown kind and a bad event', () => {
     const s0 = setup();
     expect(reduce(s0, { type: 'stream', event: ev('weather', { sunny: true }) })).toBe(s0);

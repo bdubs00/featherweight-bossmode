@@ -22,6 +22,12 @@ import type {
   Result,
   Run,
   SearchHit,
+  Skill,
+  SkillPreview,
+  SkillSource,
+  SkillText,
+  SkillsList,
+  Marketplace,
   Transcript,
   Whoami,
 } from './types';
@@ -123,6 +129,14 @@ export const api = {
   search: (q: string, signal?: AbortSignal) =>
     call<{ q: string; results: SearchHit[]; cut: boolean }>('/v1/pages/search' + query({ q }), { signal }),
 
+  /** The skills and the tools of the fleet. docs/CONTRACT.md, section 12, names the shapes. */
+  skills: () => call<SkillsList>('/v1/bossmode/skills').then((r) => ({ skills: (r && r.skills) || [], tools: (r && r.tools) || [] })),
+  skill: (name: string) => call<SkillText>('/v1/bossmode/skills/' + enc(name)),
+  marketplaces: () => call<{ marketplaces: Marketplace[] }>('/v1/bossmode/marketplaces').then((r) => (r && r.marketplaces) || []),
+  previewSkill: (source: SkillSource) => call<SkillPreview>('/v1/bossmode/skills/preview', { method: 'POST', body: { source } }),
+  installSkill: (token: string) => call<Skill>('/v1/bossmode/skills/install', { method: 'POST', body: { token } }),
+  removeSkill: (name: string) => call<null>('/v1/bossmode/skills/' + enc(name), { method: 'DELETE' }),
+
   faces: () => call<{ faces: FaceMeta[] }>('/v1/faces').then((r) => (r && r.faces) || []),
   /** faceBlob reads a face as SVG bytes behind the token. */
   faceBlob: async (agent: string): Promise<Blob> => {
@@ -130,6 +144,13 @@ export const api = {
     const type = (res.headers.get('Content-Type') || '').split(';')[0].trim();
     if (type !== 'image/svg+xml') throw new ApiError(res.status, { detail: 'The face of ' + agent + ' is not an SVG image.' });
     return new Blob([await res.arrayBuffer()], { type: 'image/svg+xml' });
+  },
+  /** logoBlob reads the logo of the theme behind the token. The path is on this origin under /v1/. */
+  logoBlob: async (path: string): Promise<Blob> => {
+    const res = await send(path, { accept: 'image/svg+xml, image/png, image/webp, image/jpeg' });
+    const type = (res.headers.get('Content-Type') || '').split(';')[0].trim().toLowerCase();
+    if (!/^image\/(svg\+xml|png|webp|jpeg|gif)$/.test(type)) throw new ApiError(res.status, { detail: 'The logo is not an image.' });
+    return new Blob([await res.arrayBuffer()], { type });
   },
   putFace: (agent: string, svg: string) =>
     call<FaceMeta>('/v1/faces/' + enc(agent), { method: 'PUT', body: svg, headers: { 'Content-Type': 'image/svg+xml' } }),

@@ -57,12 +57,26 @@ export interface SafeLink {
 
 /**
  * safeHref returns the address that a link keeps, or null. A link keeps an
- * http, https, or mailto address. A relative link to a .md file becomes a
- * link to that page of the wiki in the page. Any other link loses its
- * address and stays as text.
+ * http, https, or mailto address. A relative link to a .md file, and a link
+ * #page/<path> of the backend, become a link to that page of the wiki in
+ * the page. Any other link loses its address and stays as text.
  */
 export function safeHref(href: string, base = ''): SafeLink | null {
   const raw = String(href || '').trim();
+  // The backend links a page of the wiki as #page/<path>, the route of the
+  // page at /ui. The link opens the same page of the wiki here.
+  const wiki = /^#pages?\/(.+)$/.exec(raw);
+  if (wiki) {
+    let path = '';
+    try {
+      path = decodeURIComponent(wiki[1]);
+    } catch {
+      return null;
+    }
+    const parts = path.split('/');
+    if (!/\.md$/i.test(path) || parts.some((x) => x === '' || x === '..' || x === '.') || /[\u0000-\u001f\\]/.test(path)) return null;
+    return { href: '#pages/' + parts.map(encodeURIComponent).join('/'), external: false };
+  }
   if (!raw || raw.startsWith('#')) return null;
   let u: URL;
   try {

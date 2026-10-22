@@ -116,6 +116,11 @@ describe('renderInline', () => {
   it('keeps no attack in one line', () => {
     clean(renderInline('<img src=x onerror=alert(1)> [x](javascript:alert(1)) <svg onload=alert(1)>'));
   });
+
+  it('opens the #page link of the backend as a page of the wiki here', () => {
+    const box = dom(renderInline('The report is in [bridges/br-1/report.md](#page/bridges/br-1/report.md).'));
+    expect(box.querySelector('a')!.getAttribute('href')).toBe('#pages/bridges/br-1/report.md');
+  });
 });
 
 describe('safeHref', () => {
@@ -128,6 +133,15 @@ describe('safeHref', () => {
     expect(safeHref(' \njavascript:alert(1)')).toBeNull();
     expect(safeHref('//evil.example/x')).toEqual({ href: 'https://evil.example/x', external: true });
     expect(safeHref('ftp://example.com')).toBeNull();
+  });
+
+  it('maps #page/<path> and #pages/<path> to the wiki, and only a path of a page', () => {
+    expect(safeHref('#page/bridges/b1/report.md')).toEqual({ href: '#pages/bridges/b1/report.md', external: false });
+    expect(safeHref('#pages/a%20b.md')).toEqual({ href: '#pages/a%20b.md', external: false });
+    expect(safeHref('#page/../secret.md')).toBeNull();
+    expect(safeHref('#page/notes')).toBeNull();
+    expect(safeHref('#page//x.md')).toBeNull();
+    expect(safeHref('#page/%E0%A4%A.md')).toBeNull();
   });
 });
 

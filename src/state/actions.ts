@@ -3,9 +3,9 @@
 
 import { api, type NewBridge, type NewMember } from '../api/routes';
 import { openStream, type StreamHandle } from '../api/stream';
-import type { Entry, ReactionKind, StreamEvent } from '../api/types';
+import type { Entry, MessageEventData, ReactionKind, StreamEvent } from '../api/types';
 import { store } from './store';
-import type { SigninNeeded } from '../api/client';
+import { ApiError, type SigninNeeded } from '../api/client';
 
 const loading = new Map<string, Promise<unknown>>();
 
@@ -140,6 +140,20 @@ export async function loadFleet(): Promise<void> {
   store.dispatch({ type: 'fleet', fleet });
 }
 
+/** loadSkills reads the skills and the tools. A workbench without the route leaves them out. */
+export async function loadSkills(): Promise<void> {
+  try {
+    const skills = await once('skills', () => api.skills());
+    store.dispatch({ type: 'skills', skills });
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) {
+      store.dispatch({ type: 'skills', skills: { skills: [], tools: [] } });
+      return;
+    }
+    throw e;
+  }
+}
+
 export async function loadFaces(): Promise<void> {
   const faces = await once('faces', () => api.faces());
   store.dispatch({ type: 'faces', faces });
@@ -149,8 +163,35 @@ export async function loadFaces(): Promise<void> {
 
 let stream: StreamHandle | null = null;
 
+/**
+ * completeEvent returns the event with its whole entry. A bridge.message
+ * event can carry a partial entry, a card without its input and its schema.
+ * The page reads that entry again with ?from=<seq>&limit=1 and applies what
+ * the route answers. When the read fails, or the route answers another
+ * entry, the event drops, and the next read of the channel brings the card.
+ */
+export async function completeEvent(e: StreamEvent): Promise<StreamEvent | null> {
+  if (e.kind !== 'bridge.message') return e;
+  const d = e.data as MessageEventData | null;
+  if (!d || !d.message || !d.message.partial || typeof d.bridge !== 'string') return e;
+  try {
+    const page = await api.messages(d.bridge, { from: d.message.seq, limit: 1 });
+    const whole = page && page.messages ? page.messages.find((m) => m.seq === d.message.seq) : undefined;
+    if (!whole || whole.partial) return null;
+    return { ...e, data: { bridge: d.bridge, message: whole } };
+  } catch {
+    return null;
+  }
+}
+
 /** onEvent handles one event: a bridge that the page does not know loads first. */
-async function onEvent(e: StreamEvent): Promise<void> {
+async function onEvent(raw: StreamEvent): Promise<void> {
+  const e = await completeEvent(raw);
+  if (!e) {
+    // The id still moves, so a reconnect does not ask for the event again.
+    if (raw.id) store.dispatch({ type: 'stream', event: { id: raw.id, kind: 'skipped', data: null } });
+    return;
+  }
   const s = store.get();
   if (e.kind === 'bridge.message' || e.kind === 'bridge.member') {
     const d = e.data as { bridge?: string } | null;
