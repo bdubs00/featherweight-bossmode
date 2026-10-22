@@ -244,7 +244,7 @@ function SkillView({ s }: { s: CatalogSkill }) {
 function ItemMenu({ s, admin, onRemove }: { s: CatalogSkill; admin: boolean; onRemove: () => void }) {
   if (!s.slash && !(admin && s.kind === 'imported')) return null;
   return (
-    <span class="collapsed-only">
+    <span class="collapsed-only head-keys">
       <CopyKey slash={s.slash} />
       {admin && s.kind === 'imported' && (
         <Button size="s" kind="danger" onClick={onRemove}>
@@ -351,6 +351,28 @@ function RemoveSkill({ s, onDone }: { s: CatalogSkill; onDone: () => void }) {
   );
 }
 
+/** ImportedList names the imported skills and where each came from: the names that an install can replace. */
+function ImportedList({ skills }: { skills: CatalogSkill[] }) {
+  if (skills.length === 0) return null;
+  return (
+    <section class="dsec" aria-labelledby="imported-head">
+      <h2 class="sec-head t-sub" id="imported-head">
+        Imported <Chip>{skills.length}</Chip>
+      </h2>
+      <ul class="imported">
+        {skills.map((s) => (
+          <li>
+            <a href={hrefOf({ place: 'skills', item: { kind: 'skill', id: s.name } })} class="t-sub">
+              {s.name}
+            </a>
+            {s.source && <span class="t-meta clip">{s.source}</span>}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function SkillActions({ item }: { item?: SkillItem }) {
   const cat = useCatalog();
   const admin = useAdmin();
@@ -363,7 +385,7 @@ export function SkillActions({ item }: { item?: SkillItem }) {
     <section class="screen skill-actions" aria-labelledby="skill-actions-title">
       <PaneHeader
         id="skill-actions-title"
-        title={skill ? 'Skill' : tool ? 'Tool' : 'Skills'}
+        title={adding ? 'Skills' : skill ? 'Skill' : tool ? 'Tool' : 'Skills'}
         actions={
           admin ? (
             <Button size="s" aria-pressed={adding} onClick={() => (adding ? closeAddSkill() : openAddSkill())}>
@@ -373,10 +395,13 @@ export function SkillActions({ item }: { item?: SkillItem }) {
         }
       />
       <div class="scroll">
-        {skill && (
+        {skill && !adding && (
           <div class="dsec">
             <h2 class="sec-head t-sub">{skill.slash ? <code class="slash">{skill.slash}</code> : skill.name}</h2>
-            <p class="t-meta">{skill.kind === 'server' ? skill.server : skill.kind === 'imported' ? 'Imported' : 'Local'}</p>
+            <p class="t-meta">
+              {skill.kind === 'server' ? skill.server : skill.kind === 'imported' ? 'Imported' : 'Local'}
+              {skill.kind === 'imported' && skill.source ? '  ' + skill.source : ''}
+            </p>
             <div class="dsec-keys">
               <CopyKey slash={skill.slash} />
               {admin && skill.kind === 'imported' && (
@@ -387,7 +412,7 @@ export function SkillActions({ item }: { item?: SkillItem }) {
             </div>
           </div>
         )}
-        {tool && (
+        {tool && !adding && (
           <div class="dsec">
             <h2 class="sec-head t-sub">
               <code class="slash">{tool.id}</code>
@@ -395,6 +420,7 @@ export function SkillActions({ item }: { item?: SkillItem }) {
             <p class="t-meta">{tool.builtin ? 'Built in' : tool.server}</p>
           </div>
         )}
+        {cat && (adding || !it) && <ImportedList skills={cat.skills.filter((x) => x.kind === 'imported')} />}
       </div>
       {ask && skill && <RemoveSkill s={skill} onDone={() => setAsk(false)} />}
     </section>

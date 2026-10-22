@@ -11,7 +11,7 @@ import { make, type AddSource, type Marketplace, type Preview } from '../api/mak
 import { loadSkills } from '../state/actions';
 import { go } from '../lib/route';
 import { Markdown } from './common';
-import { Button, Chip, Field, Input, Led, PaneHeader, Tabs, TextArea } from './primitives';
+import { Button, Chip, Field, IconButton, Input, Led, PaneHeader, Tabs, TextArea } from './primitives';
 
 /* ---------- open and closed ---------- */
 
@@ -374,7 +374,7 @@ export function AddSkill({ initial = 'marketplace' }: { initial?: Avenue }) {
         }
       }}
     >
-      <PaneHeader id="add-skill-title" title="Add skill" size="title" level={1} actions={<Button size="s" onClick={closeAddSkill}>Cancel</Button>} />
+      <PaneHeader id="add-skill-title" title="Add skill" size="title" level={1} actions={<IconButton icon="close" label="Close" onClick={closeAddSkill} />} />
       <div class="avenues">
         <Tabs
           label="Add skill"

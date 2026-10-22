@@ -223,7 +223,7 @@ export function NewBridge() {
                       ) : (
                         <span class="t-sub">{s.handle}</span>
                       )}
-                      <span class="t-meta">{s.agent}</span>
+                      {s.agent !== s.handle && <span class="t-meta">{s.agent}</span>}
                     </div>
                     <Input aria-label={'Task of ' + s.handle} value={s.task} invalid={!!err.seat[s.key]} onInput={(e) => setSeat(s.key, { task: (e.target as HTMLInputElement).value, own: true })} />
                     {err.seat[s.key] && (

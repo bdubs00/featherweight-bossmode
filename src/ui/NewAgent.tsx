@@ -210,6 +210,11 @@ export function NewAgent() {
     await attempt(async () => {
       const saved = await make.putAgent(f.name.trim(), profile, workers, dry);
       setOut({ saved: { ...saved, name: saved.name || f.name.trim() }, dry });
+      // The answer shows below the form, so it comes into view.
+      requestAnimationFrame(() => {
+        const el = document.querySelector('.new-agent .form-end');
+        if (el && 'scrollIntoView' in el) el.scrollIntoView({ block: 'nearest' });
+      });
       if (!dry) await Promise.allSettled([loadAgents(), loadFaces(), loadFleet()]);
     });
     setBusy(false);
