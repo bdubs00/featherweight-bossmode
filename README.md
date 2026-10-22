@@ -6,7 +6,8 @@ featherweight agents. The workbench, `fw-workbench`, serves the built page at
 
 The plan is `docs/BOSSMODE_2026-10-21.md` in the workbench repository,
 featherweight-workbench. Sections 5 to 7 of that plan hold the contract that
-this page builds against. Nothing here is built yet.
+this page builds against. Where the plan gives no JSON, the page chose a
+shape, and `docs/CONTRACT.md` names each one for the backend team.
 
 ## Stack
 
@@ -26,3 +27,90 @@ the backend.
 - No external asset: no font, no script, and no image from another origin.
 - Comments and documentation follow plain English: short sentences, active
   voice, only the modal verbs can, will, and must, and no contractions.
+
+## Build
+
+The build needs Node 22 or newer and npm. Install the packages from the lock
+file, then build:
+
+```
+npm ci
+npm run build
+```
+
+`npm run build` checks the types with TypeScript and writes the page to
+`dist/`. The page expects to live at `/bossmode/`.
+
+`npm test` runs the unit tests with vitest: the API client, the presence
+lights, the `@` completion, the reducer of the stream, the routes, the
+question forms, and the Markdown sanitizer against hostile input.
+
+## Run against the fake server
+
+The fake server in `fake/` is for development only. It keeps its data in
+memory, trusts any token that starts with `fake-`, and checks nothing that a
+real workbench checks. It serves every route of `docs/CONTRACT.md` with
+sample data: two bridges, a channel of forty entries, an approval card and a
+question card, a manager conversation, a fleet with two pools, a wiki of eight
+pages, and a face for every agent. Timers move members between presences and
+post messages every few seconds.
+
+1. Start the fake server: `npm run fake`. It listens on
+   http://127.0.0.1:8787.
+2. In a second terminal, start the page: `npm run dev`. Vite serves the page
+   at http://localhost:5173/bossmode/ and sends `/v1` and `/ui` to the fake
+   server.
+3. Open http://localhost:5173/bossmode/. The page goes to the fake sign-in,
+   which signs you in as alice@example.com and comes back.
+
+The fake server also serves `dist/` at http://127.0.0.1:8787/bossmode/ with
+the content security policy of the page, so you can check a build under that
+policy after `npm run build`.
+
+Variables of the fake server:
+
+| Variable | Effect |
+|---|---|
+| `FAKE_PORT` | The port, 8787 by default |
+| `FAKE_SIGNIN=0` | A 401 names no sign-in route, so the page shows the token form. Paste `fake-alice` or `fake-bob`. |
+| `FAKE_QUIET=1` | No timers |
+| `FAKE_TICK` | The time between two timer steps in milliseconds, 5000 by default |
+
+A sign-in at `/ui/signin?as=bob` signs you in as bob@example.com.
+
+## Run against a workbench
+
+There are two ways.
+
+- Development. Start the page with the address of the workbench:
+  `FW_URL=http://localhost:8080 npm run dev`. Vite sends `/v1` and `/ui` to
+  the workbench. The browser sign-in of the workbench returns to the address
+  of the workbench, not to Vite, so paste an access token in the token form
+  of the page instead.
+- A build. Run `npm run build`, and set `workbench.bossmode.dir` (or
+  `FW_WORKBENCH_BOSSMODE_DIR`) to the `dist/` directory. The workbench then
+  serves the page at `/bossmode/` behind its own sign-in. An embedded build
+  copies `dist/` into `surface/web/bossmode/` of the workbench.
+
+The workbench must serve the routes and the stream of `docs/CONTRACT.md`.
+
+## Dependencies
+
+The page has three dependencies at run time. The build bundles them, so the
+page loads nothing from another origin.
+
+| Package | Why |
+|---|---|
+| `preact` | Draws the components. It is small, and it has the component model of React. |
+| `marked` | Turns the Markdown of agents and of the wiki into HTML. The page shows raw HTML in the Markdown as text. |
+| `dompurify` | Removes from that HTML every tag and attribute outside a short allow list, so a message or a page holds no script, no event attribute, no style, no SVG, and no image. |
+
+The build and the tests use four more packages. None of them reaches the
+browser.
+
+| Package | Why |
+|---|---|
+| `vite` | Builds `dist/` and serves the page in development, with a proxy to the API |
+| `typescript` | Checks the types |
+| `vitest` | Runs the unit tests |
+| `jsdom` | Gives the tests a DOM, which DOMPurify needs |
