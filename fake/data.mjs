@@ -309,14 +309,14 @@ function channelOne(b) {
   push(agent('reviewer'), 'Thanks. Then the role matches the manifest on the user. I still see one change: `minute` now defaults to `*`.');
   push(bob, 'Make the default `0`. A job that runs every minute by mistake is worse than one that runs once an hour.');
   push(agent('migrator-1'), 'Done: `minute` defaults to `0` now.', { replyTo: seq });
-  push(sys('started'), 'tester woke up and works on roles/cron.', { mirrors: { run: 'run-tester', seq: 2, type: 'fw.turn.started' } });
+  push(sys('started'), 'tester woke up.', { mirrors: { run: 'run-tester', seq: 2, type: 'fw.turn.started' } });
   push(agent('tester'), 'molecule converge passed on Debian 12. Idempotence passed: the second run changed nothing.');
   push(agent('tester'), 'Ubuntu 24.04 passed too.\n\n| platform | converge | idempotence |\n|---|---|---|\n| debian-12 | ok | ok |\n| ubuntu-24.04 | ok | ok |');
   push(sys('asleep'), 'tester went to sleep.', { mirrors: { run: 'run-tester', seq: 9, type: 'fw.run.finished' } });
   const done = push(agent('reviewer'), 'I reviewed **roles/cron**. It matches the manifest, with two notes:\n\n1. The role keeps `root` as the default user, as hiera does.\n2. `minute` defaults to `0` now, as Bob asked.\n\nI approve the role.', { mirrors: { run: 'run-reviewer', seq: 12, type: 'fw.run.finished' } });
   done.reactions.up = [ALICE];
   done.reactions.heart = [ALICE];
-  push(sys('finished'), 'reviewer finished its turn.', { mirrors: { run: 'run-reviewer', seq: 12, type: 'fw.run.finished' } });
+  push(alice, 'Thanks, @reviewer. Cron is done for me.', { to: ['reviewer'] });
   push(agent('writer'), 'I started `docs/migration.md`. I will list each module with its role and the open questions.');
   push(agent('migrator-2'), 'The nginx site template uses a Puppet `each` over the upstreams. Jinja has `for`, so the port is direct.');
   push(alice, '@migrator-2 keep the old file names of the templates, so a diff against Puppet stays readable.', { to: ['migrator-2'] });
@@ -362,9 +362,16 @@ function channelTwo(b) {
   return list;
 }
 
+/**
+ * The revision of the wiki. Each write of any page takes the next one, as
+ * the bucket of the store counts, so the versions of one page grow but are
+ * not consecutive.
+ */
+export const wiki = { rev: 0 };
+
 /** page builds one wiki page with its versions. */
 function page(path, versions) {
-  return { path, versions: versions.map((v, i) => ({ version: i + 1, text: v.text, hash: hash(v.text), by: v.by, at: minutesAgo(v.m), summary: v.summary || '' })) };
+  return { path, versions: versions.map((v) => ({ version: ++wiki.rev, text: v.text, hash: hash(v.text), by: v.by, run: v.run, at: minutesAgo(v.m), summary: v.summary || '' })) };
 }
 
 function seedPages() {
@@ -372,18 +379,18 @@ function seedPages() {
   const add = (p) => pages.set(p.path, p);
   add(page('index.md', [
     { m: 600, by: ALICE, summary: 'Start the wiki', text: '---\ntitle: The wiki of the fleet\n---\n# The wiki of the fleet\n\nAgents read this page before they start. People read it to see what the fleet knows.\n\n- [How we write Ansible](runbooks/ansible-style.md)\n- [The cron module](modules/cron.md)\n- [The nginx module](modules/nginx.md)\n' },
-    { m: 300, by: 'agent:writer', summary: 'Link the plan of the Puppet bridge', text: '---\ntitle: The wiki of the fleet\n---\n# The wiki of the fleet\n\nAgents read this page before they start. People read it to see what the fleet knows.\n\n- [How we write Ansible](runbooks/ansible-style.md)\n- [The cron module](modules/cron.md)\n- [The nginx module](modules/nginx.md)\n- [The plan of the Puppet bridge](bridges/br-puppet/plan.md)\n\nEach agent keeps what people liked in `agents/<agent>/learned.md`.\n' },
+    { m: 300, by: 'agent:writer', run: 'run-writer', summary: 'Link the plan of the Puppet bridge', text: '---\ntitle: The wiki of the fleet\n---\n# The wiki of the fleet\n\nAgents read this page before they start. People read it to see what the fleet knows.\n\n- [How we write Ansible](runbooks/ansible-style.md)\n- [The cron module](modules/cron.md)\n- [The nginx module](modules/nginx.md)\n- [The plan of the Puppet bridge](bridges/br-puppet/plan.md)\n\nEach agent keeps what people liked in `agents/<agent>/learned.md`.\n' },
   ]));
   add(page('_index.md', [{ m: 5, by: 'bossmode', summary: 'Generated', text: '# Every page\n\n- index.md\n- runbooks/ansible-style.md\n- modules/cron.md\n- modules/nginx.md\n- bridges/br-puppet/plan.md\n- agents/migrator/learned.md\n- agents/reviewer/learned.md\n' }]));
   add(page('runbooks/ansible-style.md', [
     { m: 500, by: BOB, summary: 'First rules', text: '---\ntitle: How we write Ansible\ntags: [ansible, style]\n---\n# How we write Ansible\n\n1. Every task has a `name` that says what it does.\n2. Use the fully qualified names of modules, such as `ansible.builtin.package`.\n3. A destructive option is false by default.\n' },
     { m: 200, by: 'agent:reviewer', summary: 'Add the rule about handlers', text: '---\ntitle: How we write Ansible\ntags: [ansible, style]\n---\n# How we write Ansible\n\n1. Every task has a `name` that says what it does.\n2. Use the fully qualified names of modules, such as `ansible.builtin.package`.\n3. A destructive option is false by default.\n4. A handler name starts with a verb: `Reload nginx`, not `nginx reload`.\n' },
   ]));
-  add(page('modules/cron.md', [{ m: 90, by: 'agent:migrator', summary: 'Notes of the cron role', text: '---\ntitle: The cron module\ntags: [puppet, ansible]\n---\n# The cron module\n\n| Puppet | Ansible |\n|---|---|\n| `cron::job` | `ansible.builtin.cron` with a loop |\n| `cron::purge` | `cron_purge`, false by default |\n\nSee [the style guide](../runbooks/ansible-style.md).\n' }]));
+  add(page('modules/cron.md', [{ m: 90, by: 'run:run-migrator-1', summary: 'Notes of the cron role', text: '---\ntitle: The cron module\ntags: [puppet, ansible]\n---\n# The cron module\n\n| Puppet | Ansible |\n|---|---|\n| `cron::job` | `ansible.builtin.cron` with a loop |\n| `cron::purge` | `cron_purge`, false by default |\n\nSee [the style guide](../runbooks/ansible-style.md).\n' }]));
   add(page('modules/nginx.md', [
     { m: 60, by: 'agent:migrator', summary: 'Notes of the nginx role', text: '---\ntitle: The nginx module\n---\n# The nginx module\n\nThe site templates keep their names: `site.conf.erb` becomes `site.conf.j2`.\n\n## Notes from the old wiki\n\nThe old wiki held raw HTML. The page shows it as text and runs nothing:\n\n<img src=x onerror="alert(1)"> <script>alert(2)</script>\n\n![a chart from another site](https://example.com/chart.png)\n\n[a link that runs code](javascript:alert(3)) and [a safe link](https://nginx.org/en/docs/).\n' },
   ]));
-  add(page('bridges/br-puppet/plan.md', [{ m: 124, by: 'agent:manager', summary: 'The plan of the bridge', text: '---\ntitle: The plan of the Puppet bridge\n---\n# Migrate the remaining Puppet modules\n\n- [x] cron, by migrator-1\n- [ ] nginx, by migrator-2\n- [ ] logrotate, next\n\nThe reviewer reads each role. The tester runs molecule. The writer keeps the notes.\n' }]));
+  add(page('bridges/br-puppet/plan.md', [{ m: 124, by: 'token', summary: 'The plan of the bridge', text: '---\ntitle: The plan of the Puppet bridge\n---\n# Migrate the remaining Puppet modules\n\n- [x] cron, by migrator-1\n- [ ] nginx, by migrator-2\n- [ ] logrotate, next\n\nThe reviewer reads each role. The tester runs molecule. The writer keeps the notes.\n' }]));
   add(page('agents/migrator/learned.md', [{ m: 400, by: 'bossmode', summary: 'A heart from alice', text: '# What people liked from migrator\n\n## 2026-10-20, bridge br-older, migrator-1\n\nAlice asked for the ntp module. The agent kept the hiera names, so the inventory did not change. [run](#)\n' }]));
   add(page('agents/reviewer/learned.md', [{ m: 20, by: 'bossmode', summary: 'A heart from alice', text: '# What people liked from reviewer\n\n## Today, bridge br-puppet, reviewer\n\nAlice asked for a review of roles/cron. The agent checked the role against the manifest and named the one change of behavior.\n' }]));
   return pages;

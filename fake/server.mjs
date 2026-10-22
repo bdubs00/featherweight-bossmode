@@ -9,12 +9,13 @@
 //   FAKE_SIGNIN=0      a 401 names no sign-in route, so the page shows the token form
 //   FAKE_QUIET=1       no timers
 //   FAKE_TICK=5000     the time between two timer steps, in milliseconds
+//   FAKE_STREAM_MS     the life of one stream before the server closes it, 15 minutes by default
 
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ALICE, AGENTS, FLEET, hash, seed } from './data.mjs';
+import { AGENTS, FLEET, hash, seed, wiki } from './data.mjs';
 import { checkSvg, identicon } from './faces.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -23,6 +24,7 @@ const PORT = Number(process.env.FAKE_PORT || 8787);
 const SIGNIN = process.env.FAKE_SIGNIN !== '0';
 const QUIET = process.env.FAKE_QUIET === '1';
 const TICK = Number(process.env.FAKE_TICK || 5000);
+const STREAM_MS = Number(process.env.FAKE_STREAM_MS || 15 * 60_000);
 
 const S = seed();
 const now = () => new Date().toISOString();
@@ -49,21 +51,22 @@ function send(res, status, body, headers = {}) {
 }
 
 /** problem answers an RFC 9457 problem document. */
-function problem(res, status, detail, extra = {}) {
+function problem(res, status, detail, extra = {}, headers = {}) {
   const titles = { 400: 'Bad Request', 401: 'Unauthorized', 403: 'Forbidden', 404: 'Not Found', 409: 'Conflict', 412: 'Precondition Failed', 413: 'Content Too Large', 422: 'Unprocessable Content' };
-  res.writeHead(status, { 'Content-Type': 'application/problem+json', 'Cache-Control': 'no-store' });
+  res.writeHead(status, { 'Content-Type': 'application/problem+json', 'Cache-Control': 'no-store', ...headers });
   res.end(JSON.stringify({ type: 'about:blank', title: titles[status] || 'Error', status, detail, ...extra }));
 }
 
 class Refusal extends Error {
-  constructor(status, detail, extra) {
+  constructor(status, detail, extra, headers) {
     super(detail);
     this.status = status;
     this.extra = extra;
+    this.headers = headers;
   }
 }
-const refuse = (status, detail, extra) => {
-  throw new Refusal(status, detail, extra);
+const refuse = (status, detail, extra, headers) => {
+  throw new Refusal(status, detail, extra, headers);
 };
 
 async function readBody(req, max = 512 * 1024) {
@@ -94,7 +97,10 @@ async function readJson(req) {
 
 const RING = 500;
 const events = [];
-let eventSeq = 0;
+// The ids count from the start time of the server in microseconds, as the
+// front counts them, so an id from before a restart gives reset.
+const FIRST_ID = Date.now() * 1000;
+let eventSeq = FIRST_ID;
 const clients = new Set();
 
 /** publish sends one event to every stream and keeps it for a resume. */
@@ -116,7 +122,7 @@ function stream(req, res) {
   if (last) {
     const n = Number(last);
     const first = events.length ? Number(events[0].id) : eventSeq + 1;
-    if (!Number.isInteger(n) || n < first - 1 || n > eventSeq) {
+    if (!Number.isSafeInteger(n) || n < first - 1 || n < FIRST_ID || n > eventSeq) {
       // The page asks for events that the ring no longer holds.
       write(res, { id: String(eventSeq), kind: 'reset', data: null });
     } else {
@@ -125,8 +131,11 @@ function stream(req, res) {
   }
   clients.add(res);
   const ping = setInterval(() => res.write(': keep-alive\n\n'), 15000);
+  // The front closes a stream after a while, and the page connects again with Last-Event-ID.
+  const life = setTimeout(() => res.end(), STREAM_MS);
   req.on('close', () => {
     clearInterval(ping);
+    clearTimeout(life);
     clients.delete(res);
   });
 }
@@ -154,13 +163,53 @@ function listItem(b, subject) {
     ...rest,
     lastSeq: ch.length ? ch[ch.length - 1].seq : 0,
     read,
-    unread: ch.filter((e) => e.seq > read && counts(e, subject)).length,
+    unread: ch.slice(-2000).filter((e) => e.seq > read && counts(e, subject)).length,
     memberCount: members.length,
     needsYou: members.filter((m) => m.presence === 'needs-you').length,
   };
 }
 
 const record = (b, subject) => ({ ...listItem(b, subject), members: b.members });
+
+/** usageOf sums the usage of the runs of a bridge, with the partial mark of the tool batch. */
+function usageOf(b) {
+  const u = { turns: 0, toolCalls: 0, reported: 0, final: 0, missing: 0, partial: false };
+  for (const m of b.members) {
+    for (const id of m.runs) {
+      const r = S.runs.get(id);
+      if (!r || !r.usage) {
+        u.missing++;
+        continue;
+      }
+      u.turns += r.usage.turns || 0;
+      u.toolCalls += r.usage.toolCalls || 0;
+      u.reported++;
+      if (['completed', 'failed', 'canceled'].includes(r.state)) u.final++;
+    }
+  }
+  u.partial = u.missing > 0;
+  return u;
+}
+
+/** stoppedRun names how the newest run of a seat stopped, or "" when it can take a message. */
+function stoppedRun(m) {
+  const r = S.runs.get(m.runs[m.runs.length - 1]);
+  if (!r) return '';
+  if (r.state === 'failed') return 'failed';
+  if (r.state === 'canceled') return 'was canceled';
+  return '';
+}
+
+/** dropCards rewrites the cards of a run that stopped waiting as denied, with no decider and a note. */
+function dropCards(bridgeId, runIds, note) {
+  for (const e of S.channels.get(bridgeId) || []) {
+    if (e.decision && e.decision.state === 'pending' && runIds.includes(e.decision.run)) {
+      e.decision = { ...e.decision, state: 'deny', decidedAt: now(), note };
+      delete e.decision.decidedBy;
+      republish(bridgeId, e);
+    }
+  }
+}
 
 /** post appends an entry to a channel and publishes it. */
 function post(bridgeId, from, text, more = {}) {
@@ -247,7 +296,12 @@ let replyN = 0;
 function fanOut(bridgeId, e) {
   const b = S.bridges.get(bridgeId);
   if (!b || b.state !== 'open') return;
-  const active = b.members.filter((m) => !m.fired && !m.muted && m.presence !== 'error');
+  for (const h of e.to || []) {
+    const m = b.members.find((x) => x.handle === h);
+    const how = m && stoppedRun(m);
+    if (how) system(bridgeId, 'failed', `${h} got no message, because its newest run ${how}. Seat it again with a new task.`);
+  }
+  const active = b.members.filter((m) => !m.fired && !m.muted && !stoppedRun(m));
   const to = e.to && e.to.length ? active.filter((m) => e.to.includes(m.handle)) : active.slice(0, 2);
   to.forEach((m, i) => {
     const wasAsleep = m.presence === 'asleep';
@@ -366,38 +420,75 @@ function managerTurn(run, first) {
 
 /* ---------- pages ---------- */
 
-function pageMeta(p) {
-  const v = p.versions[p.versions.length - 1];
-  const title = (/^title:\s*(.+)$/m.exec(v.text) || [])[1] || (/^#\s+(.+)$/m.exec(v.text) || [])[1] || p.path;
-  return { path: p.path, title: title.replace(/^["']|["']$/g, '').trim(), hash: v.hash, by: v.by, at: v.at, size: Buffer.byteLength(v.text) };
+/** live returns the newest version of a page, or null for a removed page. */
+function live(p) {
+  const v = p && p.versions[p.versions.length - 1];
+  return v && !v.deleted ? v : null;
+}
+
+function titleOf(text, path) {
+  const t = (/^title:\s*(.+)$/m.exec(text) || [])[1] || (/^#\s+(.+)$/m.exec(text) || [])[1] || '';
+  return t.replace(/^["']|["']$/g, '').trim() || path;
+}
+
+const tagsOf = (text) => ((/^tags:\s*\[(.*)\]$/m.exec(text) || [])[1] || '').split(',').map((t) => t.trim()).filter(Boolean);
+
+/** pageMeta is a page without its text, as GET /v1/pages lists it. */
+function pageMeta(p, v = live(p)) {
+  const out = { path: p.path, title: titleOf(v.text, p.path), tags: tagsOf(v.text), hash: v.hash, version: v.version, size: Buffer.byteLength(v.text), by: v.by, at: v.at, summary: v.summary || '' };
+  if (v.run) out.run = v.run;
+  return out;
 }
 
 function pageBody(p, version) {
-  const v = version ? p.versions.find((x) => x.version === version) : p.versions[p.versions.length - 1];
-  if (!v) refuse(404, `the page ${p.path} has no version ${version}`);
-  const meta = pageMeta(p);
-  const tags = ((/^tags:\s*\[(.*)\]$/m.exec(v.text) || [])[1] || '').split(',').map((t) => t.trim()).filter(Boolean);
-  return { ...meta, hash: v.hash, by: v.by, at: v.at, text: v.text, tags, summary: v.summary, version: v.version };
+  const v = version ? p.versions.find((x) => x.version === version && !x.deleted) : live(p);
+  if (!v) refuse(404, version ? `the page ${p.path} has no version ${version}` : `no page ${p.path}`);
+  return { ...pageMeta(p, v), text: v.text };
 }
 
+/**
+ * checkPath applies the rule of the store: a relative path of at most 8
+ * parts and 512 bytes, no part that is empty or starts with a dot, no
+ * control character, and .md on the last part alone. The paths search and
+ * .../history meet routes of their own.
+ */
 function checkPath(p) {
   const parts = p.split('/');
-  if (!p || p.startsWith('/') || parts.length > 8 || parts.some((x) => !x || x === '.' || x === '..') || /[\u0000-\u001f]/.test(p)) {
-    refuse(400, `the page path ${JSON.stringify(p)} must be a relative path with at most 8 parts`);
+  if (!p) refuse(400, 'the path is empty; a page path ends with .md, such as notes/plan.md');
+  if (Buffer.byteLength(p) > 512) refuse(400, 'a page path has at most 512 bytes');
+  if (parts.length > 8 || parts.some((x) => !x || x.startsWith('.')) || /[\u0000-\u001f\u007f]/.test(p)) {
+    refuse(400, `the path ${JSON.stringify(p)} must be a relative path of at most 8 parts, with no part that starts with a dot`);
   }
+  if (p === 'search') refuse(400, 'the path search is the route GET /v1/pages/search, so no page has it; a page path ends with .md, such as search.md');
+  if (parts[parts.length - 1] === 'history') refuse(400, `the path ${JSON.stringify(p)} ends with history, which is the route of the history of a page; a page path ends with .md`);
+  if (!p.endsWith('.md')) refuse(400, `the path ${JSON.stringify(p)} does not end with .md; a page path ends with .md, such as notes/plan.md`);
+  if (parts.slice(0, -1).some((x) => x.endsWith('.md'))) refuse(400, `the path ${JSON.stringify(p)} has a directory that ends with .md; only the last part of a page path ends with .md`);
 }
 
-function writePage(p, text, by, summary) {
+function checkWritable(p) {
+  checkPath(p);
+  if (p === '_index.md') refuse(400, 'the store writes _index.md after each change of the wiki, so nobody else writes or removes it; write index.md instead');
+}
+
+/**
+ * writePage writes a page. The same text again makes no new version and
+ * answers the page as it is. by is a subject, agent:<profile>, run:<id>,
+ * token, or bossmode.
+ */
+function writePage(p, text, by, summary, run) {
   let page = S.pages.get(p);
+  const cur = live(page);
+  if (cur && cur.text === text) return { page, changed: false };
   if (!page) {
     page = { path: p, versions: [] };
     S.pages.set(p, page);
   }
-  const version = page.versions.length ? page.versions[page.versions.length - 1].version + 1 : 1;
-  page.versions.push({ version, text, hash: hash(text + version), by, at: now(), summary: summary || '' });
+  const v = { version: ++wiki.rev, text, hash: hash(text), by, at: now(), summary: summary || '' };
+  if (run) v.run = run;
+  page.versions.push(v);
   if (page.versions.length > 64) page.versions.shift();
   publish('page', pageMeta(page));
-  return page;
+  return { page, changed: true };
 }
 
 /** heart appends an entry to the learned page of the agent, as section 4.5 says. */
@@ -407,22 +498,32 @@ function heart(bridgeId, e, person, note) {
   const agent = m ? m.agent : e.mirrors ? (S.runs.get(e.mirrors.run) || {}).agent : '';
   if (!agent) return;
   const p = `agents/${agent}/learned.md`;
-  const old = S.pages.get(p);
-  const head = old ? old.versions[old.versions.length - 1].text : `# What people liked from ${agent}\n`;
+  const old = live(S.pages.get(p));
+  const head = old ? old.text : `# What people liked from ${agent}\n`;
   const entry = `\n## ${now().slice(0, 10)}, bridge ${bridgeId}, ${e.from.handle || agent}\n\n${person.name} hearted: ${e.text.replace(/\s+/g, ' ').slice(0, 280)}${note ? `\n\nTheir note: ${note}` : ''}\n`;
   writePage(p, (head + entry).slice(-64 * 1024), 'bossmode', 'A heart from ' + person.name.toLowerCase());
 }
 
 /* ---------- faces ---------- */
 
+/** faceOf returns the face of an agent that the fake knows, else a 404. */
 function faceOf(agent) {
-  let f = S.faces.get(agent);
-  if (!f) {
-    if (!AGENTS.some((a) => a.name === agent)) refuse(404, `no agent ${agent}`);
-  }
+  const f = S.faces.get(agent);
+  if (!f) refuse(404, `no agent ${agent}`);
   return f;
 }
-const faceMeta = (f) => ({ agent: f.agent, displayName: f.displayName, tagline: f.tagline, hash: f.hash, custom: f.custom });
+
+let faceRev = 0;
+const faceMeta = (f) => {
+  const out = { agent: f.agent, displayName: f.displayName, tagline: f.tagline, hash: f.hash, custom: f.custom };
+  if (f.by) Object.assign(out, { by: f.by, at: f.at, version: f.version });
+  return out;
+};
+
+/** stamp records who changed a face and when. */
+function stamp(f, person) {
+  Object.assign(f, { by: person.subject, at: now(), version: ++faceRev });
+}
 
 /* ---------- the routes ---------- */
 
@@ -477,7 +578,10 @@ on('POST', '/v1/bridges', async (c) => {
   c.status = 201;
   return record(b, c.person.subject);
 });
-on('GET', '/v1/bridges/([^/]+)', (c, id) => record(bridgeOr404(id), c.person.subject));
+on('GET', '/v1/bridges/([^/]+)', (c, id) => {
+  const b = bridgeOr404(id);
+  return { ...record(b, c.person.subject), usage: usageOf(b) };
+});
 on('PATCH', '/v1/bridges/([^/]+)', async (c, id) => {
   const b = bridgeOr404(id);
   const body = await readJson(c.req);
@@ -491,6 +595,13 @@ on('PATCH', '/v1/bridges/([^/]+)', async (c, id) => {
     b.state = 'closed';
     b.closedAt = now();
     system(id, 'closed', `${c.person.name.toLowerCase()} closed the bridge. Nothing was canceled.`);
+    if (b.delegation.report) {
+      setTimeout(() => {
+        const p = `bridges/${id}/report.md`;
+        writePage(p, `# Report of ${b.title}\n\n${b.members.map((m) => `- **${m.handle}**: ${m.task}`).join('\n')}\n`, 'agent:manager', 'The report of the bridge', 'run-manager-1');
+        system(id, 'changed', `The manager wrote the report: [${p}](${p})`);
+      }, 3000);
+    }
   } else if (body.state === 'open' && b.state !== 'open') {
     b.state = 'open';
     b.closedAt = null;
@@ -521,6 +632,7 @@ on('POST', '/v1/bridges/([^/]+)/messages', async (c, id) => {
   const text = String(body.text || '').trim();
   if (!text) refuse(400, 'a message needs a text');
   const to = Array.isArray(body.to) ? body.to.map(String) : [];
+  if (to.includes('operator')) refuse(400, 'a person does not address the operator; the operator reads the channel');
   for (const h of to) {
     const m = b.members.find((x) => x.handle === h);
     if (!m) refuse(400, `no member ${h} in this bridge`);
@@ -584,12 +696,7 @@ on('DELETE', '/v1/bridges/([^/]+)/members/([^/]+)', (c, id, handle) => {
     }
   }
   setMember(id, m, { fired: true, muted: true, presence: 'fired', activity: null });
-  for (const e of S.channels.get(id)) {
-    if (e.decision && e.decision.state === 'pending' && m.runs.includes(e.decision.run)) {
-      e.decision = { ...e.decision, state: 'deny', decidedBy: c.person.subject, decidedAt: now(), note: 'The seat was fired.' };
-      republish(id, e);
-    }
-  }
+  dropCards(id, m.runs, 'the seat was fired, so the run stopped waiting.');
   system(id, 'fired', `${c.person.name.toLowerCase()} fired ${m.handle}. Its Task stays in its pool.`);
   return m;
 });
@@ -603,9 +710,23 @@ on('PATCH', '/v1/bridges/([^/]+)/members/([^/]+)', async (c, id, handle) => {
     if (!body.task.trim()) refuse(400, 'a task needs words');
     patch.task = body.task.trim();
   }
+  if ('task' in patch) {
+    // A new task seats the member again: a new run starts with the task.
+    if (m.fired) refuse(409, `${m.handle} is fired`);
+    const run = newRun(m.agent, m.handle, id, patch.task, c.person.subject);
+    patch.runs = [...m.runs, run.id];
+    patch.presence = 'working';
+    patch.activity = run.activity;
+  }
   setMember(id, m, patch);
   if ('muted' in patch) system(id, 'muted', `${c.person.name.toLowerCase()} ${patch.muted ? 'muted' : 'unmuted'} ${m.handle}.`);
-  if ('task' in patch) system(id, 'task', `${m.handle} has a new task: ${patch.task}`);
+  if ('task' in patch) {
+    system(id, 'task', `${m.handle} has a new task: ${patch.task}`, { mirrors: { run: patch.runs[patch.runs.length - 1], seq: 1, type: 'fw.run.queued' } });
+    setTimeout(() => {
+      post(id, { kind: 'agent', handle: m.handle, run: m.runs[m.runs.length - 1] }, 'I read the channel and start on my new task.');
+      setMember(id, m, { presence: 'idle', activity: null });
+    }, 3000);
+  }
   return m;
 });
 
@@ -696,6 +817,7 @@ on('POST', '/v1/runs/([^/]+)/cancel', (c, id) => {
     const m = b.members.find((x) => x.runs.includes(id));
     if (m) {
       setMember(bid, m, { presence: 'idle', activity: null });
+      dropCards(bid, [id], 'the run was canceled, so it stopped waiting.');
       system(bid, 'canceled', `${c.person.name.toLowerCase()} stopped the run of ${m.handle}.`);
     }
   }
@@ -708,40 +830,56 @@ on('POST', '/v1/runs/([^/]+)/reactions', async (c, id) => {
   const seq = Number(body.seq || 0);
   const items = S.transcripts.get(id) || [];
   if (seq !== 0 && !items.some((x) => x.seq === seq)) refuse(400, `the run ${id} has no event ${seq}`);
-  const end = items.filter((x) => x.kind === 'end').pop();
-  const receipt = body.reaction !== 'heart' && !!end && end.seq === seq && run.state === 'completed';
+  if (body.note && String(body.note).length > 1024) refuse(400, 'a note holds at most 1 KB');
   run.reactions = run.reactions || { up: 0, down: 0, heart: 0 };
   run.reactions[body.reaction] = (run.reactions[body.reaction] || 0) + 1;
+  // The reaction is one more event of the run, so its seq grows.
+  run.seq += 1;
+  run.updatedAt = now();
   publish('run', run);
-  c.status = 201;
-  return { run: id, seq, reaction: body.reaction, receipt };
+  return run;
 });
 
-on('GET', '/v1/pages', () => ({ pages: [...S.pages.values()].map(pageMeta).sort((a, b) => (a.path < b.path ? -1 : 1)) }));
+on('GET', '/v1/pages', () => ({ pages: [...S.pages.values()].filter(live).map((p) => pageMeta(p)).sort((a, b) => (a.path < b.path ? -1 : 1)) }));
 on('GET', '/v1/pages/search', (c) => {
   const q = String(c.url.searchParams.get('q') || '').trim().toLowerCase();
-  if (!q) return { q, results: [] };
+  if (!q) return { q, results: [], read: 0, unread: 0, cut: false };
   const words = q.split(/\s+/);
   const results = [];
+  let read = 0;
   for (const p of S.pages.values()) {
-    const v = p.versions[p.versions.length - 1];
+    const v = live(p);
+    if (!v) continue;
+    read++;
     const meta = pageMeta(p);
     const hay = (p.path + '\n' + meta.title + '\n' + v.text).toLowerCase();
     if (!words.every((w) => hay.includes(w))) continue;
+    // A word in the path or the title weighs more than a word in the text.
+    const score = words.reduce((n, w) => n + (p.path.toLowerCase().includes(w) ? 3 : 0) + (meta.title.toLowerCase().includes(w) ? 2 : 0) + (v.text.toLowerCase().split(w).length - 1), 0);
     const at = v.text.toLowerCase().indexOf(words[0]);
     const snippet = at >= 0 ? v.text.slice(Math.max(0, at - 40), at + 80).replace(/\s+/g, ' ') : meta.title;
-    results.push({ path: p.path, title: meta.title, snippet });
+    results.push({ path: p.path, title: meta.title, snippet, version: v.version, score });
   }
-  return { q, results };
+  results.sort((a, b) => b.score - a.score || (a.path < b.path ? -1 : 1));
+  return { q, results, read, unread: 0, cut: false };
 });
 on('GET', '/v1/pages/(.+)/history', (c, p) => {
   const path = decodeURIComponent(p);
+  checkPath(path);
   const page = S.pages.get(path);
   if (!page) refuse(404, `no page ${path}`);
-  return { path, versions: [...page.versions].reverse().map(({ text, ...v }) => ({ ...v, size: Buffer.byteLength(text) })) };
+  return {
+    path,
+    versions: [...page.versions].reverse().map((v) =>
+      v.deleted
+        ? { version: v.version, hash: '', by: '', at: v.at, summary: '', size: 0, deleted: true }
+        : { version: v.version, hash: v.hash, by: v.by, at: v.at, summary: v.summary, size: Buffer.byteLength(v.text), title: titleOf(v.text, path), ...(v.run ? { run: v.run } : {}) },
+    ),
+  };
 });
 on('GET', '/v1/pages/(.+)', (c, p) => {
   const path = decodeURIComponent(p);
+  checkPath(path);
   const page = S.pages.get(path);
   if (!page) refuse(404, `no page ${path}`);
   const v = c.url.searchParams.get('version');
@@ -755,25 +893,28 @@ on('GET', '/v1/pages/(.+)', (c, p) => {
 });
 on('PUT', '/v1/pages/(.+)', async (c, p) => {
   const path = decodeURIComponent(p);
-  checkPath(path);
+  checkWritable(path);
   const body = await readJson(c.req);
   if (typeof body.text !== 'string') refuse(400, 'a page needs a text');
   if (Buffer.byteLength(body.text) > 262144) refuse(413, 'a page holds at most 256 KB');
-  const page = S.pages.get(path);
-  const cur = page ? page.versions[page.versions.length - 1].hash : '';
+  const cur = live(S.pages.get(path));
   const ifMatch = String(c.req.headers['if-match'] || '').replace(/^W\//, '').replace(/"/g, '');
   const ifNone = c.req.headers['if-none-match'];
-  if (ifNone === '*' && page) refuse(412, `the page ${path} exists already`, { hash: cur });
-  if (ifMatch && ifMatch !== cur) refuse(412, `the page ${path} changed since you read it`, { hash: cur });
+  const etag = cur ? { ETag: '"' + cur.hash + '"' } : {};
+  if (ifNone === '*' && cur) refuse(412, `the page ${path} exists already`, { hash: cur.hash }, etag);
+  if (ifMatch && (!cur || ifMatch !== cur.hash)) refuse(412, `the page ${path} changed since you read it`, cur ? { hash: cur.hash } : {}, etag);
   const out = writePage(path, body.text, c.person.subject, body.summary);
-  const res = pageBody(out, 0);
+  const res = pageBody(out.page, 0);
   c.headers.ETag = '"' + res.hash + '"';
-  c.status = page ? 200 : 201;
+  c.status = out.changed && !cur ? 201 : 200;
   return res;
 });
 on('DELETE', '/v1/pages/(.+)', (c, p) => {
   const path = decodeURIComponent(p);
-  if (!S.pages.delete(path)) refuse(404, `no page ${path}`);
+  checkWritable(path);
+  const page = S.pages.get(path);
+  if (!live(page)) refuse(404, `no page ${path}`);
+  page.versions.push({ version: ++wiki.rev, deleted: true, at: now() });
   publish('page', { path, title: '', hash: '', by: c.person.subject, at: now(), size: 0, deleted: true });
   c.status = 204;
   return undefined;
@@ -781,7 +922,9 @@ on('DELETE', '/v1/pages/(.+)', (c, p) => {
 
 on('GET', '/v1/faces', () => ({ faces: AGENTS.map((a) => faceMeta(faceOf(a.name))) }));
 on('GET', '/v1/faces/([^/]+)', (c, a) => {
-  const f = faceOf(decodeURIComponent(a));
+  const agent = decodeURIComponent(a);
+  // An agent that the caller cannot see, or that the fake does not know, gets the identicon.
+  const f = S.faces.get(agent) || { svg: identicon(agent), hash: hash(identicon(agent)) };
   const etag = '"' + f.hash + '"';
   if (c.req.headers['if-none-match'] === etag) {
     c.status = 304;
@@ -795,10 +938,12 @@ on('GET', '/v1/faces/([^/]+)', (c, a) => {
 });
 on('PUT', '/v1/faces/([^/]+)', async (c, a) => {
   const f = faceOf(decodeURIComponent(a));
-  const svg = await readBody(c.req, 64 * 1024);
-  const why = checkSvg(svg);
+  const raw = await readBody(c.req, 1024 * 1024);
+  if (Buffer.byteLength(raw) > 32 * 1024) refuse(413, 'a face holds at most 32 KB');
+  const why = checkSvg(raw);
   if (why) refuse(422, why);
-  Object.assign(f, { svg, custom: true, hash: hash(svg + f.displayName + f.tagline) });
+  Object.assign(f, { svg: raw, custom: true, hash: hash(raw + f.displayName + f.tagline) });
+  stamp(f, c.person);
   publish('face', faceMeta(f));
   return faceMeta(f);
 });
@@ -814,6 +959,7 @@ on('PATCH', '/v1/faces/([^/]+)', async (c, a) => {
     f.tagline = String(body.tagline);
   }
   f.hash = hash(f.svg + f.displayName + f.tagline);
+  stamp(f, c.person);
   publish('face', faceMeta(f));
   return faceMeta(f);
 });
@@ -821,6 +967,7 @@ on('DELETE', '/v1/faces/([^/]+)', (c, a) => {
   const f = faceOf(decodeURIComponent(a));
   const svg = identicon(f.agent);
   Object.assign(f, { svg, custom: false, hash: hash(svg + f.displayName + f.tagline) });
+  stamp(f, c.person);
   publish('face', faceMeta(f));
   return faceMeta(f);
 });
@@ -897,7 +1044,7 @@ const server = http.createServer(async (req, res) => {
     if (typeof out === 'string') return send(res, c.status, out, c.headers);
     send(res, c.status, out, c.headers);
   } catch (e) {
-    if (e instanceof Refusal) return problem(res, e.status, e.message, e.extra);
+    if (e instanceof Refusal) return problem(res, e.status, e.message, e.extra, e.headers);
     console.error(e);
     if (!res.headersSent) problem(res, 500, 'the fake server failed: ' + e.message);
   }
@@ -916,6 +1063,23 @@ const CHATTER = [
 let chatN = 0;
 let moveN = 0;
 
+/** taskPhase moves a Task of the fleet view and sends the task and member events. */
+function taskPhase(name, phase) {
+  const member = 'default/' + name;
+  const state = phase === 'Running' ? 'live' : 'suspended';
+  for (const pool of FLEET.pools) {
+    for (const t of pool.tasks) {
+      if (t.name !== name) continue;
+      t.phase = phase;
+      if (phase === 'Running') delete t.note;
+      else t.note = 'Asleep. A request wakes it.';
+    }
+  }
+  for (const m of FLEET.members) if (m.name === member) Object.assign(m, { state, lastSeen: now() });
+  publish('task', { kind: 'task', member, phase, time: now() });
+  publish('member', { kind: 'member', member, state, time: now() });
+}
+
 function tick() {
   const b = S.bridges.get('br-puppet');
   if (!b || b.state !== 'open') return;
@@ -930,11 +1094,13 @@ function tick() {
   }
   if (tester && !tester.fired) {
     if (step === 0) {
+      taskPhase('crew-2', 'Running');
       system(b.id, 'started', 'tester woke up.');
       setMember(b.id, tester, { presence: 'working', activity: { turn: 3, tool: 'bash', phrase: 'Ran "molecule test"', since: now() } });
     } else if (step === 2) setMember(b.id, tester, { presence: 'idle', activity: null });
     else if (step === 3) {
       setMember(b.id, tester, { presence: 'asleep', activity: null });
+      taskPhase('crew-2', 'Suspended');
       system(b.id, 'asleep', 'tester went to sleep.');
     }
   }
