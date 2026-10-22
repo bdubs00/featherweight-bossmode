@@ -63,7 +63,8 @@ npm run build
 `npm test` runs the unit tests with vitest: the API client, the presence
 lights, the `@` completion, the reducer of the stream, the routes, the
 question forms, the Markdown sanitizer against hostile input, the live
-answer of a run, and the quick chat.
+answer of a run, the quick chat, the agents of the fleet, the words of a
+system line, and the links of every screen of the page.
 
 ## Run against the fake server
 

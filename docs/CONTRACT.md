@@ -747,8 +747,9 @@ open. The page reads them from `GET /v1/fleet`: the `agent` of each pool,
 and the `agents` of each member other than the front itself (`self`), each
 with the `role` of the caller. A profile of `GET /v1/agents` adds its
 description and its lists to an agent of the same name. A profile of the
-front that no pool runs and no member holds shows only when the page knows
-a run of it, such as a seat. `src/lib/agents.ts` holds the rule. The
+front that no pool runs shows only when the page knows a run of it, such
+as a seat, also where a member holds a profile of that name, as a member
+of an old test can hold `default`. `src/lib/agents.ts` holds the rule. The
 picker of Add, the people list, the new-bridge screen, the Skills place, and
 the new-agent screen read this one list. The free workers of an agent come
 from its pool.

@@ -9,11 +9,12 @@ import type { Agent, Fleet } from '../api/types';
 /**
  * fleetAgents lists the agents of the fleet by name: the agent of each
  * pool, and each agent that a member other than the front holds. A profile
- * of the front that no pool runs and no member holds shows only when the
- * page knows a run of it, such as a seat on a bridge. known names those
- * agents. The role of an agent is the role of the person on it: the role
- * that a member names, else the role of the profile of the front, else ""
- * when the page cannot tell.
+ * of the front itself, such as default, shows only when a pool runs it or
+ * the page knows a run of it, such as a seat on a bridge, also when a
+ * member holds a profile of that name. known names the agents with a run.
+ * The role of an agent is the role of the person on it: the role that a
+ * member names, else the role of the profile of the front, else "" when
+ * the page cannot tell.
  */
 export function fleetAgents(fleet: Fleet | null | undefined, own: Agent[] | null | undefined, known: Iterable<string> = []): Agent[] {
   const byName = new Map<string, Agent>();
@@ -38,10 +39,14 @@ export function fleetAgents(fleet: Fleet | null | undefined, own: Agent[] | null
     }
   }
   const ran = new Set(known);
+  const pooled = new Set(fleet ? (fleet.pools || []).map((p) => p.agent) : []);
   for (const o of own || []) {
+    if (!pooled.has(o.name) && !ran.has(o.name)) {
+      byName.delete(o.name);
+      continue;
+    }
     const a = byName.get(o.name);
-    if (a) byName.set(o.name, { ...o, role: a.role || o.role || '', description: o.description || a.description });
-    else if (ran.has(o.name)) byName.set(o.name, { ...o, role: o.role || '' });
+    byName.set(o.name, { ...o, role: (a && a.role) || o.role || '', description: o.description || (a && a.description) });
   }
   return [...byName.values()].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 }

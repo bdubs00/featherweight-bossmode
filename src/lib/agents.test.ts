@@ -11,6 +11,8 @@ const fleet: Fleet = {
     { name: 'front-0', self: true, state: 'live', lastSeen: '', canForward: false, accessMode: 'rules', agents: [{ name: 'default', role: 'owner' }], active: 0, inputRequired: 0 },
     { name: 'default/crew-migrator-0', state: 'quiet', lastSeen: '', canForward: true, accessMode: 'rules', agents: [{ name: 'bootstrap', role: 'owner' }, { name: 'migrator', role: 'owner', description: 'Migrates modules.' }], active: 0, inputRequired: 0 },
     { name: 'default/tickets-0', state: 'quiet', lastSeen: '', canForward: true, accessMode: 'rules', agents: [{ name: 'triage', role: 'viewer' }], active: 0, inputRequired: 0 },
+    // A member of an old test holds a profile of the name of the front's own.
+    { name: 'default/fw-e2e', state: 'quiet', lastSeen: '', canForward: true, accessMode: 'rules', agents: [{ name: 'default', role: 'owner' }], active: 0, inputRequired: 0 },
   ],
   pools: [
     { name: 'crew-migrator', atespace: 'default', agent: 'migrator', intake: 'q', wanted: 1, actual: 1, ready: 1, hash: 'h', checkedAt: '', tasks: [{ name: 'crew-migrator-0', phase: 'Suspended', current: true }] },
@@ -20,7 +22,7 @@ const fleet: Fleet = {
 const own: Agent[] = [{ name: 'default', role: 'owner', description: 'The front.' }];
 
 describe('fleetAgents', () => {
-  it('names the agents of the pools and of the members, by name, and never the profile of the front alone', () => {
+  it('names the agents of the pools and of the members, by name, and never a profile of the front with no pool and no run, also where a member holds its name', () => {
     expect(fleetAgents(fleet, own).map((a) => a.name)).toEqual(['bootstrap', 'migrator', 'reviewer', 'triage']);
   });
 
