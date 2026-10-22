@@ -61,6 +61,12 @@ the plan does instead, and why.
 | A soft wide shadow and a hairline under the same popover | Only floating layers (menus, the picker, dialogs) carry the soft shadow, below their hard edge | A soft shadow solves a real layering problem only where a layer floats over content. |
 | Decorative entrance motion on each section | Three motions: the amber light breathes, an arriving decision card settles once, and the reply chip slides in | Motion that answers a change shows what changed. Motion on load says nothing. |
 | A sentence of help under every field and in every footer | A label, a limit in the error at the moment the person hits it, and a definition behind a question mark | The operator learns the page once and reads it a thousand times. |
+| Glyphs of the mockup that are not symmetric, such as the marks of writer and scribe | Every mark mirrors around its middle column | A symmetric mark reads as a face at 20 pixels. |
+| `4 Tasks awake` at the foot of the list (the mockup) | `4 workers awake` | The page never says Task or pool to an operator. |
+| A soft wash under a selected member and a needs-you row of `#FFF7E8` without a token (the mockup) | `--wash-need`, light and graphite, only for a row that needs you | A color without a token drifts. |
+| A decided card with the same hard edge as a waiting one | A decided card turns quiet: a line edge, no drop, no light | Only what waits keeps the hard edge. |
+| The usage of a bridge at the foot of the members (the mockup), against the contract, which showed none | The foot shows turns, cost, and pages from `usage`, for runs that report it | The owner approved the mockup, and `GET /v1/bridges/{id}` carries `usage`. |
+| One flat list of bridges | Open bridges, then a Closed group behind a toggle, and a filter field once the list grows | Collapsed sections and a filter keep hundreds of bridges in reach. |
 
 The groove band deserves one more word, because repeating stripes are a
 known tell of generated pages. The band here is 8 pixels tall. It sits only at
@@ -303,7 +309,7 @@ centered, because they are not anyone's voice. Numbers in chips are centered
 in the chip. Nothing is justified.
 
 The places of the app bar, top to bottom: the logo well, Activity, Bridges,
-Fleet, Wiki, Manager, and the account at the foot. Each place has a 22-pixel
+Fleet, Skills, Wiki, Manager, and the account at the foot. Each place has a 22-pixel
 icon over a 12-pixel label. The active place sits on paper with a line edge
 and a sheen, as a key that is pressed in. A count on Activity is a black chip
 at the top right of the icon.
@@ -313,8 +319,14 @@ at the top right of the icon.
 | Activity | The inbox: what needs you first, then what is new | The item you picked | none |
 | Bridges | Bridges, open first, each with its count and its light | The channel, with the tabs Posts, Wiki, and Decisions | The members, with Add |
 | Fleet | People: the seats grouped by bridge, then Not on a bridge | A direct conversation with a member, with the tabs Chat, Run, and Files, or the board | The profile of the agent |
+| Skills | The skills by origin (Imported, Local, one group per server), then the tools (Built in, one group per server) | The text of a skill or the description of a tool, and the agents that can load it | Add skill, and the actions on the item |
 | Wiki | The tree and the search | A page, its history, or the editor | none |
 | Manager | none at first | The conversation | none at first |
+
+A pane with nothing picked keeps its header row and its groove band. Thus
+the bands of the three panes stay in one line. The invitation to act sits in
+the middle of the pane. The account key opens a menu with the name of the person, the
+theme (Match the system, Light, Graphite), Connections, and Sign out.
 
 ## 6. The primitives
 
@@ -325,15 +337,16 @@ color, radius, shadow, or type size of its own.
 
 | Primitive | What it draws | States |
 |---|---|---|
+| `Help` | A 22-pixel question mark that opens a definition in a small layer | open, closed by Escape or a click elsewhere |
 | `Led` | A 9-pixel square light and its word | Green, amber (breathes), red, and grey. Struck for fired. Quiet: no word on screen, the word in a tooltip and the accessible name. |
 | `Mark` | The face of an agent: a 5 by 5 symmetric glyph from the hash of the name on a raised square, or the custom picture of the backend | Sizes 20, 32, 36, and 72. A halo of a status color in the header of a member conversation. Selected: the well turns paper. |
 | `Avatar` | A person: initials in on-ink on an ink square | sizes 20, 32, 36 |
 | `Chip` | A count or a short state on a heading line | plain (line edge, muted), ink (unread), amber (decisions), with an optional `Led` inside |
-| `Button` | A key | Kinds: primary (accent, 2px edge, raised 1px), secondary (key ground, 1px edge, 1px drop), quiet (no edge, no ground). Sizes 36 and 32, and 44 on touch. Disabled, pressed, and a link with `href`. |
+| `Button` | A key | Primary: accent, 2px edge, raised 1px. Secondary: key ground, 1px edge, 1px drop. Quiet: no edge, no ground. Danger: a secondary key with the red word, for Fire and Remove. Sizes 36 and 32, and 44 on touch. Disabled, pressed, and a link with `href`. `IconButton` is a key with one glyph and a name. |
 | `Recess` | `Input`, `TextArea`, `Command`, and `Field`: a label, the control, and the reason of a failure | focus, invalid, disabled |
 | `GrooveBand` | The 8-pixel band of fine grooves | on paper, on a card |
-| `PaneHeader` | The 56-pixel header of a pane: a back link on narrow screens, the heading, its chip, the actions, and the groove band under it | title (main pane) or heading (list and details) |
-| `Card` | A surface with a hard edge, a groove band, a title with an optional light, a body, and actions at the end | settle: once, on arrival |
+| `PaneHeader` | The 56-pixel header of a pane: a back link, the heading, its chip, the actions, and the groove band under it | Title (main pane) or heading (list and details). The back link shows where its column is out of sight (`to: 'list'` or `'main'`), or always (`to: 'here'`). |
+| `Card` | A surface with a hard edge, a groove band, a title with an optional light, a body, and actions at the end | Settle: once, on arrival. Quiet: a line edge, no drop, no breath, for a card that waits for nothing. |
 | `Tabs` | Tabs on a header line, each with an optional count chip | current (ink, bold, the accent bar), hover (ink) |
 | `ReactionChip` | A thumb up, a thumb down, or a heart with its count | mine (the line turns ink), the heart filled with the accent |
 | `LogoWell` | The 44-pixel square at the top of the app bar | empty (dashed edge, a neutral mark), a logo from the deployment |
@@ -358,7 +371,11 @@ color, radius, shadow, or type size of its own.
 8. Nothing moves unless something changed, and only three things move.
 9. Every target is 44 pixels on touch, every action has a key path, and
    reduced motion stops all motion.
-10. The page loads nothing from another origin: the typeface, the marks, and
+10. Skills and tools live in their own place. Elsewhere they show only in
+    three spots. The first is the picker of skills on the new-agent screen
+    and on the profile. The second is the slash menu of a one-on-one
+    composer. The third is the one line of a profile that counts them.
+11. The page loads nothing from another origin: the typeface, the marks, and
     the icons are part of the build.
 
 ## 8. The theme of a deployment
@@ -419,4 +436,222 @@ The research for this plan, at most ten searches, read these pages:
 
 ## 11. Screens for the next stage
 
-The lead writes section 11 after the shell is built.
+Three screens rework the page in parallel, on top of this branch. Each one
+owns a set of files and never edits a file of another screen. The lead owns
+the shared files. The shell already routes every screen: `src/ui/App.tsx`
+names the component of each pane for each route, and each component lives
+in a file of one screen. A first cut of each new screen is in place, so the
+page works end to end from the start.
+
+### 11.1 Rules for every screen
+
+1. Build from the primitives of section 6. Add no color, radius, shadow,
+   type size, or motion. For a missing token or primitive, write the need in
+   the report, and the lead adds it.
+2. Follow `docs/COPY.md` for every string of your files, and the words of
+   its section 2. The word pool never appears. A status is a word.
+3. Keep the rules of the page: one token in `sessionStorage`, the sign-in
+   flow, a word beside every light, keyboard reach for every action, 44-pixel
+   targets on touch, reduced motion, no external asset, and no browser
+   dialog. Ask before a destructive action with `Confirm` of `common.tsx`.
+4. A new route of the API, a new type, a new action, or a new piece of state
+   goes in a new file that you own, such as `src/state/activity.ts`, never in
+   `src/api/routes.ts`, `src/api/types.ts`, `src/state/actions.ts`, or
+   `src/state/reducer.ts`. The lead folds them in after the merge.
+5. A new glyph goes in a file of your own. The lead moves it into
+   `src/ui/icons.tsx` after the merge.
+6. A fake route goes in your file `fake/routes-<a|b|c>.mjs`. It gets the
+   helpers of `fake/server.mjs` through `register`.
+7. As a file of yours moves to the primitives, it drops the classes of
+   `src/styles/legacy.css`. Once no screen uses that file, the lead removes
+   it.
+8. Tests sit beside your files. `npm run build` and `npm test` pass before
+   each commit.
+9. A change to a route, to the panes of a route, or to a shared file goes in
+   your report. Do not edit `src/lib/route.ts` or `src/ui/App.tsx`.
+
+### 11.2 Screen A: the bridges
+
+Files: `src/ui/BridgeList.tsx`, `src/ui/Channel.tsx`, `src/ui/Message.tsx`,
+`src/ui/Decision.tsx`, `src/ui/Composer.tsx`, `src/ui/Roster.tsx`,
+`src/styles/channel.css`, and `fake/routes-a.mjs`. New files of A, such as
+`src/ui/Picker.tsx` for the picker of Add, belong to A.
+
+The work:
+
+- The list of bridges. Rows as the mockup draws them: the title, the unread
+  count as an ink chip, the members, and the light of what needs you. Open
+  bridges first, the Closed group behind its toggle, and a filter field
+  above the list once it holds more than ten bridges.
+- The header of the channel. The title, the tabs Posts, Wiki, and Decisions
+  with the amber count of the decisions that wait, the key Close bridge, and
+  the More menu with What the manager can do and Reopen. The tab Wiki lists
+  the pages under `bridges/<id>/`. The tab Decisions lists the cards of the
+  bridge, waiting first. The routes are `#bridge/<id>/wiki` and
+  `#bridge/<id>/decisions`.
+- The entries. Reaction chips at the top right of an entry, with
+  `ReactionChip`. A system line with the light of its event: green for
+  started, amber for needs you and asked, red for failed, grey for the rest,
+  including `finished`. An entry from the handle `manager` draws the mark of
+  the manager.
+- The folding of system lines and agent chatter. Three or more system lines
+  in a row fold into one line, such as `5 updates`, that opens in place.
+  Messages that agents send only to agents fold into one line, such as
+  `migrator-1 and reviewer: 4 messages`. A decision card never folds.
+- The decision card. `Card` with the title Needs your decision and the amber
+  light. Its body holds the sentence of `decisionTitle`, the command in
+  `Command`, the rule label of `whyWords`, Details, and the Note field. Its
+  keys are Deny, Always allow, and the label of the decision. A card that
+  arrives on the stream after the channel loaded settles once. A card on
+  load never moves.
+- The composer. The words of COPY.md for the address line.
+- The capacity line. A bridge whose seats outnumber the workers of their
+  agents gets one line in its channel: `Runs in waves: N seats share M
+  workers.` The counts come from `workersOf` of `src/lib/workers.ts`.
+- The members pane. Rows of the mockup: the mark at 36, the handle, the
+  status, the task, the phrase of the activity, and the reason of an error,
+  such as `Stopped at 40 turns`. The status comes from `seatLight`, which
+  says waiting for a worker for a queued run. A row that needs you takes `--wash-need`. The More
+  menu holds Open conversation (to `#member/<bridge>/<handle>`), Mute, Seat
+  again, Change task, and Fire. The foot shows This bridge with turns, cost,
+  and pages from `usage`, for runs that report it.
+- The picker of Add. One field, Who, with the placeholder `Who?`. A list of
+  agents with their marks, their taglines, and their workers: `N free` with
+  a green light, or `waiting for a worker` with a grey one. Two groups: On
+  this bridge, then Everyone else. A click puts a new seat row at the top of the
+  members. The row holds the handle of `nextHandle` and the task, filled
+  from the goal of the bridge, with the keys Seat and Cancel. Advanced opens the full form: handle, agent, and task, with the
+  reason of `handleReason`. New agent opens `#new-agent`.
+
+### 11.3 Screen B: the fleet and the people
+
+Files: `src/ui/Fleet.tsx`, `src/ui/Member.tsx`, `src/ui/Board.tsx`,
+`src/ui/Activity.tsx`, `src/ui/RunPane.tsx`, `src/ui/Conversation.tsx`,
+`src/styles/fleet.css`, and `fake/routes-b.mjs`. New files of B, such as
+`src/ui/Profile.tsx`, belong to B. B imports `DecisionCard` of A and
+`SkillPicker` of C and edits neither.
+
+The work:
+
+- The people list, in the list pane of Fleet. The seats of every open
+  bridge, grouped by bridge, each group with the title of its bridge as a
+  link and a count chip. Each row: the mark at 32, the handle, its status,
+  and its task. Then Not on a bridge, last: the agents with no seat, with
+  the state of their workers. A Find a member field on top. The header has
+  the count chip, an `N awake` chip with a green light, and the key New
+  agent. The list loads the record of each open bridge, and the stream
+  keeps it current.
+- The member conversation, at `#member/<bridge>/<handle>`. The header has
+  the mark at 36 with the halo of its status. The word of the status is in
+  the tooltip and the accessible name. The handle is the title, and
+  `in <bridge>` is a link. The tabs are Chat, Run, and Files, with the count
+  of files. The More key opens the menu of the seat. Chat shows the transcript of the runs of the seat in
+  the look of the channel, with the composer `Message <handle>`. Its slash
+  menu offers the skills of the agent through the `commands` of `Composer`.
+  Run shows the result, what it did, the limits, and the reactions. Files
+  shows the files and the viewer. The `activity` of `GET /v1/runs/{id}` has
+  no phrase, so the phrase comes from the member of the bridge.
+- The profile of the agent, in the details pane. The mark at 72, the
+  tagline, the tools as chips, a rule as an amber word, and the key New
+  face. What people liked, from `agents/<agent>/learned.md`, with a count
+  chip and Open page. Workers, with its chip, the question mark What is a
+  worker, and Keep as a number field in place. Each worker: its name, its
+  status, and the seat it serves or the time it slept, as `since()` gives
+  it. The one line `N skills`, and the picker of skills of C. Today: runs,
+  cost, and decisions.
+- Activity. The inbox in the order of attention: the decisions that wait,
+  then the errors, then the messages to you, then the rest. j and k move,
+  Enter opens, a allows, d denies, and r replies. A decision shows as the
+  card of A.
+- The board, at `#board`. One light per member, grouped by bridge, as small
+  tiles of a mark, a handle, and a light with its word for a screen reader,
+  for a fleet too large for a list. A key on the header of the people list
+  switches between the list and the board.
+- Open in the contract: the route that changes Keep, and the counts of
+  Today. B serves them in `fake/routes-b.mjs` and names them in its report.
+
+### 11.4 Screen C: what you make
+
+Files: `src/ui/Pages.tsx`, `src/ui/Manager.tsx`, `src/ui/NewBridge.tsx`,
+`src/ui/NewAgent.tsx`, `src/ui/Appearance.tsx`, `src/ui/Skills.tsx`,
+`src/styles/wiki.css`, and `fake/routes-c.mjs`. New files of C, such as
+`src/ui/SkillPicker.tsx` and `src/ui/AddSkill.tsx`, belong to C.
+
+The work:
+
+- The wiki. The tree with its folders as groups, each row with its name and
+  `since()`, the search, the page with its meta as parts, the history, and
+  the editor with the conflict of a 412.
+- The manager conversation. The look of the channel, the status waking with
+  a grey light while the Task of the manager wakes, and New conversation. A
+  manager that runs on the front gets no `run` event, so the screen polls
+  `GET /v1/runs/{id}` while the run works. Without a manager, the screen
+  says `No manager is set up.` with a question mark that names the setting.
+- New bridge. One question first: the goal. The placement is a visible
+  choice of two: Keep warm workers, the default (`queue`), and Fresh sandbox
+  per seat (`spawn`), which needs a manager. The seats come from the picker
+  of A once it lands, and until then from the rows of today. Advanced holds
+  the title, the handles, and what the manager can do.
+- New agent, at `#new-agent`. One question first: the name. Then How many
+  can work at once?, with 2 as the default, which the profile shows as Keep.
+  Advanced holds the description, the tools, the skills with the
+  `SkillPicker`, and the rules. The route that makes an agent is open in the
+  contract. C serves it in `fake/routes-c.mjs` and names it in its report.
+- The Skills place, at `#skills`. The list of section 5, the text of a skill
+  as Markdown with its front matter keys as chips, the description of a
+  tool, and the agents that can load it. The details pane holds one key,
+  Add skill, which opens a small chooser of four avenues: from a marketplace
+  that the admin configured, from an address, a pasted SKILL.md, and
+  uploaded files. Each avenue ends in a preview that the admin reads before
+  Install. The details pane also holds the actions on the item: Remove for
+  an imported skill, and Copy of the slash command. The routes are in
+  section 12 of `docs/CONTRACT.md`.
+- `SkillPicker`. A list of skills with check boxes and descriptions,
+  grouped by origin, with a search. The new-agent screen and the profile of
+  B use it. Its props: `skills`, `value` (the names that are on), and
+  `onChange`.
+- Appearance, at `#appearance`. The theme of the person, as in the account
+  menu, and the theme of the deployment: the accent and the logo.
+
+### 11.5 The shared files of the lead
+
+Only the lead edits these files:
+
+| Area | Files |
+|---|---|
+| The build | `index.html`, `package.json`, `package-lock.json`, `vite.config.ts`, `src/main.tsx` |
+| The look | `src/styles/` except `channel.css`, `fleet.css`, and `wiki.css`, and all of `src/ui/primitives/` |
+| The shell | `src/ui/Shell.tsx`, `src/ui/App.tsx`, `src/ui/common.tsx`, `src/ui/icons.tsx`, `src/ui/keys.ts`, `src/ui/notice.ts`, `src/ui/Signin.tsx` |
+| The data | all of `src/lib/`, `src/state/`, and `src/api/` |
+| The fake | `fake/server.mjs`, `fake/data.mjs`, `fake/faces.mjs`, `fake/skills.mjs` |
+| The documents | `README.md` and all of `docs/` |
+
+The shared libraries hold what two screens need, so no screen waits for
+another:
+
+| Need | Where |
+|---|---|
+| Faces | `markOf` in `src/lib/mark.ts`, and `Mark` |
+| Statuses | `seatLight`, `WAITING`, `phaseOf`, and `runStatus` in `src/lib/presence.ts` |
+| Capacity | `workersOf` and `awakeWorkers` in `src/lib/workers.ts` |
+| Seats | `nextHandle` and `handleReason` in `src/lib/handles.ts` |
+| Times | `since` in `src/lib/words.ts` |
+| The slash menu | `slashAt` in `src/lib/mention.ts`, and the `commands` of `Composer` |
+| Skills | `loadSkills` and `state.skills` |
+| A cut card on the stream | `completeEvent` in `src/state/actions.ts`, already in the stream |
+
+### 11.6 Screenshots
+
+`docs/shots/` holds the shell against the fake server, at 1440 by 900, 1024
+by 768, and 390 by 844, in both themes.
+
+| File | What |
+|---|---|
+| `wide-light-channel.png` | The channel with a decision that waits, the bridges, and the members |
+| `wide-graphite-channel.png` | The same in graphite |
+| `wide-light-theme.png` | A deployment with a logo and a green accent, after a decision, read again from a cut card |
+| `wide-light-fleet.png` | The fleet with the workers of each agent and the profile of an agent |
+| `wide-graphite-skills.png` | The Skills place in graphite |
+| `medium-graphite-members.png` | Two panes: the channel and the members |
+| `narrow-light-list.png` | One pane: the bridges, with the places at the bottom |
+| `narrow-graphite-channel.png` | One pane: the channel, with the back link and the composer |

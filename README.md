@@ -21,12 +21,31 @@ the backend.
 
 - One token in `sessionStorage`, as the page at `/ui` keeps it. On a 401 with
   `signin`, the page goes to `/ui/signin` and comes back.
-- Every status has a word and an icon beside its color.
+- Every status has a word beside its light. The light only repeats it.
 - Every action is reachable from the keyboard, and `prefers-reduced-motion`
   turns motion off.
 - No external asset: no font, no script, and no image from another origin.
+  The typeface, Archivo, comes from an npm package into the build.
 - Comments and documentation follow plain English: short sentences, active
   voice, only the modal verbs can, will, and must, and no contractions.
+
+## Design
+
+`docs/DESIGN.md` is the plan of the look: the subject, the tokens, the
+layout at three widths, the primitives, and the screens of the next stage.
+`docs/COPY.md` audits every string of the page. `docs/shots/` holds
+screenshots of the shell against the fake server.
+
+The code of the look:
+
+| Path | What |
+|---|---|
+| `src/styles/tokens.css` | The tokens of both themes, as CSS custom properties |
+| `src/styles/fonts.css`, `base.css` | The typeface and the base styles |
+| `src/ui/primitives/` | The primitives, with `primitives.css` and their tests |
+| `src/ui/Shell.tsx`, `src/styles/shell.css` | The app bar and the three panes |
+| `src/styles/channel.css`, `fleet.css`, `wiki.css` | The styles of the screens, one file per screen of the next stage |
+| `src/styles/legacy.css` | The classes of the old screens, until each screen moves to the primitives |
 
 ## Build
 
@@ -76,6 +95,11 @@ Variables of the fake server:
 | `FAKE_QUIET=1` | No timers |
 | `FAKE_TICK` | The time between two timer steps in milliseconds, 5000 by default |
 | `FAKE_STREAM_MS` | The life of one stream in milliseconds before the fake server closes it, 15 minutes by default, as the workbench does |
+| `FAKE_THEME=0` | `GET /v1/bossmode` carries no theme, so the page keeps its defaults |
+| `FAKE_ACCENT` | The accent of the theme, `#FF4D00` by default |
+| `FAKE_ORG` | The name of the organization of the theme, Example Org by default |
+| `FAKE_LOGO=1` | The theme names a logo, served at `/v1/bossmode/logo` |
+| `FAKE_PARTIAL=1` | A card goes out on the stream without its input and its schema, as the backend can send it, so the page reads it again |
 
 A sign-in at `/ui/signin?as=bob` signs you in as bob@example.com.
 
@@ -97,7 +121,7 @@ The workbench must serve the routes and the stream of `docs/CONTRACT.md`.
 
 ## Dependencies
 
-The page has three dependencies at run time. The build bundles them, so the
+The page has four dependencies at run time. The build bundles them, so the
 page loads nothing from another origin.
 
 | Package | Why |
@@ -105,6 +129,7 @@ page loads nothing from another origin.
 | `preact` | Draws the components. It is small, and it has the component model of React. |
 | `marked` | Turns the Markdown of agents and of the wiki into HTML. The page shows raw HTML in the Markdown as text. |
 | `dompurify` | Removes from that HTML every tag and attribute outside a short allow list, so a message or a page holds no script, no event attribute, no style, no SVG, and no image. |
+| `@fontsource-variable/archivo` | The typeface Archivo, under the SIL Open Font License 1.1, with the width and the weight axes. The build copies its files into `dist/assets`. |
 
 The build and the tests use four more packages. None of them reaches the
 browser.
