@@ -393,8 +393,12 @@ function seedPages() {
     { m: 60, by: 'agent:migrator', summary: 'Notes of the nginx role', text: '---\ntitle: The nginx module\n---\n# The nginx module\n\nThe site templates keep their names: `site.conf.erb` becomes `site.conf.j2`.\n\n## Notes from the old wiki\n\nThe old wiki held raw HTML. The page shows it as text and runs nothing:\n\n<img src=x onerror="alert(1)"> <script>alert(2)</script>\n\n![a chart from another site](https://example.com/chart.png)\n\n[a link that runs code](javascript:alert(3)) and [a safe link](https://nginx.org/en/docs/).\n' },
   ]));
   add(page('bridges/br-puppet/plan.md', [{ m: 124, by: 'token', summary: 'The plan of the bridge', text: '---\ntitle: The plan of the Puppet bridge\n---\n# Migrate the remaining Puppet modules\n\n- [x] cron, by migrator-1\n- [ ] nginx, by migrator-2\n- [ ] logrotate, next\n\nThe reviewer reads each role. The tester runs molecule. The writer keeps the notes.\n' }]));
-  add(page('agents/migrator/learned.md', [{ m: 400, by: 'bossmode', summary: 'A heart from alice', text: '# What people liked from migrator\n\n## 2026-10-20, bridge br-older, migrator-1\n\nAlice asked for the ntp module. The agent kept the hiera names, so the inventory did not change. [run](#)\n' }]));
-  add(page('agents/reviewer/learned.md', [{ m: 20, by: 'bossmode', summary: 'A heart from alice', text: '# What people liked from reviewer\n\n## Today, bridge br-puppet, reviewer\n\nAlice asked for a review of roles/cron. The agent checked the role against the manifest and named the one change of behavior.\n' }]));
+  // The front writes an entry per heart, the newest first, as a list of its parts.
+  const learned = (agent, entries) =>
+    `# What people liked from ${agent}\n\nThe front adds an entry for each heart that a person puts on a result of ${agent} in a bridge. The newest entry comes first.\n\n` +
+    entries.map((e) => `## ${e.day}, bridge "Migrate the remaining Puppet modules" (br-puppet), ${e.handle}, run ${e.run}\n\n- What ${e.who} asked: ${e.asked}\n- What ${agent} did: ${e.did}\n` + (e.note ? `- The note of ${e.who}: ${e.note}\n` : '') + `- [Open the run](#run/${e.run})\n`).join('\n');
+  add(page('agents/migrator/learned.md', [{ m: 400, by: 'bossmode', summary: 'A heart from alice', text: learned('migrator', [{ day: '2026-10-20', handle: 'migrator-1', run: 'run-migrator-1', who: 'alice', asked: 'Migrate the ntp module to an Ansible role.', did: 'Kept the hiera names, so the inventory did not change.', note: 'This is the house style.' }]) }]));
+  add(page('agents/reviewer/learned.md', [{ m: 20, by: 'bossmode', summary: 'A heart from alice', text: learned('reviewer', [{ day: '2026-10-21', handle: 'reviewer', run: 'run-reviewer', who: 'alice', asked: 'Review roles/cron against its manifest.', did: 'Checked the role against the manifest and named the one change of behavior.' }]) }]));
   return pages;
 }
 

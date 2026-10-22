@@ -389,6 +389,8 @@ Capacity shows where seating happens:
 | `Saved.`, `The new face is up.` | keep | | B |
 | new | add | the profile: `Workers` with its chip, `Keep`, and the question mark `What is a worker` with `A worker runs the work of one agent, one seat at a time. Keep is how many it keeps ready.` | B |
 | new | add | `What people liked` with its chip and `Open page` | B |
+| one sentence per heart, from `agents/<agent>/learned.md` | change | the parts of the entry: what the agent did as the main line, what the person asked as a muted line, the note when there is one, and the link `Open the run` to the run pane of the bridge, newest first, as the front writes them | done |
+| `Open the run` | add | the link of a heart to its run | done |
 | new | add | `Today` with runs, cost, and decisions | B |
 | new | add | `N skills`, the one line of the profile that counts them | done |
 | `Find a member` | add | the field above the people list | done |

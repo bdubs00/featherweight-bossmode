@@ -584,6 +584,28 @@ a.people-title:hover {
   flex: none;
   margin-top: 3px;
 }
+/* A heart: what the agent did, what was asked in muted words, the note, and the link to the run. */
+.liked-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.liked-body p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.liked-did {
+  color: var(--ink);
+}
+.liked-asked {
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+  color: var(--muted);
+}
+.liked-body .prof-link {
+  align-self: flex-start;
+}
 .keep {
   display: flex;
   flex-direction: column;

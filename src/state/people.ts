@@ -298,22 +298,70 @@ export function rulesOf(agent: string, runs: Record<string, Run>, channels: Reco
   return [...out].sort();
 }
 
+/** One heart of the page of what people liked about an agent, as its parts. */
+export interface LikedEntry {
+  /** What the agent did: the text that the person gave a heart. */
+  did: string;
+  /** What the person asked, when the entry says. */
+  asked?: string;
+  /** The note of the person, when they wrote one. */
+  note?: string;
+  /** The run that the heart is on, the bridge of the run, and the seat. */
+  run?: string;
+  bridge?: string;
+  handle?: string;
+}
+
 /**
- * likedOf reads the page of what people liked about an agent: one item per
- * section, the note of the person when it has one, else the text that they
- * gave a heart. The newest comes first.
+ * likedOf reads the page of what people liked about an agent,
+ * agents/<agent>/learned.md, one entry per heading. The front writes each
+ * entry as a list: "What <person> asked: ...", "What <agent> did: ...",
+ * "The note of <person>: ...", and a link "Open the run" to #run/<id>. Its
+ * heading names the bridge in parentheses, the seat, and the run. The page
+ * keeps the order of the front, which puts the newest entry first. An entry
+ * in paragraphs, as an older front wrote them, gives its first paragraph as
+ * what the agent did, and a paragraph "Their note:" as the note.
  */
-export function likedOf(text: string): string[] {
+export function likedOf(text: string): LikedEntry[] {
   const body = String(text || '').replace(/^---\n[\s\S]*?\n---\n?/, '');
-  const out: string[] = [];
-  for (const part of body.split(/^## .*$/m).slice(1)) {
-    const paras = part
-      .split(/\n\s*\n/)
-      .map((x) => x.replace(/\s+/g, ' ').trim())
-      .filter(Boolean);
-    if (!paras.length) continue;
-    const note = paras.find((x) => /^Their note:/i.test(x));
-    out.push(note ? note.replace(/^Their note:\s*/i, '') : paras[0].replace(/^[^:]{1,40} hearted:\s*/, ''));
+  const out: LikedEntry[] = [];
+  const parts = body.split(/^(?=## )/m).filter((x) => x.startsWith('## '));
+  for (const part of parts) {
+    const nl = part.indexOf('\n');
+    const head = (nl < 0 ? part : part.slice(0, nl)).replace(/^## /, '').trim();
+    const rest = nl < 0 ? '' : part.slice(nl + 1);
+    const e: LikedEntry = { did: '' };
+    const bridge = /\(([^()\s]+)\)/.exec(head);
+    if (bridge) e.bridge = bridge[1];
+    const seat = /\)\s*,\s*([^,\s]+)\s*,\s*run\s+(\S+)\s*$/.exec(head);
+    if (seat) {
+      e.handle = seat[1];
+      e.run = seat[2];
+    }
+    // The list of the entry: one item per line that starts with "- ", and its continuation lines.
+    const items: string[] = [];
+    for (const line of rest.split('\n')) {
+      if (/^\s*[-*] /.test(line)) items.push(line.replace(/^\s*[-*] /, '').trim());
+      else if (items.length && line.trim()) items[items.length - 1] += ' ' + line.trim();
+    }
+    let m: RegExpExecArray | null;
+    for (const it of items) {
+      if ((m = /^What .+? asked:\s*([\s\S]*)$/.exec(it))) e.asked = m[1].trim();
+      else if ((m = /^What .+? did:\s*([\s\S]*)$/.exec(it))) e.did = m[1].trim();
+      else if ((m = /^The note of .+?:\s*([\s\S]*)$/.exec(it))) e.note = m[1].trim();
+      else if ((m = /\(#run\/([^)\s]+)\)/.exec(it))) e.run = e.run || m[1];
+    }
+    if (!items.length) {
+      const paras = rest
+        .split(/\n\s*\n/)
+        .map((x) => x.replace(/\s+/g, ' ').trim())
+        .filter(Boolean);
+      const note = paras.find((x) => /^Their note:/i.test(x));
+      const first = paras.find((x) => !/^Their note:/i.test(x));
+      if (first) e.did = first.replace(/^[^:]{1,40} hearted:\s*/, '').replace(/\s*\[run\]\([^)]*\)\s*$/, '');
+      if (note) e.note = note.replace(/^Their note:\s*/i, '');
+    }
+    if (e.did || e.asked || e.note) out.push(e);
   }
-  return out.reverse();
+  return out;
 }

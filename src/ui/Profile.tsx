@@ -14,7 +14,7 @@ import { loadAgentSkills, loadFaces } from '../state/actions';
 import { useFleetAgent, useProfile } from '../state/profiles';
 import { namedProfileOf, useQueued } from '../state/queued';
 import { ensureRuns } from '../state/fetchers';
-import { likedOf, newestRun, parseKeep, policyRules, rulesOf, seatOnWorker, seatsOfAgent } from '../state/people';
+import { likedOf, newestRun, parseKeep, policyRules, rulesOf, seatOnWorker, seatsOfAgent, type LikedEntry } from '../state/people';
 import { poolNameOf } from '../lib/workers';
 import { phaseOf } from '../lib/presence';
 import { hrefOf } from '../lib/route';
@@ -57,10 +57,10 @@ function usePool(agent: string): [Pool | null | undefined, (p: Pool | null) => v
 }
 
 /** useLiked reads the page of what people liked about an agent, again when the page changes. */
-function useLiked(agent: string): { path: string; items: string[] | null } {
+function useLiked(agent: string): { path: string; items: LikedEntry[] | null } {
   const path = 'agents/' + agent + '/learned.md';
   const hash = useSelect((s) => (s.pages.byPath[path] ? s.pages.byPath[path].hash : ''));
-  const [items, setItems] = useState<string[] | null>(null);
+  const [items, setItems] = useState<LikedEntry[] | null>(null);
   useEffect(() => {
     let live = true;
     api
@@ -235,7 +235,14 @@ function RemoveWorkers({ agent, onDone }: { agent: string; onDone: () => void })
   );
 }
 
-/** Liked is What people liked: the hearts of people from the page of the agent, newest first. */
+/** runHref links the run of a heart: the run pane of its bridge, else the run on the page at /ui. */
+export function runHref(t: Pick<LikedEntry, 'run' | 'bridge' | 'handle'>): string {
+  if (!t.run) return '';
+  if (t.bridge) return hrefOf({ place: 'bridge', id: t.bridge, pane: 'run', run: t.run, handle: t.handle });
+  return '/ui#run/' + encodeURIComponent(t.run);
+}
+
+/** Liked is What people liked: the hearts of people from the page of the agent, newest first. Each shows what the agent did, what was asked, the note, and its run. */
 function Liked({ agent }: { agent: string }) {
   const { path, items } = useLiked(agent);
   const n = items ? items.length : 0;
@@ -258,7 +265,28 @@ function Liked({ agent }: { agent: string }) {
           {items!.slice(0, 3).map((t) => (
             <li>
               <Glyph name="heart" size={14} class="heart" />
-              <InlineMarkdown text={t} />
+              <div class="liked-body">
+                {t.did && (
+                  <p class="liked-did">
+                    <InlineMarkdown text={t.did} />
+                  </p>
+                )}
+                {t.asked && (
+                  <p class="liked-asked">
+                    <InlineMarkdown text={t.asked} />
+                  </p>
+                )}
+                {t.note && (
+                  <p class="liked-note">
+                    <InlineMarkdown text={t.note} />
+                  </p>
+                )}
+                {t.run && (
+                  <a class="prof-link" href={runHref(t)}>
+                    Open the run
+                  </a>
+                )}
+              </div>
             </li>
           ))}
         </ul>

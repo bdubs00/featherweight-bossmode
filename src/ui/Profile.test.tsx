@@ -9,6 +9,25 @@ import { forgetQueued } from '../state/queued';
 let calls: Call[] = [];
 let restore = () => {};
 
+// What people liked, as the front writes it: the newest entry first.
+const LEARNED = [
+  '# What people liked from migrator',
+  '',
+  '## 2026-10-22, bridge "Migrate Puppet" (b1), migrator-1, run 01RUN1',
+  '',
+  '- What alice asked: Migrate the cron module.',
+  '- What migrator did: Ran the lint.',
+  '- The note of alice: Clean.',
+  '- [Open the run](#run/01RUN1)',
+  '',
+  '## 2026-10-21, bridge "Migrate Puppet" (b1), migrator-2, run 01RUN2',
+  '',
+  '- What bob asked: Keep the names.',
+  '- What migrator did: Kept the names.',
+  '- [Open the run](#run/01RUN2)',
+  '',
+].join('\n');
+
 // The fleet names crew as the pool of migrator, so the profile reads that pool.
 const POOL = { name: 'crew', wanted: 1, actual: 1, ready: 1, tasks: [{ name: 'crew-0', phase: 'Running' }, { name: 'crew-9', phase: 'Running', current: false }] };
 
@@ -20,7 +39,7 @@ beforeEach(() => {
     ['GET', /^\/v1\/pools\/crew$/, () => POOL],
     ['DELETE', /^\/v1\/pools\/crew$/, () => null],
     ['GET', /^\/v1\/bossmode\/agents\/migrator\/today$/, () => ({ runs: 7, costUSD: 1.9, decisions: 2 })],
-    ['GET', /^\/v1\/pages\/agents\/migrator\/learned\.md$/, () => ({ path: 'agents/migrator/learned.md', text: '# Liked\n\n## a\n\nAlice hearted: Kept the names.\n\n## b\n\nBob hearted: Ran the lint.\n' })],
+    ['GET', /^\/v1\/pages\/agents\/migrator\/learned\.md$/, () => ({ path: 'agents/migrator/learned.md', text: LEARNED })],
     ['GET', /^\/v1\/runs\/run-migrator-2$/, () => ({ id: 'run-migrator-2', agent: 'migrator', state: 'completed', seq: 1, createdAt: '', updatedAt: '' })],
   ]);
   calls = f.calls;
@@ -85,7 +104,11 @@ describe('the profile', () => {
     await vi.waitFor(() => expect(el.querySelector('.today')).not.toBeNull());
     const heads = [...el.querySelectorAll('.prof-sec h3')].map((h) => h.textContent);
     expect(heads).toEqual(['What people liked', 'Workers', 'Today']);
-    expect([...el.querySelectorAll('.liked li')].map((x) => x.textContent)).toEqual(['Ran the lint.', 'Kept the names.']);
+    // Each heart: what the agent did, what was asked as a muted line, the note, and Open the run.
+    const first = el.querySelectorAll('.liked li')[0];
+    expect([...first.querySelectorAll('.liked-body > *')].map((x) => x.className + ' ' + x.textContent)).toEqual(['liked-did Ran the lint.', 'liked-asked Migrate the cron module.', 'liked-note Clean.', 'prof-link Open the run']);
+    expect(first.querySelector('a.prof-link')!.getAttribute('href')).toBe('#bridge/b1/run/01RUN1/migrator-1');
+    expect(el.querySelectorAll('.liked li')[1].querySelector('.liked-note')).toBeNull();
     expect([...el.querySelectorAll('.prof-link')].map((a) => a.getAttribute('href'))).toContain('#pages/agents/migrator/learned.md');
     expect(el.querySelector('.help-key')!.getAttribute('aria-label')).toBe('What is a worker');
     expect((el.querySelector('.keep input') as HTMLInputElement).value).toBe('1');

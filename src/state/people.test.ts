@@ -267,9 +267,36 @@ describe('the profile', () => {
     expect(rulesOf('scribe', runs, {})).toEqual([]);
   });
 
-  it('reads what people liked, the note first and the newest first', () => {
-    const text = '# What people liked from migrator\n\n## 2026-10-20, bridge b, migrator-1\n\nAlice hearted: Kept the hiera names.\n\n## 2026-10-21, bridge b, migrator-2\n\nBob hearted: Pushed the branch.\n\nTheir note: Ran the lint first.\n';
-    expect(likedOf(text)).toEqual(['Ran the lint first.', 'Kept the hiera names.']);
+  it('reads each heart of the front as its parts, in the order of the front, which puts the newest first', () => {
+    const text = [
+      '# What people liked from reviewer',
+      '',
+      'The front adds an entry for each heart. The newest entry comes first.',
+      '',
+      '## 2026-10-22, bridge "boss A 20261022-032331" (01m5h7wt3wxph1gxc34gqz2tnq), reviewer, run 01M5H7WXC6MCR0QGT4CM8JAX0B',
+      '',
+      '- What token asked: Reply with the single word READY and nothing else. Use no tool.',
+      '- What reviewer did: ACK',
+      '- The note of token: boss heart 20261022-032331',
+      '- [Open the run](#run/01M5H7WXC6MCR0QGT4CM8JAX0B)',
+      '',
+      '## 2026-10-21, bridge "Migrate Puppet" (b1), reviewer-2, run 01RUN2',
+      '',
+      '- What alice asked: Review roles/cron',
+      '  against its manifest.',
+      '- What reviewer did: Named the one change of behavior.',
+      '- [Open the run](#run/01RUN2)',
+      '',
+    ].join('\n');
+    expect(likedOf(text)).toEqual([
+      { did: 'ACK', asked: 'Reply with the single word READY and nothing else. Use no tool.', note: 'boss heart 20261022-032331', run: '01M5H7WXC6MCR0QGT4CM8JAX0B', bridge: '01m5h7wt3wxph1gxc34gqz2tnq', handle: 'reviewer' },
+      { did: 'Named the one change of behavior.', asked: 'Review roles/cron against its manifest.', run: '01RUN2', bridge: 'b1', handle: 'reviewer-2' },
+    ]);
+  });
+
+  it('reads an entry in paragraphs, as an older front wrote them, and a page with no entry', () => {
+    const text = '# What people liked from migrator\n\n## 2026-10-21, bridge b, migrator-2\n\nBob hearted: Pushed the branch.\n\nTheir note: Ran the lint first.\n\n## 2026-10-20, bridge b, migrator-1\n\nAlice hearted: Kept the hiera names. [run](#)\n';
+    expect(likedOf(text)).toEqual([{ did: 'Pushed the branch.', note: 'Ran the lint first.' }, { did: 'Kept the hiera names.' }]);
     expect(likedOf('# Nothing yet\n')).toEqual([]);
   });
 });
