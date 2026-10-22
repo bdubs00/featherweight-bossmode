@@ -1,7 +1,8 @@
-// The fleet: every pool with its Tasks and their phases, and every agent
-// with its face, so an operator sees the whole team. An agent opens its face
-// in the pane, where a person can change the name, the tagline, and the
-// picture.
+// The fleet: the agents in the list pane, every agent with its workers and
+// their phases in the main pane, and the face of an agent in the details
+// pane, where a person can change the name, the tagline, and the picture.
+// Screen B reworks the place into the people list grouped by bridge, the
+// board, and the profile of docs/DESIGN.md, section 11.
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
@@ -11,8 +12,52 @@ import { phaseOf } from '../lib/presence';
 import { ago } from '../lib/words';
 import { useRoving } from './keys';
 import { attempt, showError } from './notice';
-import { Back, Empty, Face, Light } from './common';
+import { Empty, Face, Light } from './common';
 import { Icon } from './icons';
+import { Button, Chip, Mark, PaneHeader } from './primitives';
+
+/** FleetList is the list pane of the Fleet place: the agents, each with its mark and its tagline. */
+export function FleetList({ current }: { current?: string; member?: string }) {
+  const agents = useSelect((s) => s.agents);
+  const faces = useSelect((s) => s.faces);
+  const list = useRoving<HTMLDivElement>();
+  useEffect(() => {
+    if (!agents) attempt(loadAgents);
+  }, []);
+  return (
+    <section class="screen fleet-list" aria-labelledby="fleet-list-title">
+      <PaneHeader
+        id="fleet-list-title"
+        title="Fleet"
+        count={agents ? agents.length : undefined}
+        countLabel={agents ? agents.length + ' agents' : undefined}
+        actions={
+          <Button href="#new-agent" size="s" icon="plus" class="key-icon" aria-label="New agent" title="New agent" />
+        }
+      />
+      <div class="scroll" ref={list}>
+        <div class="rows" role="list">
+          {(agents || []).map((a) => {
+            const f = faces[a.name];
+            const on = a.name === current;
+            return (
+              <div role="listitem">
+                <a class={'prow-agent' + (on ? ' sel' : '')} href={'#fleet/' + encodeURIComponent(a.name)} data-item aria-current={on ? 'page' : undefined}>
+                  <Mark agent={a.name} size={32} selected={on} />
+                  <span class="main">
+                    <span class="t-sub clip">{(f && f.displayName) || a.name}</span>
+                    <span class="t-meta clip">{(f && f.tagline) || a.description || a.name}</span>
+                  </span>
+                </a>
+              </div>
+            );
+          })}
+        </div>
+        {agents && agents.length === 0 && <Empty>You can see no agent.</Empty>}
+      </div>
+    </section>
+  );
+}
 
 export function Fleet() {
   // The view comes from GET /v1/fleet, and the member and task events of
@@ -35,21 +80,22 @@ export function Fleet() {
     read();
     if (!agents) attempt(loadAgents);
   }, []);
-  const names = (agents || []).map((a) => a.name);
   return (
     <section class="screen fleet" aria-labelledby="fleet-title">
-      <header class="bar">
-        <Back narrow label="Bridges" href="#" />
-        <div class="title">
-          <h1 id="fleet-title">Fleet</h1>
-          <p class="goal">{fleet ? `${(fleet.pools || []).length} pools, ${fleet.members.length} Tasks, ${names.length} agents` : 'Loading'}</p>
-        </div>
-        <div class="end">
-          <button type="button" class="btn small" disabled={busy} onClick={read}>
+      <PaneHeader
+        id="fleet-title"
+        title="Workers"
+        size="title"
+        level={1}
+        back={{ href: '#fleet', label: 'Fleet', to: 'list' }}
+        count={fleet ? (fleet.pools || []).reduce((n, p) => n + p.tasks.length, 0) : undefined}
+        countLabel="workers"
+        actions={
+          <Button size="s" disabled={busy} onClick={read}>
             Read again
-          </button>
-        </div>
-      </header>
+          </Button>
+        }
+      />
       <div class="scroll pad">
         <h2 class="sec">Pools</h2>
         {fleet && (fleet.pools || []).length === 0 && <Empty>The fleet has no pool that you can see.</Empty>}
@@ -171,13 +217,9 @@ export function AgentPane({ agent }: { agent: string }) {
   };
   return (
     <section class="screen agentpane" aria-labelledby="agent-title">
-      <header class="bar">
-        <Back label="Fleet" href="#fleet" />
-        <div class="title">
-          <h2 id="agent-title">{(face && face.displayName) || agent}</h2>
-          <p class="goal">{agent}</p>
-        </div>
-      </header>
+      <PaneHeader id="agent-title" title={(face && face.displayName) || agent} back={{ href: '#fleet', label: 'Fleet', to: 'main' }}>
+        <Chip>agent</Chip>
+      </PaneHeader>
       <div class="scroll pad">
         <div class="bigface">
           <Face agent={agent} size={96} />

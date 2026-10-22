@@ -11,10 +11,10 @@ import { senderName } from '../lib/words';
 import { hrefOf } from '../lib/route';
 import { useRoving, smooth } from './keys';
 import { attempt } from './notice';
-import { Back, Confirm, Empty, Menu } from './common';
+import { Confirm, Empty, Menu } from './common';
 import { EntryRow } from './Message';
 import { Composer } from './Composer';
-import { Icon } from './icons';
+import { Button, Chip, Led, PaneHeader } from './primitives';
 
 /** Delegations is the dialog of what the manager can do in this bridge. */
 function Delegations({ id, value, onClose }: { id: string; value: Delegation; onClose: () => void }) {
@@ -62,7 +62,7 @@ function ChannelComposer(p: { id: string; title: string; closed: boolean; reply:
     <Composer
       draft={p.id}
       label={'Message to the bridge ' + p.title}
-      placeholder="Message every member, or @ one member"
+      placeholder="Message the bridge"
       members={members}
       disabled={p.closed ? 'This bridge is closed. Open it again to send.' : ''}
       reply={r ? { seq: r.seq, who: senderName(r.from), text: r.text, handle: r.from.kind === 'agent' ? r.from.handle : undefined } : null}
@@ -154,9 +154,7 @@ export function Channel({ id }: { id: string }) {
   if (!b) {
     return (
       <section class="screen channel" aria-label="Bridge">
-        <div class="bar">
-          <Back narrow label="Bridges" href="#" />
-        </div>
+        <PaneHeader title="Bridge" size="title" level={1} back={{ href: '#', label: 'Bridges', to: 'list' }} />
         <Empty>{known ? 'This bridge is not here, or you cannot see it.' : 'Loading the bridge.'}</Empty>
       </section>
     );
@@ -164,21 +162,19 @@ export function Channel({ id }: { id: string }) {
   const closed = b.state === 'closed';
   return (
     <section class="screen channel" aria-labelledby="channel-title">
-      <header class="bar">
-        <Back narrow label="Bridges" href="#" />
-        <div class="title">
-          <h1 id="channel-title">{b.title}</h1>
-          <p class="goal" title={b.goal}>
-            {closed ? 'Closed. ' : ''}
-            {b.goal}
-          </p>
-        </div>
-        <div class="end">
-          <a class="btn small roster-link" href={hrefOf({ place: 'bridge', id, pane: 'roster' })}>
-            <Icon name="people" /> {b.memberCount || 0}
-            <span class="sr"> members</span>
-          </a>
-          <Menu
+      <PaneHeader
+        id="channel-title"
+        title={b.title}
+        size="title"
+        level={1}
+        back={{ href: '#', label: 'Bridges', to: 'list' }}
+        actions={
+          <>
+            {closed && <Led tone="grey" word="closed" />}
+            <Button href={hrefOf({ place: 'bridge', id, pane: 'roster' })} size="s" class="collapsed-only">
+              Members <Chip label={(b.memberCount || 0) + ' members'}>{b.memberCount || 0}</Chip>
+            </Button>
+            <Menu
             label="Bridge settings"
             icon="gear"
             items={[
@@ -186,17 +182,18 @@ export function Channel({ id }: { id: string }) {
               closed ? { label: 'Open the bridge again', onSelect: () => attempt(() => patchBridge(id, { state: 'open' })) } : { label: 'Close the bridge', danger: true, onSelect: () => setConfirm('close') },
             ]}
           />
-        </div>
-      </header>
+          </>
+        }
+      />
       <div class="scroll msgs" ref={scroller} onScroll={onScroll}>
         {prev > 0 && (
           <div class="earlier">
-            <button type="button" class="btn small" disabled={older} onClick={earlier}>
+            <Button size="s" disabled={older} onClick={earlier}>
               {older ? 'Loading' : 'Load earlier messages'}
-            </button>
+            </Button>
           </div>
         )}
-        {seqs && prev === 0 && <p class="start">The start of the bridge {b.title}.</p>}
+        {seqs && prev === 0 && <p class="start">{b.goal || b.title}</p>}
         <div class="entries" ref={list} role="log" aria-label={'Messages of ' + b.title} aria-live="polite" aria-relevant="additions">
           {seqs && seqs.map((seq, i) => <EntryRow key={seq} bridge={id} seq={seq} prevSeq={i > 0 ? seqs[i - 1] : 0} onReply={onReply} />)}
           {!seqs && <Empty>Loading the channel.</Empty>}

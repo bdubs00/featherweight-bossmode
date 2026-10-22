@@ -15,7 +15,8 @@ import { ago, personName } from '../lib/words';
 import { go, hrefOf } from '../lib/route';
 import { useRoving } from './keys';
 import { attempt, showError } from './notice';
-import { Back, Empty, Markdown, When } from './common';
+import { Empty, Markdown, When } from './common';
+import { Button, PaneHeader } from './primitives';
 import { Icon } from './icons';
 
 /** byName names the writer of a page: a person, an agent, a run, the fleet token, or bossmode. */
@@ -120,18 +121,17 @@ export function PageTree({ current }: { current?: string }) {
   }, [q]);
   return (
     <section class="screen pagetree" aria-labelledby="pages-title">
-      <header class="bar">
-        <Back narrow label="Bridges" href="#" />
-        <div class="title">
-          <h2 id="pages-title">Pages</h2>
-          <p class="goal">The wiki of the fleet. Agents write it, and people read it.</p>
-        </div>
-        <div class="end">
-          <a class="btn small" href="#create">
-            <Icon name="plus" /> New
-          </a>
-        </div>
-      </header>
+      <PaneHeader
+        id="pages-title"
+        title="Wiki"
+        count={loaded ? Object.keys(byPath).length : undefined}
+        countLabel={Object.keys(byPath).length + ' pages'}
+        actions={
+          <Button href="#create" size="s">
+            New
+          </Button>
+        }
+      />
       <div class="scroll">
         <form class="search" role="search" onSubmit={(e) => e.preventDefault()}>
           <Icon name="search" />
@@ -200,9 +200,7 @@ export function PageView({ path, version }: { path: string; version?: number }) 
   if (missing) {
     return (
       <section class="screen pageview">
-        <header class="bar">
-          <Back label="Pages" href="#pages" />
-        </header>
+        <PaneHeader title={pageName(path)} size="title" level={1} back={{ href: '#pages', label: 'Wiki', to: 'list' }} />
         <div class="scroll pad">
           <Empty>No page {path} is here.</Empty>
           <a class="btn" href={hrefOf({ place: 'pages', path, mode: 'create' })}>
@@ -215,25 +213,27 @@ export function PageView({ path, version }: { path: string; version?: number }) 
   const fm = page ? stripFrontMatter(page.text) : null;
   return (
     <section class="screen pageview" aria-labelledby="page-title">
-      <header class="bar">
-        <Back narrow label="Pages" href="#pages" />
-        <div class="title">
-          <h1 id="page-title" tabIndex={-1} ref={heading}>
-            {(page && (page.title || fm!.title)) || pageName(path)}
-          </h1>
-          <p class="goal">{path}</p>
-        </div>
-        <div class="end">
-          <a class="btn small" href={hrefOf({ place: 'pages', path, mode: 'history' })}>
-            <Icon name="history" /> History
-          </a>
-          {!version && path !== INDEX_PATH && (
-            <a class="btn small" href={hrefOf({ place: 'pages', path, mode: 'edit' })}>
-              <Icon name="edit" /> Edit
-            </a>
-          )}
-        </div>
-      </header>
+      <PaneHeader
+        id="page-title"
+        title={(page && (page.title || fm!.title)) || pageName(path)}
+        size="title"
+        level={1}
+        headingRef={heading}
+        focusable
+        back={{ href: '#pages', label: 'Wiki', to: 'list' }}
+        actions={
+          <>
+            <Button href={hrefOf({ place: 'pages', path, mode: 'history' })} size="s">
+              History
+            </Button>
+            {!version && path !== INDEX_PATH && (
+              <Button href={hrefOf({ place: 'pages', path, mode: 'edit' })} size="s">
+                Edit
+              </Button>
+            )}
+          </>
+        }
+      />
       <div class="scroll pad">
         {version && page && (
           <p class="banner">
@@ -272,13 +272,7 @@ export function PageHistory({ path }: { path: string }) {
   }, [path, meta && meta.hash]);
   return (
     <section class="screen pagehistory" aria-labelledby="history-title">
-      <header class="bar">
-        <Back label="Page" href={hrefOf({ place: 'pages', path, mode: 'read' })} />
-        <div class="title">
-          <h1 id="history-title">History</h1>
-          <p class="goal">{path}</p>
-        </div>
-      </header>
+      <PaneHeader id="history-title" title={'History of ' + pageName(path)} size="title" level={1} back={{ href: hrefOf({ place: 'pages', path, mode: 'read' }), label: 'the page', to: 'here' }} />
       <div class="scroll pad">
         {!versions && <Empty>Loading the history.</Empty>}
         <ol class="versions" ref={list}>
@@ -414,13 +408,13 @@ export function PageEditor({ path: initial, create }: { path?: string; create?: 
   const why = create && path.trim() ? pageReason(target) : '';
   return (
     <section class="screen pageedit" aria-labelledby="edit-title">
-      <header class="bar">
-        <Back label={create ? 'Pages' : 'Page'} href={create ? '#pages' : hrefOf({ place: 'pages', path: initial || '', mode: 'read' })} />
-        <div class="title">
-          <h1 id="edit-title">{create ? 'New page' : 'Edit'}</h1>
-          <p class="goal">{target}</p>
-        </div>
-      </header>
+      <PaneHeader
+        id="edit-title"
+        title={create ? 'New page' : 'Edit ' + pageName(initial || '')}
+        size="title"
+        level={1}
+        back={{ href: create ? '#pages' : hrefOf({ place: 'pages', path: initial || '', mode: 'read' }), label: create ? 'Wiki' : 'the page', to: 'here' }}
+      />
       <form
         class="scroll pad form editor"
         onSubmit={(e) => {

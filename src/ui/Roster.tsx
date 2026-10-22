@@ -8,12 +8,12 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import type { Member } from '../api/types';
 import { useSelect } from '../state/store';
 import { addMember, fire, loadAgents, patchMember } from '../state/actions';
-import { presenceOf } from '../lib/presence';
+import { seatLight } from '../lib/presence';
 import { hrefOf, go } from '../lib/route';
 import { useRoving } from './keys';
 import { attempt } from './notice';
-import { Back, Confirm, Empty, Face, Light, Menu } from './common';
-import { Icon } from './icons';
+import { Confirm, Empty, Face, Light, Menu } from './common';
+import { Button, PaneHeader } from './primitives';
 
 const DRAG_TYPE = 'application/x-fw-member';
 
@@ -22,16 +22,16 @@ type Ask = { kind: 'fire'; m: Member } | { kind: 'task'; m: Member } | { kind: '
 const MemberRow = memo(function MemberRow({ bridge, handle, onAsk, current }: { bridge: string; handle: string; onAsk: (a: Ask) => void; current: boolean }) {
   const m = useSelect((s) => (s.rosters[bridge] ? s.rosters[bridge].byHandle[handle] : undefined));
   if (!m) return null;
-  const light = presenceOf(m.presence);
   const run = m.runs[m.runs.length - 1];
   // A seat whose newest run failed, stopped at a limit, or was canceled gets
   // no message. A new task seats it again.
   const runState = useSelect((s) => (run && s.runs[run] ? s.runs[run].state : ''));
+  const light = seatLight(m.presence, runState);
   const stopped = m.presence === 'error' || runState === 'failed' || runState === 'canceled';
   const open = () => run && go({ place: 'bridge', id: bridge, pane: 'run', run, handle: m.handle });
   return (
     <li
-      class={'member' + (m.fired ? ' fired' : '') + (current ? ' sel' : '')}
+      class={'member' + (m.fired ? ' fired' : '') + (current ? ' sel' : '') + (m.presence === 'needs-you' ? ' needs' : '')}
       draggable={!m.fired}
       onDragStart={(e) => {
         if (!e.dataTransfer) return;
@@ -43,13 +43,13 @@ const MemberRow = memo(function MemberRow({ bridge, handle, onAsk, current }: { 
       onDragEnd={() => document.body.classList.remove('dragging-member')}
     >
       <button type="button" class="open" data-item onClick={open} disabled={!run} aria-label={`${m.handle}, ${light.word}. ${m.task}${m.activity && m.activity.phrase ? '. ' + m.activity.phrase : ''}. Open its run.`}>
-        <Face agent={m.agent} size={40} />
+        <Face agent={m.agent} size={36} />
         <span class="main">
           <span class="t">
             <span class="handle">{m.handle}</span>
+            <Light light={light} />
             {m.muted && !m.fired && <span class="tag">muted</span>}
           </span>
-          <Light light={light} />
           <span class="task">{m.task}</span>
           {m.activity && m.activity.phrase && m.presence === 'working' && <span class="act">{m.activity.phrase}</span>}
         </span>
@@ -180,20 +180,20 @@ export function Roster({ bridge, current }: { bridge: string; current?: string }
 
   return (
     <section class="screen roster" ref={pane} aria-labelledby="roster-title">
-      <header class="bar">
-        <Back narrow label="Channel" href={hrefOf({ place: 'bridge', id: bridge, pane: 'none' })} />
-        <div class="title">
-          <h2 id="roster-title">Roster</h2>
-          <p class="goal">{order ? order.length + (order.length === 1 ? ' member' : ' members') : 'Loading'}</p>
-        </div>
-        <div class="end">
-          {isOpen && (
-            <button type="button" class="btn small" onClick={() => setAsk({ kind: 'add' })}>
-              <Icon name="plus" /> Add
-            </button>
-          )}
-        </div>
-      </header>
+      <PaneHeader
+        id="roster-title"
+        title="Members"
+        count={order ? order.length : undefined}
+        countLabel={order ? (order.length === 1 ? '1 member' : order.length + ' members') : undefined}
+        back={{ href: hrefOf({ place: 'bridge', id: bridge, pane: 'none' }), label: 'Channel', to: 'main' }}
+        actions={
+          isOpen && (
+            <Button size="s" onClick={() => setAsk({ kind: 'add' })}>
+              Add
+            </Button>
+          )
+        }
+      />
       <div class="scroll">
         {order && order.length > 0 ? (
           <ul class="members" ref={list}>

@@ -11,6 +11,7 @@ import { alwaysAllow, decide } from '../state/actions';
 import { attempt } from './notice';
 import { Icon } from './icons';
 import { When } from './common';
+import { Button, Card, Command } from './primitives';
 
 /** canAlways reports whether a card offers Always allow, with the rule of /ui. */
 export function canAlways(d: Decision): boolean {
@@ -75,12 +76,35 @@ export function ApprovalCard({ d, who, onDecide }: { d: Decision; who: string; o
     setBusy(false);
     if (ok && onDecide) onDecide();
   };
+  const title = decisionTitle(who, d);
   return (
-    <div class={'decide' + (pending ? '' : ' done')}>
-      <p class="kick">Permission</p>
-      <h3>{decisionTitle(who, d)}</h3>
+    <Card
+      class={'decide' + (pending ? '' : ' done')}
+      title={pending ? 'Needs your decision' : title}
+      tone={pending ? 'amber' : undefined}
+      quiet={!pending}
+      label={(pending ? 'Needs your decision: ' : '') + title}
+      actions={
+        pending ? (
+          <>
+            <Button disabled={busy} onClick={() => go('deny')} aria-label={'Deny: thumb down for ' + who}>
+              Deny
+            </Button>
+            {canAlways(d) && (
+              <Button disabled={busy} onClick={() => go('always')} title={`Allow this call, and let ${who} use ${d.tool} from now on without asking`}>
+                Always allow
+              </Button>
+            )}
+            <Button kind="primary" disabled={busy} onClick={() => go('allow')} aria-label={(d.label || 'Allow') + ': thumb up for ' + who}>
+              {d.label || 'Allow'}
+            </Button>
+          </>
+        ) : undefined
+      }
+    >
+      {pending && <p>{title}.</p>}
       {edit && <p class="target">{edit.path}</p>}
-      {cmd && <pre class="code">{cmd}</pre>}
+      {cmd && <Command>{cmd}</Command>}
       {effect && <p class="effect">{effect}</p>}
       {why && <p class="why">{why}</p>}
       <details class="more">
@@ -94,29 +118,14 @@ export function ApprovalCard({ d, who, onDecide }: { d: Decision; who: string; o
         {raw && <pre class="code">{raw}</pre>}
       </details>
       {pending ? (
-        <>
-          <label class="note-field">
-            <span>Note for {who}, if you want</span>
-            <input type="text" value={note} maxLength={1024} onInput={(e) => setNote((e.target as HTMLInputElement).value)} />
-          </label>
-          <div class="do three">
-            <button type="button" class="btn" disabled={busy} onClick={() => go('deny')} aria-label={'Deny: thumb down for ' + who}>
-              <Icon name="down" /> Deny
-            </button>
-            {canAlways(d) && (
-              <button type="button" class="btn" disabled={busy} onClick={() => go('always')} title={`Allow this call, and let ${who} use ${d.tool} from now on without asking`}>
-                Always allow
-              </button>
-            )}
-            <button type="button" class="btn primary" disabled={busy} onClick={() => go('allow')} aria-label={(d.label || 'Allow') + ': thumb up for ' + who}>
-              <Icon name="up" /> {d.label || 'Allow'}
-            </button>
-          </div>
-        </>
+        <label class="note-field">
+          <span>Note</span>
+          <input type="text" value={note} maxLength={1024} placeholder="Optional" onInput={(e) => setNote((e.target as HTMLInputElement).value)} />
+        </label>
       ) : (
         <DecidedLine d={d} />
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -164,10 +173,14 @@ export function QuestionCard({ d, who, onDecide }: { d: Decision; who: string; o
       answer(content);
     }
   };
+  const question = d.reason || 'A question for you';
   return (
-    <div class={'decide question' + (pending ? '' : ' done')}>
-      <p class="kick">Question from {who}</p>
-      <h3>{d.reason || 'A question for you'}</h3>
+    <Card class={'decide question' + (pending ? '' : ' done')} title={pending ? 'Needs your answer' : question} tone={pending ? 'amber' : undefined} quiet={!pending} label={'Question from ' + who + ': ' + question}>
+      {pending && (
+        <p>
+          {who} asks: <b>{question}</b>
+        </p>
+      )}
       {!pending ? (
         <DecidedLine d={d} />
       ) : form.kind === 'choices' ? (
@@ -179,9 +192,9 @@ export function QuestionCard({ d, who, onDecide }: { d: Decision; who: string; o
               </button>
             ))}
           </div>
-          <button type="button" class="btn plain small decline" disabled={busy} onClick={decline}>
+          <Button kind="quiet" size="s" class="decline" disabled={busy} onClick={decline}>
             Decline
-          </button>
+          </Button>
         </>
       ) : (
         <form onSubmit={submit}>
@@ -207,16 +220,16 @@ export function QuestionCard({ d, who, onDecide }: { d: Decision; who: string; o
             ))
           )}
           <div class="do">
-            <button type="button" class="btn" disabled={busy} onClick={decline}>
+            <Button disabled={busy} onClick={decline}>
               Decline
-            </button>
-            <button type="submit" class="btn primary" disabled={busy}>
+            </Button>
+            <Button type="submit" kind="primary" disabled={busy}>
               {d.label || 'Answer'}
-            </button>
+            </Button>
           </div>
         </form>
       )}
-    </div>
+    </Card>
   );
 }
 

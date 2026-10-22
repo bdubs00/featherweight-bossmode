@@ -1,33 +1,56 @@
-// The page: the rail, the main column, and the pane. In a wide window the
-// three show side by side. In a narrow window one shows at a time, and the
-// route picks it. The keyboard reaches every action: / puts the focus in
-// the composer, and Escape closes or goes back.
+// The page: the sign-in, then the shell with the app bar and three panes.
+// The route picks the place, the screen of each pane, and the one pane that
+// a narrow window shows. The keyboard reaches every action: / puts the
+// focus in the composer, and Escape closes or goes back.
+//
+// panesOf maps each route to its screens. The screens live in files that the
+// screens of the next stage own (docs/DESIGN.md, section 11), so a screen
+// changes its file and never this one.
 
+import type { ComponentChildren } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import { clearToken, getToken, setToken, setUnauthorizedHandler, type SigninNeeded } from '../api/client';
 import { afterUnauthorized, clearSigninMarks, markSignedOut, sessionStore } from '../api/auth';
 import { api } from '../api/routes';
 import { store, useSelect } from '../state/store';
-import { loadAgents, loadBridges, loadFaces, startStream, stopStream } from '../state/actions';
+import { loadAgents, loadBridges, loadFaces, loadFleet, loadSkills, startStream, stopStream } from '../state/actions';
 import { forgetFaces } from '../lib/faces';
-import { columnOf, go, parentOf, parseRoute, type Route } from '../lib/route';
+import { applyTheme, themeOf } from '../lib/theme';
+import { canonicalPath, columnOf, go, parentOf, parseRoute, type Route } from '../lib/route';
 import { isTyping } from './keys';
 import { clearNotice, showError, useNotice } from './notice';
-import { Rail } from './Rail';
+import { Shell, shownOf } from './Shell';
+import { BridgeList } from './BridgeList';
 import { Channel } from './Channel';
 import { Roster } from './Roster';
 import { RunPane } from './RunPane';
 import { Manager } from './Manager';
-import { Fleet, AgentPane } from './Fleet';
+import { Fleet, AgentPane, FleetList } from './Fleet';
+import { MemberMain, MemberProfile } from './Member';
+import { Board } from './Board';
+import { ActivityList, ActivityMain } from './Activity';
 import { PageEditor, PageHistory, PageTree, PageView } from './Pages';
 import { NewBridge } from './NewBridge';
+import { NewAgent } from './NewAgent';
+import { Appearance } from './Appearance';
+import { SkillActions, SkillList, SkillMain } from './Skills';
 import { Signin } from './Signin';
-import { Empty } from './common';
+import { Button, Card, Led } from './primitives';
 
 type Auth = { kind: 'loading' } | { kind: 'ready' } | { kind: 'signin'; signinUrl: string; expired: boolean; error: string } | { kind: 'failed'; error: string };
 
 let leaving = false;
 let tokenTry = false;
+/** The bridge that the person read last, so Bridges opens it again. */
+let lastBridge = '';
+
+/** The width from which two panes show side by side. */
+const TWO_PANES = '(min-width: 800px)';
+/** The width from which three panes show side by side. */
+const THREE_PANES = '(min-width: 1200px)';
+
+/** here is the address of the page for the sign-in, with the slash that the sign-in needs. */
+const here = () => canonicalPath(location.pathname) + location.search + location.hash;
 
 function useRoute(): Route {
   const [r, setR] = useState(() => parseRoute(location.hash));
@@ -39,70 +62,98 @@ function useRoute(): Route {
   return r;
 }
 
-/** Home is the main column with no bridge open: the newest open bridge, or a hint. */
+/** Home is the main pane of Bridges with no bridge open: the last bridge, the newest open one, or an invitation. */
 function Home() {
   const loaded = useSelect((s) => s.bridges.loaded);
-  const first = useSelect((s) => s.bridges.order.find((id) => s.bridges.byId[id].state === 'open'));
+  const first = useSelect((s) => (lastBridge && s.bridges.byId[lastBridge] ? lastBridge : s.bridges.order.find((id) => s.bridges.byId[id].state === 'open')));
   useEffect(() => {
-    // A wide window opens the newest open bridge, so the main column is never empty.
-    if (first && window.matchMedia('(min-width: 1024px)').matches) go({ place: 'bridge', id: first, pane: 'none' }, true);
+    // Where two panes show, the main pane opens a bridge, so it is never empty.
+    if (first && window.matchMedia(TWO_PANES).matches) go({ place: 'bridge', id: first, pane: 'none' }, true);
   }, [first]);
   return (
     <section class="screen home">
-      <div class="scroll pad">
-        {loaded && !first ? (
-          <Empty>
-            No bridge is open. <a href="#new">Open a bridge</a>, or ask the <a href="#manager">manager</a> to open one.
-          </Empty>
-        ) : (
-          <Empty>Pick a bridge in the rail.</Empty>
-        )}
-      </div>
+      {loaded && !first ? (
+        <div class="empty center">
+          <p>No bridge is open. Open one, or ask the manager to open one.</p>
+          <Button href="#new" kind="primary">
+            Open a bridge
+          </Button>
+        </div>
+      ) : (
+        <div class="empty center">
+          <p>Loading the bridges.</p>
+        </div>
+      )}
     </section>
   );
 }
 
-function mainOf(r: Route) {
-  switch (r.place) {
-    case 'bridge':
-      return <Channel id={r.id} />;
-    case 'manager':
-      return <Manager />;
-    case 'new':
-      return <NewBridge />;
-    case 'fleet':
-      return <Fleet />;
-    case 'pages':
-      if (r.mode === 'create') return <PageEditor path={r.path} create />;
-      if (!r.path) return <PageTreeHint />;
-      if (r.mode === 'history') return <PageHistory path={r.path} />;
-      if (r.mode === 'edit') return <PageEditor path={r.path} />;
-      return <PageView path={r.path} version={r.version} />;
-  }
-  return <Home />;
-}
-
-function PageTreeHint() {
+function PageHint() {
   return (
     <section class="screen">
-      <div class="scroll pad">
-        <Empty>Pick a page in the tree, or search the wiki.</Empty>
+      <div class="empty center">
+        <p>Pick a page in the list, or search the wiki.</p>
+        <Button href="#create">New page</Button>
       </div>
     </section>
   );
 }
 
-function paneOf(r: Route) {
+interface Panes {
+  list: ComponentChildren | null;
+  main: ComponentChildren;
+  details: ComponentChildren | null;
+}
+
+/** panesOf names the screen of each pane for a route. */
+function panesOf(r: Route): Panes {
   switch (r.place) {
+    case 'home':
+      return { list: <BridgeList current="" />, main: <Home />, details: null };
+    case 'new':
+      return { list: <BridgeList current="" />, main: <NewBridge />, details: null };
     case 'bridge':
-      if (r.pane === 'run' && r.run) return <RunPane bridge={r.id} runId={r.run} handle={r.handle} />;
-      return <Roster bridge={r.id} current={r.handle} />;
+      return {
+        list: <BridgeList current={r.id} />,
+        main: <Channel id={r.id} />,
+        details: r.pane === 'run' && r.run ? <RunPane bridge={r.id} runId={r.run} handle={r.handle} /> : <Roster bridge={r.id} current={r.handle} />,
+      };
+    case 'activity':
+      return { list: <ActivityList />, main: <ActivityMain />, details: null };
     case 'fleet':
-      return r.agent ? <AgentPane agent={r.agent} /> : null;
-    case 'pages':
-      return <PageTree current={r.path} />;
+      return { list: <FleetList current={r.agent} />, main: r.board ? <Board /> : <Fleet />, details: r.agent ? <AgentPane agent={r.agent} /> : null };
+    case 'member':
+      return { list: <FleetList member={r.bridge + '/' + r.handle} />, main: <MemberMain bridge={r.bridge} handle={r.handle} tab={r.tab} />, details: <MemberProfile bridge={r.bridge} handle={r.handle} /> };
+    case 'new-agent':
+      return { list: <FleetList />, main: <NewAgent />, details: null };
+    case 'skills':
+      return { list: <SkillList current={r.item} />, main: <SkillMain item={r.item} />, details: <SkillActions item={r.item} /> };
+    case 'pages': {
+      let main: ComponentChildren;
+      if (r.mode === 'create') main = <PageEditor path={r.path} create />;
+      else if (!r.path) main = <PageHint />;
+      else if (r.mode === 'history') main = <PageHistory path={r.path} />;
+      else if (r.mode === 'edit') main = <PageEditor path={r.path} />;
+      else main = <PageView path={r.path} version={r.version} />;
+      return { list: <PageTree current={r.path} />, main, details: null };
+    }
+    case 'manager':
+      return { list: null, main: <Manager />, details: null };
+    case 'appearance':
+      return { list: null, main: <Appearance />, details: null };
   }
-  return null;
+}
+
+function Notice({ text }: { text: string }) {
+  return (
+    <div class="notice" role="alert">
+      <Led tone="red" word="Failed" />
+      <p>{text}</p>
+      <Button kind="quiet" size="s" onClick={clearNotice}>
+        Dismiss
+      </Button>
+    </div>
+  );
 }
 
 export function App() {
@@ -110,15 +161,22 @@ export function App() {
   const [auth, setAuth] = useState<Auth>({ kind: 'loading' });
   const notice = useNotice();
   const open = route.place === 'bridge' ? route.id : '';
+  const config = useSelect((s) => s.config);
 
   useEffect(() => {
     store.dispatch({ type: 'open', bridge: open });
+    if (open) lastBridge = open;
   }, [open]);
+
+  // The theme of the deployment: its accent and its logo, or the defaults.
+  useEffect(() => {
+    applyTheme(themeOf(config));
+  }, [config]);
 
   const unauthorized = (e: SigninNeeded) => {
     if (leaving) return;
-    const step = afterUnauthorized({ signinUrl: e.signinUrl, here: location.pathname + location.search + location.hash, hadToken: !!getToken(), now: Date.now(), store: sessionStore });
-    const error = tokenTry ? 'That access token did not work.' : '';
+    const step = afterUnauthorized({ signinUrl: e.signinUrl, here: here(), hadToken: !!getToken(), now: Date.now(), store: sessionStore });
+    const error = tokenTry ? 'That access token did not work. Check it, or sign in.' : '';
     tokenTry = false;
     clearToken();
     stopStream();
@@ -138,18 +196,25 @@ export function App() {
       clearSigninMarks();
       store.dispatch({ type: 'me', me });
       setAuth({ kind: 'ready' });
-      const config = await api.config().catch(() => null);
-      store.dispatch({ type: 'config', config });
+      const cfg = await api.config().catch(() => null);
+      store.dispatch({ type: 'config', config: cfg });
       await Promise.all([loadBridges(), loadFaces().catch(showError), loadAgents().catch(showError)]);
       startStream(unauthorized);
+      // The fleet and the skills fill the counts of workers and the pickers.
+      // A page without them still works, so their errors stay quiet.
+      loadFleet().catch(() => {});
+      loadSkills().catch(() => {});
     } catch (e) {
       const err = e as { name?: string; message?: string };
       if (err && err.name === 'SigninNeeded') return;
-      setAuth({ kind: 'failed', error: (err && err.message) || 'The workbench did not answer.' });
+      setAuth({ kind: 'failed', error: (err && err.message) || 'The workbench did not answer. Check the connection, then try again.' });
     }
   };
 
   useEffect(() => {
+    // The sign-in takes a return address only under /bossmode/, with the slash.
+    const path = canonicalPath(location.pathname);
+    if (path !== location.pathname) history.replaceState(null, '', path + location.search + location.hash);
     setUnauthorizedHandler(unauthorized);
     boot();
     return () => stopStream();
@@ -166,7 +231,7 @@ export function App() {
         if (box && !box.disabled) box.focus();
         else {
           const s = store.get();
-          const id = s.open || s.bridges.order.find((x) => s.bridges.byId[x].state === 'open');
+          const id = s.open || lastBridge || s.bridges.order.find((x) => s.bridges.byId[x].state === 'open');
           go(id ? { place: 'bridge', id, pane: 'none' } : { place: 'manager' });
           setTimeout(() => {
             const b = document.getElementById('composer') as HTMLTextAreaElement | null;
@@ -181,10 +246,12 @@ export function App() {
           return;
         }
         const r = parseRoute(location.hash);
-        const wide = window.matchMedia('(min-width: 1024px)').matches;
-        // In a wide window the rail and the main column stay, so Escape goes
-        // back only from what the pane or the main column opened.
-        if (wide && ((r.place === 'bridge' && r.pane !== 'run') || r.place === 'home' || r.place === 'manager' || (r.place === 'fleet' && !r.agent))) return;
+        const p = panesOf(r);
+        const shown = shownOf(columnOf(r), !!p.list, !!p.details);
+        // Where three panes show, the list and the main pane stay, so Escape
+        // goes back only from what the details pane or the main pane opened.
+        const wide = window.matchMedia(THREE_PANES).matches;
+        if (wide && shown !== 'details' && (r.place === 'bridge' || r.place === 'home' || r.place === 'manager' || r.place === 'activity' || r.place === 'member' || (r.place === 'fleet' && !r.board) || (r.place === 'skills' && !r.item))) return;
         e.preventDefault();
         go(parentOf(r));
       }
@@ -215,6 +282,7 @@ export function App() {
         signinUrl={auth.signinUrl}
         expired={auth.expired}
         error={auth.error}
+        here={here()}
         onToken={(t) => {
           tokenTry = true;
           setToken(t);
@@ -227,33 +295,18 @@ export function App() {
   if (auth.kind === 'failed') {
     return (
       <main class="signin">
-        <h1>Bossmode</h1>
-        <p class="alert" role="alert">
-          {auth.error}
-        </p>
-        <button type="button" class="btn primary wide" onClick={boot}>
-          Try again
-        </button>
+        <Card title="Bossmode" tone="red" label="The workbench did not answer">
+          <p class="alert" role="alert">
+            {auth.error}
+          </p>
+          <Button kind="primary" onClick={boot}>
+            Try again
+          </Button>
+        </Card>
       </main>
     );
   }
 
-  const pane = paneOf(route);
-  return (
-    <div class={'app' + (pane ? '' : ' no-pane')} data-col={columnOf(route)}>
-      <Rail route={route} onSignOut={signOut} />
-      <main class="col-main" id="main">
-        {notice && (
-          <div class="alert top" role="alert">
-            <p>{notice}</p>
-            <button type="button" class="btn small" onClick={clearNotice}>
-              Dismiss
-            </button>
-          </div>
-        )}
-        {mainOf(route)}
-      </main>
-      {pane && <aside class="col-pane" aria-label="Details">{pane}</aside>}
-    </div>
-  );
+  const panes = panesOf(route);
+  return <Shell route={route} list={panes.list} main={panes.main} details={panes.details} notice={notice ? <Notice text={notice} /> : null} onSignOut={signOut} />;
 }

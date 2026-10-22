@@ -1,12 +1,14 @@
-// The composer: a text box with @ completion over the roster, a reply chip,
-// and Cmd or Ctrl+Enter to send. A draft stays in sessionStorage, so a move
-// to another screen, a reload, or a sign-in keeps it.
+// The composer: a text box with @ completion over the roster, a slash menu
+// of commands in a one-on-one conversation, a reply chip, and Cmd or
+// Ctrl+Enter to send. A draft stays in sessionStorage, so a move to another
+// screen, a reload, or a sign-in keeps it.
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { applyCompletion, completionAt, mentionsIn, type Completion } from '../lib/mention';
-import { excerpt, list } from '../lib/words';
+import { applyCompletion, completionAt, mentionsIn, slashAt, type Completion } from '../lib/mention';
+import { list } from '../lib/words';
 import { Face } from './common';
-import { Icon } from './icons';
+import { Glyph } from './icons';
+import { Button } from './primitives';
 
 const draftKey = (k: string) => 'fw.bossmode.draft.' + k;
 
@@ -45,6 +47,11 @@ export interface ComposerProps {
   disabled?: string;
   /** onSend sends the text. It resolves true when the text went out. */
   onSend: (text: string, to: string[]) => Promise<boolean>;
+  /**
+   * The slash commands of a one-on-one conversation, such as the skills of
+   * the agent. A / at the start of the text opens the menu.
+   */
+  commands?: { name: string; description: string }[];
 }
 
 export function Composer(p: ComposerProps) {
@@ -55,6 +62,10 @@ export function Composer(p: ComposerProps) {
   const box = useRef<HTMLTextAreaElement>(null);
   const handles = useMemo(() => (p.members || []).map((m) => m.handle), [p.members]);
   const byHandle = useMemo(() => new Map((p.members || []).map((m) => [m.handle, m])), [p.members]);
+  const commands = useMemo(() => (p.commands || []).map((c) => c.name), [p.commands]);
+  const byCommand = useMemo(() => new Map((p.commands || []).map((c) => [c.name, c])), [p.commands]);
+  /** completeAt opens the slash menu or the @ completion at the caret. */
+  const completeAt = (v: string, caret: number): Completion | null => (commands.length ? slashAt(v, caret, commands) : null) || (handles.length ? completionAt(v, caret, handles) : null);
 
   // Another draft key, such as another bridge, reads its own draft.
   useEffect(() => {
@@ -80,8 +91,7 @@ export function Composer(p: ComposerProps) {
   const update = (v: string, caret: number) => {
     setText(v);
     writeDraft(p.draft, v);
-    const c = handles.length ? completionAt(v, caret, handles) : null;
-    setComp(c);
+    setComp(completeAt(v, caret));
     setPick(0);
   };
 
@@ -158,22 +168,22 @@ export function Composer(p: ComposerProps) {
         send();
       }}
     >
-      {p.reply && (
-        <div class="replying">
-          <Icon name="reply" />
-          <span>
-            Reply to <b>{p.reply.who}</b>: {excerpt(p.reply.text, 80)}
-          </span>
-          <button type="button" class="icon-btn" aria-label="Cancel the reply" onClick={p.onClearReply}>
-            <Icon name="close" />
-          </button>
-        </div>
-      )}
       <div class={'box' + (p.disabled ? ' off' : '')}>
+        {p.reply && (
+          <div class="replying slidein">
+            <span title={p.reply.text}>
+              <span class="muted">Replying to</span> {p.reply.who}
+              <button type="button" class="chip-x" aria-label="Stop replying" onClick={p.onClearReply}>
+                <Glyph name="close" size={12} />
+              </button>
+            </span>
+          </div>
+        )}
         {comp && (
-          <ul class="complete" id={listId} role="listbox" aria-label="Members">
+          <ul class="complete" id={listId} role="listbox" aria-label={comp.sigil === '/' ? 'Commands' : 'Members'}>
             {comp.matches.map((h, i) => {
-              const m = byHandle.get(h);
+              const m = comp.sigil === '/' ? undefined : byHandle.get(h);
+              const c = comp.sigil === '/' ? byCommand.get(h) : undefined;
               return (
                 <li
                   id={listId + '-' + i}
@@ -186,8 +196,12 @@ export function Composer(p: ComposerProps) {
                   }}
                 >
                   {m && <Face agent={m.agent} size={20} />}
-                  <b>@{h}</b>
+                  <b>
+                    {comp.sigil || '@'}
+                    {h}
+                  </b>
                   {m && <small>{m.task}</small>}
+                  {c && <small>{c.description}</small>}
                 </li>
               );
             })}
@@ -198,7 +212,7 @@ export function Composer(p: ComposerProps) {
           id="composer"
           rows={1}
           aria-label={p.label}
-          placeholder={p.disabled || p.placeholder}
+          placeholder={p.disabled || (p.reply ? 'Message ' + p.reply.who : p.placeholder)}
           disabled={!!p.disabled}
           value={text}
           aria-autocomplete={p.members ? 'list' : undefined}
@@ -211,7 +225,7 @@ export function Composer(p: ComposerProps) {
           onKeyDown={onKey}
           onClick={(e) => {
             const el = e.target as HTMLTextAreaElement;
-            setComp(handles.length ? completionAt(el.value, el.selectionStart || 0, handles) : null);
+            setComp(completeAt(el.value, el.selectionStart || 0));
           }}
           onBlur={() => setTimeout(() => setComp(null), 120)}
         />
@@ -220,10 +234,9 @@ export function Composer(p: ComposerProps) {
           <span class="keys" aria-hidden="true">
             {navigator.platform && /Mac/.test(navigator.platform) ? '⌘' : 'Ctrl'}+Enter
           </span>
-          <button type="submit" class="btn primary send" disabled={busy || !text.trim() || !!p.disabled} aria-label="Send">
-            <Icon name="send" />
-            <span>Send</span>
-          </button>
+          <Button type="submit" kind="primary" class="send" disabled={busy || !text.trim() || !!p.disabled}>
+            Send
+          </Button>
         </div>
       </div>
     </form>

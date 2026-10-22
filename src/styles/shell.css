@@ -1,0 +1,315 @@
+/* The shell: the app bar and the three panes, at the three widths of
+   docs/DESIGN.md, section 5. The data-show attribute of the shell names the
+   column that a narrow window shows. */
+
+.shell {
+  display: flex;
+  height: 100vh;
+  height: 100dvh;
+  background: var(--chrome);
+  overflow: hidden;
+}
+
+/* ---------- the app bar ---------- */
+.appbar {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  width: var(--w-appbar);
+  border-right: 1px solid var(--line);
+  background: repeating-linear-gradient(to bottom, var(--groove-chrome) 0 1px, var(--chrome) 1px 8px);
+}
+.places {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding: var(--s-2) 6px 0;
+}
+.place {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-1);
+  padding: var(--s-3) 0 var(--s-2);
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  background: var(--chrome);
+  color: var(--ink);
+  text-decoration: none;
+  font-size: var(--t-caption);
+  line-height: var(--t-caption-lh);
+  font-weight: 600;
+}
+.place:hover {
+  background: var(--raised);
+}
+.place.on {
+  background: var(--paper);
+  border-color: var(--line);
+  box-shadow: var(--e-selected);
+  font-weight: 700;
+}
+.place-count {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+}
+.account {
+  margin: auto 6px var(--s-4);
+  display: flex;
+  justify-content: center;
+}
+.account-key {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: var(--h-row);
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  background: var(--chrome);
+  cursor: pointer;
+}
+.account-key:hover,
+.account-key[aria-expanded='true'] {
+  background: var(--raised);
+}
+.menu-account {
+  top: auto;
+  right: auto;
+  bottom: 0;
+  left: calc(100% + 10px);
+}
+.menu-check {
+  margin-left: var(--s-2);
+  vertical-align: -3px;
+}
+.menu [role='menuitemradio'] .t {
+  font-weight: 400;
+}
+.menu [role='menuitemradio'][aria-checked='true'] .t {
+  font-weight: 700;
+}
+
+/* ---------- the panes ---------- */
+.pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--paper);
+}
+.pane-list {
+  flex: none;
+  width: var(--w-list);
+  border-right: 1px solid var(--line);
+}
+.pane-main {
+  flex: 1;
+  position: relative;
+}
+.pane-details {
+  flex: none;
+  width: var(--w-details);
+  border-left: 1px solid var(--line);
+}
+/* A pane holds one screen, and a screen fills it. */
+.screen {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.pad {
+  padding: var(--s-4) var(--s-5) var(--s-6);
+}
+.pane-foot {
+  flex: none;
+  padding: var(--s-4);
+  border-top: 1px solid var(--line);
+}
+.live-status {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-width: 0;
+}
+.live-status .status {
+  color: var(--ink);
+}
+/* A key that opens the details pane, for the widths that hide it. */
+.collapsed-only {
+  display: none !important;
+}
+
+/* The empty state of a pane: what to do here, and the key that does it. */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-3);
+  padding: var(--s-5);
+  color: var(--muted);
+}
+.empty p {
+  max-width: 48ch;
+}
+.empty.center {
+  align-items: center;
+  text-align: center;
+  margin: auto;
+}
+
+/* The notice of a failed action, over the top of the main pane. */
+.notice {
+  position: absolute;
+  z-index: var(--z-notice);
+  top: calc(var(--h-header) + var(--groove) + var(--s-2));
+  left: var(--s-4);
+  right: var(--s-4);
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-2) var(--s-2) var(--s-2) var(--s-4);
+  border: 1px solid var(--edge);
+  border-radius: var(--r);
+  background: var(--card);
+  box-shadow: var(--e-overlay);
+}
+.notice p {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The boot and the sign-in screens stand alone, on the chrome. */
+.boot {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  color: var(--muted);
+}
+.signin {
+  max-width: 420px;
+  margin: 12vh auto 0;
+  padding: 0 var(--s-4);
+}
+.signin .card-body {
+  gap: var(--s-3);
+}
+.signin .lede {
+  color: var(--muted);
+}
+.signin .key {
+  width: 100%;
+}
+.token-way summary {
+  cursor: pointer;
+  min-height: var(--h-row);
+  display: inline-flex;
+  align-items: center;
+  font-weight: 600;
+}
+.token-way .field {
+  margin: var(--s-2) 0 var(--s-3);
+}
+.alert {
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--led-red);
+  border-radius: var(--r);
+  color: var(--word-red);
+  font-weight: 600;
+}
+
+/* ---------- medium: two panes ---------- */
+@media (max-width: 1199px) {
+  .shell:not([data-show='details']) .pane-details {
+    display: none;
+  }
+  .shell[data-show='details'] .pane-list {
+    display: none;
+  }
+  .shell[data-show='details'] .back.to-list {
+    display: inline-flex;
+  }
+  .collapsed-only {
+    display: inline-flex !important;
+  }
+}
+
+/* ---------- narrow: one pane, the places at the bottom ---------- */
+@media (max-width: 799px) {
+  .shell {
+    flex-direction: column;
+  }
+  .pane-list,
+  .pane-main,
+  .pane-details {
+    display: none;
+    flex: 1;
+    width: auto;
+    border: 0;
+  }
+  .shell[data-show='list'] .pane-list,
+  .shell[data-show='main'] .pane-main,
+  .shell[data-show='details'] .pane-details {
+    display: flex;
+  }
+  .back,
+  .shell[data-show='details'] .back.to-list {
+    display: inline-flex;
+  }
+  .appbar {
+    order: 2;
+    flex-direction: row;
+    width: auto;
+    border-right: 0;
+    border-top: 1px solid var(--line);
+    padding-bottom: env(safe-area-inset-bottom);
+    background: var(--chrome);
+  }
+  .shell:not([data-show='list']) .appbar {
+    display: none;
+  }
+  .appbar .logo-well {
+    display: none;
+  }
+  .places {
+    flex: 1;
+    flex-direction: row;
+    gap: var(--s-1);
+    padding: var(--s-1);
+  }
+  .place {
+    flex: 1;
+    min-height: var(--h-row);
+    padding: 6px 0 var(--s-1);
+  }
+  .place-count {
+    right: calc(50% - 26px);
+    top: 2px;
+  }
+  .account {
+    margin: var(--s-1);
+    width: 56px;
+  }
+  .menu-account {
+    left: auto;
+    right: 0;
+    bottom: calc(100% + 8px);
+  }
+  .pad {
+    padding: var(--s-4);
+  }
+  .pane-head-title {
+    padding: 0 var(--s-4);
+  }
+}

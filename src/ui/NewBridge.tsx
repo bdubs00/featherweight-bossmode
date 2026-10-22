@@ -9,7 +9,8 @@ import { useSelect } from '../state/store';
 import { loadAgents, openNewBridge } from '../state/actions';
 import { go } from '../lib/route';
 import { attempt } from './notice';
-import { Back, Face } from './common';
+import { Face } from './common';
+import { PaneHeader } from './primitives';
 import { Icon } from './icons';
 
 const HANDLE = /^[a-z0-9][a-z0-9._-]{0,31}$/;
@@ -68,13 +69,7 @@ export function NewBridge() {
 
   return (
     <section class="screen newbridge" aria-labelledby="new-title">
-      <header class="bar">
-        <Back narrow label="Bridges" href="#" />
-        <div class="title">
-          <h1 id="new-title">Open a bridge</h1>
-          <p class="goal">One job, split into tasks, with one agent on each.</p>
-        </div>
-      </header>
+      <PaneHeader id="new-title" title="Open a bridge" size="title" level={1} back={{ href: '#', label: 'Bridges', to: 'list' }} />
       <form class="scroll pad form" onSubmit={submit} noValidate>
         {problems.length > 0 && (
           <div class="alert" role="alert">

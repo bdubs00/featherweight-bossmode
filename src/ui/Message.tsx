@@ -219,7 +219,7 @@ export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, onReply }
     return (
       <>
         {day && <p class="day" role="separator">{day}</p>}
-        <article class={'msg card' + (e.decision.state === 'pending' ? ' waiting' : '')} id={id} data-item data-seq={seq} aria-label={(e.decision.question ? 'Question from ' : 'Permission for ') + who}>
+        <article class={'msg decision-row' + (e.decision.state === 'pending' ? ' waiting' : '')} id={id} data-item data-seq={seq} aria-label={(e.decision.question ? 'Question from ' : 'Permission for ') + who}>
           <Face agent={agent || who.replace(/-\d+$/, '')} size={32} />
           <div class="body">
             <header>

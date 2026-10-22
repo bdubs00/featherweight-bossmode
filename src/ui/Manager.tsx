@@ -8,7 +8,8 @@ import { api } from '../api/routes';
 import type { Result } from '../api/types';
 import { store, useSelect } from '../state/store';
 import { attempt, showError } from './notice';
-import { Back, Empty, Face } from './common';
+import { Empty } from './common';
+import { Button, Mark, PaneHeader } from './primitives';
 import { Composer } from './Composer';
 import { Conversation, useTranscript } from './Conversation';
 import { Icon } from './icons';
@@ -49,12 +50,7 @@ export function Manager() {
   if (!manager) {
     return (
       <section class="screen manager" aria-labelledby="manager-title">
-        <header class="bar">
-          <Back narrow label="Bridges" href="#" />
-          <div class="title">
-            <h1 id="manager-title">Manager</h1>
-          </div>
-        </header>
+        <PaneHeader id="manager-title" title="Manager" size="title" level={1} back={{ href: '#', label: 'Bridges', to: 'list' }} />
         <div class="scroll">
           <Empty>This workbench has no manager. An operator sets the profile of the manager in workbench.bossmode.manager.</Empty>
         </div>
@@ -79,21 +75,19 @@ export function Manager() {
 
   return (
     <section class="screen manager" aria-labelledby="manager-title">
-      <header class="bar">
-        <Back narrow label="Bridges" href="#" />
-        <div class="title with-face">
-          <Face agent={manager.agent} size={32} />
-          <div>
-            <h1 id="manager-title">Manager</h1>
-            <p class="goal">It reads the fleet, opens bridges, and decides only what you delegate.</p>
-          </div>
-        </div>
-        <div class="end">
-          <button type="button" class="btn small" disabled={!runId} onClick={() => setRunId('')}>
-            <Icon name="plus" /> New conversation
-          </button>
-        </div>
-      </header>
+      <PaneHeader
+        id="manager-title"
+        title="Manager"
+        size="title"
+        level={1}
+        back={{ href: '#', label: 'Bridges', to: 'list' }}
+        lead={<Mark agent={manager.agent} size={36} />}
+        actions={
+          <Button size="s" disabled={!runId} onClick={() => setRunId('')}>
+            New conversation
+          </Button>
+        }
+      />
       <div class="scroll talk">
         {!runId && !sent && <Empty>Ask the manager about the fleet, or ask it to open a bridge. The first answer takes a few seconds, because its Task wakes for it.</Empty>}
         {runId && <Conversation run={run} result={res} t={t} agentLabel="manager" />}

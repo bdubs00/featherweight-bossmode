@@ -1,0 +1,299 @@
+/* Screen C: the wiki, the editor, the manager, the new-bridge and the
+   new-agent screens, the Skills place, and Appearance. Screen C owns this
+   file. */
+
+/* ---------- the wiki ---------- */
+.search {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin: var(--s-2) var(--s-2) 0;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--recess);
+  box-shadow: var(--e-recess);
+}
+.search:focus-within {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+.search input {
+  flex: 1;
+  min-height: var(--h-small);
+  border: 0;
+  background: none;
+  outline: none;
+  font-size: 14px;
+}
+.search .ic {
+  color: var(--muted);
+}
+.tree {
+  margin: 0;
+  padding: var(--s-2) var(--s-2) var(--s-4);
+  list-style: none;
+}
+.tree ul {
+  margin: 0;
+  padding-left: 14px;
+  list-style: none;
+}
+.tree details > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--h-small);
+  padding: var(--s-1) var(--s-2);
+  border-radius: var(--r);
+  list-style: none;
+  font-size: var(--t-meta);
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+}
+.tree details > summary::-webkit-details-marker {
+  display: none;
+}
+.tree details > summary .ic {
+  width: 11px;
+  height: 11px;
+}
+.prow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: var(--h-row);
+  padding: 6px var(--s-2);
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  color: inherit;
+  text-decoration: none;
+}
+.prow:hover {
+  background: var(--raised);
+}
+.prow.sel {
+  background: var(--raised);
+  border-color: var(--raised-line);
+  box-shadow: var(--e-selected);
+}
+.prow .ic {
+  margin-top: 3px;
+  color: var(--muted);
+}
+.prow .main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.prow .t {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.prow .s {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--t-meta);
+  color: var(--muted);
+}
+.article {
+  max-width: 72ch;
+  font-size: 16px;
+  line-height: 24px;
+}
+.meta-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+  margin: 0 0 var(--s-4);
+  font-size: var(--t-meta);
+  color: var(--muted);
+}
+.tags {
+  display: inline-flex;
+  gap: var(--s-1);
+}
+.versions {
+  margin: var(--s-2) 0 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+.versions li + li {
+  border-top: 1px solid var(--line-soft);
+}
+.vrow {
+  display: flex;
+  flex-direction: column;
+  min-height: var(--h-row);
+  padding: 10px 14px;
+  color: inherit;
+  text-decoration: none;
+}
+.vrow:hover {
+  background: var(--raised);
+}
+.vrow .s {
+  font-size: var(--t-meta);
+  color: var(--muted);
+}
+.vrow.gone {
+  margin: 0;
+  color: var(--muted);
+}
+.field-why {
+  min-height: 16px;
+  font-size: var(--t-meta);
+  color: var(--muted);
+}
+.field-why.bad {
+  color: var(--word-red);
+}
+.editor {
+  display: flex;
+  flex-direction: column;
+}
+.editor .grow {
+  flex: 1;
+}
+.editor .grow textarea {
+  min-height: 50vh;
+}
+.conflict {
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--edge);
+  border-radius: var(--r);
+  background: var(--wash-need);
+  box-shadow: var(--e-card);
+}
+.conflict p {
+  margin: 0 0 var(--s-2);
+}
+.conflict details {
+  margin-bottom: var(--s-2);
+}
+.conflict summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--h-small);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ---------- a new bridge ---------- */
+.members-form .mrow {
+  display: grid;
+  grid-template-columns: 32px 140px 160px minmax(0, 1fr) 32px;
+  gap: var(--s-2);
+  align-items: end;
+  padding: 6px 0;
+}
+.members-form .mrow > .mark,
+.members-form .mrow > .icon-btn {
+  margin-bottom: 2px;
+}
+.empty-face {
+  display: inline-block;
+  width: 32px;
+  height: 32px;
+  border: 1px dashed var(--placeholder);
+  border-radius: var(--r);
+}
+@media (max-width: 760px) {
+  .members-form .mrow {
+    grid-template-columns: 32px 1fr 1fr 32px;
+  }
+  .members-form .mrow .wide {
+    grid-column: 2 / 4;
+  }
+}
+
+/* ---------- the Skills place ---------- */
+.group {
+  padding-top: var(--s-2);
+}
+.group-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin: var(--s-2) var(--s-4) 0;
+  font-size: var(--t-meta);
+  font-weight: 700;
+  color: var(--muted);
+}
+.group-title {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin: var(--s-5) var(--s-4) 0;
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--line);
+}
+.srow {
+  display: flex;
+  flex-direction: column;
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  color: var(--ink);
+  text-decoration: none;
+}
+.srow:hover {
+  background: var(--raised);
+}
+.srow.sel {
+  background: var(--raised);
+  border-color: var(--raised-line);
+  box-shadow: var(--e-selected);
+}
+.skill-description {
+  max-width: 64ch;
+  margin-bottom: var(--s-5);
+}
+.section-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin-bottom: var(--s-2);
+}
+.agent-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.agent-chips a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-1) var(--s-2) var(--s-1) var(--s-1);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  color: var(--ink);
+  text-decoration: none;
+  font-weight: 600;
+}
+.agent-chips a:hover {
+  border-color: var(--ink);
+}
+
+/* ---------- Appearance ---------- */
+.choices {
+  margin-bottom: var(--s-4);
+}
+
+@media (pointer: coarse) {
+  .tree details > summary {
+    min-height: var(--h-row);
+  }
+}

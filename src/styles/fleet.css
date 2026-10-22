@@ -1,0 +1,453 @@
+/* Screen B: the fleet, the run of a member, the conversation of a run, the
+   profile of an agent, Activity, and the board. Screen B owns this file. */
+
+/* ---------- the list of the fleet ---------- */
+.prow-agent {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: var(--s-2);
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  color: var(--ink);
+  text-decoration: none;
+}
+.prow-agent:hover {
+  background: var(--raised);
+}
+.prow-agent.sel {
+  background: var(--raised);
+  border-color: var(--raised-line);
+  box-shadow: var(--e-selected);
+}
+.prow-agent .main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- workers ---------- */
+.pools {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--s-3);
+}
+.pool {
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.pool header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pool header > div {
+  flex: 1;
+  min-width: 0;
+}
+.pool h3 {
+  font-size: var(--t-body);
+  font-weight: 700;
+}
+.pool .s {
+  font-size: var(--t-meta);
+  color: var(--muted);
+}
+.ready {
+  font-size: var(--t-caption);
+  font-weight: 700;
+  padding: 1px 7px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  white-space: nowrap;
+}
+.ready.ok {
+  color: var(--word-green);
+}
+.ready.need {
+  color: var(--word-amber);
+}
+.tasks,
+.gaps,
+.fleet-members {
+  margin: var(--s-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.tasks li,
+.fleet-members li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-1) 10px;
+  padding: 6px 0;
+  border-top: 1px solid var(--line-soft);
+}
+.tasks .name,
+.fleet-members .name {
+  min-width: 9em;
+  font-weight: 600;
+}
+.tasks .note {
+  flex-basis: 100%;
+  font-size: var(--t-meta);
+  color: var(--muted);
+}
+.fleet-members {
+  padding: 0 var(--s-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.fleet-members li:first-child {
+  border-top: 0;
+}
+.fleet-members .s {
+  font-size: var(--t-meta);
+  color: var(--muted);
+}
+.gaps li {
+  display: flex;
+  gap: 6px;
+  font-size: var(--t-meta);
+  color: var(--word-amber);
+}
+.agents {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.agent-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-1);
+  height: 100%;
+  padding: var(--s-3) 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  color: inherit;
+  text-align: center;
+  text-decoration: none;
+}
+.agent-card:hover {
+  background: var(--raised);
+}
+.agent-card .s,
+.agent-card .role,
+.agent-card .tagline {
+  font-size: var(--t-meta);
+  color: var(--muted);
+}
+.bigface {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: var(--s-2) 0 var(--s-4);
+}
+
+/* ---------- the run of a member ---------- */
+.result {
+  padding: var(--s-3) var(--s-4) 0;
+}
+h3.work {
+  font-size: var(--t-heading);
+  line-height: var(--t-heading-lh);
+  font-weight: 800;
+  font-stretch: 108%;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+.status-line,
+.result > .status {
+  margin: var(--s-1) 0 var(--s-2);
+}
+.summary {
+  margin-top: var(--s-2);
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.files {
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+.file {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: var(--h-row);
+  padding: var(--s-2) var(--s-3);
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+.file:hover {
+  background: var(--raised);
+}
+.file + .file {
+  border-top: 1px solid var(--line-soft);
+}
+.file .ic {
+  width: 18px;
+  height: 18px;
+}
+.file .fn {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.file .fn b,
+.file .fn small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file .fn small,
+.file .fo {
+  font-size: var(--t-meta);
+  color: var(--muted);
+}
+.file.gone b {
+  text-decoration: line-through;
+}
+.filebox {
+  margin-top: var(--s-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+.filebox header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 6px 6px var(--s-3);
+  border-bottom: 1px solid var(--line);
+  font-size: var(--t-meta);
+}
+.lines {
+  margin: 0;
+  padding: var(--s-2) 0;
+  background: var(--recess);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 18px;
+  white-space: pre;
+  overflow: auto;
+  max-height: 50vh;
+  counter-reset: ln;
+}
+.lines span {
+  display: block;
+  padding-right: var(--s-3);
+}
+.lines span::before {
+  counter-increment: ln;
+  content: counter(ln);
+  display: inline-block;
+  width: 3em;
+  margin-right: var(--s-3);
+  text-align: right;
+  color: var(--muted);
+}
+.did,
+.limits {
+  margin-top: var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.did > summary,
+.steps > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  list-style: none;
+  cursor: pointer;
+}
+.did > summary::-webkit-details-marker,
+.steps > summary::-webkit-details-marker {
+  display: none;
+}
+.did > summary {
+  min-height: var(--h-row);
+  padding: 10px 14px;
+}
+.did > summary span {
+  font-size: var(--t-meta);
+  color: var(--muted);
+}
+.did[open] > summary .ic,
+.steps[open] > summary .ic,
+details[open] > summary > .ic {
+  transform: rotate(90deg);
+}
+.did > summary .ic,
+.steps > summary .ic {
+  width: 11px;
+  height: 11px;
+}
+.did ol,
+.steps ol {
+  margin: 0;
+  padding: 0 0 6px;
+  list-style: none;
+}
+.did li,
+.steps li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 14px;
+  border-top: 1px solid var(--line-soft);
+  font-size: 14px;
+}
+.did li > span,
+.steps li > span {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.did li > small,
+.steps li > small {
+  font-size: var(--t-meta);
+  color: var(--muted);
+}
+.did li.err > small,
+.steps li.err > small {
+  color: var(--word-red);
+  font-weight: 600;
+}
+.limits {
+  padding: 10px 14px;
+  list-style: none;
+}
+.result-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: var(--s-3);
+}
+.result-thumbs .lbl {
+  margin: 0;
+}
+.result-thumbs .heart-note,
+.result-thumbs .why {
+  flex-basis: 100%;
+}
+
+/* ---------- the conversation of a run ---------- */
+.chat {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--s-1) var(--s-4) var(--s-5);
+}
+.talk .chat {
+  padding-top: var(--s-3);
+}
+.bubble {
+  max-width: min(80%, 68ch);
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--paper);
+  line-height: var(--t-body-lh);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.bubble.say {
+  white-space: normal;
+}
+.bubble.mine {
+  align-self: flex-end;
+  border-color: var(--raised-line);
+  background: var(--raised);
+}
+.bubble.mine.sending {
+  opacity: 0.7;
+}
+.bubble .who {
+  display: block;
+  font-size: var(--t-meta);
+  font-weight: 700;
+  color: var(--muted);
+}
+.from {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-2);
+}
+.cap {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 60ch;
+  margin: 2px 0;
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+  color: var(--muted);
+  text-align: center;
+}
+.cap .ic {
+  width: 12px;
+  height: 12px;
+}
+.cap.err {
+  color: var(--word-red);
+}
+.cap.waiting {
+  align-self: flex-start;
+  margin: var(--s-1) var(--s-4) var(--s-3);
+  text-align: left;
+}
+.steps {
+  align-self: flex-start;
+  max-width: 68ch;
+  border-radius: var(--r);
+}
+.steps[open] {
+  align-self: stretch;
+  border: 1px solid var(--line);
+}
+.steps > summary {
+  min-height: 28px;
+  padding: 2px var(--s-1);
+  font-size: var(--t-meta);
+  color: var(--muted);
+}
+.steps[open] > summary {
+  padding: var(--s-2) 14px;
+}
+.typing {
+  display: inline-flex;
+  gap: 3px;
+}
+.typing i {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--r-led);
+  background: var(--muted);
+}
+
+/* ---------- Activity ---------- */
+.activity .brow-meta .status {
+  font-size: var(--t-meta);
+}
+
+@media (pointer: coarse) {
+  .steps > summary {
+    min-height: var(--h-row);
+  }
+}

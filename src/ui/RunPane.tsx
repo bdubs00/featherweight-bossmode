@@ -9,7 +9,8 @@ import { store, useSelect } from '../state/store';
 import { runStatus, presenceOf } from '../lib/presence';
 import { hrefOf } from '../lib/route';
 import { attempt, showError } from './notice';
-import { Back, Confirm, Face, Light, Markdown, When } from './common';
+import { Confirm, Light, Markdown, When } from './common';
+import { Button, Mark, PaneHeader } from './primitives';
 import { Conversation, useTranscript } from './Conversation';
 import { Icon } from './icons';
 
@@ -142,25 +143,22 @@ export function RunPane({ bridge, runId, handle }: { bridge: string; runId: stri
   const who = handle || (run ? run.agent : 'the agent');
   return (
     <section class="screen runpane" aria-labelledby="run-title">
-      <header class="bar">
-        <Back label="Roster" href={hrefOf({ place: 'bridge', id: bridge, pane: 'roster' })} />
-        <div class="title with-face">
-          {run && <Face agent={run.agent} size={32} />}
-          <div>
-            <h2 id="run-title" tabIndex={-1} ref={heading}>
-              {who}
-            </h2>
-            <p class="goal">{light && <Light light={light} />}</p>
-          </div>
-        </div>
-        <div class="end">
-          {run && !ended && (
-            <button type="button" class="btn small danger" onClick={() => setStop(true)}>
+      <PaneHeader
+        id="run-title"
+        title={who}
+        headingRef={heading}
+        focusable
+        back={{ href: hrefOf({ place: 'bridge', id: bridge, pane: 'roster' }), label: 'Members', to: 'here' }}
+        lead={run ? <Mark agent={run.agent} size={32} halo={light ? { tone: light.tone, word: light.word } : undefined} label={who} /> : undefined}
+        actions={
+          run &&
+          !ended && (
+            <Button size="s" kind="danger" onClick={() => setStop(true)}>
               Stop
-            </button>
-          )}
-        </div>
-      </header>
+            </Button>
+          )
+        }
+      />
       <div class="scroll">
         <div class="result">
           <h3 class="work">{(res && res.title) || (run && run.title) || 'The run'}</h3>
