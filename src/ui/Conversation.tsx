@@ -3,7 +3,9 @@
 // name, and its clock time, a quiet step line for each tool call, a fold of
 // many steps, and the decision that waits as a card. The manager, the run
 // pane of a seat, and an agent that sits on no bridge talk in this one
-// conversation.
+// conversation. A one-on-one view adds the pending answer of the live
+// stream at the end, and only such a view: the run pane of a bridge shows
+// none.
 
 import type { ComponentChildren } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
@@ -18,6 +20,7 @@ import { Markdown } from './common';
 import { DecisionCard } from './Decision';
 import { Avatar, Button, Mark } from './primitives';
 import { Msg, Quiet, StepText, StepsFold } from './Thread';
+import { LiveLines, type LiveAnswer } from './Live';
 
 export interface TranscriptState {
   items: Item[];
@@ -154,10 +157,10 @@ export interface ConversationProps {
   t: TranscriptState;
   agentLabel: string;
   onDecide?: () => void;
-  /** Text that a live stream sends for the answer that is not finished. It grows the last answer, or starts one. */
-  live?: string;
   /** What follows the last item, such as the message on its way and the status of its answer. */
   tail?: ComponentChildren;
+  /** The answer that the model writes now, from the live stream of a one-on-one view. It follows the tail. */
+  live?: LiveAnswer;
 }
 
 export function Conversation(props: ConversationProps) {
@@ -167,8 +170,7 @@ export function Conversation(props: ConversationProps) {
   const agent = run ? run.agent : '';
   const pending = run ? decisionOf(run, props.result) : null;
   const blocks = blocksOf(t.items);
-  const lastItem = [...blocks].reverse().find((b) => b.kind === 'item');
-  const liveOnLast = !!props.live && !!lastItem && lastItem.kind === 'item' && lastItem.it.kind === 'assistant';
+  const live = props.live;
   const face = <Mark agent={agent} size={32} />;
   let prev: Item | null = null;
   return (
@@ -204,14 +206,12 @@ export function Conversation(props: ConversationProps) {
               </Msg>
             );
           }
-          case 'assistant': {
-            const grow = liveOnLast && lastItem && lastItem.kind === 'item' && lastItem.it === it ? props.live : '';
+          case 'assistant':
             return (
               <Msg face={face} name={props.agentLabel} at={it.time} compact={compact}>
-                <Markdown text={(it.text || '') + (grow || '')} />
+                <Markdown text={it.text || ''} />
               </Msg>
             );
-          }
           case 'ask':
             prev = null;
             if (pending && pending.id === it.id)
@@ -252,12 +252,13 @@ export function Conversation(props: ConversationProps) {
           <DecisionCard d={pending} who={props.agentLabel} onDecide={props.onDecide} />
         </Msg>
       )}
-      {props.live && !liveOnLast && (
-        <Msg face={face} name={props.agentLabel}>
-          <Markdown text={props.live} />
+      {props.tail}
+      {live && live.text && (
+        <Msg face={face} name={props.agentLabel} pending>
+          <Markdown text={live.text} />
         </Msg>
       )}
-      {props.tail}
+      {live && <LiveLines live={live} />}
     </div>
   );
 }

@@ -45,7 +45,8 @@ export interface Call {
 
 /**
  * fakeFetch answers each call with the first route whose method and path
- * match, else with a 404 problem, and records every call.
+ * match, else with a 404 problem, and records every call. A route that
+ * answers a Response, such as an event stream, sends it as it is.
  */
 export function fakeFetch(routes: [string, RegExp, (body: unknown) => unknown][]): { calls: Call[]; restore: () => void } {
   const calls: Call[] = [];
@@ -57,6 +58,7 @@ export function fakeFetch(routes: [string, RegExp, (body: unknown) => unknown][]
     for (const [m, re, h] of routes) {
       if (m === method && re.test(path)) {
         const out = h(body);
+        if (out instanceof Response) return out;
         return new Response(out === null ? '' : JSON.stringify(out), { status: out === null ? 204 : 200, headers: { 'Content-Type': 'application/json' } });
       }
     }

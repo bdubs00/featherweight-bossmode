@@ -5,7 +5,9 @@
 // is the direct thread: the entries of the bridge from the seat or to it,
 // the cards and system lines of its runs, and the quiet step lines of its
 // newest run. A message goes to the seat alone, and a slash command runs a
-// skill of its agent.
+// skill of its agent. The tab is one-on-one, so the answer of the newest
+// run streams in from its live route while the run works, and the finished
+// answer of the channel takes its place.
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { Member as MemberT } from '../api/types';
@@ -24,41 +26,11 @@ import { Composer } from './Composer';
 import { useTranscript } from './Conversation';
 import { FilesView, RunView, useResult } from './RunPane';
 import { ThreadView, useStickToEnd } from './Thread';
+import { LiveLines, useLiveAnswer } from './Live';
+import { works } from '../lib/chat';
 import { Profile } from './Profile';
 import { ProfileLink, rememberOpen } from './Fleet';
 import { Button, Field, Led, PaneHeader, Tabs, TextArea } from './primitives';
-
-/* ---------- the live tail of an answer ---------- */
-
-const liveTexts = new Map<string, string>();
-const liveListeners = new Set<() => void>();
-const tellLive = () => {
-  for (const f of [...liveListeners]) f();
-};
-
-/** appendLive adds text that a live stream sends for the answer of a seat that is not finished. */
-export function appendLive(bridge: string, handle: string, chunk: string): void {
-  const k = bridge + '/' + handle;
-  liveTexts.set(k, (liveTexts.get(k) || '') + chunk);
-  tellLive();
-}
-
-/** endLive drops the live text of a seat, once its finished answer is in the channel. */
-export function endLive(bridge: string, handle: string): void {
-  if (liveTexts.delete(bridge + '/' + handle)) tellLive();
-}
-
-function useLive(bridge: string, handle: string): string {
-  const [, tick] = useState(0);
-  useEffect(() => {
-    const f = () => tick((n) => n + 1);
-    liveListeners.add(f);
-    return () => {
-      liveListeners.delete(f);
-    };
-  }, []);
-  return liveTexts.get(bridge + '/' + handle) || '';
-}
 
 /* ---------- the seat ---------- */
 
@@ -162,7 +134,8 @@ function Chat({ bridge, m, items, closed, stopped, reason }: { bridge: string; m
   const roster = useSelect((s) => s.rosters[bridge]);
   const skills = useSelect((s) => (s.skills ? s.skills.skills : null));
   const loadable = useSelect((s) => s.agentSkills[m.agent]);
-  const live = useLive(bridge, m.handle);
+  const run = newestRun(m);
+  const runObj = useSelect((s) => (run ? s.runs[run] : undefined));
   useEffect(() => {
     loadAgentSkills(m.agent).catch(() => {});
   }, [m.agent]);
@@ -170,20 +143,24 @@ function Chat({ bridge, m, items, closed, stopped, reason }: { bridge: string; m
   useEffect(() => {
     ensureChannels([bridge]);
   }, [bridge]);
+  const entries = useMemo(() => entriesOf(ch), [ch]);
+  // The finished answers of the seat are its entries in the channel. The live answer waits for the next one.
+  const answers = useMemo(() => entries.filter((e) => e.from.kind === 'agent' && e.from.handle === m.handle).map((e) => e.seq), [entries, m.handle]);
+  const mark = entries.length ? entries[entries.length - 1].seq : 0;
+  const working = runObj ? works(runObj) : m.presence === 'working';
+  const live = useLiveAnswer(run, { working: working && !m.fired, seq: runObj ? runObj.seq : 0, mark, answers, dropPreamble: true });
   const rows = useMemo(() => {
-    const entries = entriesOf(ch);
     const mine = directEntries(entries, m.handle, m.runs);
     // Steps older than the loaded part of the channel wait for Earlier messages.
     const from = ch && ch.prev > 0 && entries.length ? new Date(entries[0].at).getTime() : 0;
     const steps = stepsOf(items).filter((x) => new Date(x.at).getTime() >= from);
-    return withLive(threadOf(mine, steps), m.handle, live, new Date().toISOString());
-  }, [ch, items, m.handle, m.runs, live]);
+    return withLive(threadOf(mine, steps), m.handle, live.text, new Date().toISOString());
+  }, [entries, items, m.handle, m.runs, live.text]);
   const commands = useMemo(() => slashCommands(skills, loadable), [skills, loadable]);
   const names = useMemo(() => commands.map((c) => c.name), [commands]);
   const handles = useMemo(() => (roster ? roster.order : undefined), [roster]);
   const agentOf = (h: string) => (roster && roster.byHandle[h] ? roster.byHandle[h].agent : h === 'manager' ? (store.get().config?.manager?.agent ?? 'manager') : h.replace(/-\d+$/, ''));
-  const box = useStickToEnd<HTMLDivElement>(rows.length + live.length);
-  const run = newestRun(m);
+  const box = useStickToEnd<HTMLDivElement>(rows.length + live.text.length + (live.tool ? 1 : 0));
   return (
     <>
       <div class="scroll thread-scroll" ref={box}>
@@ -205,6 +182,7 @@ function Chat({ bridge, m, items, closed, stopped, reason }: { bridge: string; m
           )}
           {!ch && <p class="tline">Loading the conversation.</p>}
           <ThreadView rows={rows} bridge={bridge} agentOf={agentOf} handles={handles} runHref={run ? hrefOf({ place: 'member', bridge, handle: m.handle, tab: 'run' }) : undefined} />
+          <LiveLines live={live} />
         </div>
       </div>
       {stopped && <SeatBar bridge={bridge} m={m} how={stopped} reason={reason} />}

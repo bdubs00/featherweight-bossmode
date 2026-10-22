@@ -8,7 +8,8 @@
 // thread is the conversation of a run that the member and the agent
 // screens show too. A / at the start of a message opens the menu of the
 // skills that the manager can load, and a slash command goes to POST
-// /v1/bossmode/runs/{id}/skill.
+// /v1/bossmode/runs/{id}/skill. The conversation is one-on-one, so the
+// answer streams in from the live route while the run works.
 
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { api } from '../api/routes';
@@ -25,6 +26,8 @@ import { Button, Help, Led, Mark, PaneHeader } from './primitives';
 import { Composer } from './Composer';
 import { Conversation, POLL_MS, usePoll, useTranscript } from './Conversation';
 import { Msg, Quiet, useStickToEnd } from './Thread';
+import { useLiveAnswer } from './Live';
+import { answerSeqs, lastSeq, works } from '../lib/chat';
 
 export { POLL_MS };
 
@@ -66,7 +69,7 @@ export function Manager() {
   // The poll runs while the run works, and while an answer to the person is on its way.
   usePoll(runId, !!runId && (!!sent || !run));
   const userCount = useMemo(() => t.items.filter((x) => x.kind === 'user').length, [t.items]);
-  const box = useStickToEnd<HTMLDivElement>(t.items.length + (sent ? 1 : 0));
+  const answers = useMemo(() => answerSeqs(t.items), [t.items]);
 
   // The sent text shows until the transcript holds a new message of the person.
   useEffect(() => {
@@ -83,12 +86,14 @@ export function Manager() {
 
   const commands = useMemo(() => slashCommands(skills, loadable), [skills, loadable]);
 
-  if (!manager) return <NoManager />;
-
   const lastUser = t.items.map((x) => x.kind).lastIndexOf('user');
   const answered = lastUser >= 0 && t.items.slice(lastUser + 1).some((x) => x.kind === 'assistant' || x.kind === 'ask' || (x.kind === 'end' && !!x.isError));
   // A run that completed waits for nothing, also when its last turn gave no answer.
   const waiting = !stopped && (!!sent || (lastUser >= 0 && !answered && !(run && run.state === 'completed'))) && !(run && run.state === 'input-required');
+  const live = useLiveAnswer(runId, { working: works(run) || waiting, seq: run ? run.seq : 0, mark: lastSeq(t.items, run), answers });
+  const box = useStickToEnd<HTMLDivElement>(t.items.length + (sent ? 1 : 0) + live.text.length + (live.tool ? 1 : 0));
+
+  if (!manager) return <NoManager />;
   // The Task of the manager sleeps between messages, so the first answer waits for it to wake.
   const waking = waiting && (!run || run.state === 'queued' || run.state === 'suspended') && !t.items.some((x) => x.kind === 'assistant');
 
@@ -114,7 +119,7 @@ export function Manager() {
           <p class="tmsg-plain sending">{sent.text}</p>
         </Msg>
       )}
-      {waiting && (
+      {waiting && !live.text && !live.tool && (
         <div role="status">
           <Msg face={<Mark agent={agent} size={32} />} name={agent}>
             <p class="tmsg-status">
@@ -144,7 +149,7 @@ export function Manager() {
         }
       />
       <div class="scroll thread-scroll" ref={box}>
-        {!runId && !sent ? <p class="thread-empty">Ask about the fleet, or ask for a bridge.</p> : <Conversation run={run} result={res} t={t} agentLabel={agent} tail={tail} />}
+        {!runId && !sent ? <p class="thread-empty">Ask about the fleet, or ask for a bridge.</p> : <Conversation run={run} result={res} t={t} agentLabel={agent} tail={tail} live={live} />}
       </div>
       <Composer draft="manager" label="Message to the manager" placeholder="Ask the manager" commands={commands} onSend={(text) => send(text)} />
     </section>

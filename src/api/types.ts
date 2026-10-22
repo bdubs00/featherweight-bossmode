@@ -278,6 +278,46 @@ export interface Run {
   member?: string;
   activity?: Activity | null;
   reactions?: Partial<Record<ReactionKind, number>>;
+  /** The usage of the run so far: its tokens, its turns, and its cost. */
+  usage?: RunUsage;
+  /** The tools that an inline profile gave the run beyond the tool list of its agent. */
+  extraTools?: string[];
+  /** The profile that the kernel resolved when it queued the run, when the run object carries it. */
+  resolved?: ResolvedProfile | null;
+}
+
+/** The usage of a run, as the kernel sums it. Every field is a sum. */
+export interface RunUsage {
+  inputTokens?: number;
+  outputTokens?: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+  turns?: number;
+  toolCalls?: number;
+  costUSD?: number;
+  unpricedTokens?: number;
+}
+
+/** The parts of the resolved profile of a run that the page shows. */
+export interface ResolvedProfile {
+  model?: string;
+  tools?: string[];
+  skills?: string[];
+}
+
+/** An inline profile of a new run: a tool or skill list replaces the list of the agent for that run. */
+export interface InlineProfile {
+  tools?: string[];
+  skills?: string[];
+}
+
+/** The body of POST /v1/runs. A field that is not set stays out, because the kernel refuses an unknown field. */
+export interface NewRun {
+  agent: string;
+  input: string;
+  title?: string;
+  profile?: InlineProfile;
+  metadata?: Record<string, string>;
 }
 
 /** The decision of a result (dashboard.Decision). */

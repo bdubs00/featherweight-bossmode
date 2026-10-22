@@ -26,10 +26,14 @@ export function eventTone(event: string | undefined): Tone {
   return 'grey';
 }
 
-/** Msg is one message: the face, the name and the clock time, and the text. */
-export function Msg(p: { face: ComponentChildren; name: string; at?: string; compact?: boolean; label?: string; id?: string; corner?: ComponentChildren; tag?: ComponentChildren; children: ComponentChildren }) {
+/**
+ * Msg is one message: the face, the name and the clock time, and the text.
+ * A pending message is the answer that the model writes now: it has no
+ * clock time yet, and aria-busy tells a screen reader that it grows.
+ */
+export function Msg(p: { face: ComponentChildren; name: string; at?: string; compact?: boolean; label?: string; id?: string; corner?: ComponentChildren; tag?: ComponentChildren; pending?: boolean; children: ComponentChildren }) {
   return (
-    <article class={'tmsg' + (p.compact ? ' compact' : '')} id={p.id} aria-label={p.label}>
+    <article class={'tmsg' + (p.compact ? ' compact' : '') + (p.pending ? ' pending' : '')} id={p.id} aria-label={p.label} aria-busy={p.pending ? 'true' : undefined}>
       {p.compact ? <span class="tmsg-gutter" /> : p.face}
       <div class="tmsg-body">
         {!p.compact && (
@@ -242,7 +246,7 @@ export function ThreadView({ rows, bridge, agentOf, handles, runHref }: ThreadVi
           else if (r.kind === 'steps') node = <StepsFold steps={r.steps} />;
           else
             node = (
-              <Msg face={<Mark agent={agentOf(r.handle)} size={32} />} name={r.handle}>
+              <Msg face={<Mark agent={agentOf(r.handle)} size={32} />} name={r.handle} pending>
                 <Markdown text={r.text} handles={handles} />
               </Msg>
             );

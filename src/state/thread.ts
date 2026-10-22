@@ -109,17 +109,12 @@ export function threadOf(entries: Entry[], steps: Step[], fold = 3): ThreadRow[]
 }
 
 /**
- * withLive adds the text that a live stream sends for a member. The text
- * grows the last message of the member when that message ends the thread,
- * and else starts a new message of the member at the end.
+ * withLive adds the answer that a member writes now, from the live stream
+ * of its run, as a pending message of its own at the end of the thread. The
+ * finished answer arrives as an entry of the channel and takes its place.
  */
 export function withLive(rows: ThreadRow[], handle: string, text: string, at: string): ThreadRow[] {
   if (!text) return rows;
-  const last = rows[rows.length - 1];
-  if (last && last.kind === 'entry' && last.entry.from.kind === 'agent' && last.entry.from.handle === handle) {
-    const grown: Entry = { ...last.entry, text: last.entry.text + text };
-    return [...rows.slice(0, -1), { ...last, entry: grown }];
-  }
   return [...rows, { kind: 'live', key: 'live-' + handle, at, handle, text }];
 }
 

@@ -67,13 +67,12 @@ describe('the direct thread', () => {
     expect(rows.map((r) => (r.kind === 'entry' ? 'e' + r.entry.seq : r.kind === 'steps' ? 'fold' + r.steps.length : r.key))).toEqual(['e2', 'e4', 's1', 'e5', 'e7', 'fold3', 'e8', 'e11']);
   });
 
-  it('grows the last message of the member with live text, or starts a new one', () => {
-    const rows = threadOf([entry(1, 0, agent('migrator-1'), 'I read')], []);
-    const grown = withLive(rows, 'migrator-1', ' the module.', at(1));
-    expect(grown.length).toBe(1);
+  it('puts the live answer of the member in a pending message of its own at the end', () => {
+    const rows = threadOf([entry(1, 0, agent('migrator-1'), 'I read the module.')], []);
+    const grown = withLive(rows, 'migrator-1', 'Next: the handler.', at(1));
+    expect(grown.map((r) => r.kind)).toEqual(['entry', 'live']);
     expect(grown[0].kind === 'entry' && grown[0].entry.text).toBe('I read the module.');
-    const after = withLive(threadOf([entry(1, 0, alice, 'Go.', { to: ['migrator-1'] })], []), 'migrator-1', 'On it', at(1));
-    expect(after.map((r) => r.kind)).toEqual(['entry', 'live']);
+    expect(grown[1].kind === 'live' && grown[1].text).toBe('Next: the handler.');
     expect(withLive(rows, 'migrator-1', '', at(1))).toBe(rows);
   });
 

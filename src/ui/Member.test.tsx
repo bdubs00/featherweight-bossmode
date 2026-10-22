@@ -2,11 +2,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'preact/test-utils';
 import type { Entry } from '../api/types';
 import { store } from '../state/store';
-import { MemberMain, appendLive, endLive } from './Member';
+import { MemberMain } from './Member';
 import { at, fakeFetch, mount, seedFleet, unmountAll, type Call } from './testkit-b';
 
 let calls: Call[] = [];
 let restore = () => {};
+
+/** push sends one piece of the live stream of run-migrator-1 while it is open. */
+let push = (_: string) => {};
+const liveStream = () =>
+  new Response(
+    new ReadableStream<Uint8Array>({
+      start(c) {
+        const e = new TextEncoder();
+        push = (s) => c.enqueue(e.encode(s));
+      },
+    }),
+    { status: 200, headers: { 'Content-Type': 'text/event-stream' } },
+  );
 
 const alice = { kind: 'person' as const, name: 'alice@example.com', display: 'Alice' };
 const ENTRIES: Entry[] = [
@@ -21,6 +34,7 @@ beforeEach(() => {
     ['GET', /^\/v1\/bridges\/b1\/messages/, () => ({ bridge: 'b1', messages: ENTRIES, next: 0, prev: 0 })],
     ['POST', /^\/v1\/bridges\/b1\/messages$/, (b) => ({ seq: 9, at: at(9), from: alice, to: ['migrator-1'], text: (b as { text: string }).text })],
     ['GET', /^\/v1\/runs\/run-migrator-1\/transcript/, () => ({ run: { id: 'run-migrator-1', agent: 'migrator', state: 'running', seq: 3, createdAt: at(0), updatedAt: at(0) }, items: [{ seq: 3, time: at(2), kind: 'tool', tool: 'bash', callId: 'c1', input: { command: 'ansible-lint roles/cron' } }], next: 0, prev: 0 })],
+    ['GET', /^\/v1\/runs\/run-migrator-1\/live$/, liveStream],
     ['GET', /^\/v1\/runs\/run-migrator-1\/result$/, () => ({ runId: 'run-migrator-1', title: 'Migrate cron', agent: 'migrator', status: 'working', files: [{ path: 'a.yml', op: 'created', seq: 1 }], started: at(0), changed: at(0) })],
   ]);
   calls = f.calls;
@@ -85,14 +99,28 @@ describe('the member conversation', () => {
     expect(el.querySelector('.tline code')!.textContent).toBe('ansible-lint roles/cron');
   });
 
-  it('appends live text to the last message of the member', async () => {
+  it('streams the answer of a seat that works into a pending message, and the finished answer of the channel takes its place', async () => {
     const el = mount(<MemberMain bridge="b1" handle="migrator-1" tab="chat" />);
     await vi.waitFor(() => expect(el.querySelectorAll('.tmsg').length).toBe(2));
-    act(() => appendLive('b1', 'migrator-1', ' Next: the handler.'));
-    expect(el.querySelectorAll('.tmsg').length).toBe(2);
-    expect(el.querySelector('[role="log"]')!.textContent).toContain('The role lints clean. Next: the handler.');
-    act(() => endLive('b1', 'migrator-1'));
-    expect(el.querySelector('[role="log"]')!.textContent).not.toContain('Next: the handler.');
+    await vi.waitFor(() => expect(calls.filter((c) => c.path === '/v1/runs/run-migrator-1/live').length).toBe(1));
+    const lines = () => [...el.querySelectorAll('.tline')].map((x) => x.textContent);
+    push('event: delta\ndata: {"turn":4,"text":"Next: "}\n\n');
+    push('event: tool\ndata: {"turn":4,"name":"bash","callId":"c2"}\n\n');
+    push('event: delta\ndata: {"turn":4,"text":"the handler."}\n\n');
+    await vi.waitFor(() => expect(el.querySelector('.tmsg.pending')!.textContent).toContain('Next: the handler.'));
+    expect(el.querySelectorAll('.tmsg').length).toBe(3);
+    expect(el.querySelector('.tmsg.pending')!.getAttribute('aria-busy')).toBe('true');
+    expect(lines()).toContain('Working: bash');
+    // The model call ends: the tool line goes, and the answer waits for its entry.
+    push('event: done\ndata: {"turn":4,"stopReason":"end_turn"}\n\n');
+    await vi.waitFor(() => expect(lines()).not.toContain('Working: bash'));
+    expect(el.querySelector('.tmsg.pending')).not.toBeNull();
+    act(() => {
+      store.dispatch({ type: 'entry', bridge: 'b1', entry: { seq: 12, at: at(12), from: { kind: 'agent', handle: 'migrator-1', run: 'run-migrator-1' }, to: [], text: 'Next: the handler, as the plan says.' } });
+    });
+    await vi.waitFor(() => expect(el.querySelector('.tmsg.pending')).toBeNull());
+    expect(el.querySelector('[role="log"]')!.textContent).toContain('Next: the handler, as the plan says.');
+    expect(el.querySelectorAll('.tmsg').length).toBe(3);
   });
 
   it('offers the skills of the agent behind a slash, and sends a slash command as a skill', async () => {

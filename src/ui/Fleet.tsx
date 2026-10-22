@@ -20,6 +20,8 @@ import { Composer } from './Composer';
 import { Conversation, useTranscript, usePoll } from './Conversation';
 import { useResult } from './RunPane';
 import { useStickToEnd } from './Thread';
+import { useLiveAnswer } from './Live';
+import { answerSeqs, lastSeq, works } from '../lib/chat';
 import { Profile } from './Profile';
 import { EmptyPane } from './Shell';
 import { Button, Chip, Find, IconButton, Led, Mark, PaneHeader } from './primitives';
@@ -202,7 +204,8 @@ function keepRun(agent: string, id: string): void {
  * AgentChat is the conversation with an agent that sits on no bridge, as a
  * run: the first message starts it on a worker of the agent, a later one
  * follows up, and a slash command runs a skill in it. The manager starts
- * on its own member and opens its newest conversation.
+ * on its own member and opens its newest conversation. The conversation is
+ * one-on-one, so the answer streams in while the run works.
  */
 export function AgentChat({ agent }: { agent: string }) {
   useEffect(() => rememberOpen(hrefOf({ place: 'fleet', agent })), [agent]);
@@ -232,7 +235,9 @@ export function AgentChat({ agent }: { agent: string }) {
     : ((fleet ? fleet.members : []).filter((m) => m.agents.some((a) => a.name === agent)).sort((a, b) => (a.state === 'live' ? 0 : 1) - (b.state === 'live' ? 0 : 1))[0] || { name: '' }).name;
   const commands = useMemo(() => slashCommands(skills, loadable), [skills, loadable]);
   const names = useMemo(() => commands.map((c) => c.name), [commands]);
-  const box = useStickToEnd<HTMLDivElement>(t.items.length);
+  const answers = useMemo(() => answerSeqs(t.items), [t.items]);
+  const live = useLiveAnswer(runId, { working: works(run), seq: run ? run.seq : 0, mark: lastSeq(t.items, run), answers });
+  const box = useStickToEnd<HTMLDivElement>(t.items.length + live.text.length + (live.tool ? 1 : 0));
   const stopped = !!run && ['failed', 'canceled'].includes(run.state);
   const send = async (text: string): Promise<boolean> =>
     attempt(async () => {
@@ -265,7 +270,7 @@ export function AgentChat({ agent }: { agent: string }) {
         lead={<ProfileLink href={hrefOf({ place: 'fleet', agent, profile: true })} agent={agent} label={name} light={light} />}
       />
       <div class="scroll thread-scroll" ref={box}>
-        {runId ? <Conversation run={run} result={res} t={t} agentLabel={agent} /> : <div class="thread" />}
+        {runId ? <Conversation run={run} result={res} t={t} agentLabel={agent} live={live} /> : <div class="thread" />}
       </div>
       <Composer draft={'agent:' + agent} label={'Message to ' + agent} placeholder={'Message ' + agent} disabled={member ? '' : 'Keep 0'} commands={commands} onSend={send} />
     </section>
