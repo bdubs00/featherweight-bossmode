@@ -662,7 +662,7 @@ a.people-title:hover {
 }
 /* The name of a worker is never cut: a name longer than the row breaks
    inside it. The light and its word follow it, and the seat that it serves
-   comes last, takes the rest of the row, and may cut. */
+   comes last, takes the rest of the row, and can cut. */
 .worker-name {
   flex: 0 1 auto;
   min-width: 0;

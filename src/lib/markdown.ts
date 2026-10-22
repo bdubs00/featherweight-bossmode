@@ -61,7 +61,7 @@ export interface SafeLink {
  * resolves against the folder of the page in base, and a link #page/<path>
  * of the backend, become a link to that page of the wiki in the page. A
  * relative link that climbs above the root of the wiki, and any other link,
- * lose the address and stay as text, because a relative address would load
+ * lose the address and stay as text, because a relative address loads
  * the page with no route.
  */
 export function safeHref(href: string, base = ''): SafeLink | null {
