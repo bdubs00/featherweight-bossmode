@@ -75,6 +75,7 @@ Variables of the fake server:
 | `FAKE_SIGNIN=0` | A 401 names no sign-in route, so the page shows the token form. Paste `fake-alice` or `fake-bob`. |
 | `FAKE_QUIET=1` | No timers |
 | `FAKE_TICK` | The time between two timer steps in milliseconds, 5000 by default |
+| `FAKE_STREAM_MS` | The life of one stream in milliseconds before the fake server closes it, 15 minutes by default, as the workbench does |
 
 A sign-in at `/ui/signin?as=bob` signs you in as bob@example.com.
 

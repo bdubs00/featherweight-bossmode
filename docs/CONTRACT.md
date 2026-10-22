@@ -11,6 +11,10 @@ A section marked **New** names a route or a field that the plan does not
 have. The page needs each one. The backend team can serve another shape, and
 then this file and the page change together.
 
+The backend of the branches `boss/bridges`, `boss/pages`, and `boss/fleet`
+serves this contract. Where the backend chose another shape, this file
+follows the backend, and the page and the fake server follow this file.
+
 ## 1. Every call
 
 - The page calls its own origin only, under `/v1`.
@@ -92,8 +96,16 @@ section 6.1 of the plan without `members`, plus five fields:
 | `memberCount` | The number of seats, fired seats included |
 | `needsYou` | The number of members with the presence `needs-you` |
 
-`GET /v1/bridges/{id}` answers the same item with `members`. Each member is
-the member of the plan plus two fields:
+The workbench counts `unread` over at most the last 2000 entries of the
+channel, so a larger count stops there. The page shows 99+ above 99.
+
+`GET /v1/bridges/{id}` answers the same item with `members` and `usage`.
+`usage` sums the usage of the runs of the bridge as the tool `batch` sums a
+job: the fields of the usage of a run (`turns`, `toolCalls`, `costUSD`, and
+the tokens), plus `reported`, `final`, `missing`, and `partial`, which is true
+when a run reports no usage. Only this route carries `usage`. The page shows
+no usage, as `/ui` shows none. Each member is the member of the plan plus two
+fields:
 
 ```json
 {
@@ -149,6 +161,15 @@ record with its members. A close or an open posts a system line (section
 
 A fire of a fired member answers 200 with the member and changes nothing.
 
+A seat whose newest run was canceled, failed, or stopped at a limit gets no
+delivery from the channel. A `PATCH` with `task` seats it again: a new run
+starts with the task. The page offers Seat again in the menu of such a
+member, beside Change its task. Seat again opens the task of the member,
+which the person can change, and sends it as `task`. The page needs the
+workbench to seat the member again also when the text of the task is the
+same. The page knows that a newest run stopped from the presence `error`, or
+from the state `failed` or `canceled` of the run on the stream.
+
 ## 6. The channel
 
 ### 6.1 Pages of the channel
@@ -195,9 +216,19 @@ The plan gives the entry. The page reads four more fields:
   has `handle` and `run`.
 - **New.** `event` names what a system line says, so the page picks its icon
   and follows the state of the bridge: `opened`, `closed`, `reopened`,
-  `started`, `joined`, `finished`, `needs-you`, `asked`, `decided`, `failed`,
-  `asleep`, `fired`, `canceled`, `muted`, `task`, `changed`, and `cap`. The
-  page sets the bridge closed on `closed` and open on `reopened`.
+  `started`, `joined`, `needs-you`, `asked`, `decided`, `failed`, `asleep`,
+  `fired`, `canceled`, `muted`, `task`, `changed`, and `cap`. The page sets
+  the bridge closed on `closed` and open on `reopened`. In particular:
+  - The finished answer of a member is a message of that agent with no
+    `event`, and it mirrors the `fw.run.finished` of the run.
+  - A member whose Task wakes again posts `event: started` with the text
+    `<handle> woke up.`.
+  - After a close, the link to the report of the manager comes with
+    `event: changed`. The text can hold a Markdown link, such as
+    `[bridges/<id>/report.md](bridges/<id>/report.md)`. The page shows every
+    system line as one line of Markdown through the sanitizer, so the link
+    opens the page of the wiki.
+  - A delivery that fails for good posts `event: failed`.
 - **New.** `cut` is true when the channel holds only the first 4 KB of the
   text.
 - **New.** `decision` is set on the entry that mirrors an approval or a
@@ -217,6 +248,10 @@ The plan gives the entry. The page reads four more fields:
   When a decision lands, from any surface, the front changes the same entry
   and sends it again on the stream with the same seq. The page replaces the
   card in place. The front also posts a system line with `event: decided`.
+
+  A card whose run stops waiting without a decision, such as after a fire or
+  a cancel, is changed to `state: deny` with no `decidedBy` and a `note` that
+  says why. The page shows "No decision" and the note.
 - `reactions` holds the subjects of the people per reaction.
 
 ### 6.3 A message of the caller
@@ -224,8 +259,9 @@ The plan gives the entry. The page reads four more fields:
 `POST /v1/bridges/{id}/messages` takes `{"text", "to", "replyTo"}`. `to` is
 optional, and without it the message goes to every active member. The
 answer is 201 with the entry. The page sends no `files` yet. A handle in
-`to` that is not on the roster, or that is fired, answers 400. A closed
-bridge answers 409.
+`to` that is not on the roster, or that is fired, answers 400. The handle
+`operator` in `to` answers 400 too: an agent can address the operator, and a
+person cannot. A closed bridge answers 409.
 
 When the person replies to a message of an agent and names no handle, the
 page sets `to` to that agent, as section 4.2 of the plan says.
@@ -264,10 +300,11 @@ with `{"note"}` and then allows, as `/ui` does.
 
 `POST /v1/runs/{id}/reactions` takes `{"seq", "reaction", "note"}`. The page
 sends the seq of the last `end` item of the transcript, which is the
-`fw.run.finished` of the run, so a thumb on a result records a quality
-receipt. **New:** the answer is 201 with
-`{"run", "seq", "reaction", "receipt"}`, and the page says whether the thumb
-counted as a receipt.
+`fw.run.finished` of the run, so a thumb on a result can also record a
+quality receipt (K2). The kernel answers 200 with the run object, whose
+`reactions` holds the counts per kind. The page takes the counts from that
+answer and says that the reaction is recorded. It does not say whether the
+reaction recorded a receipt, because the answer does not tell.
 
 ### 7.4 The manager
 
@@ -287,23 +324,60 @@ transcript items with `from`.
 
 | Route | Answer |
 |---|---|
-| `GET /v1/pages` | `{"pages": [{"path", "title", "hash", "by", "at", "size"}]}` |
-| `GET /v1/pages/{path}` | `{"path", "title", "tags", "text", "hash", "by", "at", "summary", "version", "size"}`, with `ETag: "<hash>"` |
-| `GET /v1/pages/{path}?version=3` | The same for version 3 |
+| `GET /v1/pages` | `{"pages": [<info>]}` |
+| `GET /v1/pages/{path}` | `<info>` plus `"text"`, with `ETag: "<hash>"` |
+| `GET /v1/pages/{path}?version=<version>` | The same for an older version |
 | `PUT /v1/pages/{path}` | 200 with the page, or 201 for a new page |
-| `GET /v1/pages/{path}/history` | `{"path", "versions": [{"version", "hash", "by", "at", "summary", "size"}]}`, newest first |
-| `GET /v1/pages/search?q=` | `{"q", "results": [{"path", "title", "snippet"}], "cut": false}` |
+| `GET /v1/pages/{path}/history` | `{"path", "versions": [...]}`, newest first |
+| `GET /v1/pages/search?q=` | `{"q", "results": [...], "read", "unread", "cut"}` |
 
-- **New.** `PUT` takes `{"text": "...", "summary": "..."}` as JSON. The page
-  sends `If-Match: "<hash>"` for an edit and `If-None-Match: *` for a new
-  page. A 412 carries `hash`, the current hash, in the problem document. On
-  a 412 the page reads the page again and asks the person: keep their own
-  text and save over, or take the other version.
-- `by` is a subject, `agent:<handle or profile>`, or `bossmode` for a page
-  that the front writes, such as `agents/<agent>/learned.md`.
-- The page encodes each part of a path on its own. A page named `search`,
-  or a path that ends in `/history`, meets a route of its own. The backend
-  team decides how to keep those apart, for example by refusing such paths.
+The info of a page:
+
+```json
+{
+  "path": "runbooks/ansible-style.md", "title": "How we write Ansible", "tags": ["ansible", "style"],
+  "hash": "8d3c...", "version": 5, "size": 333,
+  "by": "agent:reviewer", "run": "run-...", "at": "2026-10-21T20:00:00Z", "summary": "Add the rule about handlers"
+}
+```
+
+- `version` is the revision of the store. It grows with each write of the
+  wiki, so the versions of one page grow, but they are not consecutive.
+- `by` is the subject of a person, `agent:<profile>`, `run:<id>`, `token`
+  for the token of the fleet, or `bossmode` for a page that the front
+  writes, such as `agents/<agent>/learned.md` and `_index.md`. `run` is the
+  run that wrote, when a run wrote.
+- A version of the history has `version`, `hash`, `by`, `at`, `summary`, and
+  `size`, and optionally `title`, `run`, and `deleted`. A version with
+  `deleted` marks a removal and has no text, no hash, and no writer.
+- A result of the search has `path`, `title`, `snippet`, `version`, and
+  `score`. `cut` is true when the search stopped at its bound before it read
+  the whole wiki.
+
+The rule of a path:
+
+- A path is relative, with at most 8 parts and 512 bytes, no empty part, no
+  part that starts with a dot, and no control character.
+- The last part ends with `.md`, and no other part ends with `.md`.
+- The path `search` and a path whose last part is `history` are refused,
+  because they meet the routes of the search and of the history.
+- The front writes `_index.md` after each change, and nobody else writes it.
+
+The workbench answers 400 for any other path. The page checks the same rule
+before it sends a new page, adds `.md` when the person leaves it out, and
+shows the names in the tree without `.md`. The page offers no Edit on
+`_index.md`.
+
+Writes:
+
+- `PUT` takes `{"text": "...", "summary": "..."}` as JSON. The page sends
+  `If-Match: "<hash>"` for an edit and `If-None-Match: *` for a new page.
+- A 412 carries `hash`, the current hash, in the problem document, and an
+  `ETag` header when the page exists. On a 412 the page reads the page again
+  and asks the person: keep their own text and save over, or take the other
+  version.
+- A write of the same text makes no new version and answers the page as it
+  is.
 
 ## 9. Faces
 
@@ -311,12 +385,16 @@ transcript items with `from`.
 |---|---|
 | **New.** `GET /v1/faces` | `{"faces": [{"agent", "displayName", "tagline", "hash", "custom"}]}` for every agent that the caller can see |
 | `GET /v1/faces/{agent}` | `image/svg+xml` with `ETag: "<hash>"` |
-| `PUT /v1/faces/{agent}` | The SVG as the body. 200 with the entry of `GET /v1/faces`. A face that fails the sanitizer answers 422 with the reason in `detail`. |
+| `PUT /v1/faces/{agent}` | The SVG as the body. 200 with the entry of `GET /v1/faces`. A body over 32 KB answers 413. A face that fails the sanitizer answers 422 with the reason in `detail`. |
 | `PATCH /v1/faces/{agent}` | `{"displayName", "tagline"}`, both optional. 200 with the entry. |
 | `DELETE /v1/faces/{agent}` | 200 with the entry, back to the identicon |
 
-`hash` changes when the picture, the name, or the tagline changes. The page
-reads a face again when its hash changes. It reads the SVG with the bearer
+Each entry can also carry `by`, `at`, and `version`: who changed the face
+last, when, and the revision of the store. `hash` changes when the picture,
+the name, or the tagline changes. The page reads a face again when its hash
+changes. A `GET /v1/faces/{agent}` for an agent that the caller cannot see
+answers the identicon, not a 403, so a face never fails on the page. The
+page refuses a file over 32 KB before it sends it. It reads the SVG with the bearer
 token and shows it as a blob URL in an `img` element, never as markup.
 
 ## 10. The stream
@@ -326,8 +404,14 @@ with `fetch`, because EventSource cannot send the bearer token, so the
 stream route takes the same `Authorization` header as every route.
 
 - Each event has `id:`, `event:`, and one `data:` line of JSON.
-- An id is a decimal counter of the front. On a reconnect the page sends
+- An id is a decimal counter that starts at the start time of the front in
+  microseconds, so an id from before a restart of the front gives `reset`.
+  The page keeps ids as strings. On a reconnect the page sends
   `Last-Event-ID`, and the front sends every event after that id.
+- The front closes a stream on its own after 15 minutes. The page connects
+  again at once with `Last-Event-ID`, and the light in the rail stays on
+  Live. Only a stream that ends within 5 seconds, or a failed connection,
+  makes the page wait and show that it connects again.
 - **New.** When the front cannot resume from the id, it sends one event of
   the kind `reset` with `data: null`. The page then reads the bridges, the
   faces, the open channel, and its roster again.
@@ -342,6 +426,15 @@ stream route takes the same `Authorization` header as every route.
 | `run` | The run object, with `member`, `activity`, and `reactions`. One event per change of a run that the caller can see. |
 | `page` | `{"path", "title", "hash", "by", "at", "size"}`, plus `"deleted": true` for a removed page |
 | `face` | The entry of `GET /v1/faces` for that agent |
+| `member` | `{"kind": "member", "member": "default/crew-2", "state": "live", "time"}`, or `"gone": true` in place of `state` for a member that left the view |
+| `task` | `{"kind": "task", "member": "default/crew-2", "phase": "Running", "time"}`, or `"gone": true` |
+
+The `activity` of a `run` event carries `phrase`. The page uses `member` and
+`task` on the Fleet screen: a `member` event changes the state of a fleet
+member, and a `task` event changes the phase of the Task of a pool whose
+`atespace/name` is `member`. A Task that is gone leaves its pool on the
+screen. The page reads `GET /v1/fleet` when the screen opens and after a
+`reset`.
 
 A `bridge.message` or `bridge.member` event for a bridge that the page does
 not know makes the page read that bridge with `GET /v1/bridges/{id}`. A
@@ -353,3 +446,4 @@ bridge that the manager opens therefore shows in the rail.
 - The budget of a run. The plan offers a button to raise the budget of a
   member that failed at a limit. The page shows the limit and has no button.
 - `DELETE /v1/pages/{path}`.
+- `usage` of a bridge (section 5.1).
