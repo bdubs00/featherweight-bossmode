@@ -1,18 +1,24 @@
-// The workers of an agent, from the fleet view. An agent has workers: the
-// Tasks of the pools that run it. The page never says pool to an operator.
-// Keep is the number of workers that the agent keeps, the wanted count of
-// its pools. A worker is busy while its fleet member has an active run, and
-// free otherwise, also while it sleeps, because a request wakes it.
+// The workers of an agent, from the state of each worker that the page
+// keeps (src/lib/status.ts). An agent has workers: the Tasks of the pools
+// that run it. The page never says pool to an operator. Keep is the number
+// of workers that the agent keeps, the wanted count of its pools. A worker
+// is busy while it holds an open run, and free otherwise, also while it
+// sleeps, because a request wakes it.
 
 import type { BossConfig, Fleet, Template } from '../api/types';
+import { workerStates, type Facts } from './status';
 
 export interface Worker {
   /** The name of the worker, such as crew-0. */
   name: string;
+  /** The name of its member, atespace/name, as the events name it. */
+  member: string;
   /** The phase of its Task: Running, Suspended, Pending, Failed, or Terminating. */
   phase: string;
   awake: boolean;
   busy: boolean;
+  /** False for a worker of an older configuration. */
+  current: boolean;
 }
 
 export interface Workers {
@@ -25,31 +31,19 @@ export interface Workers {
 }
 
 /** workersOf returns the workers of an agent. An agent with no worker gets zeros. */
-export function workersOf(fleet: Fleet | null | undefined, agent: string): Workers {
+export function workersOf(f: Facts | null | undefined, agent: string): Workers {
   const out: Workers = { keep: 0, workers: [], awake: 0, busy: 0, free: 0 };
-  if (!fleet) return out;
-  const active = new Map((fleet.members || []).map((m) => [m.name, m.active || 0]));
-  for (const p of fleet.pools || []) {
-    if (p.agent !== agent) continue;
-    out.keep += p.wanted || 0;
-    for (const t of p.tasks || []) {
-      const busy = (active.get(p.atespace + '/' + t.name) || active.get(t.name) || 0) > 0;
-      const awake = t.phase === 'Running';
-      out.workers.push({ name: t.name, phase: t.phase, awake, busy });
-      if (awake) out.awake++;
-      if (busy) out.busy++;
-    }
+  if (!f || !f.fleet) return out;
+  for (const p of f.fleet.pools || []) if (p.agent === agent) out.keep += p.wanted || 0;
+  for (const w of workerStates(f)) {
+    if (w.agent !== agent) continue;
+    const awake = w.phase === 'Running';
+    out.workers.push({ name: w.name, member: w.member, phase: w.phase, awake, busy: w.busy, current: w.current });
+    if (awake) out.awake++;
+    if (w.busy) out.busy++;
   }
   out.free = out.workers.filter((w) => !w.busy && w.phase !== 'Failed' && w.phase !== 'Terminating').length;
   return out;
-}
-
-/** awakeWorkers counts the workers of the whole fleet that are awake. */
-export function awakeWorkers(fleet: Fleet | null | undefined): number {
-  if (!fleet) return 0;
-  let n = 0;
-  for (const p of fleet.pools || []) for (const t of p.tasks || []) if (t.phase === 'Running') n++;
-  return n;
 }
 
 /**

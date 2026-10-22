@@ -3,7 +3,7 @@
 
 import { api, type NewBridge, type NewMember, type NewMessage } from '../api/routes';
 import { openStream, type StreamHandle } from '../api/stream';
-import type { Entry, MessageEventData, ReactionKind, RunState, StreamEvent } from '../api/types';
+import type { Entry, Fleet, FleetChange, MessageEventData, ReactionKind, RunState, StreamEvent } from '../api/types';
 import { managerRunOf } from './reducer';
 import { store } from './store';
 import { ApiError, type SigninNeeded } from '../api/client';
@@ -162,6 +162,49 @@ export async function loadAgents(): Promise<void> {
 export async function loadFleet(): Promise<void> {
   const fleet = await once('fleet', () => api.fleet());
   store.dispatch({ type: 'fleet', fleet });
+}
+
+/** The run states that are not finished. */
+const OPEN_STATES = ['queued', 'running', 'input-required', 'suspended'];
+
+/**
+ * loadOpenRuns reads the runs of the fleet that are not finished, from the
+ * view of the front, so the page knows the runs that each worker holds.
+ * The run events keep them current after that. A run that the page holds
+ * as open and that the answer leaves out finished while the stream could
+ * not resume, so the page reads it again.
+ */
+export async function loadOpenRuns(): Promise<void> {
+  const runs = await once('open-runs', () => api.fleetRuns({ state: 'active' }));
+  const listed = new Set(runs.map((r) => r && r.id));
+  const left = Object.values(store.get().runs)
+    .filter((r) => !!r.member && OPEN_STATES.includes(r.state) && !listed.has(r.id))
+    .map((r) => r.id);
+  store.dispatch({ type: 'open-runs', runs });
+  for (const id of left) {
+    api
+      .run(id)
+      .then((r) => store.dispatch({ type: 'run', run: r }))
+      .catch(() => {
+        // The next run event of the run brings its state.
+      });
+  }
+}
+
+/** holdsTask reports whether the fleet view lists a Task of that member. */
+function holdsTask(fleet: Fleet, member: string): boolean {
+  return (fleet.pools || []).some((p) => (p.tasks || []).some((t) => member === p.atespace + '/' + t.name || member === t.name));
+}
+
+let fleetTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** refreshFleetSoon reads the fleet view again a moment later, once for a burst of events. */
+function refreshFleetSoon(): void {
+  if (fleetTimer) return;
+  fleetTimer = setTimeout(() => {
+    fleetTimer = null;
+    loadFleet().catch(() => {});
+  }, 1000);
 }
 
 /** loadSkills reads the skills and the tools. A workbench without the route leaves them out. */
@@ -345,12 +388,19 @@ async function onEvent(raw: StreamEvent): Promise<void> {
   }
   store.dispatch({ type: 'stream', event: e });
   if (e.kind === 'reset') await reload();
+  // A Task that the fleet view does not list, such as a new worker after a
+  // change of Keep, brings the fleet view again, so its worker shows.
+  if (e.kind === 'task') {
+    const d = e.data as FleetChange | null;
+    const fleet = store.get().fleet;
+    if (d && typeof d.member === 'string' && !d.gone && fleet && !holdsTask(fleet, d.member)) refreshFleetSoon();
+  }
 }
 
 /** reload reads the lists again, when the stream cannot resume. */
 async function reload(): Promise<void> {
   const s = store.get();
-  await Promise.allSettled([loadBridges(), loadFaces(), s.pages.loaded ? loadPages() : Promise.resolve(), s.fleet ? loadFleet() : Promise.resolve()]);
+  await Promise.allSettled([loadBridges(), loadFaces(), s.pages.loaded ? loadPages() : Promise.resolve(), s.fleet ? loadFleet() : Promise.resolve(), s.openRuns ? loadOpenRuns() : Promise.resolve()]);
   if (s.open) await Promise.allSettled([loadBridge(s.open), loadNewer(s.open)]);
 }
 

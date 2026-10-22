@@ -7,6 +7,7 @@ import type { Bridge, Decision, Entry, Member, Result, Run } from '../api/types'
 import type { Channel, Roster } from './reducer';
 import { newestRun } from './people';
 import { decisionOf } from '../lib/decision';
+import { seatPresence, type Facts } from '../lib/status';
 
 export type InboxKind = 'decision' | 'question' | 'failed' | 'stopped' | 'message';
 
@@ -44,6 +45,8 @@ export interface InboxInput {
   results: Record<string, Result>;
   /** The subject of the person. */
   me: string;
+  /** What the page knows about the workers, so the status of a seat is the status of every screen. Without it, the presence of the bridge stands. */
+  facts?: Facts;
 }
 
 /** cardOf finds the card of a decision in a loaded channel. */
@@ -85,18 +88,20 @@ export function inboxRows(s: InboxInput): InboxRow[] {
     if (b.state !== 'open') continue;
     const roster = s.rosters[b.id];
     const members: Member[] = roster ? roster.order.map((h) => roster.byHandle[h]).filter((m) => m && !m.fired) : [];
+    const presence = (m: Member | undefined) => (m ? (s.facts ? seatPresence(s.facts, m) : m.presence) : undefined);
     for (const m of members) {
       const id = newestRun(m);
       const run = s.runs[id];
       const base = { bridge: b.id, bridgeTitle: b.title, handle: m.handle, agent: m.agent, run: id };
-      if (m.presence === 'needs-you' && run && run.state === 'input-required' && run.pending) {
+      const p = presence(m);
+      if (p === 'needs-you' && run && run.state === 'input-required' && run.pending) {
         const d = decisionOf(run, s.results[run.id], cardOf(s.channels[b.id], run.id, run.pending.id));
         if (d) {
           rows.push({ ...base, key: 'd:' + run.id + '/' + d.id, kind: d.question || d.schema ? 'question' : 'decision', status: 'needs-you', decision: d, at: run.pending.requestedAt || run.updatedAt });
           continue;
         }
       }
-      if (m.presence === 'error' || (run && (run.state === 'failed' || run.state === 'canceled'))) {
+      if (p === 'error' || (run && (run.state === 'failed' || run.state === 'canceled'))) {
         const kind: InboxKind = run && run.state === 'canceled' ? 'stopped' : 'failed';
         rows.push({ ...base, key: 's:' + b.id + '/' + m.handle, kind, status: 'error', reason: reasonOf(run, s.results[id]), at: run ? run.updatedAt : '' });
       }
@@ -108,7 +113,7 @@ export function inboxRows(s: InboxInput): InboxRow[] {
       rows.push({
         key: 'm:' + b.id,
         kind: 'message',
-        status: e.from.kind === 'agent' ? statusOfPresence(m && m.presence) : 'idle',
+        status: e.from.kind === 'agent' ? statusOfPresence(presence(m)) : 'idle',
         bridge: b.id,
         bridgeTitle: b.title,
         handle,

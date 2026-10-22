@@ -5,8 +5,9 @@
 
 import type { Agent, Bridge, Fleet, Member, Rules, Run, Skill } from '../api/types';
 import { whyWords } from '../lib/words';
-import { presenceOf, seatLight, type Light } from '../lib/presence';
+import { presenceOf, type Light } from '../lib/presence';
 import { hrefOf } from '../lib/route';
+import { factsOf, statusOf } from '../lib/status';
 import { workersOf, type Workers } from '../lib/workers';
 import type { Channel, Roster } from './reducer';
 
@@ -44,6 +45,8 @@ export interface PeopleInput {
   /** The agents of the fleet, from selectAgents of src/state/agents.ts. */
   agents: Agent[] | null;
   fleet: Fleet | null;
+  /** True once the page read the open runs of the fleet. */
+  openRuns?: boolean;
 }
 
 /** The title of the group of agents that sit on no bridge. */
@@ -51,24 +54,6 @@ export const NOT_ON_A_BRIDGE = 'Not on a bridge';
 
 /** newestRun is the id of the newest run of a seat, or "". */
 export const newestRun = (m: Pick<Member, 'runs'>): string => (m.runs && m.runs.length ? m.runs[m.runs.length - 1] : '');
-
-/** seatRowLight is the status of a seat: its presence, or waiting for a worker while its newest run waits in the queue. */
-export function seatRowLight(m: Member, runs: Record<string, Run>): Light {
-  const r = runs[newestRun(m)];
-  return seatLight(m.fired ? 'fired' : m.presence, r ? r.state : undefined);
-}
-
-/**
- * workerLight is the status of an agent from its workers: awake when one is
- * up, starting, failed, or asleep. An agent with no worker has no light.
- */
-export function workerLight(w: Workers): Light | null {
-  if (w.workers.length === 0) return null;
-  if (w.awake > 0) return { word: 'awake', tone: 'green', label: 'The worker is up.' };
-  if (w.workers.some((x) => x.phase === 'Pending')) return { word: 'starting', tone: 'grey', label: 'The worker starts.' };
-  if (w.workers.every((x) => x.phase === 'Failed')) return { word: 'failed', tone: 'red', label: 'The worker failed.' };
-  return { word: 'asleep', tone: 'grey', label: 'The worker sleeps. A request wakes it.' };
-}
 
 /** capacityWords says how many workers of an agent are free: 1 free, 2 free, or waiting for a worker. An agent with no worker gets no words. */
 export function capacityWords(w: Workers): string {
@@ -85,6 +70,7 @@ export function capacityWords(w: Workers): string {
  * its seat loads.
  */
 export function peopleOf(s: PeopleInput): PeopleGroup[] {
+  const f = factsOf(s.fleet, s.runs, !!s.openRuns);
   const groups: PeopleGroup[] = [];
   const seated = new Set<string>();
   let complete = true;
@@ -107,7 +93,7 @@ export function peopleOf(s: PeopleInput): PeopleGroup[] {
         handle: m.handle,
         agent: m.agent,
         task: m.task,
-        light: seatRowLight(m, s.runs),
+        light: statusOf(f, { seat: m }),
         href: hrefOf({ place: 'member', bridge: id, handle: m.handle, tab: 'chat' }),
       };
     });
@@ -119,8 +105,7 @@ export function peopleOf(s: PeopleInput): PeopleGroup[] {
       .map((a) => a.name)
       .sort()
       .map((name) => {
-        const w = workersOf(s.fleet, name);
-        return { key: 'agent:' + name, kind: 'agent', handle: name, agent: name, task: capacityWords(w), light: workerLight(w), href: hrefOf({ place: 'fleet', agent: name }) };
+        return { key: 'agent:' + name, kind: 'agent', handle: name, agent: name, task: capacityWords(workersOf(f, name)), light: statusOf(f, { agent: name }), href: hrefOf({ place: 'fleet', agent: name }) };
       });
     if (rows.length) groups.push({ key: '', title: NOT_ON_A_BRIDGE, rows, count: rows.length });
   }
@@ -150,8 +135,8 @@ export function filterPeople(groups: PeopleGroup[], q: string): PeopleGroup[] {
 /** The statuses in the order of attention, for the board and its status strips. */
 export const STATUS_ORDER = ['needs you', 'error', 'failed', 'working', 'awake', 'starting', 'waiting for a worker', 'idle', 'asleep', 'stopping', 'fired'];
 
-/** statusOf is the word of the status of a row, or "" for an agent with no worker. */
-export const statusOf = (r: PersonRow): string => (r.light ? r.light.word : '');
+/** rowWord is the word of the status of a row, or "" for an agent with no worker. */
+export const rowWord = (r: PersonRow): string => (r.light ? r.light.word : '');
 
 export interface StripSegment {
   word: string;
@@ -178,7 +163,7 @@ export function stripOf(rows: PersonRow[]): StripSegment[] {
 /** filterStatus keeps the rows of one status, and drops a group with none. */
 export function filterStatus(groups: PeopleGroup[], word: string): PeopleGroup[] {
   if (!word) return groups;
-  return groups.map((g) => ({ ...g, rows: g.rows.filter((r) => statusOf(r) === word) })).filter((g) => g.rows.length > 0);
+  return groups.map((g) => ({ ...g, rows: g.rows.filter((r) => rowWord(r) === word) })).filter((g) => g.rows.length > 0);
 }
 
 /** firstPerson is the row that the main pane opens when nothing is picked: a seat that needs you, else the first seat, else the first agent. */

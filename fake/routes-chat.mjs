@@ -4,8 +4,8 @@
 // time.
 //
 // The routes:
-//   GET /v1/fleet/runs?agent=&principal=&limit=   the runs of the fleet that the caller can see, newest first,
-//                                                 as {runs, total}, narrowed by agent and person
+//   GET /v1/fleet/runs?agent=&principal=&state=&limit=   the runs of the fleet that the caller can see, newest first,
+//                                                        as {runs, total}, narrowed by agent, person, and state
 //
 // The live stream of a run, GET /v1/runs/{id}/live, lives in server.mjs
 // beside the turns of the agents outside a bridge, which feed it.
@@ -62,10 +62,13 @@ export function register({ on, S }) {
     const q = c.url.searchParams;
     const agent = q.get('agent') || '';
     const principal = q.get('principal') || '';
+    const state = (q.get('state') || '').toLowerCase();
     const limit = Number(q.get('limit')) || 0;
+    // The state active keeps every run that is not finished, as the filter of the kernel does.
+    const inState = (r) => !state || (state === 'active' ? !['completed', 'failed', 'canceled'].includes(r.state) : r.state === state);
     // The caller sees the runs that it started.
     const runs = [...S.runs.values()]
-      .filter((r) => r.principal === c.person.subject && (!agent || r.agent === agent) && (!principal || r.principal === principal))
+      .filter((r) => r.principal === c.person.subject && (!agent || r.agent === agent) && (!principal || r.principal === principal) && inState(r))
       .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
     return { runs: limit ? runs.slice(0, limit) : runs, total: runs.length };
   });

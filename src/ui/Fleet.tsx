@@ -7,13 +7,13 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
 import { go, hrefOf, parseRoute, type Route } from '../lib/route';
-import { awakeWorkers } from '../lib/workers';
+import { awakeCount, statusOf } from '../lib/status';
 import { store, useSelect } from '../state/store';
+import { selectFacts } from '../state/reducer';
 import { loadAgentSkills, loadAgents, loadFleet } from '../state/actions';
 import { selectAgents } from '../state/agents';
 import { ensureRosters, ensureRuns, refreshAfterReset } from '../state/fetchers';
-import { filterPeople, firstPerson, newestRun, peopleCount, peopleOf, slashCommands, workerLight, type PeopleGroup, type PersonRow } from '../state/people';
-import { workersOf } from '../lib/workers';
+import { filterPeople, firstPerson, newestRun, peopleCount, peopleOf, slashCommands, type PeopleGroup, type PersonRow } from '../state/people';
 import { parseSlash } from '../lib/mention';
 import { useRoving } from './keys';
 import { attempt } from './notice';
@@ -62,6 +62,7 @@ export function usePeople(): { groups: PeopleGroup[]; loaded: boolean } {
   const runs = useSelect((s) => s.runs);
   const agents = useSelect(selectAgents);
   const fleet = useSelect((s) => s.fleet);
+  const openRuns = useSelect((s) => s.openRuns);
   useEffect(() => {
     const s = store.get();
     if (!s.agents) attempt(loadAgents);
@@ -78,7 +79,7 @@ export function usePeople(): { groups: PeopleGroup[]; loaded: boolean } {
     seen.current = resets;
     refreshAfterReset();
   }, [resets]);
-  const groups = useMemo(() => peopleOf({ bridges, rosters, runs, agents, fleet }), [bridges, rosters, runs, agents, fleet]);
+  const groups = useMemo(() => peopleOf({ bridges, rosters, runs, agents, fleet, openRuns }), [bridges, rosters, runs, agents, fleet, openRuns]);
   const working = groups
     .flatMap((g) => g.rows)
     .filter((r) => r.kind === 'seat' && r.light && r.light.word === 'working' && r.bridge)
@@ -116,7 +117,7 @@ export function FleetList({ current, member }: { current?: string; member?: stri
   const route = useHashRoute();
   const board = route.place === 'fleet' && !!route.board;
   const { groups, loaded } = usePeople();
-  const awake = useSelect((s) => awakeWorkers(s.fleet));
+  const awake = useSelect((s) => awakeCount(selectFacts(s)));
   const knowFleet = useSelect((s) => !!s.fleet);
   const [q, setQ] = useState('');
   const shown = useMemo(() => filterPeople(groups, q), [groups, q]);
@@ -231,8 +232,7 @@ export function AgentChat({ agent }: { agent: string }) {
   useEffect(() => {
     setRunId(readRun(agent) || (manager ? manager.run : ''));
   }, [agent, manager && manager.run]);
-  const w = workersOf(fleet, agent);
-  const light = workerLight(w);
+  const light = useSelect((s) => statusOf(selectFacts(s), { agent }));
   // The member of the fleet that serves the agent: a live one first.
   const member = manager
     ? manager.member

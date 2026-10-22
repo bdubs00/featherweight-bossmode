@@ -7,6 +7,7 @@ import { handleReason, nextHandle } from '../lib/handles';
 import { canSeat } from '../lib/agents';
 import { cap } from '../lib/words';
 import { workersOf } from '../lib/workers';
+import { factsOf, type Facts } from '../lib/status';
 
 /** One agent in the picker. */
 export interface PickRow {
@@ -32,9 +33,10 @@ export interface PickGroups {
  * query keeps the agents whose name, display name, or tagline holds it.
  * drafts names the agents of the new seats that wait, so a click on the
  * last free worker shows the agent as waiting for a worker at once. The
- * free workers of an agent come from its pool.
+ * free workers of an agent come from the state of its workers, and facts
+ * is null while the page does not know the fleet.
  */
-export function pickGroups(agents: Agent[], faces: Record<string, FaceMeta>, seats: Pick<Member, 'agent' | 'fired'>[], fleet: Fleet | null, query = '', drafts: string[] = []): PickGroups {
+export function pickGroups(agents: Agent[], faces: Record<string, FaceMeta>, seats: Pick<Member, 'agent' | 'fired'>[], facts: Facts | null, query = '', drafts: string[] = []): PickGroups {
   const q = query.trim().toLowerCase();
   const byName = new Map(agents.map((a) => [a.name, a]));
   const seated: string[] = [];
@@ -46,7 +48,7 @@ export function pickGroups(agents: Agent[], faces: Record<string, FaceMeta>, sea
     const tagline = (f && f.tagline) || a.description || '';
     if (q && !(a.name + '\n' + name + '\n' + tagline).toLowerCase().includes(q)) return null;
     const waiting = drafts.filter((d) => d === a.name).length;
-    const free = fleet ? Math.max(0, workersOf(fleet, a.name).free - waiting) : -1;
+    const free = facts && facts.fleet ? Math.max(0, workersOf(facts, a.name).free - waiting) : -1;
     return { agent: a.name, name, tagline, free };
   };
   const here = seated.map((n) => row(byName.get(n) || { name: n, role: '' })).filter((r): r is PickRow => !!r);
@@ -100,7 +102,8 @@ export function wavesLine(seats: Member[], fleet: Fleet | null): string {
   if (!fleet) return '';
   const live = seats.filter((m) => !m.fired);
   const agents = [...new Set(live.map((m) => m.agent))];
-  const workers = agents.reduce((n, a) => n + workersOf(fleet, a).workers.length, 0);
+  const f = factsOf(fleet);
+  const workers = agents.reduce((n, a) => n + workersOf(f, a).workers.length, 0);
   if (workers === 0 || live.length <= workers) return '';
   return `Runs in waves: ${live.length} seats share ${workers} ${workers === 1 ? 'worker' : 'workers'}.`;
 }

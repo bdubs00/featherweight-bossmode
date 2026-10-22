@@ -45,6 +45,9 @@ describe('presence', () => {
     expect(derivePresence({ run: { state: 'failed' }, taskPhase: 'Running' })).toBe('error');
     expect(derivePresence({ run: { state: 'completed' }, taskPhase: 'Failed' })).toBe('error');
     expect(derivePresence({ run: { state: 'completed' }, blocked: true })).toBe('error');
+    // A worker that starts does not run yet, so its seat counts as asleep, as the workbench says.
+    expect(derivePresence({ run: { state: 'completed' }, taskPhase: 'Pending' })).toBe('asleep');
+    expect(derivePresence({ run: { state: 'completed' }, taskPhase: 'Terminating' })).toBe('error');
   });
 
   it('words the phases of a worker and the status of a run', () => {

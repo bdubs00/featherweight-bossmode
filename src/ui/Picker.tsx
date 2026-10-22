@@ -16,7 +16,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/ho
 import { store, useSelect } from '../state/store';
 import { addMember, loadAgents, loadFleet } from '../state/actions';
 import { selectAgents } from '../state/agents';
-import { membersOf } from '../state/reducer';
+import { membersOf, selectFacts } from '../state/reducer';
 import { nextHandle } from '../lib/handles';
 import { attempt } from './notice';
 import { freeWords, pickGroups, seatReason, taskOfGoal, type PickRow } from './seats';
@@ -124,16 +124,16 @@ export function Picker({ bridge, drafts, draftHandles, onPick, onClose, anchor, 
   const agents = useSelect(selectAgents);
   const faces = useSelect((s) => s.faces);
   const roster = useSelect((s) => s.rosters[bridge]);
-  const fleet = useSelect((s) => s.fleet);
+  const facts = useSelect((s) => (s.fleet ? selectFacts(s) : null));
   const [query, setQuery] = useState('');
   const [mode, setMode] = useState<'list' | 'advanced'>('list');
   const panel = useRef<HTMLDivElement>(null);
   const field = useRef<HTMLInputElement>(null);
   // A bridge that does not exist yet has the seats of the form.
   const seats = useMemo(() => (bridge ? membersOf(roster) : drafts.map((agent) => ({ agent, fired: false }))), [bridge, roster, drafts]);
-  const groups = useMemo(() => pickGroups(agents || [], faces, seats, fleet, query, drafts), [agents, faces, seats, fleet, query, drafts]);
+  const groups = useMemo(() => pickGroups(agents || [], faces, seats, facts, query, drafts), [agents, faces, seats, facts, query, drafts]);
   const taken = useMemo(() => [...membersOf(roster).map((m) => m.handle), ...draftHandles], [roster, draftHandles]);
-  const all = useMemo(() => pickGroups(agents || [], faces, seats, fleet, '', drafts), [agents, faces, seats, fleet, drafts]);
+  const all = useMemo(() => pickGroups(agents || [], faces, seats, facts, '', drafts), [agents, faces, seats, facts, drafts]);
 
   useEffect(() => {
     // The agents come from the fleet and from the profiles of the front.

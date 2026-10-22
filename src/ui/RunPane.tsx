@@ -8,7 +8,9 @@ import { useEffect, useState } from 'preact/hooks';
 import { api } from '../api/routes';
 import type { FileView, Member, ReactionKind, Result } from '../api/types';
 import { store, useSelect } from '../state/store';
-import { presenceOf, runStatus } from '../lib/presence';
+import { runStatus } from '../lib/presence';
+import { seatPresence, statusOf } from '../lib/status';
+import { selectFacts } from '../state/reducer';
 import { hrefOf } from '../lib/route';
 import { attempt, showError } from './notice';
 import { Confirm, Light, Markdown, When } from './common';
@@ -168,8 +170,9 @@ export function StopKey({ runId, who }: { runId: string; who: string }) {
 /** RunView is the result of a run: the title, the status, the answer, what it did, the limits, and the reactions. */
 export function RunView({ runId, result, member, who, endSeq, gone }: { runId: string; result: Result | null; member?: Member; who: string; endSeq?: number; gone?: boolean }) {
   const run = useSelect((s) => s.runs[runId]);
+  const presence = useSelect((s) => (member ? seatPresence(selectFacts(s), member) : ''));
   const res = result;
-  const phrase = member && member.presence === 'working' && member.activity ? member.activity.phrase : '';
+  const phrase = member && presence === 'working' && member.activity ? member.activity.phrase : '';
   return (
     <div class="run-view">
       <div class="run-head">
@@ -220,7 +223,8 @@ export function RunPane({ bridge, runId, handle }: { bridge: string; runId: stri
   const member = useSelect((s) => (handle && s.rosters[bridge] ? s.rosters[bridge].byHandle[handle] : undefined));
   const res = useResult(runId);
   const t = useTranscript(runId);
-  const light = member ? presenceOf(member.presence) : run ? runStatus(run) : null;
+  const seatLight = useSelect((s) => (member ? statusOf(selectFacts(s), { seat: member }) : null));
+  const light = seatLight || (run ? runStatus(run) : null);
   const who = handle || (run ? run.agent : 'the agent');
   const end = [...t.items].reverse().find((x) => x.kind === 'end');
   return (

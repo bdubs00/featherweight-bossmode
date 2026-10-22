@@ -12,7 +12,8 @@ import type { Member, UsageSum } from '../api/types';
 import { useSelect } from '../state/store';
 import { addMember, fire, loadPages, loadRunOnce, patchMember } from '../state/actions';
 import { errorReason } from '../lib/words';
-import { seatLight } from '../lib/presence';
+import { seatPresence, statusOf } from '../lib/status';
+import { selectFacts } from '../state/reducer';
 import { hrefOf, go } from '../lib/route';
 import { useRoving } from './keys';
 import { attempt } from './notice';
@@ -41,24 +42,25 @@ const MemberRow = memo(function MemberRow({ bridge, handle, onAsk, current }: { 
   const m = useSelect((s) => (s.rosters[bridge] ? s.rosters[bridge].byHandle[handle] : undefined));
   const run = m ? m.runs[m.runs.length - 1] : '';
   const runState = useSelect((s) => (run && s.runs[run] ? s.runs[run].state : ''));
-  const reason = useSelect((s) => (run && s.runs[run] && m && m.presence === 'error' ? errorReason(s.runs[run]) : ''));
-  const presence = m ? m.presence : '';
+  // The status of the seat comes from the state of its worker on the page, as on every screen.
+  const presence = useSelect((s) => (m ? seatPresence(selectFacts(s), m) : ''));
+  const light = useSelect((s) => (m ? statusOf(selectFacts(s), { seat: m }) : null));
+  const reason = useSelect((s) => (run && s.runs[run] && presence === 'error' ? errorReason(s.runs[run]) : ''));
   const quiet = m ? !m.activity : false;
   // A seat that works with no activity can wait in the queue, and a seat in
   // error has a reason: the row reads its run once to learn which.
   useEffect(() => {
     if (run && (presence === 'error' || (presence === 'working' && quiet))) loadRunOnce(run);
   }, [run, presence, quiet]);
-  if (!m) return null;
-  const light = seatLight(m.presence, runState);
+  if (!m || !light) return null;
   // A seat whose newest run failed, stopped at a limit, or was canceled gets
   // no message. Seat again starts a new run with its task.
-  const stopped = m.presence === 'error' || runState === 'failed' || runState === 'canceled';
+  const stopped = presence === 'error' || runState === 'failed' || runState === 'canceled';
   const href = hrefOf({ place: 'member', bridge, handle: m.handle, tab: 'chat' });
-  const phrase = m.activity && m.activity.phrase && (m.presence === 'working' || m.presence === 'needs-you') && light.word !== 'waiting for a worker' ? m.activity.phrase : '';
+  const phrase = m.activity && m.activity.phrase && (presence === 'working' || presence === 'needs-you') && light.word !== 'waiting for a worker' ? m.activity.phrase : '';
   return (
     <li
-      class={'member' + (m.fired ? ' fired' : '') + (current ? ' sel' : '') + (m.presence === 'needs-you' ? ' needs' : '')}
+      class={'member' + (m.fired ? ' fired' : '') + (current ? ' sel' : '') + (presence === 'needs-you' ? ' needs' : '')}
       draggable={!m.fired}
       onDragStart={(e) => {
         if (!e.dataTransfer) return;

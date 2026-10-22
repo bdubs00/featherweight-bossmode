@@ -1,9 +1,11 @@
 // The profile of an agent, in the details pane of the Fleet place: the mark
 // at 72, the tagline, the tools and the rules as chips, the count of its
 // skills, New face, What people liked, the workers with Keep, and the
-// counts of today. The workers come from GET /v1/pools/{name}, read again
-// every 10 seconds while the profile is open, because no event of the
-// stream carries them. The page never says pool: it says Workers and Keep.
+// counts of today. The workers and their phases come from the state of
+// each worker that the stream keeps, as on every screen. GET
+// /v1/pools/{name}, read again every 10 seconds while the profile is open,
+// gives only Keep and the gaps, which no event of the stream carries. The
+// page never says pool: it says Workers and Keep.
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
@@ -15,8 +17,9 @@ import { useFleetAgent, useProfile } from '../state/profiles';
 import { namedProfileOf, useQueued } from '../state/queued';
 import { ensureRuns } from '../state/fetchers';
 import { likedOf, newestRun, parseKeep, policyRules, rulesOf, seatOnWorker, seatsOfAgent, type LikedEntry } from '../state/people';
-import { poolNameOf } from '../lib/workers';
-import { phaseOf } from '../lib/presence';
+import { poolNameOf, workersOf } from '../lib/workers';
+import { statusOf } from '../lib/status';
+import { selectFacts } from '../state/reducer';
 import { hrefOf } from '../lib/route';
 import { since } from '../lib/words';
 import { attempt, showError } from './notice';
@@ -27,7 +30,7 @@ import { Button, Chip, Field, Help, Input, Led, Mark, PaneHeader } from './primi
 const WORKER_HELP = 'A worker runs the work of one agent, one seat at a time. Keep is how many it keeps ready.';
 const POLL_MS = 10_000;
 
-/** usePool reads the workers of an agent now and every 10 seconds while the profile is open. */
+/** usePool reads Keep and the gaps of the workers of an agent now and every 10 seconds while the profile is open, and the counts of today. */
 function usePool(agent: string): [Pool | null | undefined, (p: Pool | null) => void, Today | null | undefined] {
   const [pool, setPool] = useState<Pool | null | undefined>(undefined);
   const [today, setToday] = useState<Today | null | undefined>(undefined);
@@ -146,18 +149,26 @@ export function KeepField({ agent, value, owner, onSaved }: { agent: string; val
   );
 }
 
-/** Workers is the section of the workers of an agent: the count, the question mark, Keep, and one row per worker. */
+/**
+ * Workers is the section of the workers of an agent: the count, the
+ * question mark, Keep, and one row per worker. The rows and their words
+ * come from the state of each worker on the page. The read of the pool
+ * gives Keep and the gaps.
+ */
 function Workers({ agent, owner, pool, setPool }: { agent: string; owner: boolean; pool: Pool | null | undefined; setPool: (p: Pool | null) => void }) {
   const bridges = useSelect((s) => s.bridges);
   const rosters = useSelect((s) => s.rosters);
   const seats = useMemo(() => seatsOfAgent({ bridges, rosters }, agent), [bridges, rosters, agent]);
   const runs = useSelect((s) => s.runs);
+  const facts = useSelect(selectFacts);
+  const workers = useMemo(() => workersOf(facts, agent).workers, [facts, agent]);
   const fleetMembers = useSelect((s) => (s.fleet ? s.fleet.members : []));
-  const runIds = seats.map((x) => newestRun(x.member)).join(',');
+  // The open runs of the fleet name the seat that each worker serves. Until the page reads them, it reads the newest run of each seat.
+  const openRuns = useSelect((s) => s.openRuns);
+  const runIds = openRuns ? '' : seats.map((x) => newestRun(x.member)).join(',');
   useEffect(() => {
     if (runIds) ensureRuns(runIds.split(','));
   }, [runIds]);
-  const tasks = pool ? pool.tasks : [];
   const sleptAt = (name: string) => {
     const fm = fleetMembers.find((x) => x.name === name || x.name.endsWith('/' + name));
     return fm ? since(fm.lastSeen) : '';
@@ -168,23 +179,23 @@ function Workers({ agent, owner, pool, setPool }: { agent: string; owner: boolea
         <h3 class="t-sub" id={'workers-' + agent}>
           Workers
         </h3>
-        <Chip label={tasks.length === 1 ? '1 worker' : tasks.length + ' workers'}>{tasks.length}</Chip>
+        <Chip label={workers.length === 1 ? '1 worker' : workers.length + ' workers'}>{workers.length}</Chip>
         <Help label="What is a worker">{WORKER_HELP}</Help>
         <span class="grow" />
         {pool !== undefined && <KeepField agent={agent} value={pool ? pool.wanted : 0} owner={owner} onSaved={setPool} />}
         {owner && pool && <RemoveWorkers agent={agent} onDone={() => setPool(null)} />}
       </div>
-      {tasks.length > 0 && (
+      {workers.length > 0 && (
         <ul class="workers">
-          {tasks.map((t) => {
-            const light = phaseOf(t.phase);
-            const seat = seatOnWorker(t.name, seats, runs);
-            const who = seat || (t.phase === 'Suspended' ? sleptAt(t.name) : '');
+          {workers.map((w) => {
+            const light = statusOf(facts, { worker: w.member });
+            const seat = seatOnWorker(w.name, seats, runs);
+            const who = seat || (light && light.word === 'asleep' ? sleptAt(w.name) : '');
             return (
               <li>
-                <span class="worker-name">{t.name}</span>
-                <Led tone={light.tone} word={light.word} label={light.label} />
-                {t.current === false && <Chip>old setup</Chip>}
+                <span class="worker-name">{w.name}</span>
+                {light && <Led tone={light.tone} word={light.word} label={light.label} />}
+                {!w.current && <Chip>old setup</Chip>}
                 {who && <span class="worker-who clip">{who}</span>}
               </li>
             );

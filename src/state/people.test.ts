@@ -14,14 +14,13 @@ import {
   peopleOf,
   rulesOf,
   seatOnWorker,
-  seatRowLight,
   slashCommands,
   stripOf,
-  workerLight,
   type PeopleInput,
 } from './people';
 import { parseSlash } from '../lib/mention';
 import { workersOf } from '../lib/workers';
+import { factsOf } from '../lib/status';
 import { fleetAgents } from '../lib/agents';
 
 const bridge = (id: string, title: string, state: 'open' | 'closed' = 'open'): Bridge => ({
@@ -138,27 +137,13 @@ describe('the presence words', () => {
     expect(rows[2].light!.struck).toBe(true);
   });
 
-  it('says working once the run runs, and fired for a fired seat whatever its presence', () => {
-    expect(seatRowLight(seat('a', 'x', 'working'), { 'run-a': run('run-a', 'running') }).word).toBe('working');
-    expect(seatRowLight(seat('a', 'x', 'idle', { fired: true }), {}).word).toBe('fired');
-    expect(seatRowLight(seat('a', 'x', 'error'), {}).tone).toBe('red');
-  });
-
-  it('gives an agent the state of its workers and its free workers', () => {
-    const m = workersOf(fleet, 'migrator');
-    expect(workerLight(m)!.word).toBe('awake');
-    expect(capacityWords(m)).toBe('1 free');
-    const s = workersOf(fleet, 'scribe');
-    expect(workerLight(s)!.word).toBe('asleep');
-    expect(capacityWords(s)).toBe('1 free');
-    const none = workersOf(fleet, 'idler');
-    expect(workerLight(none)).toBeNull();
+  it('gives an agent its free workers, and no words without a worker', () => {
+    expect(capacityWords(workersOf(factsOf(fleet), 'migrator'))).toBe('1 free');
+    expect(capacityWords(workersOf(factsOf(fleet), 'scribe'))).toBe('1 free');
     // An agent with no worker gets no words: no row says Keep 0.
-    expect(capacityWords(none)).toBe('');
-    const busy = workersOf({ ...fleet, members: fleet.members.map((x) => ({ ...x, active: 1 })) }, 'manager');
+    expect(capacityWords(workersOf(factsOf(fleet), 'idler'))).toBe('');
+    const busy = workersOf(factsOf({ ...fleet, members: fleet.members.map((x) => ({ ...x, active: 1 })) }), 'manager');
     expect(capacityWords(busy)).toBe('waiting for a worker');
-    const starting = workersOf({ ...fleet, pools: [{ ...fleet.pools![2], tasks: [{ name: 's', phase: 'Pending', current: true }] }] }, 'scribe');
-    expect(workerLight(starting)!.word).toBe('starting');
   });
 });
 

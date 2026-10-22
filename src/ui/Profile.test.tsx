@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'preact/test-utils';
 import { KeepField, Profile } from './Profile';
-import { fakeFetch, mount, seedFleet, unmountAll, type Call } from './testkit-b';
+import { FLEET, fakeFetch, mount, seedFleet, unmountAll, type Call } from './testkit-b';
 import { forgetProfiles } from '../state/profiles';
 import { store } from '../state/store';
 import { forgetQueued } from '../state/queued';
@@ -28,8 +28,13 @@ const LEARNED = [
   '',
 ].join('\n');
 
-// The fleet names crew as the pool of migrator, so the profile reads that pool.
-const POOL = { name: 'crew', wanted: 1, actual: 1, ready: 1, tasks: [{ name: 'crew-0', phase: 'Running' }, { name: 'crew-9', phase: 'Running', current: false }] };
+// The fleet names crew as the pool of migrator, so the profile reads that
+// pool for Keep and the gaps. Its phases are older than the stream, as the
+// read of another replica of the front can be: the page shows the stream.
+const POOL = { name: 'crew', wanted: 1, actual: 1, ready: 1, tasks: [{ name: 'crew-0', phase: 'Suspended' }, { name: 'crew-9', phase: 'Suspended', current: false }], gaps: ['crew-9 runs an older configuration.'] };
+
+/** The fleet of the stream: crew-0 is awake, and crew-9 of an older configuration too. */
+const STREAM_FLEET = { ...FLEET, pools: FLEET.pools!.map((p) => (p.name === 'crew' ? { ...p, tasks: [...p.tasks, { name: 'crew-9', phase: 'Running', current: false }] } : p)) };
 
 beforeEach(() => {
   forgetProfiles();
@@ -45,6 +50,7 @@ beforeEach(() => {
   calls = f.calls;
   restore = f.restore;
   seedFleet();
+  act(() => store.dispatch({ type: 'fleet', fleet: STREAM_FLEET }));
 });
 
 afterEach(() => {
@@ -116,14 +122,26 @@ describe('the profile', () => {
     expect(row.querySelector('.worker-name')!.textContent).toBe('crew-0');
     expect(row.querySelector('.status-word')!.textContent).toBe('awake');
     expect(el.querySelectorAll('.workers li')[1].textContent).toContain('old setup');
+    expect(el.querySelector('.worker-gaps')!.textContent).toBe('crew-9 runs an older configuration.');
     expect(el.querySelector('.today')!.textContent).toBe('7 runs$1.902 decisions');
     expect(el.textContent!.toLowerCase()).not.toContain('pool');
     expect(calls.some((c) => c.path === '/v1/pools/crew')).toBe(true);
   });
 
+  it('words each worker from the phase of the stream, never from the read of the pool', async () => {
+    const el = mount(<Profile agent="migrator" />);
+    await vi.waitFor(() => expect(calls.some((c) => c.path === '/v1/pools/crew')).toBe(true));
+    const words = () => [...el.querySelectorAll('.workers li .status-word')].map((x) => x.textContent);
+    expect(words()).toEqual(['awake', 'awake']);
+    act(() => store.dispatch({ type: 'stream', event: { id: '', kind: 'task', data: { kind: 'task', member: 'default/crew-0', phase: 'Suspended', time: '' } } }));
+    expect(words()).toEqual(['asleep', 'awake']);
+  });
+
   it('keeps Remove workers in the More menu of the workers, for an owner, and removes them after Confirm', async () => {
     const el = mount(<Profile agent="migrator" />);
     await vi.waitFor(() => expect(el.querySelectorAll('.workers li').length).toBe(2));
+    // The menu waits for the read of the workers, which says whether any exist.
+    await vi.waitFor(() => expect(el.querySelector('button[aria-label="More for workers"]')).not.toBeNull());
     // No destructive key sits in plain sight on the profile.
     expect([...el.querySelectorAll('button')].some((b) => b.textContent === 'Remove workers')).toBe(false);
     expect(el.querySelector('.key-danger')).toBeNull();

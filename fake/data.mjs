@@ -264,6 +264,15 @@ export function seed() {
   };
   runs.set(mRun.id, mRun);
   transcripts.set(mRun.id, mItems);
+
+  // A run of the reviewer outside a bridge keeps its one worker busy, so the picker shows it as waiting for a worker.
+  const style = {
+    id: 'run-reviewer-style', agent: 'reviewer', title: 'Review the style guide', state: 'running', input: 'Review the style guide against the roles.', seq: 1, origin: 'http',
+    principal: ALICE, createdAt: minutesAgo(6), updatedAt: minutesAgo(1), member: 'default/review-0', activity: { turn: 2, tool: 'files', phrase: 'Read runbooks/ansible-style.md', since: minutesAgo(1) },
+  };
+  runs.set(style.id, style);
+  transcripts.set(style.id, [item(1, 6, 'user', { text: style.input, who: ALICE })]);
+  results.set(style.id, { runId: style.id, title: style.title, agent: 'reviewer', status: 'working', started: style.createdAt, changed: style.updatedAt, next: [] });
   results.set(mRun.id, { runId: mRun.id, title: mRun.title, agent: 'manager', status: 'ready', summary: mRun.output, started: mRun.createdAt, changed: mRun.updatedAt, next: [{ kind: 'reply', label: 'Reply' }] });
 
   return { bridges, channels, reads, runs, transcripts, results, files, pages: seedPages(), faces: seedFaces(), rules: [] };

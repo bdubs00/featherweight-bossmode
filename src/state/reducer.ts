@@ -24,6 +24,7 @@ import type {
   Whoami,
 } from '../api/types';
 import type { StreamStatus } from '../api/stream';
+import type { Facts } from '../lib/status';
 
 /** The loaded part of the channel of one bridge. seqs is sorted. */
 export interface Channel {
@@ -52,6 +53,12 @@ export interface State {
   agents: Agent[] | null;
   /** The members and the pools of the fleet, from GET /v1/fleet and the member and task events. */
   fleet: Fleet | null;
+  /**
+   * True once the page read the open runs of the fleet from GET
+   * /v1/fleet/runs?state=active. The run events keep them current after
+   * that, so the page knows the runs that each worker holds.
+   */
+  openRuns: boolean;
   /** The skills of the front, from GET /v1/bossmode/skills. */
   skills: SkillsList | null;
   /** The names of the skills that each agent can load, from GET /v1/agents/{name}/skills, for the agents that the page read. */
@@ -87,6 +94,7 @@ export const initialState: State = {
   faces: {},
   agents: null,
   fleet: null,
+  openRuns: false,
   skills: null,
   agentSkills: {},
   managerPick: null,
@@ -111,6 +119,7 @@ export type Action =
   | { type: 'page'; page: PageEventData }
   | { type: 'agents'; agents: Agent[] }
   | { type: 'fleet'; fleet: Fleet }
+  | { type: 'open-runs'; runs: Run[] }
   | { type: 'skills'; skills: SkillsList | null }
   | { type: 'agent-skills'; agent: string; skills: string[] }
   | { type: 'agent-skills-forget' }
@@ -454,6 +463,11 @@ export function reduce(state: State, a: Action): State {
       return { ...state, agents: a.agents };
     case 'fleet':
       return { ...state, fleet: a.fleet };
+    case 'open-runs': {
+      let next: State = state.openRuns ? state : { ...state, openRuns: true };
+      for (const r of a.runs) if (r && typeof r.id === 'string') next = reduce(next, { type: 'run', run: r });
+      return next;
+    }
     case 'skills':
       return { ...state, skills: a.skills };
     case 'agent-skills': {
@@ -486,6 +500,20 @@ export function reduce(state: State, a: Action): State {
       return state.stream.status === a.status ? state : { ...state, stream: { ...state.stream, status: a.status } };
   }
   return state;
+}
+
+let lastFacts: Facts | null = null;
+
+/**
+ * selectFacts is what the page knows about the workers, for statusOf of
+ * src/lib/status.ts: the fleet view, the runs, and whether the page read
+ * the open runs. It keeps its identity while these stay the same, so the
+ * statuses derive once per change.
+ */
+export function selectFacts(s: Pick<State, 'fleet' | 'runs' | 'openRuns'>): Facts {
+  if (lastFacts && lastFacts.fleet === s.fleet && lastFacts.runs === s.runs && lastFacts.openRuns === s.openRuns) return lastFacts;
+  lastFacts = { fleet: s.fleet, runs: s.runs, openRuns: s.openRuns };
+  return lastFacts;
 }
 
 /** entriesOf returns the loaded entries of a channel, in order. */

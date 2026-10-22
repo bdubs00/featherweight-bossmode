@@ -16,6 +16,8 @@ import { ensureChannels, ensureResults, ensureRosters, ensureRuns, useResults } 
 import { inboxRows, keyAction, sortInbox, type InboxRow } from '../state/inbox';
 import { newestRun } from '../state/people';
 import { useSelect } from '../state/store';
+import { selectFacts } from '../state/reducer';
+import { seatPresence } from '../lib/status';
 import { canAlways, DecisionCard } from './Decision';
 import { useRoving } from './keys';
 import { attempt } from './notice';
@@ -62,6 +64,7 @@ export function useInbox(): { rows: InboxRow[]; loaded: boolean } {
   const runs = useSelect((s) => s.runs);
   const channels = useSelect((s) => s.channels);
   const me = useSelect((s) => (s.me && s.me.principal ? s.me.principal.subject : ''));
+  const facts = useSelect(selectFacts);
   const results = useResults();
   const open = useMemo(() => bridges.order.map((id) => bridges.byId[id]).filter((b) => b.state === 'open'), [bridges]);
   useEffect(() => {
@@ -71,7 +74,15 @@ export function useInbox(): { rows: InboxRow[]; loaded: boolean } {
   const want = open
     .flatMap((b) => {
       const r = rosters[b.id];
-      return r ? r.order.map((h) => r.byHandle[h]).filter((m: Member) => m && !m.fired && m.presence !== 'working' && m.presence !== 'asleep') : [];
+      return r
+        ? r.order
+            .map((h) => r.byHandle[h])
+            .filter((m: Member) => {
+              if (!m || m.fired) return false;
+              const p = seatPresence(facts, m);
+              return p !== 'working' && p !== 'asleep';
+            })
+        : [];
     })
     .map((m) => newestRun(m))
     .join(',');
@@ -85,7 +96,7 @@ export function useInbox(): { rows: InboxRow[]; loaded: boolean } {
   useEffect(() => {
     if (unread) ensureChannels(unread.split(','));
   }, [unread]);
-  const rows = sortInbox(inboxRows({ bridges: open, rosters, runs, channels, results, me }));
+  const rows = sortInbox(inboxRows({ bridges: open, rosters, runs, channels, results, me, facts }));
   const waiting = rows
     .filter((r) => r.run && (r.status === 'needs-you' || r.status === 'error'))
     .map((r) => r.run!)

@@ -6,6 +6,8 @@
 import { memo } from 'preact/compat';
 import { useState } from 'preact/hooks';
 import { useSelect } from '../state/store';
+import { selectFacts } from '../state/reducer';
+import { seatPresence } from '../lib/status';
 import { hrefOf } from '../lib/route';
 import { useRoving } from './keys';
 import { LiveStatus } from './Shell';
@@ -28,10 +30,12 @@ export function matches(title: string, filter: string): boolean {
 
 const BridgeRow = memo(function BridgeRow({ id, current }: { id: string; current: boolean }) {
   const b = useSelect((s) => s.bridges.byId[id]);
-  // A roster that the page holds shows whether a member works. The list loads no roster for it.
+  // A roster that the page holds shows whether a member works, in the status of every screen. The list loads no roster for it.
   const working = useSelect((s) => {
     const r = s.rosters[id];
-    return !!r && r.order.some((h) => r.byHandle[h].presence === 'working');
+    if (!r) return false;
+    const f = selectFacts(s);
+    return r.order.some((h) => seatPresence(f, r.byHandle[h]) === 'working');
   });
   if (!b) return null;
   const closed = b.state === 'closed';

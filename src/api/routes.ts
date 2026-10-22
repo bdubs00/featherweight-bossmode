@@ -153,9 +153,14 @@ export const api = {
   /** events reads a page of the ledger of a run, from the seq from. The front sends the call to the member that holds the run. */
   events: (id: string, from: number, limit: number) => call<{ events: RunEvent[] }>(run(id) + '/events' + query({ from, limit })).then((r) => (r && r.events) || []),
   start: (member: string, body: NewRun) => call<Run>('/v1/runs' + query({ member }), { method: 'POST', body }),
-  /** fleetRuns lists the runs of the whole fleet that the caller can see, newest first, narrowed by agent and person. */
-  fleetRuns: (q: { agent?: string; principal?: string; limit?: number }) =>
-    call<{ runs: Run[]; total?: number }>('/v1/fleet/runs' + query({ agent: q.agent, principal: q.principal, limit: q.limit })).then((r) => (r && r.runs) || []),
+  /**
+   * fleetRuns lists the runs of the whole fleet that the caller can see,
+   * newest first, narrowed by agent, person, and state. The state active
+   * keeps every run that is not finished. The front answers from its view,
+   * so the read wakes no worker.
+   */
+  fleetRuns: (q: { agent?: string; principal?: string; state?: string; limit?: number }) =>
+    call<{ runs: Run[]; total?: number }>('/v1/fleet/runs' + query({ agent: q.agent, principal: q.principal, state: q.state, limit: q.limit })).then((r) => (r && r.runs) || []),
   sendRun: (id: string, content: string) => call<unknown>(run(id) + '/messages', { method: 'POST', body: { content } }),
   decide: (id: string, approval: string, decision: 'allow' | 'deny', note?: string, content?: unknown) => {
     const body: Record<string, unknown> = { decision };

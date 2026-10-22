@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Agent, FaceMeta, Fleet, Member } from '../api/types';
 import { draftOf, freeWords, pickGroups, seatReason, taskOfGoal, wavesLine } from './seats';
 import { fleetAgents } from '../lib/agents';
+import { factsOf } from '../lib/status';
 
 const fleet: Fleet = {
   name: 'front-0',
@@ -30,28 +31,28 @@ const seat = (handle: string, agent: string, over: Partial<Member> = {}): Member
 
 describe('pickGroups', () => {
   it('puts the agents with a seat first, and leaves out an agent the person cannot seat', () => {
-    const g = pickGroups(agents, faces, [seat('migrator-1', 'migrator'), seat('scribe', 'scribe', { fired: true, presence: 'fired' })], fleet);
+    const g = pickGroups(agents, faces, [seat('migrator-1', 'migrator'), seat('scribe', 'scribe', { fired: true, presence: 'fired' })], factsOf(fleet));
     expect(g.here.map((r) => r.agent)).toEqual(['migrator']);
     expect(g.others.map((r) => r.agent)).toEqual(['reviewer', 'scribe']);
   });
 
   it('names an agent and its tagline from its face, or from the agent', () => {
-    const g = pickGroups(agents, faces, [], fleet);
+    const g = pickGroups(agents, faces, [], factsOf(fleet));
     expect(g.others[0]).toMatchObject({ name: 'Migrator', tagline: 'Turns manifests into roles' });
     expect(g.others[2]).toMatchObject({ name: 'Scribe', tagline: 'Writes notes.' });
   });
 
   it('counts the free workers of each agent, less the new seats that wait', () => {
-    const g = pickGroups(agents, faces, [], fleet);
+    const g = pickGroups(agents, faces, [], factsOf(fleet));
     expect(g.others.map((r) => r.free)).toEqual([1, 0, 0]);
-    expect(pickGroups(agents, faces, [], fleet, '', ['migrator']).others[0].free).toBe(0);
+    expect(pickGroups(agents, faces, [], factsOf(fleet), '', ['migrator']).others[0].free).toBe(0);
     expect(pickGroups(agents, faces, [], null).others[0].free).toBe(-1);
   });
 
   it('keeps the agents that match the field Who', () => {
-    expect(pickGroups(agents, faces, [], fleet, 'manifests').others.map((r) => r.agent)).toEqual(['migrator']);
-    expect(pickGroups(agents, faces, [], fleet, 'REVIEW').others.map((r) => r.agent)).toEqual(['reviewer']);
-    expect(pickGroups(agents, faces, [], fleet, 'nobody').others).toEqual([]);
+    expect(pickGroups(agents, faces, [], factsOf(fleet), 'manifests').others.map((r) => r.agent)).toEqual(['migrator']);
+    expect(pickGroups(agents, faces, [], factsOf(fleet), 'REVIEW').others.map((r) => r.agent)).toEqual(['reviewer']);
+    expect(pickGroups(agents, faces, [], factsOf(fleet), 'nobody').others).toEqual([]);
   });
 });
 
@@ -62,14 +63,14 @@ describe('pickGroups over the agents of the fleet', () => {
   const list = fleetAgents(withMember, [{ name: 'default', role: 'owner' }]);
 
   it('offers the agents that the pools run and that the members hold, and never the profile of the front alone', () => {
-    const g = pickGroups(list, faces, [], withMember);
+    const g = pickGroups(list, faces, [], factsOf(withMember));
     expect(g.here).toEqual([]);
     expect(g.others.map((r) => r.agent)).toEqual(['migrator', 'reviewer', 'tester']);
     expect(g.others.map((r) => r.free)).toEqual([1, 0, 0]);
   });
 
   it('holds the agents of the seats in On this bridge, also an agent that the fleet does not list', () => {
-    const g = pickGroups(list, faces, [seat('reviewer', 'reviewer'), seat('scribe', 'scribe'), seat('migrator-1', 'migrator')], withMember);
+    const g = pickGroups(list, faces, [seat('reviewer', 'reviewer'), seat('scribe', 'scribe'), seat('migrator-1', 'migrator')], factsOf(withMember));
     expect(g.here.map((r) => r.agent)).toEqual(['reviewer', 'scribe', 'migrator']);
     expect(g.others.map((r) => r.agent)).toEqual(['tester']);
   });

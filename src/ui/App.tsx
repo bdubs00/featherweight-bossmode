@@ -13,7 +13,7 @@ import { clearToken, getToken, setToken, setUnauthorizedHandler, type SigninNeed
 import { afterUnauthorized, clearSigninMarks, markSignedOut, sessionStore } from '../api/auth';
 import { api } from '../api/routes';
 import { store, useSelect } from '../state/store';
-import { loadAgents, loadBridges, loadFaces, loadFleet, loadSkills, startStream, stopStream } from '../state/actions';
+import { loadAgents, loadBridges, loadFaces, loadFleet, loadOpenRuns, loadSkills, startStream, stopStream } from '../state/actions';
 import { forgetFaces } from '../lib/faces';
 import { applyTheme, themeOf } from '../lib/theme';
 import { canonicalPath, columnOf, go, parentOf, parseRoute, type Route } from '../lib/route';
@@ -208,9 +208,11 @@ export function App() {
       store.dispatch({ type: 'config', config: cfg });
       await Promise.all([loadBridges(), loadFaces().catch(showError), loadAgents().catch(showError)]);
       startStream(unauthorized);
-      // The fleet and the skills fill the counts of workers and the pickers.
-      // A page without them still works, so their errors stay quiet.
+      // The fleet, its open runs, and the skills fill the statuses of the
+      // workers and the pickers. A page without them still works, so their
+      // errors stay quiet.
       loadFleet().catch(() => {});
+      loadOpenRuns().catch(() => {});
       loadSkills().catch(() => {});
     } catch (e) {
       const err = e as { name?: string; message?: string };

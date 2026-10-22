@@ -12,7 +12,8 @@ import { useSelect } from '../state/store';
 import { columnOf, placeOf, type Column, type Place, type Route } from '../lib/route';
 import { themeOf, setChoice, useChoice, type ThemeChoice } from '../lib/theme';
 import { personName } from '../lib/words';
-import { awakeWorkers } from '../lib/workers';
+import { awakeCount } from '../lib/status';
+import { selectFacts } from '../state/reducer';
 import { Glyph, type GlyphName } from './icons';
 import { Avatar, Chip, LogoWell, Led, countText } from './primitives';
 
@@ -209,7 +210,7 @@ export function AppBar({ route, onSignOut }: { route: Route; onSignOut: () => vo
 /** LiveStatus is the state of the stream and the number of awake workers, for the foot of a list. */
 export function LiveStatus() {
   const status = useSelect((s) => s.stream.status);
-  const awake = useSelect((s) => awakeWorkers(s.fleet));
+  const awake = useSelect((s) => awakeCount(selectFacts(s)));
   const known = useSelect((s) => !!s.fleet);
   const word = status === 'live' ? 'Live' : status === 'closed' ? 'Offline' : 'Connecting';
   return (

@@ -53,34 +53,34 @@ export type TaskPhase = 'Pending' | 'Running' | 'Suspended' | 'Failed' | 'Termin
 
 /**
  * derivePresence applies the table of section 6.5: the newest run of the
- * member in the bridge and the state of its Task give the presence. The
- * workbench sends the presence, and the page uses this function only when
- * a member arrives without one.
+ * member in the bridge and the phase of the Task that holds it give the
+ * presence, as the workbench derives it. A Task that sleeps or starts
+ * counts as asleep, and a Task that fails or stops counts as an error.
+ * statusOf of src/lib/status.ts calls it for every seat whose facts the
+ * page holds.
  */
 export function derivePresence(m: { fired?: boolean; run?: Pick<Run, 'state'> | null; taskPhase?: TaskPhase; blocked?: boolean }): Presence {
   if (m.fired) return 'fired';
   const state: RunState | undefined = m.run ? m.run.state : undefined;
   if (state === 'failed' || m.blocked || m.taskPhase === 'Failed' || m.taskPhase === 'Terminating') return 'error';
   if (state === 'input-required') return 'needs-you';
-  if (m.taskPhase === 'Suspended') return 'asleep';
+  if (m.taskPhase === 'Suspended' || m.taskPhase === 'Pending') return 'asleep';
   if (state === 'queued' || state === 'running' || state === 'suspended') return 'working';
   return 'idle';
 }
 
+/** The lights of the phases of a worker. One object per phase, so a selector that returns one keeps its identity. */
+const PHASES: Record<string, Light> = {
+  Running: { word: 'awake', tone: 'green', label: 'The worker is up.' },
+  Suspended: { word: 'asleep', tone: 'grey', label: 'The worker sleeps. A request wakes it.' },
+  Pending: { word: 'starting', tone: 'grey', label: 'The worker starts.' },
+  Failed: { word: 'failed', tone: 'red', label: 'The worker failed.' },
+  Terminating: { word: 'stopping', tone: 'grey', label: 'The worker stops.' },
+};
+
 /** phaseOf returns the light of a worker from the phase of its Task. */
 export function phaseOf(phase: string): Light {
-  switch (phase) {
-    case 'Running':
-      return { word: 'awake', tone: 'green', label: 'The worker is up.' };
-    case 'Suspended':
-      return { word: 'asleep', tone: 'grey', label: 'The worker sleeps. A request wakes it.' };
-    case 'Pending':
-      return { word: 'starting', tone: 'grey', label: 'The worker starts.' };
-    case 'Failed':
-      return { word: 'failed', tone: 'red', label: 'The worker failed.' };
-    case 'Terminating':
-      return { word: 'stopping', tone: 'grey', label: 'The worker stops.' };
-  }
+  if (phase && Object.prototype.hasOwnProperty.call(PHASES, phase)) return PHASES[phase];
   return { word: phase ? phase.toLowerCase() : 'unknown', tone: 'grey', label: 'The worker reports ' + (phase || 'nothing') + '.' };
 }
 

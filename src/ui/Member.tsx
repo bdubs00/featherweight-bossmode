@@ -18,7 +18,9 @@ import { store, useSelect } from '../state/store';
 import { entriesOf } from '../state/reducer';
 import { fire, loadAgentSkills, loadBridge, loadOlder, patchMember, sendMessage } from '../state/actions';
 import { ensureChannels, ensureRuns } from '../state/fetchers';
-import { newestRun, seatRowLight, slashCommands } from '../state/people';
+import { newestRun, slashCommands } from '../state/people';
+import { selectFacts } from '../state/reducer';
+import { seatPresence, statusOf } from '../lib/status';
 import { directEntries, stepsOf, threadOf, withLive } from '../state/thread';
 import { attempt } from './notice';
 import { Confirm, Menu, type MenuItem } from './common';
@@ -47,9 +49,10 @@ function useSeat(bridge: string, handle: string) {
 /** useStopped reports how the newest run of a seat stopped: failed, stopped, or "" when it takes messages. */
 function useStopped(m: MemberT | undefined): '' | 'failed' | 'stopped' {
   const state = useSelect((s) => (m && s.runs[newestRun(m)] ? s.runs[newestRun(m)].state : ''));
+  const presence = useSelect((s) => (m ? seatPresence(selectFacts(s), m) : ''));
   if (!m || m.fired) return '';
   if (state === 'canceled') return 'stopped';
-  if (state === 'failed' || m.presence === 'error') return 'failed';
+  if (state === 'failed' || presence === 'error') return 'failed';
   return '';
 }
 
@@ -136,6 +139,7 @@ function Chat({ bridge, m, items, closed, stopped, reason }: { bridge: string; m
   const loadable = useSelect((s) => s.agentSkills[m.agent]);
   const run = newestRun(m);
   const runObj = useSelect((s) => (run ? s.runs[run] : undefined));
+  const presence = useSelect((s) => seatPresence(selectFacts(s), m));
   useEffect(() => {
     loadAgentSkills(m.agent).catch(() => {});
   }, [m.agent]);
@@ -147,7 +151,7 @@ function Chat({ bridge, m, items, closed, stopped, reason }: { bridge: string; m
   // The finished answers of the seat are its entries in the channel. The live answer waits for the next one.
   const answers = useMemo(() => entries.filter((e) => e.from.kind === 'agent' && e.from.handle === m.handle).map((e) => e.seq), [entries, m.handle]);
   const mark = entries.length ? entries[entries.length - 1].seq : 0;
-  const working = runObj ? works(runObj) : m.presence === 'working';
+  const working = runObj ? works(runObj) : presence === 'working';
   const live = useLiveAnswer(run, { working: working && !m.fired, seq: runObj ? runObj.seq : 0, mark, answers, dropPreamble: true });
   const rows = useMemo(() => {
     const mine = directEntries(entries, m.handle, m.runs);
@@ -207,7 +211,7 @@ export function MemberMain({ bridge, handle, tab }: { bridge: string; handle: st
   const { m, loaded } = useSeat(bridge, handle);
   const b = useSelect((s) => s.bridges.byId[bridge]);
   const runId = m ? newestRun(m) : '';
-  const light = useSelect((s) => (m ? seatRowLight(m, s.runs) : null));
+  const light = useSelect((s) => (m ? statusOf(selectFacts(s), { seat: m }) : null));
   const stopped = useStopped(m);
   const res = useResult(runId);
   const t = useTranscript(runId);

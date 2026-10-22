@@ -270,6 +270,28 @@ function setMember(bridgeId, m, patch) {
   publish('bridge.member', { bridge: bridgeId, member: m });
 }
 
+/**
+ * moveSeat changes the presence of a seat and the state of its newest run
+ * together, as the backend does. The page derives the status of a seat
+ * from its run and the phase of its worker, so a presence that moves alone
+ * shows nothing. A run that failed, stopped, or waits for a decision stays.
+ */
+function moveSeat(bridgeId, m, presence, activity) {
+  const run = S.runs.get(m.runs[m.runs.length - 1]);
+  const state = presence === 'working' ? 'running' : presence === 'idle' || presence === 'asleep' ? 'completed' : '';
+  if (run && state && run.state !== state && !['failed', 'canceled', 'input-required'].includes(run.state)) {
+    Object.assign(run, { state, activity: state === 'running' ? activity : null, updatedAt: now(), seq: run.seq + 1 });
+    publish('run', run);
+  }
+  setMember(bridgeId, m, { presence, activity });
+}
+
+/** workerOfSeat names the worker that holds the newest run of a seat, such as crew-2, or "". */
+function workerOfSeat(m) {
+  const run = S.runs.get(m.runs[m.runs.length - 1]);
+  return run && run.member ? run.member.slice(run.member.lastIndexOf('/') + 1) : '';
+}
+
 const HANDLE = /^[a-z0-9][a-z0-9._-]{0,31}$/;
 
 function newRun(agent, handle, bridgeId, task, principal) {
@@ -343,13 +365,17 @@ function fanOut(bridgeId, e) {
   to.forEach((m, i) => {
     const wasAsleep = m.presence === 'asleep';
     setTimeout(() => {
-      if (wasAsleep) system(bridgeId, 'started', `${m.handle} woke up.`);
-      setMember(bridgeId, m, { presence: 'working', activity: { turn: 1, phrase: 'Read the message of ' + e.from.display, since: now() } });
+      if (wasAsleep) {
+        const w = workerOfSeat(m);
+        if (w) taskPhase(w, 'Running');
+        system(bridgeId, 'started', `${m.handle} woke up.`);
+      }
+      moveSeat(bridgeId, m, 'working', { turn: 1, phrase: 'Read the message of ' + e.from.display, since: now() });
     }, 600 + i * 400);
     setTimeout(() => {
       if (m.fired) return;
       post(bridgeId, { kind: 'agent', handle: m.handle, run: m.runs[m.runs.length - 1] }, REPLIES[replyN++ % REPLIES.length], { replyTo: e.seq });
-      setMember(bridgeId, m, { presence: 'idle', activity: null });
+      moveSeat(bridgeId, m, 'idle', null);
     }, 2500 + i * 1500);
   });
 }
@@ -1329,18 +1355,20 @@ function tick() {
   // A member moves between presences.
   if (m1 && !m1.fired) {
     const phrases = ['Ran "ansible-lint roles/logrotate"', 'Edited roles/logrotate/tasks/main.yml', 'Read modules/logrotate/manifests/init.pp', 'Ran "molecule converge"'];
-    if (step % 2 === 0) setMember(b.id, m1, { presence: 'working', activity: { turn: 7 + moveN, tool: 'bash', phrase: phrases[moveN % phrases.length], since: now() } });
-    else setMember(b.id, m1, { presence: 'idle', activity: null });
+    if (step % 2 === 0) moveSeat(b.id, m1, 'working', { turn: 7 + moveN, tool: 'bash', phrase: phrases[moveN % phrases.length], since: now() });
+    else moveSeat(b.id, m1, 'idle', null);
   }
+  // The tester wakes, works, rests, and sleeps again, with the worker that holds its run.
   if (tester && !tester.fired) {
+    const w = workerOfSeat(tester) || 'crew-2';
     if (step === 0) {
-      taskPhase('crew-2', 'Running');
+      taskPhase(w, 'Running');
       system(b.id, 'started', 'tester woke up.');
-      setMember(b.id, tester, { presence: 'working', activity: { turn: 3, tool: 'bash', phrase: 'Ran "molecule test"', since: now() } });
-    } else if (step === 2) setMember(b.id, tester, { presence: 'idle', activity: null });
+      moveSeat(b.id, tester, 'working', { turn: 3, tool: 'bash', phrase: 'Ran "molecule test"', since: now() });
+    } else if (step === 2) moveSeat(b.id, tester, 'idle', null);
     else if (step === 3) {
-      setMember(b.id, tester, { presence: 'asleep', activity: null });
-      taskPhase('crew-2', 'Suspended');
+      moveSeat(b.id, tester, 'asleep', null);
+      taskPhase(w, 'Suspended');
       system(b.id, 'asleep', 'tester went to sleep.');
     }
   }
