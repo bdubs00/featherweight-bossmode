@@ -98,6 +98,7 @@ Capacity shows where seating happens:
 | Now | Verdict | New text | Who |
 |---|---|---|---|
 | `Activity`, `Bridges`, `Fleet`, `Skills`, `Wiki`, `Manager` | keep | | done |
+| `Chat` (the place between Activity and Bridges, with a speech bubble) | add | the quick chat of section 7 | done |
 | `1 member needs you`, `N members need you` (count of Activity) | keep | | done |
 | `<name>, account` (account key) | keep | | done |
 | `Match the system`, `Light`, `Graphite` | keep | | done |
@@ -380,7 +381,7 @@ Capacity shows where seating happens:
 | `Tools and rules` (the list of chips) | add | an accessible name | done |
 | `Edit` (the key of an owner on the profile) | add | | done |
 | `Keep is a whole number, 0 or more.` | add | the error of the Keep field | done |
-| `Remove workers`, with Confirm: `Remove the workers of <agent>?`, `Every worker of <agent> stops. A seat of <agent> waits for a worker.`, and the key `Remove workers` | add | an owner only, at the end of Workers | done |
+| `Remove workers`, with Confirm: `Remove the workers of <agent>?`, `Every worker of <agent> stops. A seat of <agent> waits for a worker.`, and the key `Remove workers` | change | an owner only, as the danger item of the menu `More for workers` beside Keep, so no destructive key sits in plain sight | done |
 | `N runs`, `$N`, `N decisions` (Today) | add | `1 run` and `1 decision` for one, and `$N so far` when a run reports no cost | done |
 
 ### src/ui/RunPane.tsx and src/ui/Conversation.tsx
@@ -528,3 +529,46 @@ Capacity shows where seating happens:
 | `Replace <name>` | add | the key after a 409 for the name of an imported skill. A 409 for a source that changed shows its reason, and a new preview. | done |
 | `imported`, `local`, `built in`, and the name of a server | add | the origin of a skill or a tool | done |
 | `Write an https address of a SKILL.md, of the folder of a skill, or of a zip file.`, `Pick at most 64 files.` | add | the errors of the address and the upload | done |
+
+## 7. The quick chat and the live answer
+
+### src/ui/Chat.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| new | add | `Chat` with the count chip, `1 chat` and `N chats` for a screen reader | done |
+| new | add | `New`, the key of a new chat on the header of the list, the word of the other lists | done |
+| new | add | `Find a chat`, the field above the history | done |
+| new | add | `Today`, `Yesterday`, and the date, such as `Monday, October 19`, the quiet heading of each day of the history | done |
+| new | add | a row of the history: the title of the run, the status of the run as a light with its word (`working`, `waiting for a worker`, `needs you`, `ready`, `ended`, `failed`, `stopped`), and `since()`, such as `25 min`. A run without a title shows the start of its first message, else `Chat`. | done |
+| new | add | `Loading the chats.`, `No chat holds those words.` | done |
+| new | add | `No chat yet.` with the key `New chat` | done |
+| new | add | `New chat`, the title of a chat before its first message | done |
+| new | add | `Tools`, `Skills`, the two headings of the picks, each with the count chip of the picks that are on, `N of M` for a screen reader | done |
+| new | add | `Find a tool`, `Find a skill`, the fields of a row of picks that holds more than twelve | done |
+| new | add | `Loading the tools.`, while the picks wait for the catalogs | done |
+| new | add | `A chat needs at least one tool. Pick one.`, the error of the picks when every tool is off, because an empty tool list gives a run every tool | done |
+| new | add | `Ask a question` (placeholder), `Message to <agent>` (label) | done |
+| new | add | `working`, or `waiting for a worker`, with the phrase of the step, the status of an answer on its way | done |
+| new | add | `Stopped. Your next message starts a new chat.` | done |
+| new | add | `This chat`, the heading of the details, and `This chat, <status>`, the name of the mark that opens it | done |
+| new | add | `Tools`, `Skills` with the count chip, `1 tool` and `N tools`, `1 skill` and `N skills` for a screen reader | done |
+| new | add | `for this chat`, the quiet word on the chip of a tool that the picks gave beyond the list of the agent | done |
+| new | add | `Model`, with the model of the resolved profile, when the run object carries it | done |
+| new | add | `Usage`, with `N turns`, `N tokens`, and `$N`, and `so far` while the run works. `1 turn` and `1 token` for one. | done |
+| new | add | `No quick chat is set up.` with the question mark `Where the quick chat is set up` and `The setting workbench.bossmode.chat names the agent of the quick chat.` | done |
+| `Rename`, `Save as agent` | remove | the backend has no route that sets the title of a run, and the new-agent screen takes no run to start from | done |
+
+### src/ui/Live.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| new | add | `Working: <tool>`, a quiet line while the model calls a tool, without the prefix `front.`. It goes when the model call ends. | done |
+| new | add | `Live view is busy`, a quiet line while the run has as many live clients as it takes, and the view reads the run with its poll | done |
+| new | add | the pending answer: the face and the name of the agent, and the text as the model writes it, with no clock time | done |
+
+### src/ui/Profile.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| new | add | `More for workers`, the name of the menu key of the section of the workers, for an owner | done |

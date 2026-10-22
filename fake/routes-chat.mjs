@@ -27,7 +27,7 @@ const daysAgo = (d, hour) => {
 
 /** The sample chats: the question, the answer, the state, when, and whether a step came first. */
 const CHATS = [
-  { who: ALICE, when: at(25), q: 'How do I rotate the logs of nginx on Debian?', a: 'Logrotate reads `/etc/logrotate.d/nginx` once a day. Keep 14 rotations, compress all but the newest, and send `USR1` in `postrotate`.', step: true },
+  { who: ALICE, when: at(25), q: 'Which handler reloads nginx after a change of its site?', a: '`Reload nginx`. Each task that writes the site notifies it, and it runs once at the end of the play.', step: true },
   { who: ALICE, when: at(130), q: 'Summarize the release notes of 2.3 in five lines.', a: '- The fleet view shows workers.\n- Bridges close with a report.\n- The wiki keeps hearts.\n- Skills install from a marketplace.\n- The manager asks before it spends.' },
   { who: ALICE, when: daysAgo(1, 16), q: 'What does the cron role do with the hiera keys?', a: 'It reads `cron_jobs` as a list and makes one job per item, with the user root unless an item names another.', step: true },
   { who: ALICE, when: daysAgo(1, 10), q: 'Draft a reply to the platform team about the freeze.', a: '', state: 'failed', error: 'The run reached its limit of 8 turns.' },

@@ -237,6 +237,10 @@ Nothing moves on load. Hover changes color and nothing else, with no
 transition. `prefers-reduced-motion: reduce` turns all three off: the amber
 light holds a steady glow, and the card and the chip appear in place.
 
+The answer that a live stream sends is not a motion. Its text grows as the
+model writes it, in a pending message with no clock time, no cursor, and no
+fade, so reduced motion changes nothing there.
+
 ### 4.6 Layers
 
 | Token | Value | Use |
@@ -311,8 +315,8 @@ Alignment: text is left aligned everywhere. System lines in a channel are
 centered, because they are not anyone's voice. Numbers in chips are centered
 in the chip. Nothing is justified.
 
-The places of the app bar, top to bottom: the logo well, Activity, Bridges,
-Fleet, Skills, Wiki, Manager, and the account at the foot. Each place has a 22-pixel
+The places of the app bar, top to bottom: the logo well, Activity, Chat,
+Bridges, Fleet, Skills, Wiki, Manager, and the account at the foot. Each place has a 22-pixel
 icon over a 12-pixel label. The active place sits on paper with a line edge
 and a sheen, as a key that is pressed in. A count on Activity is a black chip
 at the top right of the icon.
@@ -320,6 +324,7 @@ at the top right of the icon.
 | Place | List pane | Main pane | Details pane |
 |---|---|---|---|
 | Activity | The inbox: what needs you first, then what is new | The item you picked | none |
+| Chat | The history of the quick chat, newest first, grouped by day | The conversation of a chat, or the picks of a new chat | This chat: the tools and the skills in use, the model, and the usage |
 | Bridges | Bridges, open first, each with its count and its light | The channel, with the tabs Posts, Wiki, and Decisions | The members, with Add |
 | Fleet | People: the seats grouped by bridge, then Not on a bridge | A direct conversation with a member, with the tabs Chat, Run, and Files, or the board | The profile of the agent |
 | Skills | The skills by origin (Imported, Local, one group per server), then the tools (Built in, one group per server) | The text of a skill or the description of a tool, and the agents that can load it | Add skill, and the actions on the item |
@@ -328,7 +333,9 @@ at the top right of the icon.
 
 The address names the focus. `#fleet/<agent>` and `#member/<bridge>/<handle>`
 focus the conversation, and `/profile` after either focuses the profile:
-the mark at the head of a conversation links there. `#activity/<key>` names
+the mark at the head of a conversation links there. `#chat/<run>` focuses
+a chat, `#chat/new` a new chat, and `/details` after a chat its details:
+the mark at the head of a chat links there. `#activity/<key>` names
 the item of the inbox that the main pane shows, so a narrow window opens it.
 `#skills/add` opens the chooser of Add skill.
 
@@ -385,9 +392,10 @@ color, radius, shadow, or type size of its own.
 9. Every target is 44 pixels on touch, every action has a key path, and
    reduced motion stops all motion.
 10. Skills and tools live in their own place. Elsewhere they show only in
-    three spots. The first is the picker of skills on the new-agent screen
+    four spots. The first is the picker of skills on the new-agent screen
     and on the profile. The second is the slash menu of a one-on-one
-    composer. The third is the one line of a profile that counts them.
+    composer. The third is the one line of a profile that counts them. The
+    fourth is the Chat place: the picks of a new chat, and This chat.
 11. The page loads nothing from another origin: the typeface, the marks, and
     the icons are part of the build.
 
@@ -632,7 +640,69 @@ The work:
   logo belong to the deployment, and the page does not show or change
   them there.
 
-### 11.5 The shared files of the lead
+### 11.5 The quick chat and the live answer
+
+The last screen adds the Chat place and the live answer. The files are
+`src/ui/Chat.tsx`, `src/ui/Live.tsx`, `src/api/live.ts`, `src/lib/chat.ts`,
+`src/styles/chat.css`, and `fake/routes-chat.mjs`.
+
+- The place. Chat sits in the app bar between Activity and Bridges, with
+  a speech bubble. It takes the three panes of a member conversation. The
+  list pane holds `Chat` with its count, the key `New`, `Find a chat`, and
+  the history as the rows of the bridge list: the title, the state as a
+  light with its word, and the time as a short meta, under a quiet heading
+  per day. The main pane holds the conversation of the run, with the
+  thread and the composer of a member on no bridge, the slash menu
+  included. A new chat shows the picks above the composer: `Tools` and
+  `Skills`, each a row of chips with check boxes and a count chip, and a
+  field to find one past twelve. The details pane holds `This chat`: the
+  tools and the skills in use as chips, an extra tool with `for this chat`,
+  the model, and the usage, with `so far` while the run works. Without
+  `chat` in the settings, the place says `No quick chat is set up.` beside
+  a question mark that names the setting.
+- The live answer. Only a one-on-one view opens the live stream of a
+  run: the quick chat, the manager, an agent on no bridge, and the Chat
+  tab of a seat. The answer grows in a pending message at the end of the
+  thread, a quiet line `Working: <tool>` names the tool that the model
+  calls until the call ends, and the real item takes the place of the
+  pending message once the view holds it. A 429 leaves the view on its
+  poll with the quiet line `Live view is busy`. The bridge channel, the
+  inbox of Activity, and the board never open the stream, because many
+  answers that grow at once in a group view are too much to read.
+- The profile. `Remove workers` sits in a More menu of the section of the
+  workers, so no destructive key sits in plain sight on the profile.
+- Left out. The page has no key to rename a chat, because the backend has
+  no route that sets the title of a run, and no key to save a chat as an
+  agent, because the new-agent screen takes no run to start from
+  (`docs/CONTRACT.md`, section 14).
+
+### 11.6 Screenshots
+
+`docs/shots/` holds the merged page against the fake server, run with
+`FAKE_ADMIN=1 FAKE_A=1 FAKE_QUIET=1`, at 1440 by 900, 800 by 900, and 390 by
+844 on touch. The shots of the Chat place add `FAKE_LIVE=1 FAKE_LIVE_HOLD=1`,
+so the answer stops near its middle while it streams in. Each name says the
+theme, the width, and the screen: `final-<light|graphite>-<width>-<screen>.png`.
+
+| Screen | What | Widths and themes |
+|---|---|---|
+| `channel-picker` | The first board: a decision that waits, the reply chip, the picker of Add open, and a new seat row | 1440, both |
+| `channel` | The third board: the channel with the reply chip and the members | 1440, both; 800, both; 390, both |
+| `fleet` | The second board: the people list, the conversation with migrator-1, and the profile | 1440, both; 800, both; 390, both |
+| `skills-add` | The Skills place with the chooser on the preview of a skill of a marketplace | 1440, both |
+| `new-agent` | New agent with a name, Keep, the template, and the skills | 1440, both |
+| `new-bridge` | Open a bridge with a goal, two seats, and the picker below Add | 1440, both |
+| `wiki` | A page of the wiki with its meta and the tree | 1440, both |
+| `manager` | The conversation with the manager and the slash menu with the hint of an argument | 1440, both |
+| `activity` | The inbox with a decision in the main pane | 1440, both |
+| `board` | The board with the strip of statuses of each group | 1440, both |
+| `members` | Two panes: the channel with its tabs in a strip, and the members | 800, graphite |
+| `list` | One pane: the bridges, with the places at the bottom | 390, light |
+| `theme` | A deployment with a logo and a green accent | 1440, light |
+| `chat` | The quick chat: the history by day, a chat whose answer streams in after a tool call, and This chat with a tool for this chat | 1440, both; 390, light |
+| `chat-new` | A new chat with the picks of tools and skills and a question in the composer | 1440, light |
+
+### 11.7 The shared files of the lead
 
 Only the lead edits these files:
 
@@ -658,26 +728,3 @@ another:
 | The slash menu | `slashAt` in `src/lib/mention.ts`, and the `commands` of `Composer` |
 | Skills | `loadSkills` and `state.skills` |
 | A cut card on the stream | `completeEvent` in `src/state/actions.ts`, already in the stream |
-
-### 11.6 Screenshots
-
-`docs/shots/` holds the merged page against the fake server, run with
-`FAKE_ADMIN=1 FAKE_A=1 FAKE_QUIET=1`, at 1440 by 900, 800 by 900, and 390 by
-844 on touch. Each name says the theme, the width, and the screen:
-`final-<light|graphite>-<width>-<screen>.png`.
-
-| Screen | What | Widths and themes |
-|---|---|---|
-| `channel-picker` | The first board: a decision that waits, the reply chip, the picker of Add open, and a new seat row | 1440, both |
-| `channel` | The third board: the channel with the reply chip and the members | 1440, both; 800, both; 390, both |
-| `fleet` | The second board: the people list, the conversation with migrator-1, and the profile | 1440, both; 800, both; 390, both |
-| `skills-add` | The Skills place with the chooser on the preview of a skill of a marketplace | 1440, both |
-| `new-agent` | New agent with a name, Keep, the template, and the skills | 1440, both |
-| `new-bridge` | Open a bridge with a goal, two seats, and the picker below Add | 1440, both |
-| `wiki` | A page of the wiki with its meta and the tree | 1440, both |
-| `manager` | The conversation with the manager and the slash menu with the hint of an argument | 1440, both |
-| `activity` | The inbox with a decision in the main pane | 1440, both |
-| `board` | The board with the strip of statuses of each group | 1440, both |
-| `members` | Two panes: the channel with its tabs in a strip, and the members | 800, graphite |
-| `list` | One pane: the bridges, with the places at the bottom | 390, light |
-| `theme` | A deployment with a logo and a green accent | 1440, light |

@@ -19,7 +19,7 @@
 //   FAKE_A=1           the sample data shows each state of the bridges screen (routes-a.mjs)
 //   FAKE_LIVE=1        GET /v1/runs/{id}/live streams each answer outside a bridge in pieces, as the model writes it
 //   FAKE_LIVE_MS=120   the time between two pieces of a live answer, in milliseconds
-//   FAKE_LIVE_HOLD=1   a live answer stops at about two thirds and waits there, for a screenshot
+//   FAKE_LIVE_HOLD=1   a live answer stops near its middle and waits there, for a screenshot
 
 import http from 'node:http';
 import fs from 'node:fs';
@@ -444,12 +444,12 @@ function liveIdle(run) {
 
 /**
  * liveText streams a text as the model writes it: a piece of a few words
- * every FAKE_LIVE_MS, then done. With FAKE_LIVE_HOLD=1 it stops at about
- * two thirds and waits there. A run that stops working ends it.
+ * every FAKE_LIVE_MS, then done. With FAKE_LIVE_HOLD=1 it stops near its
+ * middle and waits there. A run that stops working ends it.
  */
 function liveText(run, turn, text, then) {
   const words = text.match(/\S+\s*/g) || [text];
-  const hold = LIVE_HOLD ? Math.ceil(words.length * 0.66) : words.length;
+  const hold = LIVE_HOLD ? Math.ceil(words.length * 0.45) : words.length;
   let i = 0;
   const step = () => {
     if (run.state !== 'running') return;
@@ -544,6 +544,8 @@ function managerTurn(run, first) {
         const seq = items[items.length - 1].seq + 1;
         items.push({ seq, time: now(), kind: 'tool', tool: 'recall', callId: 'call-' + seq, input: { query: 'notes of before' } });
         items.push({ seq: seq + 1, time: now(), kind: 'result', tool: 'recall', callId: 'call-' + seq, text: '2 notes' });
+        // The model call of the tool counts as a turn of the run.
+        spend(run);
         Object.assign(run, { seq: seq + 1, updatedAt: now(), activity: { turn: turn + 1, phrase: 'Thinking in turn ' + (turn + 1), since: now() } });
         publish('run', run);
         setTimeout(() => answer(turn + 1), 400);

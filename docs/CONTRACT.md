@@ -96,8 +96,8 @@ in this order:
 - `chat` is null when `workbench.bossmode.chat.agent` is empty. `chat.agent`
   is the profile of the quick chat, and `chat.member` is the fleet member
   that runs it, or `""`. A quick chat is a run of that profile on that
-  member, with the metadata `fw.view: quickchat`. The page reads the key and
-  has no screen for it yet (section 14).
+  member, with the metadata `fw.view: quickchat`. The Chat place uses it
+  (section 7.7). Without it, the place says that no quick chat is set up.
 
 A workbench without bossmode answers 404, and the page then shows no manager.
 
@@ -329,7 +329,21 @@ The page reads the existing routes `GET /v1/runs/{id}`,
 `GET /v1/runs/{id}/result`, `GET /v1/runs/{id}/transcript`, and
 `GET /v1/runs/{id}/files/{path}` with `Accept: application/json`, as `/ui`
 reads them. The run object carries two fields of the kernel changes:
-`activity` (K4) and `reactions`, the counts of K2.
+`activity` (K4) and `reactions`, the counts of K2. The quick chat also
+reads these fields of the run object:
+
+- `usage`: `inputTokens`, `outputTokens`, `cacheReadTokens`,
+  `cacheWriteTokens`, `turns`, `toolCalls`, `costUSD`, and
+  `unpricedTokens`. This chat shows the turns, the sum of the tokens, and
+  the cost, with `so far` while the run works.
+- `extraTools`: the tools that an inline profile gave the run beyond the
+  tool list of its agent. This chat marks each one `for this chat`.
+- **New.** `resolved`: `{"model", "tools", "skills"}` of the profile that
+  the kernel resolved when it queued the run. The kernel records it in
+  `fw.run.queued` and does not put it in the run object yet. The page
+  shows the model when the field is there, and names the tools and the
+  skills of a chat from it. Without it, the page names the picks that it
+  sent, else the lists of the agent. The fake server sends it.
 
 ### 7.2 Decisions
 
@@ -374,9 +388,96 @@ the agent, a live member first, and a later message follows up.
 `POST /v1/bossmode/runs/{id}/skill` takes `{"name", "args", "text"}`, with
 `args` and `text` optional, and answers 202 with the run object, as
 `POST /v1/runs/{id}/messages` answers. The front expands the skill of the
-catalog and sends the message pinned. The conversation of the manager and
-of an agent on no bridge send their slash commands here. An unknown skill
-answers 404, and a skill that is not for people answers 400.
+catalog and sends the message pinned. The conversation of the manager, of
+an agent on no bridge, and of the quick chat send their slash commands
+here. An unknown skill answers 404, and a skill that is not for people
+answers 400.
+
+### 7.6 The live answer
+
+`GET /v1/runs/{id}/live` streams the text of a run as the model writes
+it, as server-sent events with no ids. The page reads it with `fetch` and
+the bearer token, as it reads the stream of section 10, in
+`src/api/live.ts`.
+
+| Kind | Data | What the page does |
+|---|---|---|
+| `delta` | `{"turn", "text"}` | Appends the piece to the pending answer at the end of the thread. A piece of another turn after a `done` starts a new part of it. |
+| `tool` | `{"turn", "name", "callId"}` | Shows the quiet line `Working: <tool>`. |
+| `done` | `{"turn", "stopReason"}` | Ends the part of the turn and takes the line away. `error`, a call that failed, drops its text. The Chat tab of a seat also drops the text before a tool call (`tool_use`), because its thread shows only the answer that the channel holds. |
+| `idle` | `{"state"}` | The run left the running state: the stream stops, and the page reads the run. |
+
+- A comment line every 15 seconds keeps the stream open.
+- A client that connects in the middle of a model call gets the pieces from
+  then on, with no replay. The page shows what it gets, and the real item
+  of the answer takes the place of the pending answer once the view holds
+  it: the assistant item of the transcript, or the entry of the seat in
+  the channel, with a seq above the newest seq that the view knew when the
+  part began.
+- The page opens the stream while the run is `queued` or `running`, or
+  while an answer to a message of the person is on its way. After a clean
+  close it connects again at once while the run works, unless the stream
+  lived less than 5 seconds: then it waits first. After a lost connection
+  or a 5xx it waits 1, 2, 4, then 8 seconds. It stops on `idle`, and opens
+  again once the run moves.
+- A run takes 16 clients. The 17th gets 429: the page stops for that run
+  in that view, shows `Live view is busy`, and reads the run with its
+  poll. Another error answer, such as a 404 of a workbench without the
+  route, stops it with no note.
+- The stream ends when the run finishes or the client goes. The page
+  closes it when the view closes.
+- Only a one-on-one view opens it: the quick chat, the manager, an agent
+  on no bridge, and the Chat tab of a seat, where the run is the newest
+  run of the seat. The bridge channel, the inbox of Activity, the board,
+  and the run pane of a bridge never do.
+- A run of the front itself sends no `run` event on the stream of section
+  10, so its conversation still reads `GET /v1/runs/{id}` every 3 seconds
+  while it works (section 7.4). The live route works for it all the same.
+  The front relays the route for a run of another fleet member.
+
+### 7.7 The quick chat
+
+The Chat place holds the quick chat of `chat` (section 4). A chat is a run
+of `chat.agent` on `chat.member`.
+
+- The history is `GET /v1/fleet/runs?agent=<chat.agent>&principal=<subject>`,
+  with the subject of `GET /v1/whoami`. The answer is
+  `{"runs": [<run>], "total", "glance"}`, newest first, in the shape of
+  `GET /v1/runs` of the kernel. Each row shows `title`, the state, and
+  `createdAt`. The kernel titles a run from the first sentence of its
+  input, and the front can write a model title later as the annotation
+  `fw.title`. A chat that the page starts joins the history through its
+  metadata `fw.view: quickchat`.
+- The picks of a new chat come from `GET /v1/tools` (section 12), each
+  tool with `name` and `text`, and from `GET /v1/bossmode/skills`. The
+  lists of the agent come from `GET /v1/agents/{name}`, `tools` and
+  `skills`, and the picks start from them. A tool list that is empty or
+  holds `*` gives every tool, and an entry can name a whole server, such
+  as `github`, or a glob, such as `front.pages_*`. A skill list of `null`
+  gives every skill.
+- The first message starts the run:
+
+  ```
+  POST /v1/runs?member=<chat.member>
+  {"agent": "<chat.agent>", "input": "...",
+   "profile": {"tools": [...], "skills": [...]},
+   "metadata": {"fw.view": "quickchat"}}
+  ```
+
+  A tool or skill list of the inline profile replaces the list of the
+  agent for this run. A tool that the list of the agent leaves out still
+  works, and the run object names it in `extraTools`. An empty tool list
+  gives a run every tool, so the page asks for at least one tool before it
+  starts a chat. A catalog that is empty or did not load offers no picks,
+  and its list stays out of the inline profile, so the list of the agent
+  holds. `title` is optional, and the page leaves it out.
+- A later message is `POST /v1/runs/{id}/messages` with `{"content"}`. A
+  slash command of a chat with a run goes to
+  `POST /v1/bossmode/runs/{id}/skill` with `{"name", "args"}` (section
+  7.5). On a new chat, a slash command starts the run with its text.
+- A chat that failed or was canceled takes no message, so the next message
+  starts a new chat with the same picks.
+- Reopening a chat of the history is a follow-up conversation on that run.
 
 ## 8. Pages
 
@@ -611,6 +712,7 @@ Remove to an admin alone.
 | Route | Answer |
 |---|---|
 | `GET /v1/agents` | `{"agents": [<view>]}`: each agent with its profile, as `name`, `description`, `role`, `tools`, `skills`, and `policy`, among others. The profile shows the tools as chips and the rules that ask first as amber words. |
+| `GET /v1/agents/{name}` | One agent in the same shape. The picks of a new chat start from its `tools` and `skills`. An agent that the caller cannot view answers 404. |
 | `PUT /v1/agents/{name}` | Takes the profile and `workers`, `{"template", "replicas"}`, and answers 201 for a new agent or 200, with `{"name", "description", "role", "pool"}`. `pool` is the status of the workers that the front made. With `?dryRun=true` it checks the profile, saves nothing, and adds `exists`. An unknown field answers 400. |
 | `GET /v1/pools/{name}` | The status of the workers of a pool: `name`, `source`, `template`, `atespace`, `agent`, `intake`, `wanted`, `actual`, `ready`, `hash`, `tasks`, `gaps`, and `checkedAt`. The page names the pool of an agent from the fleet view, else by the rule of the front for a new agent: the name in lower case, with a hyphen for each character that is not a letter or a digit. |
 | `PATCH /v1/pools/{name}` | `{"replicas": n}` changes Keep, for an owner. The answer is the status. |
@@ -627,5 +729,9 @@ open, because no event of the stream carries it.
 - The budget of a run. The plan offers a button to raise the budget of a
   member that failed at a limit. The page shows the limit and has no button.
 - `DELETE /v1/pages/{path}`.
-- The quick chat of `chat` (section 4), and its history of
-  `GET /v1/fleet/runs`.
+- A route that sets the title of a run. The front writes `fw.title` with
+  `fw.Agent.Annotate`, and no HTTP route offers the annotation, so the
+  Chat place has no Rename.
+- A run to start a new agent from. The new-agent screen takes no run,
+  such as `#new-agent?fromRun=<id>`, so the Chat place has no Save as
+  agent.

@@ -62,7 +62,8 @@ npm run build
 
 `npm test` runs the unit tests with vitest: the API client, the presence
 lights, the `@` completion, the reducer of the stream, the routes, the
-question forms, and the Markdown sanitizer against hostile input.
+question forms, the Markdown sanitizer against hostile input, the live
+answer of a run, and the quick chat.
 
 ## Run against the fake server
 
@@ -70,9 +71,10 @@ The fake server in `fake/` is for development only. It keeps its data in
 memory, trusts any token that starts with `fake-`, and checks nothing that a
 real workbench checks. It serves every route of `docs/CONTRACT.md` with
 sample data: two bridges, a channel of forty entries, an approval card and a
-question card, a manager conversation, a fleet with two pools, a wiki of eight
-pages, and a face for every agent. Timers move members between presences and
-post messages every few seconds.
+question card, a manager conversation, a quick chat with a history of six
+chats, a fleet with two pools, a wiki of eight pages, and a face for every
+agent. Timers move members between presences and post messages every few
+seconds.
 
 1. Start the fake server: `npm run fake`. It listens on
    http://127.0.0.1:8787.
@@ -102,6 +104,9 @@ Variables of the fake server:
 | `FAKE_PARTIAL=1` | A card goes out on the stream without its input and its schema, as the backend can send it, so the page reads it again |
 | `FAKE_ADMIN=1` | `whoami` says that the person is an admin, who adds and removes skills |
 | `FAKE_A=1` | The sample data shows each state of the bridges screen: a seat that waits for a worker, a fired seat, folds, a card in the state unknown, a second open bridge, and a closed one |
+| `FAKE_LIVE=1` | `GET /v1/runs/{id}/live` streams each answer outside a bridge in pieces, as the model writes it. The quick chat calls one tool first. Without it, the route sends no piece, and `idle` when the run stops working. |
+| `FAKE_LIVE_MS` | The time between two pieces of a live answer in milliseconds, 120 by default |
+| `FAKE_LIVE_HOLD=1` | A live answer stops near its middle and waits there, for a screenshot of an answer that streams in |
 
 A sign-in at `/ui/signin?as=bob` signs you in as bob@example.com.
 
