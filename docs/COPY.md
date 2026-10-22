@@ -566,6 +566,8 @@ Capacity shows where seating happens:
 | new | add | `No chat yet.` with the key `New chat` | done |
 | new | add | `New chat`, the title of a chat before its first message | done |
 | new | add | `Tools`, `Skills`, the two headings of the picks, each with the count chip of the picks that are on, `N of M` for a screen reader | done |
+| the picks of `Tools` from the catalog of the front | change | `Tools` holds the tool list of the profile of the agent: each tool of the catalog that an entry names, and an entry that names none, such as `front.pages_*`, as one chip by its name. Every chip of `Tools` starts on. | done |
+| `More tools` | add | the heading of the other tools of the catalog, which start off, with its count chip. `spawn_task`, `await_task`, `propose_agent`, and `ask_user` never start on, so they sit here. | done |
 | new | add | `Find a tool`, `Find a skill`, the fields of a row of picks that holds more than twelve | done |
 | new | add | `Loading the tools.`, while the picks wait for the catalogs | done |
 | new | add | `A chat needs at least one tool. Pick one.`, the error of the picks when every tool is off, because an empty tool list gives a run every tool | done |
@@ -574,6 +576,7 @@ Capacity shows where seating happens:
 | new | add | `Stopped. Your next message starts a new chat.` | done |
 | new | add | `This chat`, the heading of the details, and `This chat, <status>`, the name of the mark that opens it | done |
 | new | add | `Tools`, `Skills` with the count chip, `1 tool` and `N tools`, `1 skill` and `N skills` for a screen reader | done |
+| `Tools 0` (This chat of a chat whose picks the page cannot tell) | remove | `Tools` names the tools that the chat started with: the resolved profile of the run, the picks of the tab, the first event of the run, else the list of the profile with the tools for this chat. The section leaves out where the page cannot tell. | done |
 | new | add | `for this chat`, the quiet word on the chip of a tool that the picks gave beyond the list of the agent | done |
 | new | add | `Model`, with the model of the resolved profile, when the run object carries it | done |
 | new | add | `Usage`, with `N turns`, `N tokens`, and `$N`, and `so far` while the run works. `1 turn` and `1 token` for one. | done |

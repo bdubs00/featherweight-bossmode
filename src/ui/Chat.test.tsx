@@ -110,7 +110,10 @@ describe('the Chat place', () => {
     expect(chip(el, 'bash').querySelector('input')!.checked).toBe(false);
     expect(chip(el, 'notes').querySelector('input')!.checked).toBe(true);
     expect(chip(el, 'plan').querySelector('input')!.checked).toBe(false);
-    expect([...el.querySelectorAll('.pick-sec h2')].map((h) => h.textContent)).toEqual(['Tools', 'Skills']);
+    // The tools of the profile sit in Tools, and the other tools of the catalog under More tools.
+    expect([...el.querySelectorAll('.pick-sec h2')].map((h) => h.textContent)).toEqual(['Tools', 'More tools', 'Skills']);
+    expect([...el.querySelectorAll('#chat-tools ~ .pick-chips .pick-chip, section[aria-labelledby="chat-tools"] .pick-chip')].map((l) => l.textContent!.trim())).toEqual(['files']);
+    expect([...el.querySelectorAll('section[aria-labelledby="chat-more-tools"] .pick-chip')].map((l) => l.textContent!.trim())).toEqual(['bash', 'web_fetch']);
     act(() => chip(el, 'web_fetch').querySelector('input')!.click());
     act(() => chip(el, 'notes').querySelector('input')!.click());
     const box = el.querySelector('#composer') as HTMLTextAreaElement;
@@ -137,15 +140,53 @@ describe('the Chat place', () => {
     expect(calls.some((c) => c.path.includes('/skill'))).toBe(false);
   });
 
-  it('leaves the tools out of the inline profile when the workbench names no tool, so the list of the agent holds', async () => {
+  it('offers the tools of the profile by their names when the workbench names no tool', async () => {
     tools = [];
     configure(CHAT);
     const el = mount(<ChatMain />);
-    await vi.waitFor(() => expect(el.querySelectorAll('.pick-chip').length).toBe(2));
-    expect([...el.querySelectorAll('.pick-sec h2')].map((h) => h.textContent)).toEqual(['Skills']);
+    await vi.waitFor(() => expect(el.querySelectorAll('.pick-chip').length).toBe(3));
+    expect([...el.querySelectorAll('.pick-sec h2')].map((h) => h.textContent)).toEqual(['Tools', 'Skills']);
     send(el.querySelector('#composer') as HTMLTextAreaElement, 'Hello?');
     await vi.waitFor(() => expect(posts().length).toBe(1));
-    expect((posts()[0].body as { profile: unknown }).profile).toEqual({ skills: ['notes'] });
+    expect((posts()[0].body as { profile: unknown }).profile).toEqual({ tools: ['files'], skills: ['notes'] });
+  });
+
+  it('leaves the tools out of the inline profile when neither the workbench nor the profile names a tool, so the list of the agent holds', async () => {
+    tools = [];
+    configure(CHAT);
+    const f = fakeFetch([['GET', /^\/v1\/agents\/chat$/, () => ({ name: 'chat', role: 'operator', skills: ['notes'] })]]);
+    try {
+      const el = mount(<ChatMain />);
+      await vi.waitFor(() => expect(el.querySelectorAll('.pick-chip').length).toBe(2));
+      expect([...el.querySelectorAll('.pick-sec h2')].map((h) => h.textContent)).toEqual(['Skills']);
+      send(el.querySelector('#composer') as HTMLTextAreaElement, 'Hello?');
+      await vi.waitFor(() => expect(calls.filter((c) => c.method === 'POST').length + f.calls.filter((c) => c.method === 'POST').length).toBe(1));
+      expect((f.calls.find((c) => c.method === 'POST')!.body as { profile: unknown }).profile).toEqual({ skills: ['notes'] });
+    } finally {
+      f.restore();
+    }
+  });
+
+  it('starts a quick chat from the tools of its profile, by name where the catalog holds no such tool, and never with the tools that hand off work or wait on the person', async () => {
+    tools = ['bash', 'files', 'spawn_task', 'await_task', 'propose_agent', 'ask_user'].map((name) => ({ name, source: 'builtin', text: 'The tool ' + name + '.' }));
+    configure(CHAT);
+    const f = fakeFetch([
+      ['GET', /^\/v1\/tools$/, () => ({ tools })],
+      ['GET', /^\/v1\/agents\/chat$/, () => ({ name: 'chat', role: 'operator', pool: 'manager', tools: ['files', 'front.pages_*', 'spawn_task'], skills: ['notes'] })],
+      ['POST', /^\/v1\/runs\?member=/, () => NEW],
+    ]);
+    try {
+      const el = mount(<ChatMain />);
+      await vi.waitFor(() => expect(el.querySelectorAll('.pick-chip').length).toBe(9));
+      const row = (id: string) => [...el.querySelectorAll(`section[aria-labelledby="${id}"] .pick-chip`)].map((l) => l.textContent!.trim() + (l.querySelector('input')!.checked ? ' on' : ''));
+      expect(row('chat-tools')).toEqual(['files on', 'front.pages_* on']);
+      expect(row('chat-more-tools')).toEqual(['bash', 'spawn_task', 'await_task', 'propose_agent', 'ask_user']);
+      send(el.querySelector('#composer') as HTMLTextAreaElement, 'Hello?');
+      await vi.waitFor(() => expect(f.calls.some((c) => c.method === 'POST')).toBe(true));
+      expect((f.calls.find((c) => c.method === 'POST')!.body as { profile: unknown }).profile).toEqual({ tools: ['files', 'front.pages_*'], skills: ['notes'] });
+    } finally {
+      f.restore();
+    }
   });
 
   it('asks for a tool when the person turns every tool off', async () => {
@@ -186,5 +227,22 @@ describe('the Chat place', () => {
     expect(el.querySelector('.chat-model')!.textContent).toBe('model-large');
     expect(el.querySelector('.today')!.textContent).toBe('1 turn1,200 tokens$0.02');
     expect([...el.querySelectorAll('button')].map((b) => b.textContent)).not.toContain('Rename');
+  });
+
+  it('names the tools that a chat started with from the first event of its run, when the run object carries no resolved profile', async () => {
+    configure(CHAT);
+    const BARE: Run = { ...OLD, id: 'run-chat-2', resolved: undefined, extraTools: undefined };
+    act(() => store.dispatch({ type: 'run', run: BARE }));
+    const f = fakeFetch([
+      ['GET', /^\/v1\/runs\/run-chat-2\/events\?from=1&limit=1$/, () => ({ events: [{ seq: 1, type: 'fw.run.queued', data: { agent: 'chat', profile: { tools: ['files', 'front.pages_*', 'bash'] }, extraTools: ['bash'], resolved: { tools: ['files', 'front.pages_*', 'bash'], skills: ['notes'] } } }] })],
+    ]);
+    try {
+      const el = mount(<ChatDetails run="run-chat-2" />);
+      await vi.waitFor(() => expect(el.querySelectorAll('.chat-chips .chip').length).toBe(4));
+      expect([...el.querySelectorAll('.chat-chips .chip')].map((c) => c.textContent)).toEqual(['files', 'front.pages_*', 'bashfor this chat', 'notes']);
+      expect(el.querySelector('#chat-tools-in-use')!.parentElement!.querySelector('.chip')!.textContent).toContain('3');
+    } finally {
+      f.restore();
+    }
   });
 });

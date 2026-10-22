@@ -103,6 +103,56 @@ export function defaultTools(catalog: Tool[], list: string[] | null | undefined)
   return catalog.filter((t) => toolOn(list, t)).map(toolId);
 }
 
+/** The tools that a quick chat never starts with: they hand work to other runs, propose agents, or wait on the person. */
+export const NOT_FOR_CHAT = ['spawn_task', 'await_task', 'propose_agent', 'ask_user'];
+
+/** One chip of the picks: the name that goes into the inline profile, the name on the chip, and the plain phrase of the tool. */
+export interface PickItem {
+  id: string;
+  name: string;
+  text: string;
+}
+
+export interface ToolPicks {
+  /** The tools of the profile, which start on. */
+  own: PickItem[];
+  /** The other tools of the catalog, under More tools, which start off. */
+  more: PickItem[];
+}
+
+const itemOf = (t: Tool): PickItem => ({ id: toolId(t), name: t.name, text: t.text || t.description || '' });
+
+/**
+ * toolPicks splits the tools of a new chat in two rows. The first holds
+ * the tool list of the profile of the agent, which the catalog of the
+ * front does not always hold: an entry that names tools of the catalog
+ * shows those tools, and an entry that names none, such as front.pages_*
+ * that only the worker has, shows as one chip by its name, as written. A
+ * list that is empty, missing, or holds * gives every tool of the catalog.
+ * The second row, More tools, holds the other tools of the catalog. The
+ * tools of NOT_FOR_CHAT never start on, so they sit in More tools.
+ */
+export function toolPicks(catalog: Tool[], list: string[] | null | undefined): ToolPicks {
+  const own: PickItem[] = [];
+  const seen = new Set<string>();
+  const add = (x: PickItem) => {
+    if (seen.has(x.id) || NOT_FOR_CHAT.includes(x.id) || NOT_FOR_CHAT.includes(x.name)) return;
+    seen.add(x.id);
+    own.push(x);
+  };
+  if (!list || list.length === 0 || list.includes('*')) {
+    for (const t of catalog) add(itemOf(t));
+  } else {
+    for (const e of list) {
+      const hits = catalog.filter((t) => toolOn([e], t));
+      if (hits.length) for (const t of hits) add(itemOf(t));
+      else add({ id: e, name: e, text: '' });
+    }
+  }
+  const more = catalog.map(itemOf).filter((x) => !seen.has(x.id));
+  return { own, more };
+}
+
 /** toggle turns one name on or off in a list of picks, and keeps the order of the list. */
 export function toggle(list: string[], name: string, on: boolean): string[] {
   if (on) return list.includes(name) ? list : [...list, name];

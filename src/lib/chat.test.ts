@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Run, Tool } from '../api/types';
-import { answerSeqs, chatTitle, defaultTools, findChats, historyGroups, isQuickChat, lastSeq, startBody, toggle, toolOn, usageParts, works } from './chat';
+import { NOT_FOR_CHAT, answerSeqs, chatTitle, defaultTools, findChats, historyGroups, isQuickChat, lastSeq, startBody, toggle, toolOn, toolPicks, usageParts, works } from './chat';
 
 const run = (id: string, createdAt: string, extra: Partial<Run> = {}): Run => ({ id, agent: 'chat', state: 'completed', seq: 1, createdAt, updatedAt: createdAt, ...extra });
 const local = (d: number, h: number) => new Date(2026, 9, 22 - d, h, 30).toISOString();
@@ -53,6 +53,20 @@ describe('the picks of a new chat', () => {
     expect(defaultTools(tools, [])).toHaveLength(5);
     expect(defaultTools(tools, null)).toHaveLength(5);
     expect(toolOn(['*'], tools[0])).toBe(true);
+  });
+
+  it('starts with the tools of the profile, by name where the catalog holds no such tool, and offers the rest under More tools', () => {
+    const catalog: Tool[] = [...tools, { name: 'spawn_task', source: 'builtin' }, { name: 'ask_user', source: 'builtin' }];
+    const p = toolPicks(catalog, ['files', 'front.pages_*', 'recall', 'spawn_task']);
+    expect(p.own.map((x) => x.id)).toEqual(['files', 'pages_read', 'pages_write', 'recall']);
+    expect(p.own.find((x) => x.id === 'recall')).toEqual({ id: 'recall', name: 'recall', text: '' });
+    expect(p.more.map((x) => x.id)).toEqual(['bash', 'create_issue', 'spawn_task', 'ask_user']);
+    // A glob that the catalog of the front does not hold stays one chip, as written.
+    expect(toolPicks([{ name: 'bash', source: 'builtin' }], ['front.pages_*']).own.map((x) => x.name)).toEqual(['front.pages_*']);
+    // Every tool: the catalog, less the tools that never start on.
+    expect(toolPicks(catalog, []).own.map((x) => x.id)).toEqual(['bash', 'files', 'pages_read', 'pages_write', 'create_issue']);
+    expect(toolPicks(catalog, null).more.map((x) => x.id)).toEqual(['spawn_task', 'ask_user']);
+    expect(NOT_FOR_CHAT).toEqual(['spawn_task', 'await_task', 'propose_agent', 'ask_user']);
   });
 
   it('toggles a pick and keeps the order', () => {

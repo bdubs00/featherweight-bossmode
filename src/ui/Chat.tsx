@@ -13,16 +13,17 @@
 
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { api } from '../api/routes';
-import type { Agent, InlineProfile, QuickChat, Run, Skill, Tool } from '../api/types';
+import type { Agent, InlineProfile, QueuedData, QuickChat, Run, Skill, Tool } from '../api/types';
 import { store, useSelect } from '../state/store';
 import { forgetProfiles, useProfile } from '../state/profiles';
+import { forgetQueued, useQueued } from '../state/queued';
 import { loadAgentSkills, loadChats, loadSkills } from '../state/actions';
 import { slashCommands } from '../state/people';
 import { runStatus } from '../lib/presence';
 import { go, hrefOf } from '../lib/route';
 import { parseSlash } from '../lib/mention';
 import { since } from '../lib/words';
-import { answerSeqs, chatTitle, defaultTools, findChats, historyGroups, isQuickChat, lastSeq, newestFirst, startBody, toggle, toolId, usageParts, works } from '../lib/chat';
+import { answerSeqs, chatTitle, findChats, historyGroups, isQuickChat, lastSeq, newestFirst, startBody, toggle, toolPicks, usageParts, works, type PickItem } from '../lib/chat';
 import { isOn, skillOf } from '../lib/catalog';
 import { useRoving } from './keys';
 import { attempt } from './notice';
@@ -51,6 +52,7 @@ export function forgetChat(): void {
   toolCache = null;
   toolLoad = null;
   forgetProfiles();
+  forgetQueued();
 }
 
 /** useChat is the quick chat of the settings, or null when none is set up. */
@@ -196,12 +198,6 @@ export function ChatList({ current }: { current?: string }) {
 
 /* ---------- the picks of a new chat ---------- */
 
-interface PickItem {
-  id: string;
-  name: string;
-  text: string;
-}
-
 /** PickRow is one row of chips with check boxes, with a field to find one when it holds more than FIND_FROM. */
 function PickRow({ id, title, find, items, value, onChange, error }: { id: string; title: string; find: string; items: PickItem[]; value: string[]; onChange: (next: string[]) => void; error?: string }) {
   const [q, setQ] = useState('');
@@ -259,16 +255,24 @@ function NewChat({ chat }: { chat: QuickChat }) {
     if (!skills) loadSkills().catch(() => setNoSkills(true));
   }, []);
   const ready = tools !== null && agent !== undefined && (skills !== null || noSkills);
-  // The picks start from the lists of the agent, once the catalogs and the agent are in. A catalog
-  // that is empty or did not load offers no picks, and its list stays out of the inline profile.
+  // The tools of the profile start on, each tool of the catalog that an
+  // entry names, or the entry by its name where the catalog holds no such
+  // tool. The other tools of the catalog wait under More tools.
+  const rows = useMemo(() => {
+    const list = agent ? agent.tools : null;
+    if (tools && tools.length) return toolPicks(tools, list);
+    // A catalog that is empty or did not load offers the entries of the profile alone.
+    return { own: (list || []).filter((x) => x !== '*').map((x) => ({ id: x, name: x, text: '' })), more: [] };
+  }, [tools, agent]);
+  // The picks start from the lists of the agent, once the catalogs and the agent are in. With no
+  // tool to offer, the tool list stays out of the inline profile, so the list of the agent holds.
   useEffect(() => {
     if (!ready || picks) return;
     setPicks({
-      tools: tools && tools.length ? defaultTools(tools, agent ? agent.tools : null) : undefined,
+      tools: rows.own.length || rows.more.length ? rows.own.map((x) => x.id) : undefined,
       skills: skills && skills.length ? defaultSkills(skills, agent ? agent.skills : null) : undefined,
     });
   }, [ready]);
-  const toolList = useMemo(() => (tools || []).map((t) => ({ id: toolId(t), name: t.name, text: t.text || t.description || '' })), [tools]);
   const skillList = useMemo(() => skillItems(skills), [skills]);
   const commands = useMemo(() => slashCommands(skills, picks && picks.skills ? picks.skills : []), [skills, picks]);
 
@@ -300,9 +304,22 @@ function NewChat({ chat }: { chat: QuickChat }) {
               id="chat-tools"
               title="Tools"
               find="Find a tool"
-              items={toolList}
+              items={rows.own}
               value={picks.tools}
               error={error}
+              onChange={(next) => {
+                setError('');
+                setPicks({ ...picks, tools: next });
+              }}
+            />
+          )}
+          {picks && picks.tools && rows.more.length > 0 && (
+            <PickRow
+              id="chat-more-tools"
+              title="More tools"
+              find="Find a tool"
+              items={rows.more}
+              value={picks.tools}
               onChange={(next) => {
                 setError('');
                 setPicks({ ...picks, tools: next });
@@ -319,14 +336,29 @@ function NewChat({ chat }: { chat: QuickChat }) {
 
 /* ---------- a chat ---------- */
 
-/** picksOfRun are the tools and the skills of a chat: the resolved profile of the run, the picks of this tab, or the lists of the agent. */
-function picksOfRun(run: Run | undefined, runId: string, agent: Agent | null | undefined): { tools: string[] | null; skills: string[] | null } {
+/**
+ * picksOfRun are the tools and the skills that a chat started with: the
+ * resolved profile of the run object, the picks of this tab, the resolved
+ * profile of the first event of the run, else the lists of the agent with
+ * the tools that the run has beyond them. null where the page cannot tell.
+ */
+function picksOfRun(run: Run | undefined, runId: string, agent: Agent | null | undefined, queued?: QueuedData | null): { tools: string[] | null; skills: string[] | null } {
   const r = run && run.resolved;
+  const q = queued && queued.resolved;
   const p = picksOf.get(runId);
+  const extra = (run && run.extraTools) || (queued && queued.extraTools) || [];
+  const listed = agent && agent.tools && agent.tools.length ? agent.tools : null;
+  const fromAgent = listed ? [...listed, ...extra.filter((x) => !listed.includes(x))] : extra.length ? [...extra] : null;
   return {
-    tools: (r && r.tools) || (p && p.tools) || (agent && agent.tools) || null,
-    skills: (r && r.skills) || (p && p.skills) || (agent ? (agent.skills === undefined ? null : agent.skills) : null),
+    tools: (r && r.tools) || (p && p.tools) || (q && q.tools) || fromAgent,
+    skills: (r && r.skills) || (p && p.skills) || (q && q.skills) || (agent ? (agent.skills === undefined ? null : agent.skills) : null),
   };
+}
+
+/** useStart reads the first event of a chat when neither the run object nor this tab names its picks. */
+function useStart(run: Run | undefined, runId: string): QueuedData | null | undefined {
+  const known = !!(run && run.resolved && run.resolved.tools) || picksOf.has(runId);
+  return useQueued(run && !known ? runId : '');
 }
 
 /** ChatRun is the conversation of a chat and its composer. */
@@ -362,7 +394,8 @@ function ChatRun({ chat, runId }: { chat: QuickChat; runId: string }) {
   const answers = useMemo(() => answerSeqs(t.items), [t.items]);
   const live = useLiveAnswer(runId, { working: works(run) || waiting, seq: run ? run.seq : 0, mark: lastSeq(t.items, run), answers });
   const box = useStickToEnd<HTMLDivElement>(t.items.length + (sent ? 1 : 0) + live.text.length + (live.tool ? 1 : 0));
-  const picks = picksOfRun(run, runId, agent);
+  const start = useStart(run, runId);
+  const picks = picksOfRun(run, runId, agent, start);
   const commands = useMemo(() => slashCommands(skills, picks.skills || loadable || (skills || []).map((s) => s.name)), [skills, picks.skills, loadable]);
   const names = useMemo(() => commands.map((c) => c.name), [commands]);
 
@@ -452,10 +485,12 @@ export function ChatDetails({ run: runId }: { run: string }) {
   const run = useSelect((s) => s.runs[runId]);
   const skillsCatalog = useSelect((s) => (s.skills ? s.skills.skills : null));
   const agent = useAgent(chat ? chat.agent : '');
+  const start = useStart(run, runId);
   if (!chat) return null;
-  const picks = picksOfRun(run, runId, agent);
-  const extra = (run && run.extraTools) || [];
-  const tools = [...(picks.tools || []).filter((x) => !extra.includes(x)), ...extra];
+  // The tools that the chat started with. A list that the page cannot tell leaves the section out, so a chat with tools never reads Tools 0.
+  const picks = picksOfRun(run, runId, agent, start);
+  const extra = (run && run.extraTools) || (start && start.extraTools) || [];
+  const tools = picks.tools ? [...picks.tools.filter((x) => !extra.includes(x)), ...extra] : null;
   const skills = picks.skills || (skillsCatalog || []).map((s) => s.name);
   const model = run && run.resolved && run.resolved.model;
   const parts = run ? usageParts(run.usage, works(run)) : [];
@@ -463,26 +498,28 @@ export function ChatDetails({ run: runId }: { run: string }) {
     <section class="screen chat-details" aria-labelledby="chat-details-title">
       <PaneHeader id="chat-details-title" title="This chat" back={{ href: hrefOf({ place: 'chat', run: runId }), label: run ? chatTitle(run) : 'Chat', to: 'main' }} />
       <div class="scroll">
-        <section class="prof-sec" aria-labelledby="chat-tools-in-use">
-          <div class="prof-sec-head">
-            <h3 class="t-sub" id="chat-tools-in-use">
-              Tools
-            </h3>
-            <Chip label={tools.length === 1 ? '1 tool' : tools.length + ' tools'}>{tools.length}</Chip>
-          </div>
-          {tools.length > 0 && (
-            <ul class="prof-chips chat-chips">
-              {tools.map((x) => (
-                <li>
-                  <Chip class="prof-tool">
-                    {x}
-                    {extra.includes(x) && <span class="chip-note">for this chat</span>}
-                  </Chip>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+        {tools && (
+          <section class="prof-sec" aria-labelledby="chat-tools-in-use">
+            <div class="prof-sec-head">
+              <h3 class="t-sub" id="chat-tools-in-use">
+                Tools
+              </h3>
+              <Chip label={tools.length === 1 ? '1 tool' : tools.length + ' tools'}>{tools.length}</Chip>
+            </div>
+            {tools.length > 0 && (
+              <ul class="prof-chips chat-chips">
+                {tools.map((x) => (
+                  <li>
+                    <Chip class="prof-tool">
+                      {x}
+                      {extra.includes(x) && <span class="chip-note">for this chat</span>}
+                    </Chip>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
         <section class="prof-sec" aria-labelledby="chat-skills-in-use">
           <div class="prof-sec-head">
             <h3 class="t-sub" id="chat-skills-in-use">

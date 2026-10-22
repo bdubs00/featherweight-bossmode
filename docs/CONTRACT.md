@@ -458,13 +458,18 @@ of `chat.agent` on `chat.member`.
   input, and the front can write a model title later as the annotation
   `fw.title`. A chat that the page starts joins the history through its
   metadata `fw.view: quickchat`.
-- The picks of a new chat come from `GET /v1/tools` (section 12), each
-  tool with `name` and `text`, and from `GET /v1/bossmode/skills`. The
-  lists of the agent come from `GET /v1/agents/{name}`, `tools` and
-  `skills`, and the picks start from them. A tool list that is empty or
-  holds `*` gives every tool, and an entry can name a whole server, such
-  as `github`, or a glob, such as `front.pages_*`. A skill list of `null`
-  gives every skill.
+- The picks of a new chat start from the lists of the agent, from
+  `GET /v1/agents/{name}`, `tools` and `skills`. The catalog of the front,
+  `GET /v1/tools` (section 12), is not what the agent can run: a worker
+  has tools that the front does not, such as `front.pages_*`. So the row
+  Tools holds the tool list of the profile, each entry as the tools of the
+  catalog that it names, or as one chip by its name where it names none.
+  A tool list that is empty or holds `*` gives every tool, and an entry
+  can name a whole server, such as `github`, or a glob, such as
+  `front.pages_*`. The other tools of the catalog sit under More tools,
+  off. `spawn_task`, `await_task`, `propose_agent`, and `ask_user` never
+  start on for a quick chat. The skills come from
+  `GET /v1/bossmode/skills`, and a skill list of `null` gives every skill.
 - The first message starts the run:
 
   ```
@@ -478,9 +483,11 @@ of `chat.agent` on `chat.member`.
   agent for this run. A tool that the list of the agent leaves out still
   works, and the run object names it in `extraTools`. An empty tool list
   gives a run every tool, so the page asks for at least one tool before it
-  starts a chat. A catalog that is empty or did not load offers no picks,
-  and its list stays out of the inline profile, so the list of the agent
-  holds. `title` is optional, and the page leaves it out.
+  starts a chat. A catalog of tools that is empty or did not load offers
+  the entries of the tool list of the profile alone. Where neither names a
+  tool, or the skill catalog is empty, that list stays out of the inline
+  profile, so the list of the agent holds. `title` is optional, and the
+  page leaves it out.
 - A later message is `POST /v1/runs/{id}/messages` with `{"content"}`. A
   slash command of a chat with a run goes to
   `POST /v1/bossmode/runs/{id}/skill` with `{"name", "args"}` (section
