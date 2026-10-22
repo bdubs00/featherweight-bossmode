@@ -97,15 +97,20 @@ a.people-title:hover {
   gap: var(--s-3);
 }
 /* The handle and the bridge link take the width that the tabs and the
-   menu leave, and the tabs never shrink. The bridge link gives up its
-   width first, and the handle cuts only when the link has none left. */
+   menu leave, and the tabs never shrink. The bridge link asks for no
+   width of its own and fills what the handle leaves, so it cuts first, and
+   the handle cuts only when the link has no width left. */
 .member-main .pane-head > h1 {
   flex: 0 1 auto;
   min-width: 0;
 }
 .member-where {
-  flex: 0 1000 auto;
+  flex: 1 1 0;
   min-width: 0;
+  /* The space before the bridge link is part of its text, so a link with
+     no width left takes no gap from the handle. */
+  margin-left: calc(-1 * var(--s-3));
+  text-indent: var(--s-3);
 }
 .member-main .pane-actions .tabs {
   flex: none;
