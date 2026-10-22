@@ -168,23 +168,30 @@ describe('afterUnauthorized', () => {
 
   it('shows the token form without a sign-in route', () => {
     const step = afterUnauthorized({ signinUrl: '', here: '/bossmode/', hadToken: false, now: 1000, store: mem() });
-    expect(step).toEqual({ kind: 'screen', signinUrl: '', expired: false });
+    expect(step).toEqual({ kind: 'screen', signinUrl: '', expired: false, returned: false });
   });
 
   it('does not loop when the sign-in comes back with a token that fails', () => {
     const store = mem();
     store.set(SIGNIN_AT_KEY, '1000');
     const step = afterUnauthorized({ signinUrl: '/ui/signin', here: '/bossmode/', hadToken: true, now: 1000 + LOOP_MS - 1, store });
-    expect(step).toEqual({ kind: 'screen', signinUrl: '/ui/signin', expired: true });
+    expect(step).toEqual({ kind: 'screen', signinUrl: '/ui/signin', expired: true, returned: true });
     const later = afterUnauthorized({ signinUrl: '/ui/signin', here: '/bossmode/', hadToken: true, now: 1000 + LOOP_MS + 1, store });
     expect(later.kind).toBe('redirect');
+  });
+
+  it('says that the page came back from a sign-in that did not finish', () => {
+    const store = mem();
+    store.set(SIGNIN_AT_KEY, '1000');
+    const step = afterUnauthorized({ signinUrl: '/ui/signin', here: '/bossmode/', hadToken: false, now: 1000 + 5 * 60_000, store });
+    expect(step).toEqual({ kind: 'screen', signinUrl: '/ui/signin', expired: false, returned: true });
   });
 
   it('stays on the screen after a sign-out', () => {
     const store = mem();
     store.set(SIGNED_OUT_KEY, '1');
     const step = afterUnauthorized({ signinUrl: '/ui/signin', here: '/bossmode/', hadToken: false, now: 5, store });
-    expect(step.kind).toBe('screen');
+    expect(step).toEqual({ kind: 'screen', signinUrl: '/ui/signin', expired: false, returned: false });
   });
 });
 

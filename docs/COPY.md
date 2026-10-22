@@ -115,6 +115,7 @@ Capacity shows where seating happens:
 | `Sign in` | keep | `Sign in to <name>` for a theme with a name | done |
 | `Your sign-in ended. Sign in again to go on. Your drafts stay.` | change | `Your sign-in ended. Sign in again, and your drafts stay.` | done |
 | `Sign in to run your fleet.` | keep | | done |
+| `The sign-in did not finish. Sign in again, or use an access token.` | new | the lede after a return from a sign-in without a session, with the token way open | done |
 | `Paste your access token to run your fleet.` | keep | | done |
 | `Use an access token` | keep | | done |
 | `Access token` | keep | | done |

@@ -14,9 +14,11 @@ export const SIGNED_OUT_KEY = 'fw.bossmode.signedOut';
 /**
  * LOOP_MS is how long the page waits before it goes to sign-in again on its
  * own. Without the wait, a sign-in that comes back with a token that fails
- * at once sends the page back and forth.
+ * at once sends the page back and forth. It is ten minutes, so a person who
+ * comes back from a sign-in that did not finish sees the screen, also after
+ * a pause.
  */
-export const LOOP_MS = 60_000;
+export const LOOP_MS = 600_000;
 
 export interface Storage {
   get(key: string): string | null;
@@ -56,10 +58,14 @@ export function signinAddress(signinUrl: string, here: string): string {
   return base + (base.includes('?') ? '&' : '?') + 'next=' + encodeURIComponent(here);
 }
 
-/** The next step of the page after a 401. */
+/**
+ * The next step of the page after a 401. On the screen, returned is true
+ * when the page went to the sign-in in this tab and came back without a
+ * session, so the screen opens the token way.
+ */
 export type SigninStep =
   | { kind: 'redirect'; url: string }
-  | { kind: 'screen'; signinUrl: string; expired: boolean };
+  | { kind: 'screen'; signinUrl: string; expired: boolean; returned: boolean };
 
 /**
  * afterUnauthorized decides the next step after a 401. The page goes to the
@@ -76,11 +82,12 @@ export function afterUnauthorized(opts: {
 }): SigninStep {
   const { store, now } = opts;
   const url = signinAddress(opts.signinUrl, opts.here);
-  if (!url) return { kind: 'screen', signinUrl: '', expired: opts.hadToken };
+  if (!url) return { kind: 'screen', signinUrl: '', expired: opts.hadToken, returned: false };
   const signedOut = store.get(SIGNED_OUT_KEY) === '1';
   const last = Number(store.get(SIGNIN_AT_KEY) || '0');
-  if (signedOut || (last > 0 && now - last < LOOP_MS)) {
-    return { kind: 'screen', signinUrl: opts.signinUrl, expired: opts.hadToken };
+  const returned = last > 0 && now - last < LOOP_MS;
+  if (signedOut || returned) {
+    return { kind: 'screen', signinUrl: opts.signinUrl, expired: opts.hadToken, returned: returned && !signedOut };
   }
   store.set(SIGNIN_AT_KEY, String(now));
   return { kind: 'redirect', url };

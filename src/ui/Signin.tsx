@@ -1,7 +1,8 @@
 // The sign-in screen. With browser sign-in on, Sign in goes to /ui/signin
 // with next set to the address of the page, and the person comes back to
 // the same screen. The token form stays as a way in for a developer, or the
-// only way when sign-in is off.
+// only way when sign-in is off. After a sign-in that did not finish, the
+// token form is open, so a person whose issuer is down still gets in.
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { signinAddress } from '../api/auth';
@@ -9,7 +10,7 @@ import { useSelect } from '../state/store';
 import { themeOf } from '../lib/theme';
 import { Button, Card, Field, Input, buttonClass } from './primitives';
 
-export function Signin(p: { signinUrl: string; expired: boolean; error: string; here: string; onToken: (t: string) => void }) {
+export function Signin(p: { signinUrl: string; expired: boolean; returned: boolean; error: string; here: string; onToken: (t: string) => void }) {
   const [token, setToken] = useState('');
   const go = useRef<HTMLAnchorElement>(null);
   const field = useRef<HTMLInputElement>(null);
@@ -40,7 +41,15 @@ export function Signin(p: { signinUrl: string; expired: boolean; error: string; 
         <h1 id="signin-title" class="t-title">
           {name ? 'Sign in to ' + name : 'Sign in'}
         </h1>
-        <p class="lede">{p.expired ? 'Your sign-in ended. Sign in again, and your drafts stay.' : url ? 'Sign in to run your fleet.' : 'Paste your access token to run your fleet.'}</p>
+        <p class="lede">
+          {p.expired
+            ? 'Your sign-in ended. Sign in again, and your drafts stay.'
+            : p.returned
+              ? 'The sign-in did not finish. Sign in again, or use an access token.'
+              : url
+                ? 'Sign in to run your fleet.'
+                : 'Paste your access token to run your fleet.'}
+        </p>
         {p.error && (
           <p class="alert" role="alert">
             {p.error}
@@ -51,7 +60,7 @@ export function Signin(p: { signinUrl: string; expired: boolean; error: string; 
             <a ref={go} class={buttonClass('primary')} href={url}>
               Sign in
             </a>
-            <details class="token-way" open={!!p.error}>
+            <details class="token-way" open={!!p.error || p.returned}>
               <summary>Use an access token</summary>
               {form}
             </details>

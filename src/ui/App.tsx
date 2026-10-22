@@ -38,7 +38,7 @@ import { SkillActions, SkillList, SkillMain } from './Skills';
 import { Signin } from './Signin';
 import { Button, Card, Led } from './primitives';
 
-type Auth = { kind: 'loading' } | { kind: 'ready' } | { kind: 'signin'; signinUrl: string; expired: boolean; error: string } | { kind: 'failed'; error: string };
+type Auth = { kind: 'loading' } | { kind: 'ready' } | { kind: 'signin'; signinUrl: string; expired: boolean; returned: boolean; error: string } | { kind: 'failed'; error: string };
 
 let leaving = false;
 let tokenTry = false;
@@ -193,7 +193,7 @@ export function App() {
       location.assign(step.url);
       return;
     }
-    setAuth({ kind: 'signin', signinUrl: step.signinUrl, expired: step.expired, error });
+    setAuth({ kind: 'signin', signinUrl: step.signinUrl, expired: step.expired, returned: step.returned, error });
   };
 
   const boot = async () => {
@@ -225,7 +225,19 @@ export function App() {
     if (path !== location.pathname) history.replaceState(null, '', path + location.search + location.hash);
     setUnauthorizedHandler(unauthorized);
     boot();
-    return () => stopStream();
+    // A page that comes back from the cache of the browser, as after Back
+    // from a sign-in that did not finish, starts again. Without this, the
+    // person sees a page that waits for a move that ended.
+    const onShow = (e: PageTransitionEvent) => {
+      if (!e.persisted) return;
+      leaving = false;
+      boot();
+    };
+    addEventListener('pageshow', onShow);
+    return () => {
+      removeEventListener('pageshow', onShow);
+      stopStream();
+    };
   }, []);
 
   // The keys of the whole page: / and Escape.
@@ -289,6 +301,7 @@ export function App() {
       <Signin
         signinUrl={auth.signinUrl}
         expired={auth.expired}
+        returned={auth.returned}
         error={auth.error}
         here={here()}
         onToken={(t) => {

@@ -40,8 +40,10 @@ replaces the location with that path. Any other `next` returns to `/ui`, as
 today.
 
 The page goes to the sign-in on its own after a 401. It does not go again
-within one minute, and it does not go after the person signs out in the
-tab. In those two cases it shows a Sign in link and the token form.
+within ten minutes, and it does not go after the person signs out in the
+tab. In those two cases it shows a Sign in link and the token form. After a
+return from a sign-in without a session, the token form is open. A page
+that comes back from the cache of the browser, as after Back, starts again.
 
 ## 3. The static page and its content security policy
 
