@@ -9,7 +9,7 @@ import { useSelect } from '../state/store';
 import { dayWords, excerpt, personName, senderName } from '../lib/words';
 import { decide, react } from '../state/actions';
 import { attempt } from './notice';
-import { Avatar, Face, Markdown, When } from './common';
+import { Avatar, Face, InlineMarkdown, Markdown, When } from './common';
 import { DecisionCard } from './Decision';
 import { Icon, type IconName } from './icons';
 
@@ -207,7 +207,7 @@ export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, onReply }
         <div class={'sys ' + (e.event || '')} id={id} data-item data-seq={seq}>
           <p>
             <Icon name={SYS_ICON[e.event || ''] || 'dot'} />
-            <span>{e.text}</span> <When at={e.at} />
+            <InlineMarkdown text={e.text} /> <When at={e.at} />
           </p>
           {e.mirrors && <Reactions bridge={bridge} e={e} />}
         </div>

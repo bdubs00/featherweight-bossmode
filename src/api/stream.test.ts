@@ -92,6 +92,63 @@ describe('openStream', () => {
     expect(h.lastId()).toBe('5');
   });
 
+  it('connects again at once and stays live after a routine close', async () => {
+    const statuses: string[] = [];
+    const heads: Record<string, string>[] = [];
+    const slept: number[] = [];
+    let clock = 0;
+    let n = 0;
+    await new Promise<void>((resolve) => {
+      openStream({
+        onEvent: () => {},
+        onStatus: (s) => statuses.push(s),
+        now: () => clock,
+        sleep: async (ms) => {
+          slept.push(ms);
+        },
+        fetch: async (_url, init) => {
+          heads.push(init!.headers as Record<string, string>);
+          n++;
+          if (n === 1) {
+            // The front closes the stream after 15 minutes.
+            clock += 15 * 60_000;
+            return stream(['id: 1761000000000001\nevent: run\ndata: {"id":"r1","seq":1}\n\n']);
+          }
+          resolve();
+          return new Promise<Response>(() => {});
+        },
+      });
+    });
+    expect(statuses).toEqual(['connecting', 'live']);
+    expect(slept).toEqual([]);
+    expect(heads[1]['Last-Event-ID']).toBe('1761000000000001');
+  });
+
+  it('waits before it connects again when a stream closes at once', async () => {
+    const statuses: string[] = [];
+    const slept: number[] = [];
+    let n = 0;
+    await new Promise<void>((resolve) => {
+      openStream({
+        onEvent: () => {},
+        onStatus: (s) => statuses.push(s),
+        now: () => 0,
+        backoff: [7],
+        sleep: async (ms) => {
+          slept.push(ms);
+        },
+        fetch: async () => {
+          n++;
+          if (n === 1) return stream([': hello\n\n']);
+          resolve();
+          return new Promise<Response>(() => {});
+        },
+      });
+    });
+    expect(slept).toEqual([7]);
+    expect(statuses).toContain('lost');
+  });
+
   it('stops on a 401 and reports it', async () => {
     let calls = 0;
     const statuses: string[] = [];

@@ -19,8 +19,27 @@ export function canAlways(d: Decision): boolean {
   return !!d.tool && (r === 'default' || /^rule: ask /.test(r)) && !/^rule: ask (readonly|read-only|idempotent|destructive|parallel|parallelsafe)$/i.test(r);
 }
 
-/** DecidedLine says who decided and how. */
+/**
+ * DecidedLine says who decided and how. A card whose run stopped waiting
+ * without a decision has state deny, no decider, and a note that says why.
+ */
 function DecidedLine({ d }: { d: Decision }) {
+  if (!d.decidedBy && d.state === 'deny') {
+    return (
+      <p class="decided quiet">
+        <Icon name="stop" />
+        <span>
+          No decision: {d.note || 'the run stopped waiting.'}
+          {d.decidedAt && (
+            <>
+              {' '}
+              <When at={d.decidedAt} />
+            </>
+          )}
+        </span>
+      </p>
+    );
+  }
   const who = personName(d.decidedBy);
   const q = !!d.question;
   const words = q ? (d.state === 'allow' ? `${who} answered: ${d.answer || 'an answer'}` : `${who} declined the question`) : d.state === 'allow' ? `${who} allowed this` : `${who} denied this`;

@@ -135,6 +135,11 @@ export async function loadAgents(): Promise<void> {
   store.dispatch({ type: 'agents', agents });
 }
 
+export async function loadFleet(): Promise<void> {
+  const fleet = await once('fleet', () => api.fleet());
+  store.dispatch({ type: 'fleet', fleet });
+}
+
 export async function loadFaces(): Promise<void> {
   const faces = await once('faces', () => api.faces());
   store.dispatch({ type: 'faces', faces });
@@ -170,7 +175,7 @@ async function onEvent(e: StreamEvent): Promise<void> {
 /** reload reads the lists again, when the stream cannot resume. */
 async function reload(): Promise<void> {
   const s = store.get();
-  await Promise.allSettled([loadBridges(), loadFaces(), s.pages.loaded ? loadPages() : Promise.resolve()]);
+  await Promise.allSettled([loadBridges(), loadFaces(), s.pages.loaded ? loadPages() : Promise.resolve(), s.fleet ? loadFleet() : Promise.resolve()]);
   if (s.open) await Promise.allSettled([loadBridge(s.open), loadNewer(s.open)]);
 }
 

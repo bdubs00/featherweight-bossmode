@@ -4,7 +4,7 @@
 import type { ComponentChildren, JSX } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useFace } from '../lib/faces';
-import { renderMarkdown } from '../lib/markdown';
+import { renderInline, renderMarkdown } from '../lib/markdown';
 import type { Light as LightT } from '../lib/presence';
 import { useSelect } from '../state/store';
 import { clock, dayWords, personName } from '../lib/words';
@@ -61,6 +61,12 @@ export function Markdown({ text, base, handles, class: cls }: { text: string; ba
   const key = handles ? handles.join(',') : '';
   const html = useMemo(() => renderMarkdown(text, { base, handles }), [text, base, key]);
   return <div class={'md' + (cls ? ' ' + cls : '')} dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
+/** InlineMarkdown shows one line, such as a system line, sanitized and with no block element. */
+export function InlineMarkdown({ text }: { text: string }) {
+  const html = useMemo(() => renderInline(text), [text]);
+  return <span class="md-inline" dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
 /** When shows the time of a moment, with the day and the full time on hover. */

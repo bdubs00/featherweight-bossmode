@@ -5,9 +5,8 @@
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
-import type { Fleet as FleetT } from '../api/types';
 import { useSelect } from '../state/store';
-import { loadAgents, loadFaces } from '../state/actions';
+import { loadAgents, loadFaces, loadFleet } from '../state/actions';
 import { phaseOf } from '../lib/presence';
 import { ago } from '../lib/words';
 import { useRoving } from './keys';
@@ -16,7 +15,9 @@ import { Back, Empty, Face, Light } from './common';
 import { Icon } from './icons';
 
 export function Fleet() {
-  const [fleet, setFleet] = useState<FleetT | null>(null);
+  // The view comes from GET /v1/fleet, and the member and task events of
+  // the stream keep its phases current.
+  const fleet = useSelect((s) => s.fleet);
   const [busy, setBusy] = useState(false);
   const agents = useSelect((s) => s.agents);
   const faces = useSelect((s) => s.faces);
@@ -24,7 +25,7 @@ export function Fleet() {
   const read = async () => {
     setBusy(true);
     try {
-      setFleet(await api.fleet());
+      await loadFleet();
     } catch (e) {
       showError(e);
     }

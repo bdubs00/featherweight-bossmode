@@ -103,8 +103,9 @@ export const api = {
     return call<unknown>(run(id) + '/approvals/' + enc(approval), { method: 'POST', body: note ? { decision: 'allow', note } : { decision: 'allow' } });
   },
   cancel: (id: string) => call<unknown>(run(id) + '/cancel', { method: 'POST', body: {} }),
+  /** reactRun records a reaction on an event of a run (K2) and answers the run with its counts. */
   reactRun: (id: string, seq: number, reaction: ReactionKind, note?: string) =>
-    call<{ run: string; seq: number; reaction: ReactionKind; receipt: boolean }>(run(id) + '/reactions', {
+    call<Run>(run(id) + '/reactions', {
       method: 'POST',
       body: note ? { seq, reaction, note } : { seq, reaction },
     }),
@@ -120,7 +121,7 @@ export const api = {
     }),
   history: (path: string) => call<{ path: string; versions: PageVersion[] }>('/v1/pages/' + encPath(path) + '/history').then((r) => (r && r.versions) || []),
   search: (q: string, signal?: AbortSignal) =>
-    call<{ q: string; results: SearchHit[]; cut?: boolean }>('/v1/pages/search' + query({ q }), { signal }),
+    call<{ q: string; results: SearchHit[]; cut: boolean }>('/v1/pages/search' + query({ q }), { signal }),
 
   faces: () => call<{ faces: FaceMeta[] }>('/v1/faces').then((r) => (r && r.faces) || []),
   /** faceBlob reads a face as SVG bytes behind the token. */

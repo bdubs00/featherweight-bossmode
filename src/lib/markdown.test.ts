@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { renderMarkdown, safeHref, sanitize, stripFrontMatter } from './markdown';
+import { renderInline, renderMarkdown, safeHref, sanitize, stripFrontMatter } from './markdown';
 
 /** dom parses rendered HTML, so a test can look for what must not be there. */
 function dom(html: string): HTMLElement {
@@ -103,6 +103,18 @@ describe('renderMarkdown', () => {
     expect(box.querySelector('span')!.className).toBe('mention');
     expect(box.querySelector('code')!.className).toBe('language-go');
     expect(box.querySelector('p')!.hasAttribute('class')).toBe(false);
+  });
+});
+
+describe('renderInline', () => {
+  it('links the report of a bridge into the wiki and keeps no block', () => {
+    const box = dom(renderInline('The manager wrote the report: [bridges/b1/report.md](bridges/b1/report.md).'));
+    expect(box.querySelector('p')).toBeNull();
+    expect(box.querySelector('a')!.getAttribute('href')).toBe('#pages/bridges/b1/report.md');
+  });
+
+  it('keeps no attack in one line', () => {
+    clean(renderInline('<img src=x onerror=alert(1)> [x](javascript:alert(1)) <svg onload=alert(1)>'));
   });
 });
 

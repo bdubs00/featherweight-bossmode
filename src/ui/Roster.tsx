@@ -17,13 +17,17 @@ import { Icon } from './icons';
 
 const DRAG_TYPE = 'application/x-fw-member';
 
-type Ask = { kind: 'fire'; m: Member } | { kind: 'task'; m: Member } | { kind: 'add' } | null;
+type Ask = { kind: 'fire'; m: Member } | { kind: 'task'; m: Member } | { kind: 'seat'; m: Member } | { kind: 'add' } | null;
 
 const MemberRow = memo(function MemberRow({ bridge, handle, onAsk, current }: { bridge: string; handle: string; onAsk: (a: Ask) => void; current: boolean }) {
   const m = useSelect((s) => (s.rosters[bridge] ? s.rosters[bridge].byHandle[handle] : undefined));
   if (!m) return null;
   const light = presenceOf(m.presence);
   const run = m.runs[m.runs.length - 1];
+  // A seat whose newest run failed, stopped at a limit, or was canceled gets
+  // no message. A new task seats it again.
+  const runState = useSelect((s) => (run && s.runs[run] ? s.runs[run].state : ''));
+  const stopped = m.presence === 'error' || runState === 'failed' || runState === 'canceled';
   const open = () => run && go({ place: 'bridge', id: bridge, pane: 'run', run, handle: m.handle });
   return (
     <li
@@ -56,6 +60,7 @@ const MemberRow = memo(function MemberRow({ bridge, handle, onAsk, current }: { 
           items={[
             { label: 'Open its run', onSelect: open },
             { label: m.muted ? 'Unmute' : 'Mute', hint: m.muted ? 'It gets the messages of the channel again.' : 'It gets no broadcast, only a message to it.', onSelect: () => attempt(() => patchMember(bridge, m.handle, { muted: !m.muted })) },
+            ...(stopped ? [{ label: 'Seat again', hint: 'Its newest run stopped, so it gets no message. A new run starts with its task.', onSelect: () => onAsk({ kind: 'seat', m }) }] : []),
             { label: 'Change its task', onSelect: () => onAsk({ kind: 'task', m }) },
             { label: 'Fire', danger: true, hint: 'Its open runs stop. Its Task stays in its pool.', onSelect: () => onAsk({ kind: 'fire', m }) },
           ]}
@@ -113,13 +118,13 @@ function AddMember({ bridge, onClose }: { bridge: string; onClose: () => void })
   );
 }
 
-function NewTask({ bridge, m, onClose }: { bridge: string; m: Member; onClose: () => void }) {
+function NewTask({ bridge, m, seat, onClose }: { bridge: string; m: Member; seat?: boolean; onClose: () => void }) {
   const [task, setTask] = useState(m.task);
   const [busy, setBusy] = useState(false);
   return (
     <Confirm
-      title={'A new task for ' + m.handle}
-      confirm="Save the task"
+      title={seat ? 'Seat ' + m.handle + ' again' : 'A new task for ' + m.handle}
+      confirm={seat ? 'Seat again' : 'Save the task'}
       busy={busy || !task.trim()}
       onCancel={onClose}
       onConfirm={async () => {
@@ -129,6 +134,7 @@ function NewTask({ bridge, m, onClose }: { bridge: string; m: Member; onClose: (
         if (ok) onClose();
       }}
     >
+      {seat && <p>A new run of {m.handle} starts with this task, and the channel reaches it again. You can change the task first.</p>}
       <label class="fld">
         <span>Task</span>
         <textarea value={task} onInput={(e) => setTask((e.target as HTMLTextAreaElement).value)} />
@@ -218,6 +224,7 @@ export function Roster({ bridge, current }: { bridge: string; current?: string }
         </Confirm>
       )}
       {ask && ask.kind === 'task' && <NewTask bridge={bridge} m={ask.m} onClose={() => setAsk(null)} />}
+      {ask && ask.kind === 'seat' && <NewTask bridge={bridge} m={ask.m} seat onClose={() => setAsk(null)} />}
       {ask && ask.kind === 'add' && <AddMember bridge={bridge} onClose={() => setAsk(null)} />}
     </section>
   );

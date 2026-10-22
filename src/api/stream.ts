@@ -109,6 +109,8 @@ export interface StreamOptions {
   /** The waits between attempts, in milliseconds. A test sets them short. */
   backoff?: number[];
   sleep?: (ms: number) => Promise<void>;
+  /** The clock, in milliseconds. A test sets it. */
+  now?: () => number;
 }
 
 export interface StreamHandle {
@@ -120,6 +122,15 @@ export interface StreamHandle {
 const BACKOFF = [1000, 2000, 4000, 8000, 15000];
 
 /**
+ * QUIET_MS is how long a stream must have lived for its clean close to
+ * count as a routine close. The front closes each stream after 15 minutes,
+ * and the page then connects again at once, with no lost state. A stream
+ * that closes sooner waits first, so a server that closes at once never
+ * makes a tight loop.
+ */
+export const QUIET_MS = 5000;
+
+/**
  * openStream reads the stream until close. After an error or an end, it
  * waits and connects again with Last-Event-ID. A 401 stops it.
  */
@@ -128,6 +139,7 @@ export function openStream(opts: StreamOptions): StreamHandle {
   const doFetch = opts.fetch || ((i, init) => fetch(i, init));
   const backoff = opts.backoff || BACKOFF;
   const sleep = opts.sleep || ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  const now = opts.now || (() => Date.now());
   const ctl = new AbortController();
   let lastId = opts.lastId || '';
   let closed = false;
@@ -175,9 +187,12 @@ export function openStream(opts: StreamOptions): StreamHandle {
 
   (async () => {
     let attempt = 0;
+    let quiet = false;
     while (!closed) {
-      status(attempt === 0 ? 'connecting' : 'lost');
+      // After a routine close the light stays on Live while the page connects again.
+      if (!quiet) status(attempt === 0 ? 'connecting' : 'lost');
       let opened = false;
+      const start = now();
       try {
         opened = await once();
         if (!opened && !closed) {
@@ -189,6 +204,12 @@ export function openStream(opts: StreamOptions): StreamHandle {
         // A lost connection or a failed answer. The loop tries again.
       }
       if (closed) break;
+      if (opened && now() - start >= QUIET_MS) {
+        attempt = 0;
+        quiet = true;
+        continue;
+      }
+      quiet = false;
       status('lost');
       attempt = opened ? 1 : attempt + 1;
       await sleep(backoff[Math.min(attempt - 1, backoff.length - 1)]);

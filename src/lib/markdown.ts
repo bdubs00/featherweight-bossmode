@@ -185,6 +185,15 @@ export function renderMarkdown(text: string, opts: RenderOptions = {}): string {
   return sanitize(html, opts);
 }
 
+/**
+ * renderInline turns one line of Markdown, such as a system line with the
+ * link of a report, into sanitized HTML with no block element.
+ */
+export function renderInline(text: string, opts: RenderOptions = {}): string {
+  const html = md.parseInline(String(text || '')) as string;
+  return sanitize(html, opts);
+}
+
 /** stripFrontMatter removes the front matter of a wiki page and returns its title. */
 export function stripFrontMatter(text: string): { body: string; title: string; tags: string[] } {
   const m = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(text);

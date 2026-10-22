@@ -44,19 +44,19 @@ function FileBox({ run, path, onClose }: { run: string; path: string; onClose: (
   );
 }
 
-/** ResultThumbs records a reaction on the result of the run (K2). */
+/** ResultThumbs records a reaction on the result of the run (K2), with the seq of its fw.run.finished. */
 function ResultThumbs({ run, seq }: { run: string; seq: number }) {
   const counts = useSelect((s) => (s.runs[run] && s.runs[run].reactions) || {});
   const [done, setDone] = useState<string>('');
   const [heart, setHeart] = useState(false);
   const [note, setNote] = useState('');
+  // The route answers the run with its counts, which replace the counts here.
   const send = async (k: ReactionKind, n?: string) => {
-    let receipt = false;
     const ok = await attempt(async () => {
       const r = await api.reactRun(run, seq, k, n);
-      receipt = r.receipt;
+      if (r && typeof r.id === 'string') store.dispatch({ type: 'run', run: r });
     });
-    if (ok) setDone(k === 'heart' ? 'You hearted this result.' : receipt ? 'Your thumb counts as a quality receipt.' : 'Your thumb is on the run.');
+    if (ok) setDone(k === 'heart' ? 'Your heart is recorded.' : 'Your thumb is recorded.');
   };
   return (
     <div class="result-thumbs">

@@ -10,6 +10,8 @@ import type {
   Bridge,
   Entry,
   FaceMeta,
+  Fleet,
+  FleetChange,
   Member,
   MemberEventData,
   MessageEventData,
@@ -47,6 +49,8 @@ export interface State {
   faces: Record<string, FaceMeta>;
   /** The agents that the caller can see, from GET /v1/agents. */
   agents: Agent[] | null;
+  /** The members and the pools of the fleet, from GET /v1/fleet and the member and task events. */
+  fleet: Fleet | null;
   /** The bridge that the person reads now, or "". */
   open: string;
   stream: { status: StreamStatus; lastId: string };
@@ -64,6 +68,7 @@ export const initialState: State = {
   pages: { byPath: {}, loaded: false },
   faces: {},
   agents: null,
+  fleet: null,
   open: '',
   stream: { status: 'connecting', lastId: '' },
   resets: 0,
@@ -83,6 +88,7 @@ export type Action =
   | { type: 'pages'; pages: PageMeta[] }
   | { type: 'page'; page: PageEventData }
   | { type: 'agents'; agents: Agent[] }
+  | { type: 'fleet'; fleet: Fleet }
   | { type: 'faces'; faces: FaceMeta[] }
   | { type: 'face'; face: FaceMeta }
   | { type: 'stream'; event: StreamEvent }
@@ -254,6 +260,47 @@ function applyPage(state: State, p: PageEventData): State {
   return { ...state, pages: { ...state.pages, byPath } };
 }
 
+/** taskKey tells whether a task event names a Task of a pool: atespace/name, or the name alone. */
+function sameTask(member: string, atespace: string, name: string): boolean {
+  return member === atespace + '/' + name || member === name;
+}
+
+/** applyFleet applies a member or a task event to a loaded fleet view. */
+function applyFleet(state: State, c: FleetChange): State {
+  const f = state.fleet;
+  if (!f || !c || typeof c.member !== 'string') return state;
+  if (c.kind === 'member') {
+    const i = f.members.findIndex((m) => m.name === c.member);
+    let members = f.members;
+    if (c.gone) {
+      if (i < 0) return state;
+      members = f.members.filter((_, j) => j !== i);
+    } else if (i >= 0) {
+      if (!c.state || f.members[i].state === c.state) return state;
+      members = f.members.map((m, j) => (j === i ? { ...m, state: c.state as string, lastSeen: c.time || m.lastSeen } : m));
+    } else {
+      members = [...f.members, { name: c.member, state: c.state || 'unknown', lastSeen: c.time, canForward: false, accessMode: '', agents: [], active: 0, inputRequired: 0 }];
+    }
+    return { ...state, fleet: { ...f, members } };
+  }
+  if (c.kind === 'task') {
+    let changed = false;
+    const pools = (f.pools || []).map((p) => {
+      const i = p.tasks.findIndex((t) => sameTask(c.member, p.atespace, t.name));
+      if (i < 0) return p;
+      if (c.gone) {
+        changed = true;
+        return { ...p, tasks: p.tasks.filter((_, j) => j !== i) };
+      }
+      if (!c.phase || p.tasks[i].phase === c.phase) return p;
+      changed = true;
+      return { ...p, tasks: p.tasks.map((t, j) => (j === i ? { ...t, phase: c.phase as string } : t)) };
+    });
+    return changed ? { ...state, fleet: { ...f, pools } } : state;
+  }
+  return state;
+}
+
 /** applyStream applies one event of the stream. An unknown kind changes nothing. */
 export function applyStream(state: State, ev: StreamEvent): State {
   let next = state;
@@ -282,6 +329,12 @@ export function applyStream(state: State, ev: StreamEvent): State {
     case 'face': {
       const f = d as unknown as FaceMeta;
       if (f && typeof f.agent === 'string') next = reduce(state, { type: 'face', face: f });
+      break;
+    }
+    case 'member':
+    case 'task': {
+      const c = d as unknown as FleetChange;
+      if (c && typeof c === 'object') next = applyFleet(state, { ...c, kind: ev.kind });
       break;
     }
     case 'reset':
@@ -364,6 +417,8 @@ export function reduce(state: State, a: Action): State {
       return applyPage(state, a.page);
     case 'agents':
       return { ...state, agents: a.agents };
+    case 'fleet':
+      return { ...state, fleet: a.fleet };
     case 'faces': {
       const faces: Record<string, FaceMeta> = {};
       for (const f of a.faces) faces[f.agent] = state.faces[f.agent] && state.faces[f.agent].hash === f.hash && JSON.stringify(state.faces[f.agent]) === JSON.stringify(f) ? state.faces[f.agent] : f;

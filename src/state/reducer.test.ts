@@ -182,6 +182,28 @@ describe('the reducer', () => {
     expect(s.faces.reviewer.hash).toBe('f2');
   });
 
+  it('moves a Task and a member of the fleet view, and drops one that is gone', () => {
+    const fleet = {
+      name: 'front-0',
+      members: [{ name: 'default/crew-2', state: 'suspended', lastSeen: '', canForward: true, accessMode: 'static', agents: [], active: 0, inputRequired: 0 }],
+      pools: [{ name: 'crew', atespace: 'default', agent: 'migrator', intake: 'q', wanted: 2, actual: 2, ready: 1, hash: 'h', checkedAt: '', tasks: [{ name: 'crew-1', phase: 'Running', current: true }, { name: 'crew-2', phase: 'Suspended', current: true }] }],
+    };
+    let s = reduce(initialState, { type: 'fleet', fleet });
+    const before = s.fleet!.pools![0].tasks[0];
+    s = reduce(s, { type: 'stream', event: ev('task', { kind: 'task', member: 'default/crew-2', phase: 'Running', time: 't' }) });
+    expect(s.fleet!.pools![0].tasks[1].phase).toBe('Running');
+    expect(s.fleet!.pools![0].tasks[0]).toBe(before);
+    s = reduce(s, { type: 'stream', event: ev('member', { kind: 'member', member: 'default/crew-2', state: 'live', time: 't' }) });
+    expect(s.fleet!.members[0].state).toBe('live');
+    s = reduce(s, { type: 'stream', event: ev('task', { kind: 'task', member: 'default/crew-1', gone: true, time: 't' }) });
+    expect(s.fleet!.pools![0].tasks.map((t) => t.name)).toEqual(['crew-2']);
+    s = reduce(s, { type: 'stream', event: ev('member', { kind: 'member', member: 'default/crew-2', gone: true, time: 't' }) });
+    expect(s.fleet!.members).toEqual([]);
+    // Without a loaded view, the events change nothing.
+    const s0 = reduce(initialState, { type: 'stream', event: ev('task', { kind: 'task', member: 'x', phase: 'Running', time: 't' }, '') });
+    expect(s0).toBe(initialState);
+  });
+
   it('counts a reset, so the page loads again', () => {
     const s = reduce(initialState, { type: 'stream', event: ev('reset', null) });
     expect(s.resets).toBe(1);
