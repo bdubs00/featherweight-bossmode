@@ -25,5 +25,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    // tokens.test.ts reads the tokens as text, so the tests process that file.
+    css: { include: [/tokens\.css/] },
   },
 });

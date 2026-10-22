@@ -1,0 +1,199 @@
+/* The tokens of the page. docs/DESIGN.md, section 4, names each one and its
+   job. A screen uses these and adds no color, radius, shadow, or type size
+   of its own.
+
+   The light theme is snow on platinum. The graphite theme redefines the same
+   names: under prefers-color-scheme: dark when the person picked no theme,
+   and under data-theme="dark" when the person picked graphite. The accent
+   and its label color come from the deployment, and src/lib/theme.ts sets
+   them on the root element. */
+
+:root {
+  color-scheme: light;
+
+  /* The six base values. */
+  --paper: #f3f3ef;
+  --chrome: #dcdcd6;
+  --line: #c4c4bc;
+  --recess: #ecece7;
+  --ink: #000000;
+  --muted: #55554f;
+
+  /* Derived values, one job each. */
+  --line-soft: #e2e2dc;
+  --raised: #dcdcd6;
+  --raised-line: #c4c4bc;
+  --sheen: #ffffff;
+  --key: #f3f3ef;
+  --edge: #000000;
+  --drop: #000000;
+  --groove-chrome: #d2d2cc;
+  --card: #f3f3ef;
+  --card-groove: #dcdcd6;
+  --on-ink: #f3f3ef;
+  --placeholder: #8a8a82;
+  --wash-need: #fff7e8;
+
+  /* Status lights and their words. */
+  --led-green: #1e9e45;
+  --led-amber: #f0a400;
+  --led-red: #d1281f;
+  --led-grey: #9a9a92;
+  --word-green: #177a36;
+  --word-amber: #8a5500;
+  --word-red: #a8201a;
+
+  /* The accent. A deployment changes the color, never its three uses. */
+  --accent: #ff4d00;
+  --on-accent: #000000;
+
+  /* The hues of the marks of agents. The manager takes ink. */
+  --mark-0: #2b4a8c;
+  --mark-1: #b5531e;
+  --mark-2: #3f7a3a;
+  --mark-3: #6b4c9a;
+  --mark-4: #8c6a1e;
+  --mark-5: #1f6b73;
+  --mark-6: #9c2f52;
+  --mark-7: #4d5866;
+
+  /* Type. */
+  --font: 'Archivo Variable', Archivo, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --mono: ui-monospace, Menlo, Consolas, 'Liberation Mono', monospace;
+  --t-title: 22px;
+  --t-title-lh: 28px;
+  --t-heading: 18px;
+  --t-heading-lh: 24px;
+  --t-body: 15px;
+  --t-body-lh: 22px;
+  --t-meta: 13px;
+  --t-meta-lh: 18px;
+  --t-caption: 12px;
+  --t-caption-lh: 16px;
+  --t-code: 13px;
+  --t-code-lh: 18px;
+
+  /* Space, size, and radius. */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --h-header: 56px;
+  --h-row: 44px;
+  --h-control: 36px;
+  --h-small: 32px;
+  --groove: 8px;
+  --w-appbar: 76px;
+  --w-list: 300px;
+  --w-details: 340px;
+  --r: 4px;
+  --r-led: 2px;
+
+  /* Elevation. Only the overlay carries a soft shadow. */
+  --e-key: 0 1px 0 var(--drop);
+  --e-primary: 0 2px 0 var(--drop), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  --e-card: 0 2px 0 var(--drop);
+  --e-chip: 0 1px 0 var(--line);
+  --e-recess: inset 0 1px 2px rgba(0, 0, 0, 0.14);
+  --e-overlay: 0 2px 0 var(--drop), 0 12px 24px rgba(0, 0, 0, 0.14);
+  --e-selected: inset 0 1px 0 var(--sheen);
+  --led-ring: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+
+  /* Motion. Three things move, and reduced motion stops all three. */
+  --m-breathe: 2.4s ease-in-out infinite;
+  --m-settle: 0.24s ease-out;
+  --m-slide: 0.16s ease-out;
+
+  /* Layers. */
+  --z-menu: 30;
+  --z-notice: 40;
+  --z-dialog: 50;
+}
+
+/* Graphite, for a system in the dark scheme when the person picked no theme. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --paper: #353532;
+    --chrome: #2a2a28;
+    --line: #4a4a46;
+    --recess: #2e2e2b;
+    --ink: #f3f3ef;
+    --muted: #b8b8b0;
+    --line-soft: #3e3e3b;
+    --raised: #44443f;
+    --raised-line: #55554f;
+    --sheen: #55554f;
+    --key: #44443f;
+    --edge: #1a1a18;
+    --drop: #000000;
+    --groove-chrome: #323230;
+    --card: #3b3b38;
+    --card-groove: #2e2e2b;
+    --on-ink: #000000;
+    --placeholder: #8a8a82;
+    --wash-need: #3f3828;
+    --led-grey: #6e6e68;
+    --word-green: #4ccb70;
+    --word-amber: #f0a400;
+    --word-red: #ff7b72;
+    --mark-0: #7fa1e8;
+    --mark-1: #e8905a;
+    --mark-2: #7cc47a;
+    --mark-3: #b89ae0;
+    --mark-4: #d9b45a;
+    --mark-5: #6cc4cc;
+    --mark-6: #e88aa8;
+    --mark-7: #a9b6c6;
+    --e-key: 0 1px 0 #000000, inset 0 1px 0 var(--sheen);
+    --e-chip: 0 1px 0 #000000;
+    --e-recess: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+    --e-overlay: 0 2px 0 var(--drop), 0 12px 24px rgba(0, 0, 0, 0.4);
+    --e-selected: inset 0 1px 0 var(--sheen);
+  }
+}
+
+/* Graphite, when the person picked it. The block repeats the values above,
+   because CSS has no way to share one block between a media query and an
+   attribute. tokens.test.ts checks that the two blocks stay equal. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --paper: #353532;
+  --chrome: #2a2a28;
+  --line: #4a4a46;
+  --recess: #2e2e2b;
+  --ink: #f3f3ef;
+  --muted: #b8b8b0;
+  --line-soft: #3e3e3b;
+  --raised: #44443f;
+  --raised-line: #55554f;
+  --sheen: #55554f;
+  --key: #44443f;
+  --edge: #1a1a18;
+  --drop: #000000;
+  --groove-chrome: #323230;
+  --card: #3b3b38;
+  --card-groove: #2e2e2b;
+  --on-ink: #000000;
+  --placeholder: #8a8a82;
+  --wash-need: #3f3828;
+  --led-grey: #6e6e68;
+  --word-green: #4ccb70;
+  --word-amber: #f0a400;
+  --word-red: #ff7b72;
+  --mark-0: #7fa1e8;
+  --mark-1: #e8905a;
+  --mark-2: #7cc47a;
+  --mark-3: #b89ae0;
+  --mark-4: #d9b45a;
+  --mark-5: #6cc4cc;
+  --mark-6: #e88aa8;
+  --mark-7: #a9b6c6;
+  --e-key: 0 1px 0 #000000, inset 0 1px 0 var(--sheen);
+  --e-chip: 0 1px 0 #000000;
+  --e-recess: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+  --e-overlay: 0 2px 0 var(--drop), 0 12px 24px rgba(0, 0, 0, 0.4);
+  --e-selected: inset 0 1px 0 var(--sheen);
+}

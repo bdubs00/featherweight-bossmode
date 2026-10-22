@@ -27,6 +27,18 @@ export interface BossConfig {
   manager: ManagerConfig | null;
   placement: Placement;
   maxMembers: number;
+  /** The theme of the deployment. A workbench without one leaves it out. */
+  theme?: ThemeSettings | null;
+}
+
+/** The theme of a deployment, from GET /v1/bossmode. Each field is optional. */
+export interface ThemeSettings {
+  /** The accent color, as a hex color such as #FF4D00. */
+  accent?: string;
+  /** The name of the organization that runs the platform. */
+  name?: string;
+  /** The path of the logo on this origin, such as /v1/bossmode/logo. */
+  logo?: string;
 }
 
 export interface ManagerConfig {
@@ -186,6 +198,12 @@ export interface Entry {
   mirrors?: Mirror | null;
   reactions?: Partial<Record<ReactionKind, string[]>>;
   decision?: Decision | null;
+  /**
+   * True on a stream event that carries a cut entry: a card without
+   * decision.input and decision.schema. The page reads the entry again with
+   * ?from=<seq>&limit=1 and never shows the cut card.
+   */
+  partial?: boolean;
 }
 
 /** One page of the channel, as the transcript route pages. */
@@ -466,4 +484,79 @@ export interface FleetChange {
   phase?: string;
   gone?: boolean;
   time: string;
+}
+
+/* ---------- skills and tools ---------- */
+
+/**
+ * Where a skill comes from: imported by an admin (from a marketplace, a
+ * URL, a pasted SKILL.md, or uploaded files), local to the configuration,
+ * or offered by a tool server.
+ */
+export type SkillOrigin = 'imported' | 'local' | 'server';
+
+/**
+ * A skill of GET /v1/bossmode/skills: the keys of the front matter of its
+ * SKILL.md, where it comes from, and the agents that can load it.
+ */
+export interface Skill {
+  name: string;
+  description: string;
+  origin: SkillOrigin;
+  /** The tool server of a skill of origin server. */
+  server?: string;
+  /** For an imported skill: the marketplace or the address it came from. */
+  source?: string;
+  license?: string;
+  'allowed-tools'?: string[];
+  /** The agents that can load the skill. */
+  agents: string[];
+  /** The slash command of the skill in a one-on-one composer, such as /ansible-style. */
+  slash?: string;
+}
+
+/** A tool of GET /v1/bossmode/skills: built in, or from a tool server. */
+export interface Tool {
+  /** The id of the tool, unique over the fleet, such as bash or github/create_issue. */
+  id: string;
+  name: string;
+  description: string;
+  origin: 'builtin' | 'server';
+  server?: string;
+  agents: string[];
+}
+
+/** The answer of GET /v1/bossmode/skills. */
+export interface SkillsList {
+  skills: Skill[];
+  tools: Tool[];
+}
+
+/** The answer of GET /v1/bossmode/skills/{name}: the skill and the text of its SKILL.md. */
+export interface SkillText extends Skill {
+  text: string;
+  files?: { path: string; size: number }[];
+}
+
+/** A marketplace that the admin configured, from GET /v1/bossmode/marketplaces. */
+export interface Marketplace {
+  name: string;
+  url: string;
+  skills: { name: string; description: string }[];
+}
+
+/** The source of a skill to preview: the four avenues of Add skill. */
+export type SkillSource =
+  | { kind: 'marketplace'; marketplace: string; skill: string }
+  | { kind: 'url'; url: string }
+  | { kind: 'text'; text: string }
+  | { kind: 'files'; files: { path: string; text: string }[] };
+
+/** The answer of POST /v1/bossmode/skills/preview: what Install would add. */
+export interface SkillPreview {
+  /** The token of the preview, for POST /v1/bossmode/skills/install. */
+  token: string;
+  skill: Skill;
+  text: string;
+  files: { path: string; size: number }[];
 }

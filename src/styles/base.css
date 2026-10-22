@@ -1,0 +1,278 @@
+/* The base of the page: the reset, the body, the type roles, links, code,
+   focus, the text of Markdown, and the three motions. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+[hidden] {
+  display: none !important;
+}
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+body {
+  background: var(--chrome);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: var(--t-body);
+  line-height: var(--t-body-lh);
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+}
+h1,
+h2,
+h3,
+h4,
+p {
+  margin: 0;
+}
+
+/* The type roles of section 4.2 of the design. */
+.t-title {
+  font-size: var(--t-title);
+  line-height: var(--t-title-lh);
+  font-weight: 800;
+  font-stretch: 110%;
+  letter-spacing: -0.025em;
+}
+.t-heading {
+  font-size: var(--t-heading);
+  line-height: var(--t-heading-lh);
+  font-weight: 800;
+  font-stretch: 108%;
+  letter-spacing: -0.02em;
+}
+.t-sub {
+  font-size: var(--t-body);
+  line-height: var(--t-body-lh);
+  font-weight: 700;
+}
+.t-meta {
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+  color: var(--muted);
+}
+.t-caption {
+  font-size: var(--t-caption);
+  line-height: var(--t-caption-lh);
+  font-weight: 700;
+}
+.t-code,
+code,
+pre,
+kbd {
+  font-family: var(--mono);
+  font-size: var(--t-code);
+  line-height: var(--t-code-lh);
+}
+.muted {
+  color: var(--muted);
+}
+.clip {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Links are ink. Hover underlines them; the accent never marks a link. */
+a {
+  color: var(--ink);
+}
+a:hover {
+  text-decoration-thickness: 2px;
+}
+
+/* Inline code sits on the raised ground. */
+code {
+  background: var(--raised);
+  border-radius: var(--r);
+  padding: 1px 5px;
+}
+pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+}
+
+/* Focus is a 2-pixel ink outline, never the accent. */
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+/* A heading that takes the focus after a move shows no ring. */
+h1[tabindex='-1']:focus,
+h2[tabindex='-1']:focus {
+  outline: none;
+}
+
+/* A text only for a screen reader. */
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* The small icons of the page, drawn by src/ui/icons.tsx. */
+.ic {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  vertical-align: -3px;
+}
+
+/* The text of an agent, a person, or a page of the wiki. */
+.md {
+  overflow-wrap: anywhere;
+}
+.md > :first-child {
+  margin-top: 0;
+}
+.md > :last-child {
+  margin-bottom: 0;
+}
+.md p,
+.md ul,
+.md ol,
+.md blockquote,
+.md table,
+.md pre {
+  margin: 0 0 var(--s-2);
+}
+.md ul,
+.md ol {
+  padding-left: 22px;
+}
+.md pre {
+  background: var(--recess);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  box-shadow: var(--e-recess);
+  padding: 10px 12px;
+  white-space: pre-wrap;
+  max-height: 20em;
+  overflow: auto;
+}
+.md blockquote {
+  border-left: 2px solid var(--line);
+  padding-left: var(--s-3);
+  color: var(--muted);
+}
+.md table {
+  border-collapse: collapse;
+  font-size: 14px;
+  display: block;
+  overflow: auto;
+}
+.md th,
+.md td {
+  border: 1px solid var(--line-soft);
+  padding: var(--s-1) var(--s-2);
+  text-align: left;
+}
+.md h1,
+.md h2,
+.md h3,
+.md h4 {
+  margin: var(--s-4) 0 var(--s-2);
+  font-weight: 800;
+  line-height: 1.25;
+}
+.md h1 {
+  font-size: 22px;
+  font-stretch: 110%;
+  letter-spacing: -0.025em;
+}
+.md h2 {
+  font-size: 18px;
+  font-stretch: 108%;
+  letter-spacing: -0.02em;
+}
+.md h3,
+.md h4 {
+  font-size: 15px;
+  font-weight: 700;
+}
+.md a {
+  font-weight: 600;
+}
+.md a:not([href]) {
+  color: var(--muted);
+  text-decoration: underline dotted;
+}
+.md .mention {
+  font-weight: 700;
+}
+.md hr {
+  border: 0;
+  border-top: 1px solid var(--line-soft);
+  margin: var(--s-4) 0;
+}
+
+/* The three motions of section 4.5 of the design. */
+@keyframes breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 3px var(--led-amber), var(--led-ring);
+  }
+  50% {
+    box-shadow: 0 0 10px 2px var(--led-amber), var(--led-ring);
+  }
+}
+@keyframes settle {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes slidein {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .breathe {
+    animation: breathe var(--m-breathe);
+  }
+  .settle {
+    animation: settle var(--m-settle) both;
+  }
+  .slidein {
+    animation: slidein var(--m-slide) both;
+  }
+}
+/* Reduced motion stops every motion, also any that a screen adds by mistake. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
