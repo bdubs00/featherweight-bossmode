@@ -57,9 +57,12 @@ export interface SafeLink {
 
 /**
  * safeHref returns the address that a link keeps, or null. A link keeps an
- * http, https, or mailto address. A relative link to a .md file, and a link
- * #page/<path> of the backend, become a link to that page of the wiki in
- * the page. Any other link loses its address and stays as text.
+ * http, https, or mailto address. A relative link to a .md file, which
+ * resolves against the folder of the page in base, and a link #page/<path>
+ * of the backend, become a link to that page of the wiki in the page. A
+ * relative link that climbs above the root of the wiki, and any other link,
+ * lose the address and stay as text, because a relative address would load
+ * the page with no route.
  */
 export function safeHref(href: string, base = ''): SafeLink | null {
   const raw = String(href || '').trim();
@@ -78,9 +81,20 @@ export function safeHref(href: string, base = ''): SafeLink | null {
     return { href: '#pages/' + parts.map(encodeURIComponent).join('/'), external: false };
   }
   if (!raw || raw.startsWith('#')) return null;
+  const dir = base.includes('/') ? base.slice(0, base.lastIndexOf('/') + 1) : '';
+  // A relative path resolves against the folder of the page. A path that
+  // climbs above the root of the wiki points outside it, so it opens no
+  // page of the wiki.
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(raw) && !raw.startsWith('/') && !raw.startsWith('\\')) {
+    let depth = dir.split('/').filter(Boolean).length;
+    for (const part of raw.split(/[?#]/)[0].split('/')) {
+      if (part === '..') depth--;
+      else if (part && part !== '.') depth++;
+      if (depth < 0) return null;
+    }
+  }
   let u: URL;
   try {
-    const dir = base.includes('/') ? base.slice(0, base.lastIndexOf('/') + 1) : '';
     u = new URL(raw, WIKI + dir.split('/').map(encodeURIComponent).join('/'));
   } catch {
     return null;

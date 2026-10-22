@@ -135,6 +135,15 @@ describe('safeHref', () => {
     expect(safeHref('ftp://example.com')).toBeNull();
   });
 
+  it('resolves a relative path against the folder of the page, and keeps a path that climbs above the wiki out of it', () => {
+    expect(safeHref('../../runbooks/ansible-style.md', 'bridges/01m5h96ejx8yh5fqkgce83wa5z/plan.md')).toEqual({ href: '#pages/runbooks/ansible-style.md', external: false });
+    expect(safeHref('./notes.md', 'bridges/b1/plan.md')).toEqual({ href: '#pages/bridges/b1/notes.md', external: false });
+    expect(safeHref('../../../outside.md', 'bridges/b1/plan.md')).toBeNull();
+    expect(safeHref('../x.md')).toBeNull();
+    expect(safeHref('a/../../x.md', 'index.md')).toBeNull();
+    expect(safeHref('../../roles/cron/tasks/main.yml', 'bridges/b1/plan.md')).toBeNull();
+  });
+
   it('maps #page/<path> and #pages/<path> to the wiki, and only a path of a page', () => {
     expect(safeHref('#page/bridges/b1/report.md')).toEqual({ href: '#pages/bridges/b1/report.md', external: false });
     expect(safeHref('#pages/a%20b.md')).toEqual({ href: '#pages/a%20b.md', external: false });

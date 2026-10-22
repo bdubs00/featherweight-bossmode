@@ -544,6 +544,12 @@ before it sends a new page, adds `.md` when the person leaves it out, and
 shows the names in the tree without `.md`. The page offers no Edit on
 `_index.md`.
 
+A link inside a page that names a relative path, such as
+`../../runbooks/ansible-style.md` in `bridges/<id>/plan.md`, resolves
+against the folder of the page and opens the page of the wiki at
+`#pages/<path>`. A link that climbs above the root of the wiki, or that
+names a file that is not a page, keeps its text and no address.
+
 Writes:
 
 - `PUT` takes `{"text": "...", "summary": "..."}` as JSON. The page sends

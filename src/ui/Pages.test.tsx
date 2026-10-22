@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { PageMeta } from '../api/types';
 import { PageEditor, PageTree, PageView, foldersOf } from './Pages';
+import { parseRoute } from '../lib/route';
 import { click, fakeApi, fieldOf, keyNamed, mount, problem, settle, typeIn, unmountAll } from './testkit-c';
 
 const meta = (path: string, at = '2026-10-22T00:00:00Z'): PageMeta => ({ path, title: '', hash: 'h-' + path, size: 1, by: 'agent:writer', at });
@@ -44,6 +45,24 @@ describe('a page', () => {
     expect(keyNamed(el, 'History')).toBeTruthy();
     expect(keyNamed(el, 'Edit')).toBeUndefined();
     expect(el.querySelector('.parts')!.textContent).toContain('bossmode');
+  });
+});
+
+describe('the links of a page', () => {
+  it('resolve a relative link against the folder of the page and open the page of the wiki, and keep a path outside the wiki as text', async () => {
+    const text = 'Follow [the house style](../../runbooks/ansible-style.md), [the notes](notes.md), and [the site](https://example.com/style). [The root](../../../outside.md) and [a file](../../roles/cron/tasks/main.yml) are not pages.';
+    api = fakeApi({ 'GET /v1/pages/bridges/br-1/plan.md': { ...page(text, 'hp'), path: 'bridges/br-1/plan.md', title: 'Plan' } });
+    const el = mount(<PageView path="bridges/br-1/plan.md" />);
+    await settle();
+    const links = [...el.querySelectorAll('.article a')].map((a) => [a.textContent, a.getAttribute('href')]);
+    expect(links).toEqual([
+      ['the house style', '#pages/runbooks/ansible-style.md'],
+      ['the notes', '#pages/bridges/br-1/notes.md'],
+      ['the site', 'https://example.com/style'],
+      ['The root', null],
+      ['a file', null],
+    ]);
+    expect(parseRoute('#pages/runbooks/ansible-style.md')).toEqual({ place: 'pages', path: 'runbooks/ansible-style.md', mode: 'read' });
   });
 });
 
