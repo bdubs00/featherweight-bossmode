@@ -10,6 +10,7 @@ import type { Page, PageMeta, PageVersion, SearchHit } from '../api/types';
 import { useSelect } from '../state/store';
 import { loadPages } from '../state/actions';
 import { stripFrontMatter } from '../lib/markdown';
+import { INDEX_PATH, pageName, pageReason, withSuffix } from '../lib/pagepath';
 import { ago, personName } from '../lib/words';
 import { go, hrefOf } from '../lib/route';
 import { useRoving } from './keys';
@@ -17,8 +18,14 @@ import { attempt, showError } from './notice';
 import { Back, Empty, Markdown, When } from './common';
 import { Icon } from './icons';
 
-/** byName names the writer of a page: a person, an agent, or bossmode. */
-const byName = (by: string) => (by.startsWith('agent:') ? by.slice(6) : by === 'bossmode' ? 'bossmode' : personName(by));
+/** byName names the writer of a page: a person, an agent, a run, the fleet token, or bossmode. */
+export function byName(by: string): string {
+  if (by.startsWith('agent:')) return by.slice(6);
+  if (by.startsWith('run:')) return 'run ' + by.slice(4);
+  if (by === 'token') return 'the fleet token';
+  if (by === 'bossmode') return 'bossmode';
+  return personName(by);
+}
 
 interface Folder {
   name: string;
@@ -54,9 +61,9 @@ function FolderView({ f, current }: { f: Folder; current?: string }) {
           <a class={'prow' + (p.path === current ? ' sel' : '')} href={hrefOf({ place: 'pages', path: p.path, mode: 'read' })} data-item aria-current={p.path === current ? 'page' : undefined}>
             <Icon name="page" />
             <span class="main">
-              <span class="t">{p.title || p.path.split('/').pop()}</span>
+              <span class="t">{p.title || pageName(p.path)}</span>
               <span class="s">
-                {p.path.split('/').pop()} {'·'} {ago(p.at)}
+                {pageName(p.path)} {'·'} {ago(p.at)}
               </span>
             </span>
           </a>
@@ -84,6 +91,7 @@ export function PageTree({ current }: { current?: string }) {
   const loaded = useSelect((s) => s.pages.loaded);
   const [q, setQ] = useState('');
   const [hits, setHits] = useState<SearchHit[] | null>(null);
+  const [cut, setCut] = useState(false);
   const tree = useMemo(() => treeOf(Object.values(byPath)), [byPath]);
   const list = useRoving<HTMLUListElement>();
   useEffect(() => {
@@ -99,7 +107,10 @@ export function PageTree({ current }: { current?: string }) {
     const t = setTimeout(() => {
       api
         .search(words, ctl.signal)
-        .then((r) => setHits(r.results))
+        .then((r) => {
+          setHits(r.results || []);
+          setCut(!!r.cut);
+        })
         .catch(showError);
     }, 250);
     return () => {
@@ -140,6 +151,7 @@ export function PageTree({ current }: { current?: string }) {
               </li>
             ))}
             {hits.length === 0 && <Empty>No page holds those words.</Empty>}
+            {cut && <p class="hint">The search read part of the wiki. Use more words to find the rest.</p>}
           </ul>
         ) : (
           <ul class="tree" ref={list}>
@@ -207,7 +219,7 @@ export function PageView({ path, version }: { path: string; version?: number }) 
         <Back narrow label="Pages" href="#pages" />
         <div class="title">
           <h1 id="page-title" tabIndex={-1} ref={heading}>
-            {(page && (page.title || fm!.title)) || path.split('/').pop()}
+            {(page && (page.title || fm!.title)) || pageName(path)}
           </h1>
           <p class="goal">{path}</p>
         </div>
@@ -215,7 +227,7 @@ export function PageView({ path, version }: { path: string; version?: number }) 
           <a class="btn small" href={hrefOf({ place: 'pages', path, mode: 'history' })}>
             <Icon name="history" /> History
           </a>
-          {!version && (
+          {!version && path !== INDEX_PATH && (
             <a class="btn small" href={hrefOf({ place: 'pages', path, mode: 'edit' })}>
               <Icon name="edit" /> Edit
             </a>
@@ -271,20 +283,32 @@ export function PageHistory({ path }: { path: string }) {
         {!versions && <Empty>Loading the history.</Empty>}
         <ol class="versions" ref={list}>
           {versions &&
-            versions.map((v, i) => (
-              <li>
-                <a class="vrow" data-item href={i === 0 ? hrefOf({ place: 'pages', path, mode: 'read' }) : hrefOf({ place: 'pages', path, mode: 'read', version: v.version })}>
-                  <b>
-                    Version {v.version}
-                    {i === 0 ? ', the current one' : ''}
-                  </b>
-                  <span class="s">
-                    {byName(v.by)}, <When at={v.at} />
-                    {v.summary ? ': ' + v.summary : ''}
-                  </span>
-                </a>
-              </li>
-            ))}
+            versions.map((v, i) =>
+              v.deleted ? (
+                <li>
+                  <p class="vrow gone" data-item>
+                    <b>Removed</b>
+                    <span class="s">
+                      <When at={v.at} />
+                    </span>
+                  </p>
+                </li>
+              ) : (
+                <li>
+                  <a class="vrow" data-item href={i === 0 ? hrefOf({ place: 'pages', path, mode: 'read' }) : hrefOf({ place: 'pages', path, mode: 'read', version: v.version })}>
+                    <b>
+                      Version {v.version}
+                      {i === 0 ? ', the current one' : ''}
+                      {v.title ? ': ' + v.title : ''}
+                    </b>
+                    <span class="s">
+                      {byName(v.by)}, <When at={v.at} />
+                      {v.summary ? ': ' + v.summary : ''}
+                    </span>
+                  </a>
+                </li>
+              ),
+            )}
         </ol>
       </div>
     </section>
@@ -354,11 +378,15 @@ export function PageEditor({ path: initial, create }: { path?: string; create?: 
   };
 
   const save = async (over?: string) => {
-    const target = (create ? path : initial || '').trim().replace(/^\/+/, '');
-    if (!target) {
-      showError(new Error('A page needs a path, such as runbooks/deploy.md.'));
+    // A new path gets .md when the person leaves it out, and the page checks
+    // the rule of the store before it sends anything.
+    const target = create ? withSuffix(path) : initial || '';
+    const why = pageReason(target);
+    if (why) {
+      showError(new Error(why));
       return;
     }
+    if (create && target !== path) setPath(target);
     setBusy(true);
     try {
       const p = await api.putPage(target, text, create ? '*' : over || base, summary.trim() || undefined);
@@ -382,7 +410,8 @@ export function PageEditor({ path: initial, create }: { path?: string; create?: 
     setBusy(false);
   };
 
-  const target = create ? path : initial || '';
+  const target = create ? withSuffix(path) : initial || '';
+  const why = create && path.trim() ? pageReason(target) : '';
   return (
     <section class="screen pageedit" aria-labelledby="edit-title">
       <header class="bar">
@@ -443,8 +472,11 @@ export function PageEditor({ path: initial, create }: { path?: string; create?: 
         )}
         {create && (
           <label class="fld">
-            <span>Path, such as runbooks/deploy.md, at most 8 parts</span>
-            <input value={path} required onInput={(e) => setPath((e.target as HTMLInputElement).value)} />
+            <span>Path, such as runbooks/deploy.md. The page adds .md when you leave it out.</span>
+            <input value={path} required aria-invalid={!!why} aria-describedby="path-why" onInput={(e) => setPath((e.target as HTMLInputElement).value)} />
+            <span id="path-why" class={why ? 'field-why bad' : 'field-why'}>
+              {why || (target ? 'The page will be ' + target + '.' : '')}
+            </span>
           </label>
         )}
         <label class="fld grow">

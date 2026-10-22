@@ -111,6 +111,19 @@ export interface Bridge {
   memberCount?: number;
   /** The number of members with the presence needs-you. */
   needsYou?: number;
+  /** The sum of the usage of the runs of the bridge. Only GET /v1/bridges/{id} carries it. */
+  usage?: UsageSum;
+}
+
+/** A sum of the usage of runs, with the partial mark of the tool batch. */
+export interface UsageSum {
+  turns?: number;
+  toolCalls?: number;
+  costUSD?: number;
+  reported: number;
+  final: number;
+  missing: number;
+  partial: boolean;
 }
 
 export type SenderKind = 'person' | 'agent' | 'system';
@@ -365,26 +378,37 @@ export interface FaceMeta {
   tagline: string;
   hash: string;
   custom: boolean;
+  by?: string;
+  at?: string;
+  version?: number;
 }
 
-/** One page of the wiki in the tree. */
+/**
+ * One page of the wiki in the tree. by is a subject, agent:<profile>,
+ * run:<id>, token, or bossmode. version is the revision of the store: it
+ * grows with each write of the wiki, so the versions of one page are not
+ * consecutive.
+ */
 export interface PageMeta {
   path: string;
   title: string;
+  tags?: string[];
   hash: string;
-  by: string;
-  at: string;
+  version?: number;
   size: number;
+  by: string;
+  run?: string;
+  at: string;
+  summary?: string;
 }
 
 /** The answer of GET /v1/pages/{path}. */
 export interface Page extends PageMeta {
   text: string;
-  tags?: string[];
-  summary?: string;
   version: number;
 }
 
+/** One version of a page. A removal has deleted set, and no text, hash, or writer. */
 export interface PageVersion {
   version: number;
   hash: string;
@@ -392,16 +416,21 @@ export interface PageVersion {
   at: string;
   summary?: string;
   size: number;
+  title?: string;
+  run?: string;
+  deleted?: boolean;
 }
 
 export interface SearchHit {
   path: string;
   title: string;
   snippet: string;
+  version?: number;
+  score?: number;
 }
 
 /** The kinds of the event stream, GET /v1/bossmode/stream. */
-export type StreamKind = 'bridge.message' | 'bridge.member' | 'run' | 'page' | 'face' | 'reset';
+export type StreamKind = 'bridge.message' | 'bridge.member' | 'run' | 'page' | 'face' | 'member' | 'task' | 'reset';
 
 export interface StreamEvent {
   id: string;
@@ -424,4 +453,17 @@ export interface MemberEventData {
 /** The data of a page event. */
 export interface PageEventData extends PageMeta {
   deleted?: boolean;
+}
+
+/**
+ * The data of a member or a task event of the fleet view. A member event
+ * has state, a task event has phase, and gone marks one that left the view.
+ */
+export interface FleetChange {
+  kind: 'member' | 'task';
+  member: string;
+  state?: string;
+  phase?: string;
+  gone?: boolean;
+  time: string;
 }
