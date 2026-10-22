@@ -65,6 +65,7 @@ const lastOf: Partial<Record<Place, string>> = {};
 
 const PLACES: PlaceItem[] = [
   { id: 'activity', label: 'Activity', glyph: 'activity', href: '#activity' },
+  { id: 'chat', label: 'Chat', glyph: 'chat', href: '#chat' },
   { id: 'bridges', label: 'Bridges', glyph: 'bridges', href: '#' },
   { id: 'fleet', label: 'Fleet', glyph: 'fleet', href: '#fleet' },
   { id: 'skills', label: 'Skills', glyph: 'skills', href: '#skills' },
@@ -170,7 +171,7 @@ function AccountMenu({ onSignOut }: { onSignOut: () => void }) {
   );
 }
 
-/** AppBar is the column of places: the logo well, the six places, and the account. */
+/** AppBar is the column of places: the logo well, the seven places, and the account. */
 export function AppBar({ route, onSignOut }: { route: Route; onSignOut: () => void }) {
   const place = placeOf(route);
   const config = useSelect((s) => s.config);

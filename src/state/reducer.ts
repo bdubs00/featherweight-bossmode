@@ -63,6 +63,12 @@ export interface State {
    * settings.
    */
   managerPick: { run: string; by: string } | null;
+  /**
+   * The history of the quick chat of the person: the ids of the runs of
+   * GET /v1/fleet/runs, whose objects live in runs. A quick chat that the
+   * page starts later joins the history through its mark (src/lib/chat.ts).
+   */
+  chats: { ids: string[]; loaded: boolean };
   /** The bridge that the person reads now, or "". */
   open: string;
   stream: { status: StreamStatus; lastId: string };
@@ -84,6 +90,7 @@ export const initialState: State = {
   skills: null,
   agentSkills: {},
   managerPick: null,
+  chats: { ids: [], loaded: false },
   open: '',
   stream: { status: 'connecting', lastId: '' },
   resets: 0,
@@ -108,6 +115,7 @@ export type Action =
   | { type: 'agent-skills'; agent: string; skills: string[] }
   | { type: 'agent-skills-forget' }
   | { type: 'manager-pick'; pick: { run: string; by: string } | null }
+  | { type: 'chats'; runs: Run[] }
   | { type: 'faces'; faces: FaceMeta[] }
   | { type: 'face'; face: FaceMeta }
   | { type: 'stream'; event: StreamEvent }
@@ -457,6 +465,11 @@ export function reduce(state: State, a: Action): State {
       return Object.keys(state.agentSkills).length ? { ...state, agentSkills: {} } : state;
     case 'manager-pick':
       return { ...state, managerPick: a.pick };
+    case 'chats': {
+      let next: State = { ...state, chats: { ids: a.runs.map((r) => r.id), loaded: true } };
+      for (const r of a.runs) next = reduce(next, { type: 'run', run: r });
+      return next;
+    }
     case 'faces': {
       const faces: Record<string, FaceMeta> = {};
       for (const f of a.faces) faces[f.agent] = state.faces[f.agent] && state.faces[f.agent].hash === f.hash && JSON.stringify(state.faces[f.agent]) === JSON.stringify(f) ? state.faces[f.agent] : f;

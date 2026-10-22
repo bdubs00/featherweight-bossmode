@@ -235,6 +235,21 @@ export function ended(state: RunState | string | undefined): boolean {
   return state === 'failed' || state === 'canceled';
 }
 
+/* ---------- the quick chat ---------- */
+
+/**
+ * loadChats reads the history of the quick chat of the person: the runs of
+ * the agent of the chat that the person started, newest first.
+ */
+export async function loadChats(): Promise<void> {
+  const s = store.get();
+  const chat = s.config && s.config.chat;
+  const me = s.me && s.me.principal ? s.me.principal.subject : '';
+  if (!chat || !chat.agent) return;
+  const runs = await once('chats', () => api.fleetRuns({ agent: chat.agent, principal: me }));
+  store.dispatch({ type: 'chats', runs });
+}
+
 /** setManagerRun opens a conversation with the manager, or a new one with "". */
 export function setManagerRun(run: string): void {
   const s = store.get();

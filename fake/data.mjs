@@ -22,6 +22,7 @@ export const AGENTS = [
   { name: 'writer', description: 'Writes the notes of a migration in the wiki.', role: 'operator', displayName: 'Writer', tagline: 'Plain words for the next person.' },
   { name: 'scribe', description: 'Drafts release notes from the merged changes.', role: 'operator', displayName: 'Scribe', tagline: 'What changed, for whom, and why.' },
   { name: 'manager', description: 'Helps the operator run the fleet.', role: 'operator', displayName: 'Manager', tagline: 'Reads before it acts. Asks before it spends.' },
+  { name: 'chat', description: 'Answers the questions of one person, with the tools that the person picks.', role: 'operator', displayName: 'Chat', tagline: 'Asks back when a question is not clear.' },
 ];
 
 export function seedFaces() {
@@ -403,7 +404,7 @@ export const FLEET = {
     { name: 'default/crew-0', self: false, state: 'live', lastSeen: minutesAgo(0), canForward: true, accessMode: 'static', agents: [{ name: 'migrator', role: 'owner' }, { name: 'reviewer', role: 'owner' }, { name: 'tester', role: 'operator' }], active: 2, inputRequired: 1 },
     { name: 'default/crew-1', self: false, state: 'live', lastSeen: minutesAgo(0), canForward: true, accessMode: 'static', agents: [{ name: 'writer', role: 'operator' }, { name: 'scribe', role: 'operator' }], active: 1, inputRequired: 1 },
     { name: 'default/crew-2', self: false, state: 'suspended', lastSeen: minutesAgo(14), canForward: true, accessMode: 'static', agents: [{ name: 'tester', role: 'operator' }], active: 0, inputRequired: 0 },
-    { name: 'default/manager-0', self: false, state: 'live', lastSeen: minutesAgo(1), canForward: true, accessMode: 'static', agents: [{ name: 'manager', role: 'operator' }], active: 0, inputRequired: 0 },
+    { name: 'default/manager-0', self: false, state: 'live', lastSeen: minutesAgo(1), canForward: true, accessMode: 'static', agents: [{ name: 'manager', role: 'operator' }, { name: 'chat', role: 'operator' }], active: 0, inputRequired: 0 },
     { name: 'default/review-0', self: false, state: 'live', lastSeen: minutesAgo(0), canForward: true, accessMode: 'static', agents: [{ name: 'reviewer', role: 'owner' }], active: 1, inputRequired: 0 },
     { name: 'default/test-0', self: false, state: 'suspended', lastSeen: minutesAgo(30), canForward: true, accessMode: 'static', agents: [{ name: 'tester', role: 'operator' }], active: 0, inputRequired: 0 },
     { name: 'default/test-1', self: false, state: 'suspended', lastSeen: minutesAgo(30), canForward: true, accessMode: 'static', agents: [{ name: 'tester', role: 'operator' }], active: 0, inputRequired: 0 },

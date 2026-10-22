@@ -17,6 +17,9 @@
 //   FAKE_PARTIAL=1     a stream event of a card carries a partial entry, so the page reads it again
 //   FAKE_ADMIN=1       whoami says that the person is an admin, who can add and remove skills
 //   FAKE_A=1           the sample data shows each state of the bridges screen (routes-a.mjs)
+//   FAKE_LIVE=1        GET /v1/runs/{id}/live streams each answer outside a bridge in pieces, as the model writes it
+//   FAKE_LIVE_MS=120   the time between two pieces of a live answer, in milliseconds
+//   FAKE_LIVE_HOLD=1   a live answer stops at about two thirds and waits there, for a screenshot
 
 import http from 'node:http';
 import fs from 'node:fs';
@@ -25,7 +28,7 @@ import { fileURLToPath } from 'node:url';
 import { AGENTS, FLEET, hash, seed, wiki } from './data.mjs';
 import { checkSvg, identicon } from './faces.mjs';
 import { TEMPLATES } from './routes-c.mjs';
-import { TOOLS_OF, allowlistOf } from './skills.mjs';
+import { TOOLS_OF, allowlistOf, givesTool } from './skills.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const DIST = path.resolve(here, '..', 'dist');
@@ -37,6 +40,9 @@ const STREAM_MS = Number(process.env.FAKE_STREAM_MS || 15 * 60_000);
 const THEME = process.env.FAKE_THEME !== '0';
 const PARTIAL = process.env.FAKE_PARTIAL === '1';
 const ADMIN = process.env.FAKE_ADMIN === '1';
+const LIVE = process.env.FAKE_LIVE === '1';
+const LIVE_MS = Number(process.env.FAKE_LIVE_MS || 120);
+const LIVE_HOLD = process.env.FAKE_LIVE_HOLD === '1';
 
 const S = seed();
 
@@ -44,6 +50,8 @@ const S = seed();
 const LOGO = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 44 44" width="44" height="44"><title>Example Org</title><rect width="44" height="44" fill="#111"/><path d="M10 12h24v5H16v3h14v5H16v3h18v5H10z" fill="#f3f3ef"/></svg>`;
 const now = () => new Date().toISOString();
 const MANAGER_MEMBER = 'default/manager-0';
+/** The agent of the quick chat, on the Task of the manager, as the example of the workbench sets it up. */
+const CHAT_AGENT = 'chat';
 
 /* ---------- people ---------- */
 
@@ -417,6 +425,47 @@ function finish(bridgeId, m, run, decision, question, words) {
   setMember(bridgeId, m, { presence: 'idle', activity: null });
 }
 
+/* ---------- the live answer ---------- */
+
+/** The clients of the live stream of each run, by the id of the run. */
+const liveClients = new Map();
+const TERMINAL = ['completed', 'failed', 'canceled'];
+
+/** liveWrite sends one event of the live stream of a run to each of its clients. */
+function liveWrite(id, kind, data) {
+  for (const res of liveClients.get(id) || []) res.write(`event: ${kind}\ndata: ${JSON.stringify(data)}\n\n`);
+}
+
+/** liveIdle tells the clients that the run left the running state, and ends the stream of a run that finished. */
+function liveIdle(run) {
+  liveWrite(run.id, 'idle', { state: run.state });
+  if (TERMINAL.includes(run.state)) for (const res of liveClients.get(run.id) || []) res.end();
+}
+
+/**
+ * liveText streams a text as the model writes it: a piece of a few words
+ * every FAKE_LIVE_MS, then done. With FAKE_LIVE_HOLD=1 it stops at about
+ * two thirds and waits there. A run that stops working ends it.
+ */
+function liveText(run, turn, text, then) {
+  const words = text.match(/\S+\s*/g) || [text];
+  const hold = LIVE_HOLD ? Math.ceil(words.length * 0.66) : words.length;
+  let i = 0;
+  const step = () => {
+    if (run.state !== 'running') return;
+    if (i >= words.length) {
+      liveWrite(run.id, 'done', { turn, stopReason: 'end_turn' });
+      then();
+      return;
+    }
+    if (i >= hold) return;
+    liveWrite(run.id, 'delta', { turn, text: words.slice(i, i + 3).join('') });
+    i += 3;
+    setTimeout(step, LIVE_MS);
+  };
+  step();
+}
+
 /* ---------- the manager ---------- */
 
 function managerAnswer(run, text) {
@@ -428,6 +477,7 @@ function managerAnswer(run, text) {
   const res = S.results.get(run.id);
   if (res) Object.assign(res, { status: 'ready', summary: text });
   publish('run', run);
+  liveIdle(run);
 }
 
 /** The answers of an agent that is not the manager, in a conversation outside a bridge. */
@@ -441,17 +491,69 @@ const MANAGER_ANSWERS = [
 ];
 let managerN = 0;
 
-/** managerTurn runs one turn of the manager, or of another agent outside a bridge: it wakes, works, and answers. */
+/** The answers of the quick chat. */
+const CHAT_ANSWERS = [
+  'Logrotate reads `/etc/logrotate.d/nginx` once a day. Keep **14** rotations, compress all but the newest, and send `USR1` to nginx in `postrotate`, so nginx opens its new log without a restart. The role of the migration does the same with one template and one handler.',
+  'The freeze starts on Friday at noon. Merge what is green by Thursday, and tag the release on Monday after the checks pass again. A change after noon on Friday needs a second reviewer.',
+  'Two things differ. A handler runs once at the end of a play, however many tasks notify it. A task that you list after another runs every time, in order.',
+];
+let quickN = 0;
+
+/** answerOf is the next answer of an agent outside a bridge. */
+function answerOf(run) {
+  if (run.agent === 'manager') return MANAGER_ANSWERS[managerN++ % MANAGER_ANSWERS.length];
+  if (run.agent === CHAT_AGENT) return CHAT_ANSWERS[quickN++ % CHAT_ANSWERS.length];
+  return AGENT_ANSWERS[agentN++ % AGENT_ANSWERS.length];
+}
+
+/** spend adds the usage of one turn to a run. */
+function spend(run) {
+  const u = run.usage || {};
+  run.usage = { ...u, inputTokens: (u.inputTokens || 0) + 2140, outputTokens: (u.outputTokens || 0) + 310, turns: (u.turns || 0) + 1, costUSD: Math.round(((u.costUSD || 0) + 0.04) * 100) / 100 };
+}
+
+/**
+ * managerTurn runs one turn of the manager, or of another agent outside a
+ * bridge: it wakes, works, and answers. With FAKE_LIVE=1, the quick chat
+ * first recalls its notes, and every answer goes out on the live stream in
+ * pieces before it enters the transcript.
+ */
 function managerTurn(run, first) {
   const wake = first ? 3500 : 800;
   const manager = run.agent === 'manager';
+  const chat = run.agent === CHAT_AGENT;
+  const text = answerOf(run);
+  const turn = ((run.usage && run.usage.turns) || 0) + 1;
   setTimeout(() => {
-    Object.assign(run, { state: 'running', updatedAt: now(), activity: manager ? { turn: 1, tool: 'front.fleet', phrase: 'Read the fleet', since: now() } : { turn: 1, tool: 'files', phrase: 'Read index.md', since: now() } });
+    const activity = manager ? { turn, tool: 'front.fleet', phrase: 'Read the fleet', since: now() } : chat ? { turn, phrase: 'Thinking in turn ' + turn, since: now() } : { turn, tool: 'files', phrase: 'Read index.md', since: now() };
+    Object.assign(run, { state: 'running', updatedAt: now(), activity });
     publish('run', run);
+    if (!LIVE) return;
+    const answer = (t) => liveText(run, t, text, () => {
+      spend(run);
+      managerAnswer(run, text);
+    });
+    if (!chat) return setTimeout(() => answer(turn), 300);
+    // The chat calls one tool first: the stream names it, and the model call ends with the tool call.
+    setTimeout(() => {
+      liveWrite(run.id, 'tool', { turn, name: 'recall', callId: 'call-' + run.seq });
+      setTimeout(() => {
+        if (run.state !== 'running') return;
+        liveWrite(run.id, 'done', { turn, stopReason: 'tool_use' });
+        const items = S.transcripts.get(run.id);
+        const seq = items[items.length - 1].seq + 1;
+        items.push({ seq, time: now(), kind: 'tool', tool: 'recall', callId: 'call-' + seq, input: { query: 'notes of before' } });
+        items.push({ seq: seq + 1, time: now(), kind: 'result', tool: 'recall', callId: 'call-' + seq, text: '2 notes' });
+        Object.assign(run, { seq: seq + 1, updatedAt: now(), activity: { turn: turn + 1, phrase: 'Thinking in turn ' + (turn + 1), since: now() } });
+        publish('run', run);
+        setTimeout(() => answer(turn + 1), 400);
+      }, 700);
+    }, 400);
   }, wake);
+  if (LIVE) return;
   setTimeout(() => {
-    if (run.usage) run.usage = { ...run.usage, turns: (run.usage.turns || 0) + 1, costUSD: Math.round(((run.usage.costUSD || 0) + 0.04) * 100) / 100 };
-    managerAnswer(run, manager ? MANAGER_ANSWERS[managerN++ % MANAGER_ANSWERS.length] : AGENT_ANSWERS[agentN++ % AGENT_ANSWERS.length]);
+    spend(run);
+    managerAnswer(run, text);
   }, wake + 2500);
 }
 
@@ -578,7 +680,7 @@ on('GET', '/v1/bossmode', (c) => {
     maxMembers: 16,
     theme: { accent: process.env.FAKE_ACCENT || '#FF4D00', name: THEME ? process.env.FAKE_ORG || 'Example Org' : '', logo: process.env.FAKE_LOGO === '1' ? '/v1/bossmode/logo' : '' },
     templates: TEMPLATES,
-    chat: { agent: 'manager', member: MANAGER_MEMBER },
+    chat: { agent: CHAT_AGENT, member: MANAGER_MEMBER },
   };
 });
 on('GET', '/v1/bossmode/logo', (c) => {
@@ -787,13 +889,45 @@ on('PATCH', '/v1/bridges/([^/]+)/members/([^/]+)', async (c, id, handle) => {
 
 on('GET', '/v1/fleet', () => FLEET);
 // An agent of the view carries the parts of its profile that the page shows: the tools, the skills that it allows, and its rules.
-on('GET', '/v1/agents', () => ({ agents: AGENTS.map(({ name, description, role }) => ({ name, description, role, tools: TOOLS_OF[name] || [], skills: allowlistOf(name), policy: name === 'migrator' ? { ask: ['bash: git push*'] } : name === 'reviewer' ? { ask: ['destructive'] } : undefined })) }));
+const agentView = ({ name, description, role }) => ({ name, description, role, tools: TOOLS_OF[name] || [], skills: allowlistOf(name), policy: name === 'migrator' ? { ask: ['bash: git push*'] } : name === 'reviewer' ? { ask: ['destructive'] } : undefined });
+on('GET', '/v1/agents', () => ({ agents: AGENTS.map(agentView) }));
+on('GET', '/v1/agents/([^/]+)', (c, raw) => {
+  const name = decodeURIComponent(raw);
+  const a = AGENTS.find((x) => x.name === name);
+  if (!a) refuse(404, `no agent ${name}`);
+  return agentView(a);
+});
 
 const runOr404 = (id) => {
   const r = S.runs.get(id);
   if (!r) refuse(404, `no run ${id}`);
   return r;
 };
+// The live stream of a run: the pieces of the answer while the run works,
+// then idle. A client of a run that does not work gets idle at once.
+on('GET', '/v1/runs/([^/]+)/live', (c, raw) => {
+  const id = decodeURIComponent(raw);
+  const run = runOr404(id);
+  const set = liveClients.get(id) || new Set();
+  if (set.size >= 16) refuse(429, 'the run has 16 live clients, which is the most it takes', {}, { 'Retry-After': '1' });
+  const res = c.res;
+  res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no' });
+  res.write(': live\n\n');
+  if (run.state !== 'queued' && run.state !== 'running') {
+    res.write(`event: idle\ndata: ${JSON.stringify({ state: run.state })}\n\n`);
+    if (TERMINAL.includes(run.state)) res.end();
+    return undefined;
+  }
+  set.add(res);
+  liveClients.set(id, set);
+  const ping = setInterval(() => res.write(': keep-alive\n\n'), 15000);
+  c.req.on('close', () => {
+    clearInterval(ping);
+    set.delete(res);
+    if (!set.size) liveClients.delete(id);
+  });
+  return undefined;
+});
 // A run starts on any member of the fleet whose agents hold the agent of the body.
 on('POST', '/v1/runs', async (c) => {
   const member = c.url.searchParams.get('member') || '';
@@ -804,8 +938,21 @@ on('POST', '/v1/runs', async (c) => {
   if (!agent || !fm.agents.some((a) => a.name === agent)) refuse(400, `the fleet member ${member} runs no agent ${agent || '""'}`);
   const input = String(body.input || '').trim();
   if (!input) refuse(400, 'a run needs an input');
+  for (const k of Object.keys(body)) if (!['agent', 'input', 'title', 'profile', 'metadata', 'instructions', 'budget'].includes(k)) refuse(400, `json: unknown field "${k}"`);
   const id = 'run-' + agent + '-' + Date.now().toString(36);
-  const run = { id, agent, title: input.slice(0, 80), state: 'queued', input, seq: 1, origin: 'http', principal: c.person.subject, createdAt: now(), updatedAt: now(), member, usage: { turns: 0, costUSD: 0 } };
+  // The kernel titles a run from the first sentence of its input.
+  const title = String(body.title || '').trim() || (input.split('\n')[0].split(/(?<=[.?!])\s/)[0] || '').slice(0, 64);
+  const run = { id, agent, title, state: 'queued', input, seq: 1, origin: 'http', principal: c.person.subject, createdAt: now(), updatedAt: now(), member, usage: { turns: 0, costUSD: 0 } };
+  if (body.metadata && typeof body.metadata === 'object') run.metadata = { ...body.metadata };
+  // An inline profile replaces the lists of the agent for this run. A tool that the agent does not give is an extra tool of the run.
+  const p = body.profile && typeof body.profile === 'object' ? body.profile : null;
+  const tools = p && Array.isArray(p.tools) ? p.tools.map(String) : TOOLS_OF[agent] || [];
+  const skills = p && Array.isArray(p.skills) ? p.skills.map(String) : allowlistOf(agent);
+  run.resolved = { model: 'model-large', tools, skills };
+  if (p && Array.isArray(p.tools)) {
+    const extra = tools.filter((t) => !givesTool(TOOLS_OF[agent] || [], t));
+    if (extra.length) run.extraTools = extra;
+  }
   S.runs.set(id, run);
   S.transcripts.set(id, [{ seq: 1, time: now(), kind: 'user', text: input, who: c.person.subject }]);
   S.results.set(id, { runId: id, title: run.title, agent: run.agent, status: 'working', started: run.createdAt, changed: run.updatedAt, next: [] });
@@ -873,6 +1020,7 @@ on('POST', '/v1/runs/([^/]+)/cancel', (c, id) => {
   if (['completed', 'failed', 'canceled'].includes(run.state)) refuse(409, `the run ${id} already ended`);
   Object.assign(run, { state: 'canceled', pending: null, activity: null, updatedAt: now() });
   publish('run', run);
+  liveIdle(run);
   for (const [bid, b] of S.bridges) {
     const m = b.members.find((x) => x.runs.includes(id));
     if (m) {
@@ -1173,7 +1321,7 @@ function tick() {
 // The routes of the next stage. Each screen of docs/DESIGN.md, section 11,
 // adds its routes in its own file, so two screens never edit one file.
 // skills.mjs serves the Skills place.
-for (const name of ['skills.mjs', 'routes-a.mjs', 'routes-b.mjs', 'routes-c.mjs']) {
+for (const name of ['skills.mjs', 'routes-a.mjs', 'routes-b.mjs', 'routes-c.mjs', 'routes-chat.mjs']) {
   const mod = await import('./' + name);
   mod.register({ on, refuse, readJson, readBody, publish, S, now, AGENTS, FLEET, admin: () => ADMIN });
 }

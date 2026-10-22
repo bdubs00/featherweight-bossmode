@@ -25,6 +25,7 @@ import { Channel } from './Channel';
 import { Roster } from './Roster';
 import { RunPane } from './RunPane';
 import { Manager } from './Manager';
+import { ChatDetails, ChatList, ChatMain, NoChat } from './Chat';
 import { Fleet, AgentPane, FleetList } from './Fleet';
 import { MemberMain, MemberProfile } from './Member';
 import { Board } from './Board';
@@ -135,6 +136,12 @@ function panesOf(r: Route): Panes {
     }
     case 'manager':
       return { list: null, main: <Manager />, details: null };
+    case 'chat': {
+      const cfg = store.get().config;
+      // Without a quick chat in the settings, the place holds one pane that says so.
+      if (!cfg || !cfg.chat || !cfg.chat.agent) return { list: null, main: <NoChat />, details: null };
+      return { list: <ChatList current={r.run} />, main: <ChatMain run={r.run} />, details: r.run ? <ChatDetails run={r.run} /> : null };
+    }
     case 'appearance':
       return { list: null, main: <Appearance />, details: null };
   }
@@ -247,7 +254,7 @@ export function App() {
         // Where three panes show, the list and the main pane stay, so Escape
         // goes back only from what the details pane or the main pane opened.
         const wide = window.matchMedia(THREE_PANES).matches;
-        if (wide && shown !== 'details' && (r.place === 'bridge' || r.place === 'home' || r.place === 'manager' || r.place === 'activity' || r.place === 'member' || (r.place === 'fleet' && !r.board) || (r.place === 'skills' && !r.item))) return;
+        if (wide && shown !== 'details' && (r.place === 'bridge' || r.place === 'home' || r.place === 'manager' || r.place === 'chat' || r.place === 'activity' || r.place === 'member' || (r.place === 'fleet' && !r.board) || (r.place === 'skills' && !r.item))) return;
         e.preventDefault();
         go(parentOf(r));
       }

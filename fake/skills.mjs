@@ -38,7 +38,7 @@ const SKILLS = [
     files: [],
   },
   {
-    name: 'wiki-writer', origin: 'local', agents: ['writer', 'manager'],
+    name: 'wiki-writer', origin: 'local', agents: ['writer', 'manager', 'chat'],
     description: 'Write a page of the wiki that the next person can act on.',
     text: doc('wiki-writer', 'Write a page of the wiki that the next person can act on.', '# Wiki writer\n\nShort sentences. One page per decision. Link the run that made the change.\n'),
     files: [],
@@ -50,7 +50,7 @@ const SKILLS = [
     files: [],
   },
   {
-    name: 'docs/search-docs', origin: 'mcp', server: 'docs', agents: ['reviewer', 'writer'], argumentHint: '<question>',
+    name: 'docs/search-docs', origin: 'mcp', server: 'docs', agents: ['reviewer', 'writer', 'chat'], argumentHint: '<question>',
     description: 'Search the documentation server and quote the answer with its link.',
     text: doc('search-docs', 'Search the documentation server and quote the answer with its link.', 'Ask the docs server first. Quote the answer, and link it.\n', 'argument-hint: <question>\n'),
     files: [],
@@ -62,11 +62,16 @@ const TOOLS = [
   { name: 'bash', description: 'Run a shell command.', source: 'builtin', text: 'Run a shell command in the workspace of the worker.' },
   { name: 'files', description: 'Read and write files.', source: 'builtin', text: 'Read, create, change, and remove files in the workspace.' },
   { name: 'web_fetch', description: 'Fetch a page.', source: 'builtin', text: 'Read a page of the web as text.' },
+  { name: 'recall', description: 'Search the memory.', source: 'builtin', text: 'Search the notes and the runs of before.' },
+  { name: 'memory', description: 'Keep a note.', source: 'builtin', text: 'Write a note that a later run reads.' },
+  { name: 'clock', description: 'Read the time.', source: 'builtin', text: 'Read the date and the time of day.' },
   { name: 'create_issue', description: 'Open an issue.', source: 'github', text: 'Open an issue in a repository.' },
   { name: 'open_pull_request', description: 'Open a pull request.', source: 'github', text: 'Open a pull request from a branch.' },
   { name: 'list_commits', description: 'List commits.', source: 'github', text: 'List the commits of a branch.' },
   { name: 'bridge_post', description: 'Post to a bridge.', source: 'front', text: 'Post a message to the channel of a bridge.' },
   { name: 'pages_write', description: 'Write a page.', source: 'front', text: 'Write a page of the wiki.' },
+  { name: 'pages_read', description: 'Read a page.', source: 'front', text: 'Read a page of the wiki.' },
+  { name: 'pages_search', description: 'Search the wiki.', source: 'front', text: 'Search the pages of the wiki.' },
 ];
 
 const MARKETPLACES = [
@@ -285,7 +290,22 @@ export const TOOLS_OF = {
   writer: ['files', 'web_fetch', 'pages_write'],
   scribe: ['files', 'list_commits'],
   manager: ['front'],
+  chat: ['files', 'recall', 'memory', 'clock', 'front.pages_*'],
 };
+
+/** toolNames are the names of the tools of GET /v1/tools. */
+export const toolNames = () => TOOLS.map((t) => t.name);
+
+/**
+ * givesTool reports whether the tool list of a profile gives a tool of the
+ * catalog: by its name, its server, or a glob such as front.pages_*.
+ */
+export function givesTool(list, name) {
+  const t = TOOLS.find((x) => x.name === name);
+  const source = t ? t.source : '';
+  const glob = (p, s) => new RegExp('^' + p.split('*').map((x) => x.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.*') + '$').test(s);
+  return list.some((p) => p === name || (source && source !== 'builtin' && (p === source || glob(p, source + '.' + name))) || glob(p, name));
+}
 
 /** allowlistOf names the skills of the profile of an agent in the fake. */
 export const allowlistOf = (agent) => SKILLS.filter((s) => s.agents.includes(agent)).map((s) => s.name);

@@ -1,5 +1,5 @@
 // The address of the page keeps the screen: #bridge/<id>, #manager, #fleet,
-// #pages/<path>, and so on. The route also names the place of the app bar
+// #chat/<run>, #pages/<path>, and so on. The route also names the place of the app bar
 // and the focus column: the one pane that a narrow window shows.
 //
 // The routes of every screen live here, so the screens of the next stage
@@ -18,6 +18,7 @@ export type Route =
   | { place: 'home' }
   | { place: 'activity'; item?: string }
   | { place: 'manager' }
+  | { place: 'chat'; run?: string; fresh?: boolean; details?: boolean }
   | { place: 'new' }
   | { place: 'bridge'; id: string; pane: 'roster' | 'run' | 'none'; tab?: BridgeTab; run?: string; handle?: string }
   | { place: 'member'; bridge: string; handle: string; tab: MemberTab; profile?: boolean }
@@ -28,7 +29,7 @@ export type Route =
   | { place: 'pages'; path?: string; mode: 'tree' | 'read' | 'history' | 'edit' | 'create'; version?: number };
 
 /** The places of the app bar. */
-export type Place = 'activity' | 'bridges' | 'fleet' | 'skills' | 'wiki' | 'manager' | 'account';
+export type Place = 'activity' | 'chat' | 'bridges' | 'fleet' | 'skills' | 'wiki' | 'manager' | 'account';
 
 /** The column that a narrow window shows for a route. */
 export type Column = 'list' | 'main' | 'details';
@@ -59,6 +60,12 @@ export function parseRoute(hash: string): Route {
       return rest.length && rest.join('/') ? { place: 'activity', item: rest.map(dec).join('/') } : { place: 'activity' };
     case 'manager':
       return { place: 'manager' };
+    // #chat is the history, #chat/new a new chat, #chat/<run> a chat, and
+    // #chat/<run>/details the details of a chat, for a narrow window.
+    case 'chat':
+      if (rest[0] === 'new') return { place: 'chat', fresh: true };
+      if (rest[0]) return rest[1] === 'details' ? { place: 'chat', run: dec(rest[0]), details: true } : { place: 'chat', run: dec(rest[0]) };
+      return { place: 'chat' };
     case 'new':
       return { place: 'new' };
     case 'new-agent':
@@ -120,6 +127,9 @@ export function hrefOf(r: Route): string {
       return r.item ? '#activity/' + encPath(r.item) : '#activity';
     case 'manager':
       return '#manager';
+    case 'chat':
+      if (r.run) return '#chat/' + encodeURIComponent(r.run) + (r.details ? '/details' : '');
+      return r.fresh ? '#chat/new' : '#chat';
     case 'new':
       return '#new';
     case 'new-agent':
@@ -158,6 +168,8 @@ export function placeOf(r: Route): Place {
       return 'activity';
     case 'manager':
       return 'manager';
+    case 'chat':
+      return 'chat';
     case 'member':
     case 'fleet':
     case 'new-agent':
@@ -190,6 +202,9 @@ export function columnOf(r: Route): Column {
       return r.mode === 'tree' ? 'list' : 'main';
     case 'skills':
       return r.item || r.add ? 'main' : 'list';
+    case 'chat':
+      if (r.run) return r.details ? 'details' : 'main';
+      return r.fresh ? 'main' : 'list';
   }
   return 'main';
 }
@@ -212,6 +227,9 @@ export function parentOf(r: Route): Route {
       return { place: 'fleet' };
     case 'skills':
       return r.item || r.add ? { place: 'skills' } : { place: 'home' };
+    case 'chat':
+      if (r.run && r.details) return { place: 'chat', run: r.run };
+      return r.run || r.fresh ? { place: 'chat' } : { place: 'home' };
     case 'pages':
       if (r.mode === 'tree') return { place: 'home' };
       if (r.mode === 'read' && !r.version) return { place: 'pages', mode: 'tree' };

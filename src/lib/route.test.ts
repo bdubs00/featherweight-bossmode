@@ -7,6 +7,10 @@ describe('routes', () => {
     ['#activity', { place: 'activity' }],
     ['#activity/d:run-1/ap-2', { place: 'activity', item: 'd:run-1/ap-2' }],
     ['#manager', { place: 'manager' }],
+    ['#chat', { place: 'chat' }],
+    ['#chat/new', { place: 'chat', fresh: true }],
+    ['#chat/run%201', { place: 'chat', run: 'run 1' }],
+    ['#chat/run-1/details', { place: 'chat', run: 'run-1', details: true }],
     ['#new', { place: 'new' }],
     ['#new-agent', { place: 'new-agent' }],
     ['#appearance', { place: 'appearance' }],
@@ -64,6 +68,7 @@ describe('routes', () => {
     expect(placeOf({ place: 'pages', mode: 'tree' })).toBe('wiki');
     expect(placeOf({ place: 'activity' })).toBe('activity');
     expect(placeOf({ place: 'manager' })).toBe('manager');
+    expect(placeOf({ place: 'chat', run: 'r' })).toBe('chat');
     expect(placeOf({ place: 'skills', item: { kind: 'tool', id: 'bash' } })).toBe('skills');
     expect(columnOf({ place: 'skills' })).toBe('list');
     expect(columnOf({ place: 'skills', item: { kind: 'skill', id: 'x' } })).toBe('main');
@@ -89,6 +94,13 @@ describe('routes', () => {
     expect(parentOf({ place: 'bridge', id: 'b', pane: 'run', run: 'r' })).toEqual({ place: 'bridge', id: 'b', pane: 'roster' });
     expect(parentOf({ place: 'bridge', id: 'b', pane: 'none' })).toEqual({ place: 'home' });
     expect(parentOf({ place: 'member', bridge: 'b', handle: 'h', tab: 'run' })).toEqual({ place: 'fleet' });
+    expect(columnOf({ place: 'chat' })).toBe('list');
+    expect(columnOf({ place: 'chat', fresh: true })).toBe('main');
+    expect(columnOf({ place: 'chat', run: 'r' })).toBe('main');
+    expect(columnOf({ place: 'chat', run: 'r', details: true })).toBe('details');
+    expect(parentOf({ place: 'chat', run: 'r', details: true })).toEqual({ place: 'chat', run: 'r' });
+    expect(parentOf({ place: 'chat', run: 'r' })).toEqual({ place: 'chat' });
+    expect(parentOf({ place: 'chat', fresh: true })).toEqual({ place: 'chat' });
   });
 
   it('adds the slash that the sign-in needs to the path of the page', () => {

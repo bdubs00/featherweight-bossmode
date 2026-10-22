@@ -18,6 +18,7 @@ import type {
   Member,
   MessagePage,
   NewProfile,
+  NewRun,
   Page,
   PageMeta,
   PageVersion,
@@ -126,6 +127,8 @@ export const api = {
 
   fleet: () => call<Fleet>('/v1/fleet'),
   agents: () => call<{ agents: Agent[] }>('/v1/agents').then((r) => (r && r.agents) || []),
+  /** agent reads one agent with its profile: its tools and its skills, among others. */
+  agent: (name: string) => call<Agent>('/v1/agents/' + enc(name)),
   /** agentSkills reads the skills that the profile of an agent allows, resolved against the catalog of the front. */
   agentSkills: (agent: string) => call<AgentSkills>('/v1/agents/' + enc(agent) + '/skills'),
   /** putAgent saves a profile with its workers, or with dryRun checks it and saves nothing. The answer carries pool when the front made workers. */
@@ -146,8 +149,10 @@ export const api = {
   transcript: (id: string, q: PageQuery = {}) =>
     call<Transcript>(run(id) + '/transcript' + query({ before: q.before, from: q.from, limit: q.limit || 200 })),
   file: (id: string, path: string) => call<FileView>(run(id) + '/files/' + encPath(path)),
-  start: (member: string, body: { agent: string; input: string }) =>
-    call<Run>('/v1/runs' + query({ member }), { method: 'POST', body }),
+  start: (member: string, body: NewRun) => call<Run>('/v1/runs' + query({ member }), { method: 'POST', body }),
+  /** fleetRuns lists the runs of the whole fleet that the caller can see, newest first, narrowed by agent and person. */
+  fleetRuns: (q: { agent?: string; principal?: string; limit?: number }) =>
+    call<{ runs: Run[]; total?: number }>('/v1/fleet/runs' + query({ agent: q.agent, principal: q.principal, limit: q.limit })).then((r) => (r && r.runs) || []),
   sendRun: (id: string, content: string) => call<unknown>(run(id) + '/messages', { method: 'POST', body: { content } }),
   decide: (id: string, approval: string, decision: 'allow' | 'deny', note?: string, content?: unknown) => {
     const body: Record<string, unknown> = { decision };

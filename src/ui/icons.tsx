@@ -59,11 +59,13 @@ export function Icon({ name, class: cls }: { name: IconName; class?: string }) {
 }
 
 export type GlyphName =
-  | 'activity' | 'bridges' | 'fleet' | 'skills' | 'wiki' | 'manager' | 'logo' | 'thumb-up' | 'thumb-down' | 'heart'
+  | 'activity' | 'chat' | 'bridges' | 'fleet' | 'skills' | 'wiki' | 'manager' | 'logo' | 'thumb-up' | 'thumb-down' | 'heart'
   | 'search' | 'close' | 'more' | 'plus' | 'back' | 'reply' | 'question' | 'check' | 'gear' | 'board';
 
 const G: Record<GlyphName, JSX.Element> = {
   activity: <><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10 21h4" /></>,
+  // A speech bubble, for the quick chat.
+  chat: <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v9a1.5 1.5 0 0 1-1.5 1.5H10l-4.5 4v-4h0A1.5 1.5 0 0 1 4 14.5z" />,
   bridges: <><circle cx="7" cy="6" r="3" /><circle cx="17" cy="6" r="3" /><path d="M2 20v-1a5 5 0 0 1 5-5a5 5 0 0 1 5 5v1" /><path d="M12 20v-1a5 5 0 0 1 5-5a5 5 0 0 1 5 5v1" /></>,
   fleet: <><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></>,
   skills: <><path d="M12 3l9 5-9 5-9-5z" /><path d="M3 12.5l9 5 9-5" /><path d="M3 17l9 5 9-5" /></>,

@@ -1,0 +1,123 @@
+/* The Chat place: the history of the quick chat, the picks of a new chat,
+   and This chat. The rows of the history take the rows of the bridge list,
+   and the conversation takes the thread of a member. The file uses the
+   tokens and adds no color, radius, shadow, type size, or motion. */
+
+/* ---------- the history ---------- */
+.chat-day + .chat-day .people-head {
+  padding-top: var(--s-3);
+}
+.chat-row .brow-title {
+  font-weight: 600;
+}
+.chat-row time {
+  flex: none;
+}
+
+/* ---------- the picks of a new chat ---------- */
+.chat-picks-scroll {
+  display: flex;
+  flex-direction: column;
+}
+/* The picks sit at the end of the pane, right above the composer that they serve. */
+.chat-picks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-5);
+  margin-top: auto;
+  padding: var(--s-5);
+}
+.pick-sec {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+.pick-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  min-height: var(--h-small);
+}
+.pick-find {
+  flex: 0 1 240px;
+  margin-left: auto;
+}
+.pick-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+/* A pick is a chip with a check box: line edge when off, the ground of a picked choice when on. */
+.pick-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--h-small);
+  padding: 0 var(--s-3) 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--paper);
+  color: var(--muted);
+  font-size: var(--t-control);
+  line-height: var(--t-control-lh);
+  font-weight: 600;
+  cursor: pointer;
+}
+.pick-chip:hover {
+  color: var(--ink);
+}
+.pick-chip:has(input:checked) {
+  background: var(--raised);
+  border-color: var(--raised-line);
+  box-shadow: var(--e-selected);
+  color: var(--ink);
+}
+.pick-chip:has(input:focus-visible) {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+.pick-chip input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  flex: none;
+  accent-color: var(--ink);
+}
+.pick-chip input:focus-visible {
+  outline: none;
+}
+
+/* ---------- This chat ---------- */
+.chat-chips .chip {
+  gap: var(--s-1);
+}
+.chip-note {
+  font-weight: 600;
+  color: var(--muted);
+}
+.chat-model {
+  margin-top: var(--s-2);
+  font-size: var(--t-control);
+  line-height: var(--t-control-lh);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/* A target on a touch screen is at least 44 pixels. */
+@media (pointer: coarse) {
+  .pick-chip {
+    min-height: var(--h-row);
+  }
+}
+
+/* A narrow window gives the picks the gutter of the page. */
+@media (max-width: 799px) {
+  .chat-picks {
+    padding: var(--s-4);
+  }
+  .pick-find {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+}
