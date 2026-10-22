@@ -1,264 +1,317 @@
-// The fleet: the agents in the list pane, every agent with its workers and
-// their phases in the main pane, and the face of an agent in the details
-// pane, where a person can change the name, the tagline, and the picture.
-// Screen B reworks the place into the people list grouped by bridge, the
-// board, and the profile of docs/DESIGN.md, section 11.
+// The Fleet place. The list pane holds the people: the seats of every open
+// bridge, grouped by bridge, then the agents that sit on no bridge, with a
+// field to find a member and a key that switches to the board. The main
+// pane holds the conversation with an agent that sits on no bridge, the
+// manager among them, as a run. The details pane holds the profile.
 
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
-import { useSelect } from '../state/store';
-import { loadAgents, loadFaces, loadFleet } from '../state/actions';
-import { phaseOf } from '../lib/presence';
-import { ago } from '../lib/words';
+import { peopleApi, type SlashSkill } from '../api/people';
+import { go, hrefOf, parseRoute, type Route } from '../lib/route';
+import { awakeWorkers } from '../lib/workers';
+import { store, useSelect } from '../state/store';
+import { loadAgents } from '../state/actions';
+import { ensureRosters, ensureRuns, refreshAfterReset } from '../state/fetchers';
+import { filterPeople, firstPerson, newestRun, parseSlash, peopleCount, peopleOf, slashCommands, workerLight, type PeopleGroup, type PersonRow } from '../state/people';
+import { workersOf } from '../lib/workers';
 import { useRoving } from './keys';
-import { attempt, showError } from './notice';
-import { Empty, Face, Light } from './common';
-import { Icon } from './icons';
-import { Button, Chip, Mark, PaneHeader } from './primitives';
+import { attempt } from './notice';
+import { Composer } from './Composer';
+import { Conversation, useTranscript, usePoll } from './Conversation';
+import { useResult } from './RunPane';
+import { useStickToEnd } from './Thread';
+import { Profile } from './Profile';
+import { EmptyPane } from './Shell';
+import { Glyph } from './icons';
+import { GlyphB } from './glyphs-b';
+import { Button, Chip, Led, Mark, PaneHeader, buttonClass } from './primitives';
 
-/** FleetList is the list pane of the Fleet place: the agents, each with its mark and its tagline. */
-export function FleetList({ current }: { current?: string; member?: string }) {
-  const agents = useSelect((s) => s.agents);
-  const faces = useSelect((s) => s.faces);
-  const list = useRoving<HTMLDivElement>();
+/** The width from which two panes show side by side, as App names it. */
+const TWO_PANES = '(min-width: 800px)';
+
+/** The conversation that the person had open last, so the main pane opens it again. */
+let lastOpen = '';
+
+/** rememberOpen keeps the address of the conversation that the main pane shows. */
+export function rememberOpen(href: string): void {
+  lastOpen = href;
+}
+
+/** useHashRoute reads the route of the address, and reads it again when it changes. */
+export function useHashRoute(): Route {
+  const [r, setR] = useState(() => parseRoute(location.hash));
   useEffect(() => {
-    if (!agents) attempt(loadAgents);
+    const f = () => setR(parseRoute(location.hash));
+    window.addEventListener('hashchange', f);
+    return () => window.removeEventListener('hashchange', f);
   }, []);
+  return r;
+}
+
+/**
+ * usePeople builds the people list from the store, and loads what it
+ * needs: the agents, the record of each open bridge, and the newest run of
+ * each seat that works, so a seat that waits in the queue says so.
+ */
+export function usePeople(): { groups: PeopleGroup[]; loaded: boolean } {
+  const bridges = useSelect((s) => s.bridges);
+  const rosters = useSelect((s) => s.rosters);
+  const runs = useSelect((s) => s.runs);
+  const agents = useSelect((s) => s.agents);
+  const fleet = useSelect((s) => s.fleet);
+  useEffect(() => {
+    if (!store.get().agents) attempt(loadAgents);
+  }, []);
+  useEffect(() => {
+    if (bridges.loaded) ensureRosters();
+  }, [bridges]);
+  // A stream that cannot resume leaves the records and the runs behind, so they load again.
+  const resets = useSelect((s) => s.resets);
+  const seen = useRef(resets);
+  useEffect(() => {
+    if (resets === seen.current) return;
+    seen.current = resets;
+    refreshAfterReset();
+  }, [resets]);
+  const groups = useMemo(() => peopleOf({ bridges, rosters, runs, agents, fleet }), [bridges, rosters, runs, agents, fleet]);
+  const working = groups
+    .flatMap((g) => g.rows)
+    .filter((r) => r.kind === 'seat' && r.light && r.light.word === 'working' && r.bridge)
+    .map((r) => {
+      const m = rosters[r.bridge!] && rosters[r.bridge!].byHandle[r.handle];
+      return m ? newestRun(m) : '';
+    })
+    .join(',');
+  useEffect(() => {
+    if (working) ensureRuns(working.split(','));
+  }, [working]);
+  const open = bridges.order.filter((id) => bridges.byId[id].state === 'open');
+  const loaded = bridges.loaded && !!agents && open.every((id) => !!rosters[id]);
+  return { groups, loaded };
+}
+
+/** PersonLink is one row of the people list: the mark, the handle, the status, and the task. */
+function PersonLink({ r, on }: { r: PersonRow; on: boolean }) {
   return (
-    <section class="screen fleet-list" aria-labelledby="fleet-list-title">
+    <a class={'person' + (on ? ' sel' : '')} href={r.href} data-item aria-current={on ? 'page' : undefined}>
+      <Mark agent={r.agent} size={32} selected={on} />
+      <span class="person-main">
+        <span class="person-top">
+          <span class={'person-handle clip' + (r.light && r.light.struck ? ' struck' : '')}>{r.handle}</span>
+          {r.light && <Led tone={r.light.tone} word={r.light.word} struck={r.light.struck} label={r.light.label} />}
+        </span>
+        <span class="person-task clip">{r.task}</span>
+      </span>
+    </a>
+  );
+}
+
+/** FleetList is the list pane of the Fleet place: the people grouped by bridge, then Not on a bridge. */
+export function FleetList({ current, member }: { current?: string; member?: string }) {
+  const route = useHashRoute();
+  const board = route.place === 'fleet' && !!route.board;
+  const { groups, loaded } = usePeople();
+  const awake = useSelect((s) => awakeWorkers(s.fleet));
+  const knowFleet = useSelect((s) => !!s.fleet);
+  const [q, setQ] = useState('');
+  const shown = useMemo(() => filterPeople(groups, q), [groups, q]);
+  const list = useRoving<HTMLDivElement>();
+  const count = peopleCount(groups);
+  const sel = member ? 'seat:' + member : current ? 'agent:' + current : '';
+  return (
+    <section class="screen people" aria-labelledby="fleet-list-title">
       <PaneHeader
         id="fleet-list-title"
         title="Fleet"
-        count={agents ? agents.length : undefined}
-        countLabel={agents ? agents.length + ' agents' : undefined}
+        count={loaded ? count : undefined}
+        countLabel={count === 1 ? '1 member' : count + ' members'}
         actions={
-          <Button href="#new-agent" size="s" icon="plus" class="key-icon" aria-label="New agent" title="New agent" />
+          <>
+            <button
+              type="button"
+              class={buttonClass('quiet', 's', 'key-icon')}
+              aria-label="Board"
+              title="Board"
+              aria-pressed={board}
+              onClick={() => go(board ? { place: 'fleet' } : { place: 'fleet', board: true })}
+            >
+              <GlyphB name="board" />
+            </button>
+            <Button href="#new-agent" size="s" icon="plus" class="key-icon" aria-label="New agent" title="New agent" />
+          </>
         }
-      />
+      >
+        {knowFleet && (
+          <Chip label={awake === 1 ? '1 worker awake' : awake + ' workers awake'}>
+            <Led tone="green" word={awake + ' awake'} />
+          </Chip>
+        )}
+      </PaneHeader>
+      <div class="people-find">
+        <label class="recess people-search">
+          <Glyph name="search" size={16} />
+          <span class="sr">Find a member</span>
+          <input type="search" placeholder="Find a member" value={q} onInput={(e) => setQ((e.target as HTMLInputElement).value)} />
+        </label>
+      </div>
       <div class="scroll" ref={list}>
-        <div class="rows" role="list">
-          {(agents || []).map((a) => {
-            const f = faces[a.name];
-            const on = a.name === current;
-            return (
-              <div role="listitem">
-                <a class={'prow-agent' + (on ? ' sel' : '')} href={'#fleet/' + encodeURIComponent(a.name)} data-item aria-current={on ? 'page' : undefined}>
-                  <Mark agent={a.name} size={32} selected={on} />
-                  <span class="main">
-                    <span class="t-sub clip">{(f && f.displayName) || a.name}</span>
-                    <span class="t-meta clip">{(f && f.tagline) || a.description || a.name}</span>
-                  </span>
+        {shown.map((g) => (
+          <div class="people-group" role="group" aria-labelledby={'pg-' + (g.key || 'none')}>
+            <div class="people-head" id={'pg-' + (g.key || 'none')}>
+              {g.href ? (
+                <a class="people-title clip" href={g.href}>
+                  {g.title}
                 </a>
-              </div>
-            );
-          })}
-        </div>
-        {agents && agents.length === 0 && <Empty>You can see no agent.</Empty>}
+              ) : (
+                <span class="people-title muted clip">{g.title}</span>
+              )}
+              <span class="people-count" aria-label={g.count === 1 ? '1 member' : g.count + ' members'}>
+                {g.count}
+              </span>
+            </div>
+            <div role="list">
+              {g.rows.map((r) => (
+                <div role="listitem">
+                  <PersonLink r={r} on={r.key === sel} />
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+        {!loaded && <p class="people-note">Loading the members.</p>}
+        {loaded && groups.length === 0 && (
+          <div class="empty">
+            <p>No agent yet.</p>
+            <Button href="#new-agent" kind="primary">
+              New agent
+            </Button>
+          </div>
+        )}
       </div>
     </section>
   );
 }
 
-export function Fleet() {
-  // The view comes from GET /v1/fleet, and the member and task events of
-  // the stream keep its phases current.
+/** agentRunKey is the key under which a tab keeps the conversation of the person with an agent. */
+const agentRunKey = (agent: string) => 'fw.bossmode.agentrun.' + agent;
+
+function readRun(agent: string): string {
+  try {
+    return sessionStorage.getItem(agentRunKey(agent)) || '';
+  } catch {
+    return '';
+  }
+}
+
+function keepRun(agent: string, id: string): void {
+  try {
+    if (id) sessionStorage.setItem(agentRunKey(agent), id);
+    else sessionStorage.removeItem(agentRunKey(agent));
+  } catch {
+    // No storage: the conversation lives while the page lives.
+  }
+}
+
+/**
+ * AgentChat is the conversation with an agent that sits on no bridge, as a
+ * run: the first message starts it on a worker of the agent, a later one
+ * follows up, and a slash command runs a skill in it. The manager starts
+ * on its own member and opens its newest conversation.
+ */
+export function AgentChat({ agent }: { agent: string }) {
+  useEffect(() => rememberOpen(hrefOf({ place: 'fleet', agent })), [agent]);
+  const config = useSelect((s) => s.config);
   const fleet = useSelect((s) => s.fleet);
-  const [busy, setBusy] = useState(false);
-  const agents = useSelect((s) => s.agents);
-  const faces = useSelect((s) => s.faces);
-  const grid = useRoving<HTMLUListElement>();
-  const read = async () => {
-    setBusy(true);
-    try {
-      await loadFleet();
-    } catch (e) {
-      showError(e);
-    }
-    setBusy(false);
-  };
+  const skills = useSelect((s) => (s.skills ? (s.skills.skills as SlashSkill[]) : null));
+  const face = useSelect((s) => s.faces[agent]);
+  const manager = config && config.manager && config.manager.agent === agent ? config.manager : null;
+  // The conversation of this tab comes first, then the newest one of the manager.
+  const [runId, setRunId] = useState(() => readRun(agent) || (manager ? manager.run : ''));
+  const run = useSelect((s) => (runId ? s.runs[runId] : undefined));
+  const res = useResult(runId);
+  const t = useTranscript(runId);
+  usePoll(runId);
   useEffect(() => {
-    read();
-    if (!agents) attempt(loadAgents);
-  }, []);
+    setRunId(readRun(agent) || (manager ? manager.run : ''));
+  }, [agent, manager && manager.run]);
+  const w = workersOf(fleet, agent);
+  const light = workerLight(w);
+  // The member of the fleet that serves the agent: a live one first.
+  const member = manager
+    ? manager.member
+    : ((fleet ? fleet.members : []).filter((m) => m.agents.some((a) => a.name === agent)).sort((a, b) => (a.state === 'live' ? 0 : 1) - (b.state === 'live' ? 0 : 1))[0] || { name: '' }).name;
+  const commands = useMemo(() => slashCommands(skills, agent), [skills, agent]);
+  const names = useMemo(() => commands.map((c) => c.name), [commands]);
+  const box = useStickToEnd<HTMLDivElement>(t.items.length);
+  const stopped = !!run && ['failed', 'canceled'].includes(run.state);
+  const send = async (text: string): Promise<boolean> =>
+    attempt(async () => {
+      if (!runId || stopped) {
+        const r = await api.start(member, { agent, input: text });
+        store.dispatch({ type: 'run', run: r });
+        setRunId(r.id);
+        keepRun(agent, r.id);
+        return;
+      }
+      const skill = parseSlash(text, names);
+      if (skill) await peopleApi.runSkill(runId, skill);
+      else await api.sendRun(runId, text);
+      const r = await api.run(runId);
+      store.dispatch({ type: 'run', run: r });
+    });
+  const name = (face && face.displayName) || agent;
   return (
-    <section class="screen fleet" aria-labelledby="fleet-title">
+    <section class="screen member-main" aria-labelledby="agent-chat-title">
       <PaneHeader
-        id="fleet-title"
-        title="Workers"
+        id="agent-chat-title"
+        title={agent}
         size="title"
         level={1}
         back={{ href: '#fleet', label: 'Fleet', to: 'list' }}
-        count={fleet ? (fleet.pools || []).reduce((n, p) => n + p.tasks.length, 0) : undefined}
-        countLabel="workers"
-        actions={
-          <Button size="s" disabled={busy} onClick={read}>
-            Read again
-          </Button>
-        }
+        lead={<Mark agent={agent} size={36} label={name} halo={light ? { tone: light.tone, word: light.word } : undefined} />}
       />
-      <div class="scroll pad">
-        {fleet && (fleet.pools || []).length === 0 && <Empty>No agent has a worker that you can see.</Empty>}
-        <div class="pools">
-          {fleet &&
-            (fleet.pools || []).map((p) => (
-              <article class="pool" aria-labelledby={'pool-' + p.name}>
-                <header>
-                  <Face agent={p.agent} size={40} />
-                  <div>
-                    <h3 id={'pool-' + p.name}>{(faces[p.agent] && faces[p.agent].displayName) || p.agent}</h3>
-                    <p class="s">Keep {p.wanted}</p>
-                  </div>
-                  <span class={'ready ' + (p.ready >= p.wanted ? 'ok' : 'need')}>{p.ready} ready</span>
-                </header>
-                <ul class="tasks">
-                  {p.tasks.map((t) => (
-                    <li>
-                      <span class="name">{t.name}</span>
-                      <Light light={phaseOf(t.phase)} />
-                      {!t.current && <span class="tag">older configuration</span>}
-                      {t.note && <span class="note">{t.note}</span>}
-                    </li>
-                  ))}
-                </ul>
-                {p.gaps && p.gaps.length > 0 && (
-                  <ul class="gaps">
-                    {p.gaps.map((g) => (
-                      <li>
-                        <Icon name="hand" /> {g}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                <p class="why">Checked {ago(p.checkedAt)}.</p>
-              </article>
-            ))}
-        </div>
-        <h2 class="sec">Agents</h2>
-        <ul class="agents" ref={grid}>
-          {(agents || []).map((a) => {
-            const f = faces[a.name];
-            return (
-              <li>
-                <a class="agent-card" href={'#fleet/' + encodeURIComponent(a.name)} data-item>
-                  <Face agent={a.name} size={64} />
-                  <b>{(f && f.displayName) || a.name}</b>
-                  <span class="s">{a.name}</span>
-                  {f && f.tagline && <span class="tagline">{f.tagline}</span>}
-                  <span class="role">You are {a.role || 'a viewer'}</span>
-                </a>
-              </li>
-            );
-          })}
-        </ul>
-        {agents && agents.length === 0 && <Empty>You can see no agent.</Empty>}
-        {fleet && (
-          <>
-            <h2 class="sec">Tasks</h2>
-            <ul class="fleet-members">
-              {fleet.members.map((m) => (
-                <li>
-                  <span class="name">{m.name}</span>
-                  <Light light={m.state === 'live' ? phaseOf('Running') : m.state === 'suspended' ? phaseOf('Suspended') : phaseOf(m.state)} />
-                  <span class="s">
-                    {m.agents.map((x) => x.name).join(', ')}
-                    {m.inputRequired ? ` · ${m.inputRequired} waiting for input` : ''}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
+      <div class="scroll thread-scroll" ref={box}>
+        {runId ? <Conversation run={run} result={res} t={t} agentLabel={agent} /> : <div class="thread" />}
       </div>
+      <Composer draft={'agent:' + agent} label={'Message to ' + agent} placeholder={'Message ' + agent} disabled={member ? '' : 'Keep 0'} commands={commands} onSend={send} />
     </section>
   );
 }
 
-export function AgentPane({ agent }: { agent: string }) {
-  const face = useSelect((s) => s.faces[agent]);
-  const info = useSelect((s) => (s.agents || []).find((a) => a.name === agent));
-  const [name, setName] = useState('');
-  const [tagline, setTagline] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [saved, setSaved] = useState('');
-  const file = useRef<HTMLInputElement>(null);
+/**
+ * Fleet is the main pane of the Fleet place. With an agent in the address,
+ * it holds the conversation with that agent. Without one, where two panes
+ * show, it opens the first member, so the pane is never empty.
+ */
+export function Fleet() {
+  const route = useHashRoute();
+  const agent = route.place === 'fleet' ? route.agent : undefined;
+  const { groups, loaded } = usePeople();
+  // Where two panes show, the main pane opens the conversation of before, or the first member.
+  const again = lastOpen && groups.some((g) => g.rows.some((r) => r.href === lastOpen)) ? lastOpen : '';
+  const first = !agent && loaded ? again || (firstPerson(groups) || { href: '' }).href : '';
   useEffect(() => {
-    setName(face ? face.displayName : '');
-    setTagline(face ? face.tagline : '');
-    setSaved('');
-  }, [agent, face && face.hash]);
-  const canEdit = !!info && info.role === 'owner';
-  const save = async (e: Event) => {
-    e.preventDefault();
-    setBusy(true);
-    const ok = await attempt(() => api.patchFace(agent, { displayName: name, tagline }).then(() => loadFaces()));
-    setBusy(false);
-    if (ok) setSaved('Saved.');
-  };
-  const upload = async () => {
-    const f = file.current && file.current.files && file.current.files[0];
-    if (!f) return;
-    if (f.size > 32 * 1024) {
-      showError(new Error('A face holds at most 32 KB.'));
-      return;
-    }
-    setBusy(true);
-    const ok = await attempt(async () => {
-      await api.putFace(agent, await f.text());
-      await loadFaces();
-    });
-    setBusy(false);
-    if (file.current) file.current.value = '';
-    if (ok) setSaved('The new face is up.');
-  };
+    if (first && window.matchMedia(TWO_PANES).matches) go(first, true);
+  }, [first]);
+  if (agent) return <AgentChat agent={agent} />;
   return (
-    <section class="screen agentpane" aria-labelledby="agent-title">
-      <PaneHeader id="agent-title" title={(face && face.displayName) || agent} back={{ href: '#fleet', label: 'Fleet', to: 'main' }}>
-        <Chip>agent</Chip>
-      </PaneHeader>
-      <div class="scroll pad">
-        <div class="bigface">
-          <Face agent={agent} size={96} />
-          {face && <p class="why">{face.custom ? 'A person drew this face.' : 'A pattern from the name. No model drew it.'}</p>}
-        </div>
-        {info && info.description && <p class="lede">{info.description}</p>}
-        <form class="form" onSubmit={save}>
-          <label class="fld">
-            <span>Display name, at most 64 characters</span>
-            <input value={name} maxLength={64} disabled={!canEdit} onInput={(e) => setName((e.target as HTMLInputElement).value)} />
-          </label>
-          <label class="fld">
-            <span>Tagline, at most 140 characters</span>
-            <input value={tagline} maxLength={140} disabled={!canEdit} onInput={(e) => setTagline((e.target as HTMLInputElement).value)} />
-          </label>
-          {canEdit && (
-            <div class="do">
-              <button type="submit" class="btn primary" disabled={busy}>
-                Save
-              </button>
-            </div>
-          )}
-        </form>
-        {canEdit ? (
-          <div class="form">
-            <label class="fld">
-              <span>A new face: an SVG file of at most 32 KB. The workbench refuses a face with a script, a link, or an image inside.</span>
-              <input ref={file} type="file" accept="image/svg+xml,.svg" disabled={busy} onChange={upload} />
-            </label>
-            {face && face.custom && (
-              <button type="button" class="btn" disabled={busy} onClick={() => attempt(() => api.deleteFace(agent).then(() => loadFaces()))}>
-                Use the pattern again
-              </button>
-            )}
-          </div>
-        ) : (
-          <p class="why">Only an owner of {agent} can change its face.</p>
-        )}
-        {saved && (
-          <p class="why" role="status">
-            {saved}
-          </p>
-        )}
-      </div>
-    </section>
+    <EmptyPane back={{ href: '#fleet', label: 'Fleet' }}>
+      {loaded && groups.length === 0 ? (
+        <>
+          <p>No agent yet.</p>
+          <Button href="#new-agent" kind="primary">
+            New agent
+          </Button>
+        </>
+      ) : (
+        <p>Loading the members.</p>
+      )}
+    </EmptyPane>
   );
 }
+
+/** AgentPane is the profile of an agent in the details pane. */
+export function AgentPane({ agent }: { agent: string }) {
+  return <Profile agent={agent} />;
+}
+
