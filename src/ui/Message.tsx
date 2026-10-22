@@ -1,20 +1,25 @@
-// One entry of the channel: a message of a person or an agent, a quiet
-// system line, or a card that waits for a decision. Reactions sit under
-// each entry on hover and on focus.
+// One entry of the channel: a message of a person or an agent, a system
+// line with the light of its event, or a card that waits for a decision.
+// The reaction chips sit at the top right of an entry. The keys that add a
+// reaction or a reply show beside them on hover and on focus, and always on
+// a touch screen.
 
 import { memo } from 'preact/compat';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import type { Entry, Member, ReactionKind } from '../api/types';
+import type { Member, ReactionKind } from '../api/types';
 import { useSelect } from '../state/store';
-import { dayWords, excerpt, personName, senderName } from '../lib/words';
+import { dayWords, excerpt, list, personName, senderName } from '../lib/words';
+import { hrefOf } from '../lib/route';
+import type { Tone } from '../lib/presence';
 import { decide, react } from '../state/actions';
+import { asDecision, type EntryA } from '../state/bridges-a';
 import { attempt } from './notice';
-import { Avatar, Face, InlineMarkdown, Markdown, When } from './common';
-import { DecisionCard } from './Decision';
-import { Icon, type IconName } from './icons';
+import { InlineMarkdown, Markdown, When } from './common';
+import { DecisionCard, Light } from './Decision';
+import { Avatar, Button, IconButton, Mark, ReactionChip, TextArea } from './primitives';
 
 /** plain drops the marks of Markdown from a text, for a label. */
-const plain = (t: string) => t.replace(/```[\s\S]*?```/g, ' code ').replace(/[*_`#>|\[\]]/g, '');
+const plain = (t: string) => t.replace(/```[\s\S]*?```/g, ' code ').replace(/[*_`#>|[\]]/g, '');
 
 /** agentOf finds the agent behind a handle, from the roster or the handle itself. */
 export function agentOf(roster: Record<string, Member> | undefined, handle: string): string {
@@ -29,25 +34,31 @@ function handleOfRun(roster: Record<string, Member> | undefined, run: string): s
   return '';
 }
 
-const SYS_ICON: Record<string, IconName> = {
-  opened: 'people',
-  closed: 'stop',
-  reopened: 'people',
-  started: 'play',
-  joined: 'plus',
-  finished: 'check',
-  'needs-you': 'hand',
-  asked: 'hand',
-  decided: 'check',
-  failed: 'cross',
-  asleep: 'moon',
-  fired: 'slash',
-  canceled: 'stop',
-  muted: 'slash',
-  task: 'edit',
-  cap: 'hand',
-  changed: 'gear',
-};
+/** toneOfEvent is the light of a system line: green for started, amber for needs you and asked, red for failed, grey for the rest. */
+export function toneOfEvent(event: string | undefined): Tone {
+  if (event === 'started') return 'green';
+  if (event === 'needs-you' || event === 'asked') return 'amber';
+  if (event === 'failed') return 'red';
+  return 'grey';
+}
+
+/* ---------- the cards that arrive ---------- */
+
+/** The newest seq of each channel when its first page loaded. A card after it arrived on the stream. */
+const loadedAt = new Map<string, number>();
+
+/** markLoaded records the newest seq of a channel at its load, so a card after it settles once. */
+export function markLoaded(bridge: string, seq: number): void {
+  loadedAt.set(bridge, seq);
+}
+
+/** arrived reports whether an entry came on the stream after the channel loaded. */
+export function arrived(bridge: string, seq: number): boolean {
+  const at = loadedAt.get(bridge);
+  return at !== undefined && seq > at;
+}
+
+/* ---------- reactions ---------- */
 
 const NAMES: Record<ReactionKind, string> = { up: 'Thumb up', down: 'Thumb down', heart: 'Heart' };
 
@@ -77,24 +88,28 @@ function HeartNote({ onSave, onCancel }: { onSave: (note: string) => void; onCan
         }
       }}
     >
-      <label>
-        <span>What made this useful? The wiki keeps the heart with your note. The note is optional.</span>
-        <textarea ref={ref} maxLength={1024} value={note} onInput={(e) => setNote((e.target as HTMLTextAreaElement).value)} />
+      <label class="field">
+        <span class="field-label">What made this useful?</span>
+        <TextArea ref={ref} rows={2} maxLength={1024} placeholder="Optional" value={note} onInput={(e) => setNote((e.target as HTMLTextAreaElement).value)} />
       </label>
-      <div class="do">
-        <button type="button" class="btn small" onClick={onCancel}>
+      <div class="card-actions">
+        <Button size="s" onClick={onCancel}>
           Cancel
-        </button>
-        <button type="submit" class="btn small primary">
-          <Icon name="heart" /> Save heart
-        </button>
+        </Button>
+        <Button type="submit" size="s" kind="primary" icon="heart">
+          Heart
+        </Button>
       </div>
     </form>
   );
 }
 
-/** Reactions holds the counts and the bar of thumb up, thumb down, and heart. */
-function Reactions({ bridge, e, onReply }: { bridge: string; e: Entry; onReply?: (seq: number) => void }) {
+/**
+ * Reactions draws the chips of an entry and the keys that add a reaction.
+ * On a card that waits, a thumb up allows and a thumb down denies, as the
+ * keys of the card do.
+ */
+export function Reactions({ bridge, e, onReply }: { bridge: string; e: EntryA; onReply?: (seq: number) => void }) {
   const me = useSelect((s) => (s.me && s.me.principal ? s.me.principal.subject : ''));
   const [heart, setHeart] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -115,38 +130,29 @@ function Reactions({ bridge, e, onReply }: { bridge: string; e: Entry; onReply?:
     if (deciding && k === 'down') return 'Thumb down: Deny';
     return NAMES[k];
   };
+  // A chip adds the same reaction. A chip of a thumb on a card that waits only counts.
+  const chipPress = (k: ReactionKind) => {
+    if (mineOf(k) || busy) return undefined;
+    if (k === 'heart') return () => setHeart(true);
+    if (deciding) return undefined;
+    return () => press(k);
+  };
   return (
     <>
-      {shown.length > 0 && (
-        <div class="counts">
-          {shown.map((k) => (
-            <span class={'count' + (mineOf(k) ? ' mine' : '')} title={(r[k] || []).map((x) => personName(x)).join(', ')}>
-              <Icon name={k} />
-              <span>{(r[k] || []).length}</span>
-              <span class="sr">{' ' + NAMES[k] + (mineOf(k) ? ', yours among them' : '')}</span>
-            </span>
-          ))}
+      <div class="rx">
+        <div class={'rx-keys' + (heart ? ' open' : '')} role="group" aria-label="Reactions">
+          {thumbs && (
+            <>
+              <IconButton icon="thumb-up" label={label('up')} aria-pressed={deciding ? undefined : mineOf('up')} disabled={busy} onClick={() => press('up')} />
+              <IconButton icon="thumb-down" label={label('down')} aria-pressed={deciding ? undefined : mineOf('down')} disabled={busy} onClick={() => press('down')} />
+            </>
+          )}
+          <IconButton icon="heart" label="Heart" title="Heart: keep this in the wiki" aria-pressed={mineOf('heart')} aria-expanded={heart} disabled={busy} onClick={() => setHeart(!heart)} />
+          {onReply && e.from.kind !== 'system' && <IconButton icon="reply" label={'Reply to ' + senderName(e.from)} title="Reply" onClick={() => onReply(e.seq)} />}
         </div>
-      )}
-      <div class={'reacts' + (heart ? ' open' : '')} role="group" aria-label="Reactions">
-        {thumbs && (
-          <>
-            <button type="button" class={'icon-btn' + (deciding ? ' decides' : '')} aria-label={label('up')} title={label('up')} aria-pressed={deciding ? undefined : mineOf('up')} disabled={busy} onClick={() => press('up')}>
-              <Icon name="up" />
-            </button>
-            <button type="button" class={'icon-btn' + (deciding ? ' decides' : '')} aria-label={label('down')} title={label('down')} aria-pressed={deciding ? undefined : mineOf('down')} disabled={busy} onClick={() => press('down')}>
-              <Icon name="down" />
-            </button>
-          </>
-        )}
-        <button type="button" class="icon-btn" aria-label="Heart" title="Heart: keep this in the wiki" aria-pressed={mineOf('heart')} aria-expanded={heart} disabled={busy} onClick={() => setHeart(!heart)}>
-          <Icon name="heart" />
-        </button>
-        {onReply && e.from.kind !== 'system' && (
-          <button type="button" class="icon-btn" aria-label={'Reply to ' + senderName(e.from)} title="Reply" onClick={() => onReply(e.seq)}>
-            <Icon name="reply" />
-          </button>
-        )}
+        {shown.map((k) => (
+          <ReactionChip kind={k} count={(r[k] || []).length} mine={mineOf(k)} names={(r[k] || []).map((x) => personName(x)).join(', ')} onClick={chipPress(k)} disabled={busy} />
+        ))}
       </div>
       {heart && (
         <HeartNote
@@ -161,35 +167,42 @@ function Reactions({ bridge, e, onReply }: { bridge: string; e: Entry; onReply?:
   );
 }
 
+/* ---------- the reply chip ---------- */
+
+/** jumpTo asks the channel to show an entry: it opens the fold that holds it and moves the focus there. */
+export function jumpTo(bridge: string, seq: number): void {
+  window.dispatchEvent(new CustomEvent('fw-jump', { detail: { bridge, seq } }));
+}
+
 /** ReplyChip names the entry that a message answers, and jumps to it. */
 function ReplyChip({ bridge, seq }: { bridge: string; seq: number }) {
-  const target = useSelect((s) => (s.channels[bridge] ? s.channels[bridge].bySeq[seq] : undefined));
-  const jump = () => {
-    const el = document.getElementById('entry-' + bridge + '-' + seq);
-    if (el) {
-      el.scrollIntoView({ block: 'center' });
-      el.focus();
-    }
-  };
+  const target = useSelect((s) => (s.channels[bridge] ? (s.channels[bridge].bySeq[seq] as EntryA | undefined) : undefined));
   return (
-    <button type="button" class="reply-chip" onClick={jump} disabled={!target} title={target ? 'Go to the message' : 'Load earlier messages to see it'}>
-      <Icon name="reply" />
-      <span>{target ? senderName(target.from) + ': ' + excerpt(target.text, 70) : 'An earlier message'}</span>
+    <button type="button" class="reply-chip" onClick={() => jumpTo(bridge, seq)} disabled={!target} title={target ? 'Go to the message' : 'Earlier messages hold it'}>
+      <span class="reply-who">{target ? senderName(target.from) : 'An earlier message'}</span>
+      {target && <span class="reply-text">{excerpt(plain(target.text), 70)}</span>}
     </button>
   );
 }
 
+/* ---------- one entry ---------- */
+
 export interface EntryProps {
   bridge: string;
   seq: number;
+  /** The entry before this one, for the line of a new day and for the grouping of one sender. */
   prevSeq: number;
+  /** True after a fold: the entry shows its sender again. */
+  fresh?: boolean;
+  /** True in a list of cards, out of the flow of the channel: no line of a new day. */
+  listed?: boolean;
   onReply?: (seq: number) => void;
 }
 
 /** EntryRow draws one entry. It reads its own entry, so a change redraws only it. */
-export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, onReply }: EntryProps) {
-  const e = useSelect((s) => (s.channels[bridge] ? s.channels[bridge].bySeq[seq] : undefined));
-  const prev = useSelect((s) => (prevSeq && s.channels[bridge] ? s.channels[bridge].bySeq[prevSeq] : undefined));
+export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, fresh, listed, onReply }: EntryProps) {
+  const e = useSelect((s) => (s.channels[bridge] ? (s.channels[bridge].bySeq[seq] as EntryA | undefined) : undefined));
+  const prev = useSelect((s) => (prevSeq && s.channels[bridge] ? (s.channels[bridge].bySeq[prevSeq] as EntryA | undefined) : undefined));
   // A row reads strings of the roster, never the roster itself, so a change
   // of presence redraws the roster row and no message.
   const handles = useSelect((s) => (s.rosters[bridge] ? s.rosters[bridge].order : undefined));
@@ -197,17 +210,35 @@ export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, onReply }
   const runHandle = useSelect((s) => (decisionRun ? handleOfRun(s.rosters[bridge] ? s.rosters[bridge].byHandle : undefined, decisionRun) : ''));
   const handle = e && e.from.kind === 'agent' ? e.from.handle || '' : runHandle;
   const agent = useSelect((s) => (handle ? agentOf(s.rosters[bridge] ? s.rosters[bridge].byHandle : undefined, handle) : ''));
+  // A card that arrives on the stream after the channel loaded settles once. A card on load never moves.
+  const [settle] = useState(() => arrived(bridge, seq));
   if (!e) return null;
-  const day = !prev || dayWords(prev.at) !== dayWords(e.at) ? dayWords(e.at) : '';
+  const day = listed ? '' : !prev || dayWords(prev.at) !== dayWords(e.at) ? dayWords(e.at) : '';
   const id = 'entry-' + bridge + '-' + seq;
+  const dayLine = day && (
+    <p class="day" role="separator">
+      {day}
+    </p>
+  );
   if (e.from.kind === 'system' && !e.decision) {
     return (
       <>
-        {day && <p class="day" role="separator">{day}</p>}
-        <div class={'sys ' + (e.event || '')} id={id} data-item data-seq={seq}>
+        {dayLine}
+        <div class={'sys' + (e.event ? ' ev-' + e.event : '')} id={id} data-item data-seq={seq}>
           <p>
-            <Icon name={SYS_ICON[e.event || ''] || 'dot'} />
-            <InlineMarkdown text={e.text} /> <When at={e.at} />
+            <Light tone={toneOfEvent(e.event)} />
+            <span class="sys-text">
+              <InlineMarkdown text={e.text} />
+              {e.page && (
+                <>
+                  {' '}
+                  <a class="sys-page" href={hrefOf({ place: 'pages', path: e.page, mode: 'read' })}>
+                    {e.page}
+                  </a>
+                </>
+              )}
+            </span>
+            <When at={e.at} />
           </p>
           {e.mirrors && <Reactions bridge={bridge} e={e} />}
         </div>
@@ -216,46 +247,68 @@ export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, onReply }
   }
   if (e.from.kind === 'system' && e.decision) {
     const who = runHandle || e.text.split(' ')[0] || 'An agent';
+    const d = e.decision;
     return (
       <>
-        {day && <p class="day" role="separator">{day}</p>}
-        <article class={'msg decision-row' + (e.decision.state === 'pending' ? ' waiting' : '')} id={id} data-item data-seq={seq} aria-label={(e.decision.question ? 'Question from ' : 'Permission for ') + who}>
-          <Face agent={agent || who.replace(/-\d+$/, '')} size={32} />
+        {dayLine}
+        <article class={'msg card-row' + (d.state === 'pending' ? ' waiting' : '')} id={id} data-item data-seq={seq} aria-label={(d.question ? 'Question from ' : 'Decision for ') + who}>
+          <Mark agent={agent || who.replace(/-\d+$/, '')} size={32} ink={who === 'manager' || undefined} />
           <div class="body">
             <header>
               <b>{who}</b>
               <When at={e.at} />
             </header>
-            <DecisionCard d={e.decision} who={who} />
-            <Reactions bridge={bridge} e={e} />
+            <DecisionCard d={asDecision(d)} who={who} settle={settle} />
           </div>
+          <Reactions bridge={bridge} e={e} />
         </article>
       </>
     );
   }
   const name = senderName(e.from);
   const sameAsPrev =
-    !!prev && !day && !e.replyTo && prev.from.kind === e.from.kind && !prev.decision && prev.from.kind !== 'system' && senderName(prev.from) === name && new Date(e.at).getTime() - new Date(prev.at).getTime() < 5 * 60_000;
+    !fresh &&
+    !!prev &&
+    !day &&
+    !e.replyTo &&
+    prev.from.kind === e.from.kind &&
+    !prev.decision &&
+    prev.from.kind !== 'system' &&
+    senderName(prev.from) === name &&
+    new Date(e.at).getTime() - new Date(prev.at).getTime() < 5 * 60_000;
   const mine = e.from.kind === 'person';
+  const to = e.to || [];
+  const r = e.reactions || {};
+  const chips = (r.up || []).length + (r.down || []).length + (r.heart || []).length > 0;
   return (
     <>
-      {day && <p class="day" role="separator">{day}</p>}
-      <article class={'msg' + (sameAsPrev ? ' compact' : '') + (mine ? ' by-person' : ' by-agent')} id={id} data-item data-seq={seq} data-reply="1" aria-label={name + ', ' + excerpt(plain(e.text), 60)}>
-        {sameAsPrev ? <span class="gutter" /> : e.from.kind === 'agent' ? <Face agent={agent} size={32} /> : <Avatar subject={e.from.name || ''} display={e.from.display} size={32} />}
+      {dayLine}
+      <article class={'msg' + (sameAsPrev ? ' compact' : '') + (mine ? ' by-person' : ' by-agent') + (chips ? ' has-rx' : '')} id={id} data-item data-seq={seq} data-reply="1" aria-label={name + ', ' + excerpt(plain(e.text), 60)}>
+        {sameAsPrev ? (
+          <span class="gutter" />
+        ) : e.from.kind === 'agent' ? (
+          <Mark agent={agent} size={32} ink={handle === 'manager' || undefined} />
+        ) : (
+          <Avatar subject={e.from.name || ''} display={e.from.display} size={32} />
+        )}
         <div class="body">
           {!sameAsPrev && (
             <header>
               <b>{name}</b>
-              {e.from.kind === 'agent' && agent !== e.from.handle && <span class="agent-name">{agent}</span>}
               <When at={e.at} />
+              {to.length > 0 && <span class="to">to {list(to)}</span>}
             </header>
           )}
           {e.replyTo ? <ReplyChip bridge={bridge} seq={e.replyTo} /> : null}
-          {e.to && e.to.length > 0 && <p class="to">to {e.to.map((h) => '@' + h).join(', ')}</p>}
           <Markdown text={e.text} handles={handles} />
-          {e.cut && <p class="cut">The channel holds the first 4 KB. The run holds the whole text.</p>}
-          <Reactions bridge={bridge} e={e} onReply={onReply} />
+          {e.cut && (
+            <p class="cut">
+              Cut at 4 KB.{' '}
+              {e.from.kind === 'agent' && e.from.handle && <a href={hrefOf({ place: 'member', bridge, handle: e.from.handle, tab: 'chat' })}>Whole text</a>}
+            </p>
+          )}
         </div>
+        <Reactions bridge={bridge} e={e} onReply={onReply} />
       </article>
     </>
   );

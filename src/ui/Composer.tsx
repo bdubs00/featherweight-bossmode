@@ -1,14 +1,14 @@
 // The composer: a text box with @ completion over the roster, a slash menu
-// of commands in a one-on-one conversation, a reply chip, and Cmd or
-// Ctrl+Enter to send. A draft stays in sessionStorage, so a move to another
-// screen, a reload, or a sign-in keeps it.
+// of commands in a one-on-one conversation, a reply chip that slides in,
+// the address line, and Cmd or Ctrl+Enter to send. A draft stays in
+// sessionStorage, so a move to another screen, a reload, or a sign-in keeps
+// it.
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { applyCompletion, completionAt, mentionsIn, slashAt, type Completion } from '../lib/mention';
 import { list } from '../lib/words';
-import { Face } from './common';
 import { Glyph } from './icons';
-import { Button } from './primitives';
+import { Button, Mark } from './primitives';
 
 const draftKey = (k: string) => 'fw.bossmode.draft.' + k;
 
@@ -52,6 +52,16 @@ export interface ComposerProps {
    * the agent. A / at the start of the text opens the menu.
    */
   commands?: { name: string; description: string }[];
+}
+
+/** addressWords is the address line of a bridge composer: "To everyone", or "To a and b". */
+export function addressWords(to: string[]): string {
+  return to.length ? 'To ' + list(to) : 'To everyone';
+}
+
+/** keyWords names the key that sends: Cmd+Enter on a Mac, Ctrl+Enter elsewhere. */
+export function keyWords(platform = typeof navigator !== 'undefined' ? navigator.platform : ''): string {
+  return (/Mac/.test(platform || '') ? '⌘' : 'Ctrl') + '+Enter';
 }
 
 export function Composer(p: ComposerProps) {
@@ -159,7 +169,7 @@ export function Composer(p: ComposerProps) {
   };
 
   const listId = 'complete-' + p.draft;
-  const hint = p.members ? (to.length ? 'To ' + list(to.map((h) => '@' + h)) : 'To every active member') : '';
+  const hint = p.members ? addressWords(to) : '';
   return (
     <form
       class="composer"
@@ -170,10 +180,10 @@ export function Composer(p: ComposerProps) {
     >
       <div class={'box' + (p.disabled ? ' off' : '')}>
         {p.reply && (
-          <div class="replying slidein">
-            <span title={p.reply.text}>
+          <div class="replying slidein" key={p.reply.seq}>
+            <span class="reply-to" title={p.reply.text}>
               <span class="muted">Replying to</span> {p.reply.who}
-              <button type="button" class="chip-x" aria-label="Stop replying" onClick={p.onClearReply}>
+              <button type="button" class="chip-x" aria-label="Stop replying" title="Stop replying" onClick={p.onClearReply}>
                 <Glyph name="close" size={12} />
               </button>
             </span>
@@ -195,7 +205,7 @@ export function Composer(p: ComposerProps) {
                     choose(h);
                   }}
                 >
-                  {m && <Face agent={m.agent} size={20} />}
+                  {m && <Mark agent={m.agent} size={20} />}
                   <b>
                     {comp.sigil || '@'}
                     {h}
@@ -232,7 +242,7 @@ export function Composer(p: ComposerProps) {
         <div class="tools">
           <span class="hint">{hint}</span>
           <span class="keys" aria-hidden="true">
-            {navigator.platform && /Mac/.test(navigator.platform) ? '⌘' : 'Ctrl'}+Enter
+            {keyWords()}
           </span>
           <Button type="submit" kind="primary" class="send" disabled={busy || !text.trim() || !!p.disabled}>
             Send
