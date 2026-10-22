@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'preact/test-utils';
 import { store } from '../state/store';
 import { ActivityList, ActivityMain, pick } from './Activity';
+import { currentNotice } from './notice';
 import { at, fakeFetch, mount, run, seat, bridge, unmountAll, type Call } from './testkit-b';
 
 let calls: Call[] = [];
@@ -129,3 +130,19 @@ describe('the address of the inbox', () => {
   });
 });
 
+
+describe('a run that the front knows only from its index', () => {
+  it('shows its decision without a title, an input, or a schema, and raises no notice', () => {
+    act(() => {
+      store.dispatch({ type: 'bridge', bridge: bridge('b1', 'Migrate Puppet', [seat('bare', 'migrator', 'needs-you')]) });
+      store.dispatch({ type: 'run', run: { id: 'run-bare', agent: 'migrator', state: 'input-required', seq: 3, createdAt: at(0), updatedAt: at(4), pending: { id: 'ap-bare', tool: 'bash' } } });
+    });
+    const el = mount(<ActivityList />);
+    const row = rows(el).find((r) => r.querySelector('b')!.textContent === 'bare')!;
+    expect(row.querySelector('.status-word')!.textContent).toBe('needs you');
+    const main = mount(<ActivityMain item="d:run-bare/ap-bare" />);
+    expect(main.querySelector('.inbox-main-pane h1')!.textContent).toBe('bare');
+    expect(main.querySelector('.card')).not.toBeNull();
+    expect(currentNotice()).toBe('');
+  });
+});

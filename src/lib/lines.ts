@@ -1,9 +1,11 @@
 // The words of a system line of a channel. The backend writes a sentence
 // for each line, such as "migrator-2 went to sleep. A message wakes its
-// Task." The page shows its own short words for the event of the line,
-// with the handle and the person that the sentence names, and keeps the
-// sentence of the backend for a tooltip. The functions here are pure, so
-// the tests read them without a page.
+// Task." A later front writes one fact with no advice and no end mark,
+// such as "migrator-2 went to sleep". The page reads both forms. It shows
+// its own short words for the event of the line, with the handle and the
+// person that the sentence names, and keeps the sentence of the backend
+// for a tooltip. The functions here are pure, so the tests read them
+// without a page.
 
 import type { Entry, Principal } from '../api/types';
 import { cap, personName } from './words';
@@ -93,11 +95,24 @@ export function lineWords(e: Pick<Entry, 'event' | 'text' | 'page'>, me: Me): Li
       if ((m = /^(\S+) went to sleep\b/.exec(t))) return out(handleOf(m[1]) + ' went to sleep', false);
       return out(firstWord(t) + ' went to sleep', false);
     case 'decided':
-      // The note of a decision stays on its card.
+      // The note of a decision stays on its card. The front names the
+      // decider by its subject, and what it decided: a command, a file
+      // change, or the call of a tool.
+      if ((m = /^(.+?) (allowed|denied) (\S+?)'s (command|file change|call of (\S+?))(?:, with the note: .*)?\.?$/.exec(t))) {
+        const what = m[5] ? 'call of ' + m[5].replace(/^front\./, '') : m[4];
+        return out(`${by(m[1])} ${m[2]} ${handleOf(m[3])}'s ${what}`, false);
+      }
+      if ((m = /^(.+?) answered (\S+?)'s question:/.exec(t))) return out(`${by(m[1])} answered ${handleOf(m[2])}`, false);
+      if ((m = /^(.+?) declined (\S+?)'s question(?:, with the note: .*)?\.?$/.exec(t))) return out(`${by(m[1])} declined ${handleOf(m[2])}'s question`, false);
+      // The sentences of an older front.
       if ((m = /^(.+?) (allowed|denied) the call of (\S+?)(?:, with the note: .*)?\.?$/.exec(t))) return out(`${by(m[1])} ${m[2]} ${handleOf(m[3])}'s command`, false);
       if ((m = /^(.+?) answered the question of (\S+?):/.exec(t))) return out(`${by(m[1])} answered ${handleOf(m[2])}`, false);
       if ((m = /^(.+?) declined the question of (\S+?)(?:, with the note: .*)?\.?$/.exec(t))) return out(`${by(m[1])} declined ${handleOf(m[2])}'s question`, false);
       return out(by(firstWord(t)) + ' decided', false);
+    case 'lost':
+      // The fleet lost the run of a seat, as after a roll of its workers. The id of the run stays in the tooltip.
+      if ((m = /^(\S+) lost its run\b/.exec(t))) return out(handleOf(m[1]) + ' lost its worker');
+      return out(firstWord(t) + ' lost its worker');
     case 'opened':
       if ((m = /^(.+?) opened the bridge\b/.exec(t))) return out(by(m[1]) + ' opened the bridge');
       return out('The bridge opened');

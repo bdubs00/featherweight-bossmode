@@ -255,7 +255,7 @@ The plan gives the entry. The page reads four more fields:
 - **New.** `event` names what a system line says, so the page picks its icon
   and follows the state of the bridge: `opened`, `closed`, `reopened`,
   `started`, `joined`, `needs-you`, `asked`, `decided`, `failed`, `asleep`,
-  `fired`, `canceled`, `muted`, `task`, `changed`, and `cap`. The page sets
+  `fired`, `canceled`, `muted`, `task`, `changed`, `cap`, and `lost`. The page sets
   the bridge closed on `closed` and open on `reopened`. In particular:
   - The finished answer of a member is a message of that agent with no
     `event`, and it mirrors the `fw.run.finished` of the run.
@@ -271,6 +271,17 @@ The plan gives the entry. The page reads four more fields:
   - The finished answer of a member can also come as a system line with
     `event: finished`.
   - A delivery that fails for good posts `event: failed`.
+  - The fleet that lost the run of a seat, as after a roll of its workers,
+    posts `event: lost` once per seat. Its text is `<handle> lost its run
+    <id>: no worker of the fleet holds it`.
+  - A later front writes each line as one fact with no advice and no end
+    mark, such as `<handle> went to sleep`. The page reads both forms.
+  - A later front writes a decision as `<decider> allowed <handle>'s
+    command`, or `denied`, and also `file change` or `call of <tool>` in
+    place of `command`. A note adds `, with the note: <note>`. A question
+    reads `<decider> answered <handle>'s question: <answer>` or `<decider>
+    declined <handle>'s question`. The decider is the subject, so the token
+    of the fleet shows as `token`.
 - **New.** `cut` is true when the channel holds only the first 4 KB of the
   text.
 - **New.** `decision` is set on the entry that mirrors an approval or a
@@ -337,7 +348,11 @@ run, and the router of ax wakes a worker that sleeps for them. So the page
 reads them only while the worker is awake, or on an action of the person
 (section 10.1). A later front will answer `GET /v1/runs/{id}` from its
 view for a member that sleeps. Until then, that read wakes the worker too,
-so the page polls it only while the run works. The run object carries two fields of the kernel changes:
+so the page polls it only while the run works. The front can know a run
+only from its durable index, until it reads the worker. Such a run comes
+with no `title`, `input`, or `output`, and its `pending` card has no
+`input` or `schema`. The page shows such a run without them and raises no
+notice. The card then says that the agent asks for your decision. The run object carries two fields of the kernel changes:
 `activity` (K4) and `reactions`, the counts of K2. The quick chat also
 reads these fields of the run object:
 

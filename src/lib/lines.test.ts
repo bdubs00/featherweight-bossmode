@@ -60,6 +60,42 @@ describe('lineWords', () => {
   });
 });
 
+describe('the plain facts of a later front', () => {
+  it('words a decision on a command, a file change, or the call of a tool, and leaves the note on the card', () => {
+    expect(line('decided', "token denied migrator-1's command, with the note: No remote is set")).toEqual({ text: "You denied migrator-1's command" });
+    expect(lineWords({ event: 'decided', text: "alice@example.com allowed migrator-2's command" }, TOKEN)).toEqual({ text: "alice allowed migrator-2's command" });
+    expect(lineWords({ event: 'decided', text: "token allowed migrator-2's file change" }, ALICE)).toEqual({ text: "token allowed migrator-2's file change" });
+    expect(lineWords({ event: 'decided', text: "alice@example.com denied writer's call of front.pages_write, with the note: Not yet" }, ALICE)).toEqual({ text: "You denied writer's call of pages_write" });
+    expect(lineWords({ event: 'decided', text: "bob@example.com allowed writer's call of github.create_pr" }, ALICE)).toEqual({ text: "bob allowed writer's call of github.create_pr" });
+  });
+
+  it('words an answer and a declined question, with the decider as You where it is the person', () => {
+    expect(lineWords({ event: 'decided', text: "alice@example.com answered reviewer's question: Yes" }, ALICE)).toEqual({ text: 'You answered reviewer' });
+    expect(lineWords({ event: 'decided', text: "token declined scribe's question, with the note: Later" }, TOKEN)).toEqual({ text: "You declined scribe's question" });
+    expect(lineWords({ event: 'decided', text: "token declined scribe's question" }, ALICE)).toEqual({ text: "token declined scribe's question" });
+  });
+
+  it('says that a seat lost its worker, with the id of the run in the tooltip', () => {
+    const text = 'migrator-1 lost its run 01RUN9: no worker of the fleet holds it';
+    expect(line('lost', text)).toEqual({ text: 'migrator-1 lost its worker', title: text });
+  });
+
+  it('reads the lines that only lose their end mark', () => {
+    const cases: [string, string, string][] = [
+      ['started', 'migrator-1 woke up', 'migrator-1 woke up'],
+      ['asleep', 'reviewer went to sleep', 'reviewer went to sleep'],
+      ['opened', 'alice@example.com opened the bridge with 3 members', 'You opened the bridge'],
+      ['closed', 'token closed the bridge', 'token closed the bridge'],
+      ['fired', 'token fired scribe', 'token fired scribe'],
+      ['cap', 'The bridge reached its cap of 2000 messages', 'The bridge reached its cap of 2000 messages'],
+      ['failed', 'migrator-1 failed: the model answered 529 three times', 'migrator-1 failed'],
+      ['canceled', 'alice@example.com stopped the run of tester', 'You stopped tester'],
+    ];
+    for (const [event, text, words] of cases) expect(lineWords({ event, text }, ALICE).text).toBe(words);
+    expect(napOf({ from: { kind: 'system' }, event: 'started', text: 'migrator-1 woke up' })).toEqual({ nap: 'wake', handle: 'migrator-1' });
+  });
+});
+
 describe('isMe and whoName', () => {
   it('names the person who reads the page You, by the subject, the name, or the words of the token', () => {
     expect(isMe('token', TOKEN)).toBe(true);

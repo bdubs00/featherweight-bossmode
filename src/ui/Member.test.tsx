@@ -239,6 +239,22 @@ describe('the member conversation', () => {
     expect(calls.filter((c) => c.path.startsWith('/v1/runs/run-migrator-1/transcript')).length).toBe(reads);
   });
 
+  it('shows a run that the front knows only from its index, without a title, an input, or an output, and raises no notice', async () => {
+    act(() => {
+      store.dispatch({ type: 'member', bridge: 'b1', member: { handle: 'bare', agent: 'migrator', task: 'Migrate ntp', runs: ['run-bare'], fired: false, muted: false, presence: 'needs-you' } });
+      store.dispatch({ type: 'run', run: { id: 'run-bare', agent: 'migrator', state: 'input-required', seq: 3, createdAt: at(0), updatedAt: at(4), member: 'default/crew-0', pending: { id: 'ap-bare', tool: 'bash' } } });
+    });
+    const run = mount(<MemberMain bridge="b1" handle="bare" tab="run" />);
+    await vi.waitFor(() => expect(calls.some((c) => c.path === '/v1/runs/run-bare/result')).toBe(true));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(run.querySelector('.run-view h3')!.textContent).toBe('The run');
+    expect(run.querySelector('.run-status .status-word')!.textContent).toBe('needs you');
+    const chat = mount(<MemberMain bridge="b1" handle="bare" tab="chat" />);
+    expect(chat.querySelector('header .mark')!.getAttribute('aria-label')).toBe('bare, needs you');
+    await new Promise((r) => setTimeout(r, 20));
+    expect(currentNotice()).toBe('');
+  });
+
   it('says so for a seat that is not on the bridge', () => {
     const el = mount(<MemberMain bridge="b1" handle="nobody" tab="chat" />);
     expect(el.textContent).toContain('nobody has no seat on this bridge, or no run yet.');
