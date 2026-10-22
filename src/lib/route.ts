@@ -16,15 +16,15 @@ export interface SkillItem {
 
 export type Route =
   | { place: 'home' }
-  | { place: 'activity' }
+  | { place: 'activity'; item?: string }
   | { place: 'manager' }
   | { place: 'new' }
   | { place: 'bridge'; id: string; pane: 'roster' | 'run' | 'none'; tab?: BridgeTab; run?: string; handle?: string }
-  | { place: 'member'; bridge: string; handle: string; tab: MemberTab }
-  | { place: 'fleet'; agent?: string; board?: boolean }
+  | { place: 'member'; bridge: string; handle: string; tab: MemberTab; profile?: boolean }
+  | { place: 'fleet'; agent?: string; board?: boolean; profile?: boolean }
   | { place: 'new-agent' }
   | { place: 'appearance' }
-  | { place: 'skills'; item?: SkillItem }
+  | { place: 'skills'; item?: SkillItem; add?: boolean }
   | { place: 'pages'; path?: string; mode: 'tree' | 'read' | 'history' | 'edit' | 'create'; version?: number };
 
 /** The places of the app bar. */
@@ -55,7 +55,8 @@ export function parseRoute(hash: string): Route {
     case 'bridges':
       return { place: 'home' };
     case 'activity':
-      return { place: 'activity' };
+      // The item is the key of a row of the inbox, such as d:<run>/<approval>.
+      return rest.length && rest.join('/') ? { place: 'activity', item: rest.map(dec).join('/') } : { place: 'activity' };
     case 'manager':
       return { place: 'manager' };
     case 'new':
@@ -65,6 +66,7 @@ export function parseRoute(hash: string): Route {
     case 'appearance':
       return { place: 'appearance' };
     case 'skills':
+      if (rest[0] === 'add' && rest.length === 1) return { place: 'skills', add: true };
       if ((rest[0] === 'skill' || rest[0] === 'tool') && rest.length > 1 && rest.slice(1).join('/')) return { place: 'skills', item: { kind: rest[0], id: rest.slice(1).map(dec).join('/') } };
       return { place: 'skills' };
     case 'bridge': {
@@ -77,13 +79,15 @@ export function parseRoute(hash: string): Route {
     }
     case 'member': {
       if (!rest[0] || !rest[1]) return { place: 'fleet' };
+      if (rest[2] === 'profile') return { place: 'member', bridge: dec(rest[0]), handle: dec(rest[1]), tab: 'chat', profile: true };
       const tab: MemberTab = rest[2] === 'run' || rest[2] === 'files' ? rest[2] : 'chat';
       return { place: 'member', bridge: dec(rest[0]), handle: dec(rest[1]), tab };
     }
     case 'board':
       return { place: 'fleet', board: true };
     case 'fleet':
-      return rest[0] ? { place: 'fleet', agent: dec(rest[0]) } : { place: 'fleet' };
+      if (!rest[0]) return { place: 'fleet' };
+      return rest[1] === 'profile' ? { place: 'fleet', agent: dec(rest[0]), profile: true } : { place: 'fleet', agent: dec(rest[0]) };
     // #page/<path> is the address of a page of the wiki in the links that
     // the backend writes, such as the report of a closed bridge. #wiki is
     // the name of the place.
@@ -113,7 +117,7 @@ export function hrefOf(r: Route): string {
     case 'home':
       return '#';
     case 'activity':
-      return '#activity';
+      return r.item ? '#activity/' + encPath(r.item) : '#activity';
     case 'manager':
       return '#manager';
     case 'new':
@@ -123,6 +127,7 @@ export function hrefOf(r: Route): string {
     case 'appearance':
       return '#appearance';
     case 'skills':
+      if (r.add) return '#skills/add';
       return r.item ? '#skills/' + r.item.kind + '/' + encPath(r.item.id) : '#skills';
     case 'bridge': {
       const base = '#bridge/' + encodeURIComponent(r.id);
@@ -132,10 +137,10 @@ export function hrefOf(r: Route): string {
       return base;
     }
     case 'member':
-      return '#member/' + encodeURIComponent(r.bridge) + '/' + encodeURIComponent(r.handle) + (r.tab === 'chat' ? '' : '/' + r.tab);
+      return '#member/' + encodeURIComponent(r.bridge) + '/' + encodeURIComponent(r.handle) + (r.profile ? '/profile' : r.tab === 'chat' ? '' : '/' + r.tab);
     case 'fleet':
       if (r.board) return '#board';
-      return r.agent ? '#fleet/' + encodeURIComponent(r.agent) : '#fleet';
+      return r.agent ? '#fleet/' + encodeURIComponent(r.agent) + (r.profile ? '/profile' : '') : '#fleet';
     case 'pages':
       if (r.mode === 'create') return '#create' + (r.path ? '/' + encPath(r.path) : '');
       if (!r.path) return '#pages';
@@ -171,16 +176,20 @@ export function placeOf(r: Route): Place {
 export function columnOf(r: Route): Column {
   switch (r.place) {
     case 'home':
-    case 'activity':
       return 'list';
+    case 'activity':
+      return r.item ? 'main' : 'list';
     case 'bridge':
       return r.pane === 'none' ? 'main' : 'details';
+    case 'member':
+      return r.profile ? 'details' : 'main';
     case 'fleet':
-      return r.agent ? 'details' : r.board ? 'main' : 'list';
+      if (r.agent) return r.profile ? 'details' : 'main';
+      return r.board ? 'main' : 'list';
     case 'pages':
       return r.mode === 'tree' ? 'list' : 'main';
     case 'skills':
-      return r.item ? 'main' : 'list';
+      return r.item || r.add ? 'main' : 'list';
   }
   return 'main';
 }
@@ -192,14 +201,17 @@ export function parentOf(r: Route): Route {
       if (r.pane === 'run') return { place: 'bridge', id: r.id, pane: 'roster' };
       if (r.pane === 'roster') return { place: 'bridge', id: r.id, pane: 'none' };
       return { place: 'home' };
+    case 'activity':
+      return r.item ? { place: 'activity' } : { place: 'home' };
     case 'member':
-      return { place: 'fleet' };
+      return r.profile ? { place: 'member', bridge: r.bridge, handle: r.handle, tab: 'chat' } : { place: 'fleet' };
     case 'fleet':
+      if (r.agent && r.profile) return { place: 'fleet', agent: r.agent };
       return r.agent || r.board ? { place: 'fleet' } : { place: 'home' };
     case 'new-agent':
       return { place: 'fleet' };
     case 'skills':
-      return r.item ? { place: 'skills' } : { place: 'home' };
+      return r.item || r.add ? { place: 'skills' } : { place: 'home' };
     case 'pages':
       if (r.mode === 'tree') return { place: 'home' };
       if (r.mode === 'read' && !r.version) return { place: 'pages', mode: 'tree' };

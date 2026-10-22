@@ -109,3 +109,23 @@ describe('the inbox after a decision', () => {
     expect(document.activeElement).toBe(rows(el)[0]);
   });
 });
+
+describe('the address of the inbox', () => {
+  it('names the row with the focus, and a narrow window opens the row in the main pane', () => {
+    location.hash = '#activity';
+    const el = mount(<ActivityList />);
+    // An earlier test decided for early, so the rows hold late and broke.
+    const named = (i: number) => '#activity/' + rows(el)[i].getAttribute('data-key')!.split('/').map(encodeURIComponent).join('/');
+    act(() => rows(el)[0].focus());
+    expect(location.hash).toBe(named(0));
+    act(() => rows(el)[rows(el).length - 1].click());
+    expect(location.hash).toBe('#activity/s%3Ab1/broke');
+    location.hash = '';
+  });
+
+  it('shows the row that the address names', () => {
+    const el = mount(<ActivityMain item="d:run-late/ap-late" />);
+    expect(el.querySelector('.inbox-main-pane h1')!.textContent).toBe('late');
+  });
+});
+

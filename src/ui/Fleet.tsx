@@ -25,6 +25,7 @@ import { EmptyPane } from './Shell';
 import { Glyph } from './icons';
 import { GlyphB } from './glyphs-b';
 import { Button, Chip, Led, Mark, PaneHeader, buttonClass } from './primitives';
+import type { Tone } from '../lib/presence';
 
 /** The width from which two panes show side by side, as App names it. */
 const TWO_PANES = '(min-width: 800px)';
@@ -268,7 +269,7 @@ export function AgentChat({ agent }: { agent: string }) {
         size="title"
         level={1}
         back={{ href: '#fleet', label: 'Fleet', to: 'list' }}
-        lead={<Mark agent={agent} size={36} label={name} halo={light ? { tone: light.tone, word: light.word } : undefined} />}
+        lead={<ProfileLink href={hrefOf({ place: 'fleet', agent, profile: true })} agent={agent} label={name} light={light} />}
       />
       <div class="scroll thread-scroll" ref={box}>
         {runId ? <Conversation run={run} result={res} t={t} agentLabel={agent} /> : <div class="thread" />}
@@ -283,9 +284,7 @@ export function AgentChat({ agent }: { agent: string }) {
  * it holds the conversation with that agent. Without one, where two panes
  * show, it opens the first member, so the pane is never empty.
  */
-export function Fleet() {
-  const route = useHashRoute();
-  const agent = route.place === 'fleet' ? route.agent : undefined;
+export function Fleet({ agent }: { agent?: string }) {
   const { groups, loaded } = usePeople();
   // Where two panes show, the main pane opens the conversation of before, or the first member.
   const again = lastOpen && groups.some((g) => g.rows.some((r) => r.href === lastOpen)) ? lastOpen : '';
@@ -312,6 +311,19 @@ export function Fleet() {
 
 /** AgentPane is the profile of an agent in the details pane. */
 export function AgentPane({ agent }: { agent: string }) {
-  return <Profile agent={agent} />;
+  return <Profile agent={agent} back={{ href: hrefOf({ place: 'fleet', agent }), label: agent }} />;
+}
+
+/**
+ * ProfileLink is the mark at the head of a conversation, with the halo of
+ * its status. It opens the profile of the agent, which a window narrower
+ * than three panes keeps out of sight.
+ */
+export function ProfileLink({ href, agent, label, light }: { href: string; agent: string; label: string; light: { tone: Tone; word: string } | null }) {
+  return (
+    <a class="mark-link" href={href} aria-label={'Profile of ' + agent + (light ? ', ' + light.word : '')} title={light ? light.word : undefined}>
+      <Mark agent={agent} size={36} label={label} halo={light ? { tone: light.tone, word: light.word } : undefined} />
+    </a>
+  );
 }
 

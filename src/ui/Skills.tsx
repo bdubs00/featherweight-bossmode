@@ -255,10 +255,14 @@ function ItemMenu({ s, admin, onRemove }: { s: CatalogSkill; admin: boolean; onR
   );
 }
 
-export function SkillMain({ item }: { item?: SkillItem }) {
+/** SkillMain is the main pane of Skills. With add, from the address #skills/add, it opens the chooser. */
+export function SkillMain({ item, add }: { item?: SkillItem; add?: boolean }) {
   const cat = useCatalog();
   const admin = useAdmin();
   const adding = useAddSkillOpen();
+  useEffect(() => {
+    if (add) openAddSkill();
+  }, [add]);
   const [ask, setAsk] = useState(false);
   if (adding && admin) return <AddSkill />;
   const it = itemOf(cat, item);

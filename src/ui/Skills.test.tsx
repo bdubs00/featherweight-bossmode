@@ -144,6 +144,12 @@ describe('Add skill', () => {
     return mount(<SkillMain item={{ kind: 'skill', id: 'ansible-style' }} />);
   };
 
+  it('opens the chooser from the address #skills/add', () => {
+    api = fakeApi({ 'GET /v1/bossmode/marketplaces': { marketplaces: [] } });
+    const el = mount(<SkillMain add />);
+    expect(el.querySelector('h1')!.textContent).toBe('Add skill');
+  });
+
   it('offers the four avenues', () => {
     api = fakeApi({ 'GET /v1/bossmode/marketplaces': { marketplaces: [] } });
     const el = openChooser();

@@ -297,7 +297,8 @@ function EditFace({ agent, onDone }: { agent: string; onDone: (said: string) => 
   );
 }
 
-export function Profile({ agent }: { agent: string }) {
+/** Profile is the profile of an agent. back is the conversation that a narrow window goes back to. */
+export function Profile({ agent, back }: { agent: string; back?: { href: string; label: string } }) {
   const face = useSelect((s) => s.faces[agent]);
   const info = useSelect((s) => (s.agents || []).find((a) => a.name === agent)) as AgentView | undefined;
   const tools = useSelect((s) => (s.skills ? s.skills.tools : null));
@@ -340,7 +341,7 @@ export function Profile({ agent }: { agent: string }) {
       <PaneHeader
         id="profile-title"
         title={title}
-        back={{ href: '#fleet', label: 'Fleet', to: 'main' }}
+        back={{ href: back ? back.href : '#fleet', label: back ? back.label : 'Fleet', to: 'main' }}
         actions={
           owner && !edit ? (
             <Button size="s" onClick={() => setEdit(true)}>

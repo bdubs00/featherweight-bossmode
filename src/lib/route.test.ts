@@ -5,6 +5,7 @@ describe('routes', () => {
   const cases: [string, Route][] = [
     ['#', { place: 'home' }],
     ['#activity', { place: 'activity' }],
+    ['#activity/d:run-1/ap-2', { place: 'activity', item: 'd:run-1/ap-2' }],
     ['#manager', { place: 'manager' }],
     ['#new', { place: 'new' }],
     ['#new-agent', { place: 'new-agent' }],
@@ -17,15 +18,18 @@ describe('routes', () => {
     ['#member/b1/migrator-1', { place: 'member', bridge: 'b1', handle: 'migrator-1', tab: 'chat' }],
     ['#member/b1/migrator-1/run', { place: 'member', bridge: 'b1', handle: 'migrator-1', tab: 'run' }],
     ['#member/b1/migrator-1/files', { place: 'member', bridge: 'b1', handle: 'migrator-1', tab: 'files' }],
+    ['#member/b1/migrator-1/profile', { place: 'member', bridge: 'b1', handle: 'migrator-1', tab: 'chat', profile: true }],
     ['#fleet', { place: 'fleet' }],
     ['#board', { place: 'fleet', board: true }],
     ['#fleet/reviewer', { place: 'fleet', agent: 'reviewer' }],
+    ['#fleet/reviewer/profile', { place: 'fleet', agent: 'reviewer', profile: true }],
     ['#pages', { place: 'pages', mode: 'tree' }],
     ['#pages/agents/reviewer/learned.md', { place: 'pages', path: 'agents/reviewer/learned.md', mode: 'read' }],
     ['#history/index.md', { place: 'pages', path: 'index.md', mode: 'history' }],
     ['#edit/a%20b.md', { place: 'pages', path: 'a b.md', mode: 'edit' }],
     ['#version/3/index.md', { place: 'pages', path: 'index.md', mode: 'read', version: 3 }],
     ['#skills', { place: 'skills' }],
+    ['#skills/add', { place: 'skills', add: true }],
     ['#skills/skill/ansible-style', { place: 'skills', item: { kind: 'skill', id: 'ansible-style' } }],
     ['#skills/tool/github/create_issue', { place: 'skills', item: { kind: 'tool', id: 'github/create_issue' } }],
   ];
@@ -71,8 +75,16 @@ describe('routes', () => {
     expect(columnOf({ place: 'bridge', id: 'b', pane: 'none' })).toBe('main');
     expect(columnOf({ place: 'bridge', id: 'b', pane: 'run', run: 'r' })).toBe('details');
     expect(columnOf({ place: 'fleet' })).toBe('list');
-    expect(columnOf({ place: 'fleet', agent: 'a' })).toBe('details');
+    expect(columnOf({ place: 'fleet', agent: 'a' })).toBe('main');
+    expect(columnOf({ place: 'fleet', agent: 'a', profile: true })).toBe('details');
     expect(columnOf({ place: 'member', bridge: 'b', handle: 'h', tab: 'chat' })).toBe('main');
+    expect(columnOf({ place: 'member', bridge: 'b', handle: 'h', tab: 'chat', profile: true })).toBe('details');
+    expect(columnOf({ place: 'activity', item: 'd:r/a' })).toBe('main');
+    expect(columnOf({ place: 'skills', add: true })).toBe('main');
+    expect(parentOf({ place: 'member', bridge: 'b', handle: 'h', tab: 'chat', profile: true })).toEqual({ place: 'member', bridge: 'b', handle: 'h', tab: 'chat' });
+    expect(parentOf({ place: 'fleet', agent: 'a', profile: true })).toEqual({ place: 'fleet', agent: 'a' });
+    expect(parentOf({ place: 'activity', item: 'd:r/a' })).toEqual({ place: 'activity' });
+    expect(parentOf({ place: 'skills', add: true })).toEqual({ place: 'skills' });
     expect(columnOf({ place: 'pages', mode: 'tree' })).toBe('list');
     expect(parentOf({ place: 'bridge', id: 'b', pane: 'run', run: 'r' })).toEqual({ place: 'bridge', id: 'b', pane: 'roster' });
     expect(parentOf({ place: 'bridge', id: 'b', pane: 'none' })).toEqual({ place: 'home' });

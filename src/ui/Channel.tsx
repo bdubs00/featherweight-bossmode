@@ -12,7 +12,7 @@ import { loadBridge, loadChannel, loadOlder, loadPages, markRead, patchBridge, p
 import { membersOf, type Channel as ChannelState } from '../state/reducer';
 import { loadAllCards, type EntryA } from '../state/bridges-a';
 import { senderName, since } from '../lib/words';
-import { hrefOf, parseRoute, type BridgeTab } from '../lib/route';
+import { hrefOf, type BridgeTab } from '../lib/route';
 import { useRoving, smooth } from './keys';
 import { attempt } from './notice';
 import { Confirm, Empty, Menu } from './common';
@@ -104,22 +104,6 @@ function channelShape(ch: ChannelState | undefined): string | undefined {
     out.push(c.shape);
   }
   return shapeKey(out);
-}
-
-/** The tab of the route: the prop when the shell passes it, else the address. */
-function useTab(id: string, tab?: BridgeTab): BridgeTab {
-  const read = () => {
-    const r = parseRoute(location.hash);
-    return r.place === 'bridge' && r.id === id && r.tab ? r.tab : 'posts';
-  };
-  const [t, setT] = useState(read);
-  useEffect(() => {
-    const f = () => setT(read());
-    f();
-    window.addEventListener('hashchange', f);
-    return () => window.removeEventListener('hashchange', f);
-  }, [id]);
-  return tab || t;
 }
 
 /** useMedia reports whether a media query matches, and follows its changes. */
@@ -432,7 +416,7 @@ export function Channel({ id, tab: tabProp }: { id: string; tab?: BridgeTab }) {
   const loadedChannel = useSelect((s) => !!s.channels[id]);
   const waiting = useSelect((s) => waitingCards(s.channels[id]));
   const firstLoaded = useSelect((s) => (s.channels[id] ? s.channels[id].prev === 0 : false));
-  const tab = useTab(id, tabProp);
+  const tab: BridgeTab = tabProp || 'posts';
   const [confirm, setConfirm] = useState<'close' | 'delegation' | null>(null);
   // Where the window is not wide, Close bridge moves into More, and in a narrow window the tabs take a strip of their own.
   const wide = useMedia('(min-width: 1200px)');

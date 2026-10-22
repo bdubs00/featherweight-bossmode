@@ -26,8 +26,8 @@ import { useTranscript } from './Conversation';
 import { FilesView, RunView, useResult } from './RunPane';
 import { ThreadView, useStickToEnd } from './Thread';
 import { Profile } from './Profile';
-import { rememberOpen } from './Fleet';
-import { Button, Field, Led, Mark, PaneHeader, Tabs, TextArea, buttonClass } from './primitives';
+import { ProfileLink, rememberOpen } from './Fleet';
+import { Button, Field, Led, PaneHeader, Tabs, TextArea, buttonClass } from './primitives';
 import { Glyph } from './icons';
 
 /* ---------- the live tail of an answer ---------- */
@@ -322,7 +322,7 @@ export function MemberMain({ bridge, handle, tab }: { bridge: string; handle: st
         headingRef={heading}
         focusable
         back={{ href: '#fleet', label: 'Fleet', to: 'list' }}
-        lead={<Mark agent={m.agent} size={36} label={handle} halo={light ? { tone: light.tone, word: light.word } : undefined} />}
+        lead={<ProfileLink href={hrefOf({ ...base, tab: 'chat', profile: true })} agent={m.agent} label={handle} light={light} />}
         actions={
           <>
             <Tabs
@@ -358,5 +358,5 @@ export function MemberMain({ bridge, handle, tab }: { bridge: string; handle: st
 export function MemberProfile({ bridge, handle }: { bridge: string; handle: string }) {
   const { m } = useSeat(bridge, handle);
   if (!m) return null;
-  return <Profile agent={m.agent} />;
+  return <Profile agent={m.agent} back={{ href: hrefOf({ place: 'member', bridge, handle, tab: 'chat' }), label: handle }} />;
 }

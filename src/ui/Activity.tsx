@@ -4,11 +4,12 @@
 // first, then the errors, then the rest by the status of the sender. The
 // thumbs decide in the row. j and k move, Enter opens, a allows, d denies,
 // r replies, and s seats a stopped seat again. The main pane shows the row
-// that has the focus: a decision as its card.
+// that has the focus: a decision as its card. The address names that row,
+// #activity/<key>, so a narrow window opens it and a link reaches it.
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { Decision, Member } from '../api/types';
-import { go, hrefOf } from '../lib/route';
+import { go, hrefOf, parseRoute } from '../lib/route';
 import { decisionTitle, excerpt, personName, senderName, since, commandOf } from '../lib/words';
 import { alwaysAllow, decide } from '../state/actions';
 import { ensureChannels, ensureResults, ensureRosters, ensureRuns, useResults } from '../state/fetchers';
@@ -30,11 +31,14 @@ const TWO_PANES = '(min-width: 800px)';
 let pickedKey = '';
 const pickListeners = new Set<() => void>();
 
-/** pick shows a row of the inbox in the main pane. */
+/** pick shows a row of the inbox in the main pane, and names it in the address. */
 export function pick(key: string): void {
   if (key === pickedKey) return;
   pickedKey = key;
   for (const f of [...pickListeners]) f();
+  // A move of the focus replaces the address, so j and k add no history.
+  const r = parseRoute(location.hash);
+  if (key && r.place === 'activity' && r.item !== key) go({ place: 'activity', item: key }, true);
 }
 
 function usePicked(): string {
@@ -167,8 +171,9 @@ function InboxItem({ r, on }: { r: InboxRow; on: boolean }) {
       }}
       onClick={(e) => {
         if ((e.target as HTMLElement).closest('button, a')) return;
-        if (window.matchMedia(TWO_PANES).matches) pick(r.key);
-        else openRow(r);
+        pick(r.key);
+        // A narrow window shows one pane: the item opens in the main pane.
+        if (!window.matchMedia(TWO_PANES).matches) go({ place: 'activity', item: r.key });
       }}
     >
       <RowFace r={r} />
@@ -200,9 +205,10 @@ function InboxItem({ r, on }: { r: InboxRow; on: boolean }) {
   );
 }
 
-export function ActivityList() {
+export function ActivityList({ item }: { item?: string }) {
   const { rows, loaded } = useInbox();
-  const picked = usePicked();
+  const chosen = usePicked();
+  const picked = item || chosen;
   const needs = useSelect((s) => s.bridges.order.reduce((n, id) => n + (s.bridges.byId[id].state === 'open' ? s.bridges.byId[id].needsYou || 0 : 0), 0));
   const bridgesLoaded = useSelect((s) => s.bridges.loaded);
   const [seatKey, setSeatKey] = useState('');
@@ -250,7 +256,7 @@ export function ActivityList() {
           const f = document.querySelector('.inbox-main-pane .card input, .inbox-main-pane .card textarea, .inbox-main-pane .card select, .inbox-main-pane .card button') as HTMLElement | null;
           if (f) f.focus();
         }, 40);
-      } else openRow(r);
+      } else go({ place: 'activity', item: r.key });
     } else if (act === 'reply') openRow(r, true);
     else if (act === 'seat') setSeatKey(r.key);
   };
@@ -276,8 +282,9 @@ export function ActivityList() {
   );
 }
 
-export function ActivityMain() {
-  const picked = usePicked();
+export function ActivityMain({ item }: { item?: string }) {
+  const chosen = usePicked();
+  const picked = item || chosen;
   const { rows } = useInbox();
   const r = rows.find((x) => x.key === picked);
   const m = useSelect((s) => (r && r.handle && s.rosters[r.bridge] ? s.rosters[r.bridge].byHandle[r.handle] : undefined));

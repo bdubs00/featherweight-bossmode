@@ -395,6 +395,16 @@ select.recess {
   background: var(--raised);
 }
 
+/* The mark at the head of a conversation opens the profile of its agent. */
+.mark-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  border-radius: var(--r);
+  text-decoration: none;
+}
+
 /* ---------- Card ---------- */
 .card {
   max-width: 640px;
@@ -689,6 +699,10 @@ dialog.confirm .do {
   .help-key {
     width: var(--h-row);
     height: var(--h-row);
+  }
+  .mark-link {
+    min-width: var(--h-row);
+    min-height: var(--h-row);
   }
   button.rchip {
     height: var(--h-row);

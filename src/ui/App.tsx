@@ -111,19 +111,19 @@ function panesOf(r: Route): Panes {
     case 'bridge':
       return {
         list: <BridgeList current={r.id} />,
-        main: <Channel id={r.id} />,
+        main: <Channel id={r.id} tab={r.tab || 'posts'} />,
         details: r.pane === 'run' && r.run ? <RunPane bridge={r.id} runId={r.run} handle={r.handle} /> : <Roster bridge={r.id} current={r.handle} />,
       };
     case 'activity':
-      return { list: <ActivityList />, main: <ActivityMain />, details: null };
+      return { list: <ActivityList item={r.item} />, main: <ActivityMain item={r.item} />, details: null };
     case 'fleet':
-      return { list: <FleetList current={r.agent} />, main: r.board ? <Board /> : <Fleet />, details: r.agent ? <AgentPane agent={r.agent} /> : null };
+      return { list: <FleetList current={r.agent} />, main: r.board ? <Board /> : <Fleet agent={r.agent} />, details: r.agent ? <AgentPane agent={r.agent} /> : null };
     case 'member':
       return { list: <FleetList member={r.bridge + '/' + r.handle} />, main: <MemberMain bridge={r.bridge} handle={r.handle} tab={r.tab} />, details: <MemberProfile bridge={r.bridge} handle={r.handle} /> };
     case 'new-agent':
       return { list: <FleetList />, main: <NewAgent />, details: null };
     case 'skills':
-      return { list: <SkillList current={r.item} />, main: <SkillMain item={r.item} />, details: <SkillActions item={r.item} /> };
+      return { list: <SkillList current={r.item} />, main: <SkillMain item={r.item} add={r.add} />, details: <SkillActions item={r.item} /> };
     case 'pages': {
       let main: ComponentChildren;
       if (r.mode === 'create') main = <PageEditor path={r.path} create />;
