@@ -1,222 +1,41 @@
 /* Screen C: the wiki, the editor, the manager, the new-bridge and the
-   new-agent screens, the Skills place, and Appearance. Screen C owns this
-   file. */
+   new-agent screens, the Skills place with Add skill and the picker of
+   skills, and Appearance. Screen C owns this file. It uses the tokens of
+   tokens.css and adds no color, radius, shadow, type size, or motion. */
 
-/* ---------- the wiki ---------- */
-.search {
+/* ---------- the parts that the screens of C share ---------- */
+
+/* A find field at the top of a list, recessed. */
+.find {
   display: flex;
   align-items: center;
   gap: var(--s-2);
   margin: var(--s-2) var(--s-2) 0;
   padding: 0 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--r);
-  background: var(--recess);
-  box-shadow: var(--e-recess);
 }
-.search:focus-within {
+.find:focus-within {
   outline: 2px solid var(--ink);
   outline-offset: 1px;
 }
-.search input {
+.find input {
   flex: 1;
+  min-width: 0;
   min-height: var(--h-small);
   border: 0;
   background: none;
   outline: none;
-  font-size: 14px;
+  font-size: var(--t-body);
 }
-.search .ic {
+.find input::placeholder {
   color: var(--muted);
+  opacity: 1;
 }
-.tree {
-  margin: 0;
-  padding: var(--s-2) var(--s-2) var(--s-4);
-  list-style: none;
-}
-.tree ul {
-  margin: 0;
-  padding-left: 14px;
-  list-style: none;
-}
-.tree details > summary {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-height: var(--h-small);
-  padding: var(--s-1) var(--s-2);
-  border-radius: var(--r);
-  list-style: none;
-  font-size: var(--t-meta);
-  font-weight: 700;
+.find .glyph {
+  flex: none;
   color: var(--muted);
-  cursor: pointer;
-}
-.tree details > summary::-webkit-details-marker {
-  display: none;
-}
-.tree details > summary .ic {
-  width: 11px;
-  height: 11px;
-}
-.prow {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  min-height: var(--h-row);
-  padding: 6px var(--s-2);
-  border: 1px solid transparent;
-  border-radius: var(--r);
-  color: inherit;
-  text-decoration: none;
-}
-.prow:hover {
-  background: var(--raised);
-}
-.prow.sel {
-  background: var(--raised);
-  border-color: var(--raised-line);
-  box-shadow: var(--e-selected);
-}
-.prow .ic {
-  margin-top: 3px;
-  color: var(--muted);
-}
-.prow .main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-.prow .t {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 600;
-}
-.prow .s {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--t-meta);
-  color: var(--muted);
-}
-.article {
-  max-width: 72ch;
-  font-size: 16px;
-  line-height: 24px;
-}
-.meta-line {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--s-2);
-  margin: 0 0 var(--s-4);
-  font-size: var(--t-meta);
-  color: var(--muted);
-}
-.tags {
-  display: inline-flex;
-  gap: var(--s-1);
-}
-.versions {
-  margin: var(--s-2) 0 0;
-  padding: 0;
-  list-style: none;
-  border: 1px solid var(--line);
-  border-radius: var(--r);
-  overflow: hidden;
-}
-.versions li + li {
-  border-top: 1px solid var(--line-soft);
-}
-.vrow {
-  display: flex;
-  flex-direction: column;
-  min-height: var(--h-row);
-  padding: 10px 14px;
-  color: inherit;
-  text-decoration: none;
-}
-.vrow:hover {
-  background: var(--raised);
-}
-.vrow .s {
-  font-size: var(--t-meta);
-  color: var(--muted);
-}
-.vrow.gone {
-  margin: 0;
-  color: var(--muted);
-}
-.field-why {
-  min-height: 16px;
-  font-size: var(--t-meta);
-  color: var(--muted);
-}
-.field-why.bad {
-  color: var(--word-red);
-}
-.editor {
-  display: flex;
-  flex-direction: column;
-}
-.editor .grow {
-  flex: 1;
-}
-.editor .grow textarea {
-  min-height: 50vh;
-}
-.conflict {
-  padding: var(--s-3) var(--s-4);
-  border: 1px solid var(--edge);
-  border-radius: var(--r);
-  background: var(--wash-need);
-  box-shadow: var(--e-card);
-}
-.conflict p {
-  margin: 0 0 var(--s-2);
-}
-.conflict details {
-  margin-bottom: var(--s-2);
-}
-.conflict summary {
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--h-small);
-  font-weight: 600;
-  cursor: pointer;
 }
 
-/* ---------- a new bridge ---------- */
-.members-form .mrow {
-  display: grid;
-  grid-template-columns: 32px 140px 160px minmax(0, 1fr) 32px;
-  gap: var(--s-2);
-  align-items: end;
-  padding: 6px 0;
-}
-.members-form .mrow > .mark,
-.members-form .mrow > .icon-btn {
-  margin-bottom: 2px;
-}
-.empty-face {
-  display: inline-block;
-  width: 32px;
-  height: 32px;
-  border: 1px dashed var(--placeholder);
-  border-radius: var(--r);
-}
-@media (max-width: 760px) {
-  .members-form .mrow {
-    grid-template-columns: 32px 1fr 1fr 32px;
-  }
-  .members-form .mrow .wide {
-    grid-column: 2 / 4;
-  }
-}
-
-/* ---------- the Skills place ---------- */
+/* The groups of a list: a heading with its count, then the rows. */
 .group {
   padding-top: var(--s-2);
 }
@@ -224,10 +43,38 @@
   display: flex;
   align-items: center;
   gap: var(--s-2);
+  min-height: var(--h-small);
   margin: var(--s-2) var(--s-4) 0;
   font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
   font-weight: 700;
+  color: var(--ink);
+}
+button.group-head {
+  appearance: none;
+  width: calc(100% - 2 * var(--s-2));
+  margin: var(--s-2) var(--s-2) 0;
+  padding: 0 var(--s-2);
+  border: 0;
+  border-radius: var(--r);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+button.group-head:hover {
+  background: var(--raised);
+}
+.group-head .glyph {
+  flex: none;
   color: var(--muted);
+  transform: rotate(-90deg);
+}
+.group-head[aria-expanded='false'] .glyph {
+  transform: rotate(180deg);
+}
+.group-head > span:first-child,
+button.group-head > .clip {
+  min-width: 0;
 }
 .group-title {
   display: flex;
@@ -237,69 +84,765 @@
   padding-top: var(--s-4);
   border-top: 1px solid var(--line);
 }
-.srow {
+.c-rows {
   display: flex;
   flex-direction: column;
+  gap: 2px;
+  padding: var(--s-1) var(--s-2) 0;
+}
+
+/* A row of a list: a name and one line under it. */
+.srow,
+.wrow {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  min-height: var(--h-row);
   padding: var(--s-2) var(--s-3);
   border: 1px solid transparent;
   border-radius: var(--r);
+  background: none;
   color: var(--ink);
+  font: inherit;
+  text-align: left;
   text-decoration: none;
+  cursor: pointer;
 }
-.srow:hover {
+.srow:hover,
+.wrow:hover {
   background: var(--raised);
 }
-.srow.sel {
+.srow.sel,
+.wrow.sel {
   background: var(--raised);
   border-color: var(--raised-line);
   box-shadow: var(--e-selected);
 }
-.skill-description {
-  max-width: 64ch;
-  margin-bottom: var(--s-5);
+.wrow .meta,
+.vrow .meta {
+  display: flex;
+  gap: var(--s-3);
+  min-width: 0;
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+  color: var(--muted);
 }
-.section-head {
+.wrow .meta > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wrow .meta > span + span {
+  flex: none;
+}
+
+/* A section of a main pane or a details pane: a heading with its count. */
+.sec-head {
   display: flex;
   align-items: center;
   gap: var(--s-2);
-  margin-bottom: var(--s-2);
+  min-width: 0;
+  margin: 0 0 var(--s-2);
 }
-.agent-chips {
+.sec-head .act {
+  margin-left: auto;
+  font-size: var(--t-meta);
+  font-weight: 700;
+}
+.msec {
+  margin-top: var(--s-6);
+}
+.dsec {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding: var(--s-4) var(--s-4) var(--s-5);
+  border-bottom: 1px solid var(--line-soft);
+}
+.dsec-keys {
   display: flex;
   flex-wrap: wrap;
+  gap: var(--s-2);
+  margin-top: var(--s-1);
+}
+.c-lede {
+  max-width: 64ch;
+  margin-bottom: var(--s-4);
+}
+.article {
+  max-width: 72ch;
+}
+
+/* The keys at the end of a form, and a key hint beside them. */
+.form-end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--s-2);
+  margin-top: var(--s-4);
+}
+.form-end .kbd {
+  margin-right: auto;
+  font-size: var(--t-meta);
+  color: var(--muted);
+}
+.form-end .kbd:only-child,
+.form-end .kbd + .key {
+  margin-left: auto;
+}
+
+/* A form of one column. */
+.make {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  max-width: 680px;
+}
+.make fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.make legend {
+  padding: 0;
+  margin-bottom: var(--s-2);
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+  font-weight: 600;
+  color: var(--muted);
+}
+.field-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-3);
+}
+.field-row > .field {
+  flex: 1 1 140px;
+}
+.field-row > .field.narrow {
+  flex: 0 0 200px;
+}
+.field.half {
+  max-width: 50%;
+}
+.code-area {
+  font-family: var(--mono);
+  font-size: var(--t-code);
+  line-height: var(--t-code-lh);
+}
+
+/* A visible choice of two or three: each option a row with its radio. The
+   picked one takes the look of a selected row. */
+.choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--s-2);
+}
+.choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: var(--h-row);
+  padding: 10px var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  cursor: pointer;
+}
+.choice:hover {
+  border-color: var(--ink);
+}
+.choice.on {
+  background: var(--raised);
+  border-color: var(--raised-line);
+  box-shadow: var(--e-selected);
+}
+.choice input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  accent-color: var(--ink);
+}
+.choice .t-sub {
+  display: block;
+}
+.choice .t-meta {
+  display: block;
+}
+
+/* Advanced: the power behind one disclosure. */
+.advanced {
+  border-top: 1px solid var(--line);
+}
+.advanced > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  min-height: var(--h-row);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  list-style: none;
+}
+.advanced > summary::-webkit-details-marker {
+  display: none;
+}
+.advanced > summary .glyph {
+  transform: rotate(180deg);
+}
+.advanced[open] > summary .glyph {
+  transform: rotate(-90deg);
+}
+.advanced-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  padding: var(--s-2) 0 var(--s-4);
+}
+
+/* A notice in a pane: a line on the raised ground. */
+.note-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+  margin-bottom: var(--s-4);
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--raised-line);
+  border-radius: var(--r);
+  background: var(--raised);
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+}
+
+/* ---------- the wiki ---------- */
+.pagetree .group:first-of-type {
+  padding-top: 0;
+}
+.hits .snippet {
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+  color: var(--muted);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.tree-foot {
+  padding: var(--s-2) var(--s-4) var(--s-4);
+  font-size: var(--t-meta);
+  color: var(--muted);
+}
+.parts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-1) var(--s-3);
+  margin-bottom: var(--s-5);
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+  color: var(--muted);
+}
+.parts .by {
+  font-weight: 700;
+  color: var(--ink);
+}
+.tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--s-1);
+}
+.versions {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-width: 720px;
+}
+.versions li + li {
+  border-top: 1px solid var(--line-soft);
+}
+.vrow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: var(--h-row);
+  padding: 10px var(--s-3);
+  border-radius: var(--r);
+  color: var(--ink);
+  text-decoration: none;
+}
+a.vrow:hover {
+  background: var(--raised);
+}
+.vrow .head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+.vrow.gone {
+  color: var(--muted);
+}
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+.editor .text-grow {
+  flex: 1 0 auto;
+}
+.editor .text-grow .textarea {
+  flex: 1;
+  min-height: 16em;
+}
+.editor .form-end {
+  margin-top: 0;
+}
+.conflict .card-body > p {
+  color: var(--ink);
+}
+.conflict details > summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--h-small);
+  font-weight: 700;
+  cursor: pointer;
+}
+.conflict .command {
+  max-height: 16em;
+  margin-top: var(--s-2);
+}
+
+/* ---------- the manager ---------- */
+.mthread {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  padding: var(--s-4) var(--s-5) var(--s-5);
+}
+.mmsg {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: var(--s-3);
+}
+.mmsg-who {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  min-width: 0;
+}
+.mmsg time {
+  font-size: var(--t-meta);
+  color: var(--muted);
+}
+.mmsg .md,
+.mmsg .plain {
+  max-width: 72ch;
+}
+.mmsg .plain {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.mmsg.sending .plain {
+  color: var(--muted);
+}
+.mmsg > .mmsg-who {
+  align-self: center;
+}
+.mline {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+  color: var(--muted);
+  text-align: center;
+}
+.mline time {
+  color: var(--muted);
+}
+.mline .status {
+  white-space: normal;
+  text-align: left;
+}
+.talk {
+  display: flex;
+  flex-direction: column;
+}
+.msteps {
+  align-self: center;
+  max-width: 560px;
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+  color: var(--muted);
+}
+.msteps > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: var(--h-small);
+  cursor: pointer;
+  list-style: none;
+}
+.msteps > summary::-webkit-details-marker {
+  display: none;
+}
+.msteps ol {
+  margin: var(--s-1) 0 0;
+  padding-left: 22px;
+}
+.mthread .card {
+  margin-left: calc(32px + var(--s-3));
+}
+.mthread-empty {
+  margin: auto;
+  padding: var(--s-6) var(--s-5);
+  text-align: center;
+  color: var(--muted);
+}
+.manager .pane-head .status {
+  margin-left: var(--s-1);
+}
+
+/* ---------- a new agent and a new bridge ---------- */
+.who-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-4);
+}
+.who-fields {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+.mark-empty {
+  flex: none;
+  width: 72px;
+  height: 72px;
+  border: 1px dashed var(--placeholder);
+  border-radius: var(--r);
+}
+.seats {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+.seat {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-2) 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.seat-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  min-width: 0;
+}
+.seat-handle {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+.seat-handle .input {
+  max-width: 200px;
+  min-height: var(--h-small);
+}
+.agent-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+.agent-keys .key .mark {
+  margin-left: -6px;
+}
+.workers-out {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--line);
+}
+.worker-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.worker-rows li {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+}
+.worker-rows .wname {
+  min-width: 120px;
+  font-weight: 600;
+}
+
+/* ---------- the Skills place and Add skill ---------- */
+.fm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin: 0 0 var(--s-5);
+  padding: 0;
+  list-style: none;
+}
+.fm li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  padding: 2px var(--s-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  font-size: var(--t-caption);
+  line-height: var(--t-caption-lh);
+  font-weight: 700;
+}
+.fm-key {
+  color: var(--muted);
+  font-weight: 600;
+}
+.loaders {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2) var(--s-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.loaders a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: var(--h-row);
+  padding-right: var(--s-2);
+  border-radius: var(--r);
+  text-decoration: none;
+}
+.loaders a:hover .t-sub {
+  text-decoration: underline;
+}
+.imported {
+  display: flex;
+  flex-direction: column;
   gap: var(--s-2);
   margin: 0;
   padding: 0;
   list-style: none;
 }
-.agent-chips a {
-  display: inline-flex;
+.imported li {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.imported a {
+  text-decoration: none;
+}
+.imported a:hover {
+  text-decoration: underline;
+}
+.head-keys {
   align-items: center;
   gap: var(--s-2);
-  padding: var(--s-1) var(--s-2) var(--s-1) var(--s-1);
+}
+code.slash {
+  font-size: var(--t-code);
+}
+.avenues {
+  flex: none;
+  display: flex;
+  height: var(--h-row);
+  padding: 0 var(--s-5);
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+}
+.avenue-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  max-width: 680px;
+}
+.avenue-form .form-end {
+  margin-top: 0;
+}
+.pickers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+.markets {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  max-width: 680px;
+}
+.markets .group-head {
+  margin: 0;
+}
+.markets .c-rows {
+  padding: var(--s-1) 0 0;
+}
+.file-list {
+  max-width: 680px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.file-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s-4);
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.file-list code {
+  background: none;
+  padding: 0;
+  overflow-wrap: anywhere;
+}
+.preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  max-width: 760px;
+  margin-top: var(--s-5);
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--line);
+}
+.preview-why {
+  color: var(--muted);
+}
+.preview-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-3);
+}
+.preview .fm {
+  margin: 0;
+}
+.problems {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.problems li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-3);
+}
+.problems code {
+  margin-left: var(--s-2);
+}
+.preview-body {
+  max-height: 22em;
+  overflow: auto;
+  padding: var(--s-3) var(--s-4);
   border: 1px solid var(--line);
   border-radius: var(--r);
-  color: var(--ink);
-  text-decoration: none;
-  font-weight: 600;
 }
-.agent-chips a:hover {
-  border-color: var(--ink);
+.preview .sec-head {
+  margin: var(--s-2) 0 0;
+}
+
+/* ---------- the picker of skills ---------- */
+.skill-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+.skill-picker .find {
+  margin: 0;
+}
+.sp-group {
+  display: flex;
+  flex-direction: column;
+}
+.sp-head,
+.sp-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: var(--h-small);
+  cursor: pointer;
+}
+.sp-head {
+  align-items: center;
+  padding: var(--s-1) 0;
+}
+.sp-row {
+  padding: 6px 0 6px var(--s-5);
+  border-top: 1px solid var(--line-soft);
+}
+.sp-head input,
+.sp-row input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  accent-color: var(--ink);
+}
+.sp-head input {
+  margin: 0;
+}
+.sp-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.sp-head .sp-glob {
+  font-size: var(--t-caption);
 }
 
 /* ---------- Appearance ---------- */
-.choices {
-  margin-bottom: var(--s-4);
+.appearance .choices {
+  max-width: 680px;
 }
 
+/* A target on a touch screen is at least 44 pixels. */
 @media (pointer: coarse) {
-  .tree details > summary {
+  .find input,
+  .sp-head,
+  .sp-row,
+  .msteps > summary,
+  .conflict details > summary {
     min-height: var(--h-row);
   }
 }
-.actions-col {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--s-2);
+@media (max-width: 799px) {
+  .mthread {
+    padding: var(--s-4);
+  }
+  .avenues {
+    padding: 0 var(--s-4);
+  }
+  .who-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .who-row > .mark,
+  .who-row > .mark-empty {
+    align-self: flex-start;
+  }
+  .field.half {
+    max-width: none;
+  }
 }
