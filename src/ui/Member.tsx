@@ -26,6 +26,7 @@ import { useTranscript } from './Conversation';
 import { FilesView, RunView, useResult } from './RunPane';
 import { ThreadView, useStickToEnd } from './Thread';
 import { Profile } from './Profile';
+import { rememberOpen } from './Fleet';
 import { Button, Field, Led, Mark, PaneHeader, Tabs, TextArea, buttonClass } from './primitives';
 import { Glyph } from './icons';
 
@@ -280,6 +281,7 @@ function Chat({ bridge, m, items, closed, stopped, reason }: { bridge: string; m
 }
 
 export function MemberMain({ bridge, handle, tab }: { bridge: string; handle: string; tab: MemberTab }) {
+  useEffect(() => rememberOpen(hrefOf({ place: 'member', bridge, handle, tab: 'chat' })), [bridge, handle]);
   const { m, loaded } = useSeat(bridge, handle);
   const b = useSelect((s) => s.bridges.byId[bridge]);
   const runId = m ? newestRun(m) : '';

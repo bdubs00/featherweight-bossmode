@@ -7,7 +7,7 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
 import { peopleApi, type SlashSkill } from '../api/people';
-import { go, parseRoute, type Route } from '../lib/route';
+import { go, hrefOf, parseRoute, type Route } from '../lib/route';
 import { awakeWorkers } from '../lib/workers';
 import { store, useSelect } from '../state/store';
 import { loadAgents } from '../state/actions';
@@ -28,6 +28,14 @@ import { Button, Chip, Led, Mark, PaneHeader, buttonClass } from './primitives';
 
 /** The width from which two panes show side by side, as App names it. */
 const TWO_PANES = '(min-width: 800px)';
+
+/** The conversation that the person had open last, so the main pane opens it again. */
+let lastOpen = '';
+
+/** rememberOpen keeps the address of the conversation that the main pane shows. */
+export function rememberOpen(href: string): void {
+  lastOpen = href;
+}
 
 /** useHashRoute reads the route of the address, and reads it again when it changes. */
 export function useHashRoute(): Route {
@@ -211,6 +219,7 @@ function keepRun(agent: string, id: string): void {
  * on its own member and opens its newest conversation.
  */
 export function AgentChat({ agent }: { agent: string }) {
+  useEffect(() => rememberOpen(hrefOf({ place: 'fleet', agent })), [agent]);
   const config = useSelect((s) => s.config);
   const fleet = useSelect((s) => s.fleet);
   const skills = useSelect((s) => (s.skills ? (s.skills.skills as SlashSkill[]) : null));
@@ -277,10 +286,12 @@ export function Fleet() {
   const route = useHashRoute();
   const agent = route.place === 'fleet' ? route.agent : undefined;
   const { groups, loaded } = usePeople();
-  const first = !agent && loaded ? firstPerson(groups) : null;
+  // Where two panes show, the main pane opens the conversation of before, or the first member.
+  const again = lastOpen && groups.some((g) => g.rows.some((r) => r.href === lastOpen)) ? lastOpen : '';
+  const first = !agent && loaded ? again || (firstPerson(groups) || { href: '' }).href : '';
   useEffect(() => {
-    if (first && window.matchMedia(TWO_PANES).matches) go(first.href, true);
-  }, [first && first.href]);
+    if (first && window.matchMedia(TWO_PANES).matches) go(first, true);
+  }, [first]);
   if (agent) return <AgentChat agent={agent} />;
   return (
     <EmptyPane back={{ href: '#fleet', label: 'Fleet' }}>
