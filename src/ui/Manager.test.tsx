@@ -4,8 +4,8 @@ import { store } from '../state/store';
 import { forgetManagerRun } from '../state/manager';
 import type { BossConfig, Item, Run } from '../api/types';
 import { Manager, POLL_MS, slashOf } from './Manager';
-import { appendDelta, threadOf } from './Thread';
-import { click, fakeApi, keyNamed, mount, settle, typeIn, unmountAll } from './testkit';
+import { appendDelta, threadOf } from './ManagerThread';
+import { click, fakeApi, keyNamed, mount, settle, typeIn, unmountAll } from './testkit-c';
 
 const CONFIG: BossConfig = { manager: { agent: 'manager', member: 'default/manager-0', run: 'run-m' }, placement: 'queue', maxMembers: 16 };
 const run = (state: Run['state'], seq: number): Run => ({ id: 'run-m', agent: 'manager', state, seq, createdAt: '', updatedAt: '' });
@@ -55,7 +55,7 @@ describe('the manager', () => {
     });
     await settle();
     expect(runReads()).toBe(2);
-    expect([...el.querySelectorAll('.tmsg .md')].map((m) => m.textContent!.trim())).toEqual(['Two bridges are open.']);
+    expect([...el.querySelectorAll('.mmsg .md')].map((m) => m.textContent!.trim())).toEqual(['Two bridges are open.']);
     expect(el.querySelector('[role="status"] .status')).toBeNull();
     // The run completed and nothing waits, so the poll stops.
     await act(async () => {
@@ -112,7 +112,7 @@ describe('the manager', () => {
     const el = mount(<Manager />);
     await settle();
     click(keyNamed(el, 'New conversation'));
-    expect(el.querySelector('.thread-empty')!.textContent).toBe('Ask about the fleet, or ask for a bridge.');
+    expect(el.querySelector('.mthread-empty')!.textContent).toBe('Ask about the fleet, or ask for a bridge.');
     typeIn(el.querySelector('#composer'), 'Hello');
     click(keyNamed(el, 'Send'));
     await settle();

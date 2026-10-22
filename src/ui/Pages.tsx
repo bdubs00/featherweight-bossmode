@@ -66,7 +66,7 @@ function PageRow({ p, current }: { p: PageMeta; current?: string }) {
   const name = pageName(p.path);
   return (
     <div role="listitem">
-      <a class={'prow' + (on ? ' sel' : '')} href={hrefOf({ place: 'pages', path: p.path, mode: 'read' })} data-item aria-current={on ? 'page' : undefined}>
+      <a class={'wrow' + (on ? ' sel' : '')} href={hrefOf({ place: 'pages', path: p.path, mode: 'read' })} data-item aria-current={on ? 'page' : undefined}>
         <span class="t-sub clip">{p.title || name}</span>
         <span class="meta">
           <span>{name}</span>
@@ -133,7 +133,7 @@ export function PageTree({ current }: { current?: string }) {
           <div class="c-rows hits" role="list" aria-label="Pages that hold the words">
             {hits.map((h) => (
               <div role="listitem">
-                <a class={'prow' + (h.path === current ? ' sel' : '')} href={hrefOf({ place: 'pages', path: h.path, mode: 'read' })} data-item>
+                <a class={'wrow' + (h.path === current ? ' sel' : '')} href={hrefOf({ place: 'pages', path: h.path, mode: 'read' })} data-item>
                   <span class="t-sub clip">{h.title || pageName(h.path)}</span>
                   <span class="snippet">{h.snippet}</span>
                 </a>
@@ -158,7 +158,7 @@ export function PageTree({ current }: { current?: string }) {
                 <div class="group" role="group" aria-labelledby={f.path ? id : undefined} aria-label={f.path ? undefined : 'Pages'}>
                   {f.path && (
                     <button type="button" class="group-head" id={id} aria-expanded={open} onClick={() => setShut({ ...shut, [f.path]: open })}>
-                      <Glyph name="back" size={14} class="fold" />
+                      <Glyph name="back" size={14} />
                       <span class="clip">{f.path}</span>
                       <Chip>{f.pages.length}</Chip>
                     </button>
@@ -500,7 +500,7 @@ export function PageEditor({ path: initial, create }: { path?: string; create?: 
             {!why && target && <span class="t-meta">The page will be {target}.</span>}
           </Field>
         )}
-        <Field label="Text" class="grow">
+        <Field label="Text" class="text-grow">
           <TextArea
             ref={box}
             class="code-area"

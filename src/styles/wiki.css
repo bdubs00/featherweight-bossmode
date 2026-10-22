@@ -93,7 +93,7 @@ button.group-head > .clip {
 
 /* A row of a list: a name and one line under it. */
 .srow,
-.prow {
+.wrow {
   appearance: none;
   display: flex;
   flex-direction: column;
@@ -112,16 +112,16 @@ button.group-head > .clip {
   cursor: pointer;
 }
 .srow:hover,
-.prow:hover {
+.wrow:hover {
   background: var(--raised);
 }
 .srow.sel,
-.prow.sel {
+.wrow.sel {
   background: var(--raised);
   border-color: var(--raised-line);
   box-shadow: var(--e-selected);
 }
-.prow .meta,
+.wrow .meta,
 .vrow .meta {
   display: flex;
   gap: var(--s-3);
@@ -130,13 +130,13 @@ button.group-head > .clip {
   line-height: var(--t-meta-lh);
   color: var(--muted);
 }
-.prow .meta > span:first-child {
+.wrow .meta > span:first-child {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.prow .meta > span + span {
+.wrow .meta > span + span {
   flex: none;
 }
 
@@ -394,10 +394,10 @@ a.vrow:hover {
   flex-direction: column;
   gap: var(--s-4);
 }
-.editor .grow {
+.editor .text-grow {
   flex: 1 0 auto;
 }
-.editor .grow .textarea {
+.editor .text-grow .textarea {
   flex: 1;
   min-height: 16em;
 }
@@ -420,42 +420,42 @@ a.vrow:hover {
 }
 
 /* ---------- the manager ---------- */
-.thread {
+.mthread {
   display: flex;
   flex-direction: column;
   gap: var(--s-4);
   padding: var(--s-4) var(--s-5) var(--s-5);
 }
-.tmsg {
+.mmsg {
   display: grid;
   grid-template-columns: 32px minmax(0, 1fr);
   gap: var(--s-3);
 }
-.tmsg-who {
+.mmsg-who {
   display: flex;
   align-items: baseline;
   gap: var(--s-2);
   min-width: 0;
 }
-.tmsg time {
+.mmsg time {
   font-size: var(--t-meta);
   color: var(--muted);
 }
-.tmsg .md,
-.tmsg .plain {
+.mmsg .md,
+.mmsg .plain {
   max-width: 72ch;
 }
-.tmsg .plain {
+.mmsg .plain {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.tmsg.sending .plain {
+.mmsg.sending .plain {
   color: var(--muted);
 }
-.tmsg > .tmsg-who {
+.mmsg > .mmsg-who {
   align-self: center;
 }
-.tline {
+.mline {
   display: flex;
   justify-content: center;
   align-items: center;
@@ -465,10 +465,10 @@ a.vrow:hover {
   color: var(--muted);
   text-align: center;
 }
-.tline time {
+.mline time {
   color: var(--muted);
 }
-.tline .status {
+.mline .status {
   white-space: normal;
   text-align: left;
 }
@@ -476,14 +476,14 @@ a.vrow:hover {
   display: flex;
   flex-direction: column;
 }
-.tsteps {
+.msteps {
   align-self: center;
   max-width: 560px;
   font-size: var(--t-meta);
   line-height: var(--t-meta-lh);
   color: var(--muted);
 }
-.tsteps > summary {
+.msteps > summary {
   display: inline-flex;
   align-items: center;
   gap: var(--s-2);
@@ -491,17 +491,17 @@ a.vrow:hover {
   cursor: pointer;
   list-style: none;
 }
-.tsteps > summary::-webkit-details-marker {
+.msteps > summary::-webkit-details-marker {
   display: none;
 }
-.tsteps ol {
+.msteps ol {
   margin: var(--s-1) 0 0;
   padding-left: 22px;
 }
-.thread .card {
+.mthread .card {
   margin-left: calc(32px + var(--s-3));
 }
-.thread-empty {
+.mthread-empty {
   margin: auto;
   padding: var(--s-6) var(--s-5);
   text-align: center;
@@ -764,51 +764,51 @@ code.slash {
 }
 
 /* ---------- the picker of skills ---------- */
-.picker {
+.skill-picker {
   display: flex;
   flex-direction: column;
   gap: var(--s-3);
 }
-.picker .find {
+.skill-picker .find {
   margin: 0;
 }
-.pick-group {
+.sp-group {
   display: flex;
   flex-direction: column;
 }
-.pick-head,
-.pick-row {
+.sp-head,
+.sp-row {
   display: flex;
   align-items: flex-start;
   gap: 10px;
   min-height: var(--h-small);
   cursor: pointer;
 }
-.pick-head {
+.sp-head {
   align-items: center;
   padding: var(--s-1) 0;
 }
-.pick-row {
+.sp-row {
   padding: 6px 0 6px var(--s-5);
   border-top: 1px solid var(--line-soft);
 }
-.pick-head input,
-.pick-row input {
+.sp-head input,
+.sp-row input {
   flex: none;
   width: 18px;
   height: 18px;
   margin: 2px 0 0;
   accent-color: var(--ink);
 }
-.pick-head input {
+.sp-head input {
   margin: 0;
 }
-.pick-text {
+.sp-text {
   display: flex;
   flex-direction: column;
   min-width: 0;
 }
-.pick-head .glob {
+.sp-head .sp-glob {
   font-size: var(--t-caption);
 }
 
@@ -820,15 +820,15 @@ code.slash {
 /* A target on a touch screen is at least 44 pixels. */
 @media (pointer: coarse) {
   .find input,
-  .pick-head,
-  .pick-row,
-  .tsteps > summary,
+  .sp-head,
+  .sp-row,
+  .msteps > summary,
   .conflict details > summary {
     min-height: var(--h-row);
   }
 }
 @media (max-width: 799px) {
-  .thread {
+  .mthread {
     padding: var(--s-4);
   }
   .avenues {

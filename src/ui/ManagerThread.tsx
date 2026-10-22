@@ -1,4 +1,4 @@
-// The thread of a conversation with an agent, in the look of the channel:
+// The thread of the conversation with the manager, in the look of the channel:
 // each message with the mark or the initials of its sender, the name, and
 // the clock time; the tool calls between two messages folded into one line;
 // and a centered line for what happened, with its light. The thread is
@@ -98,7 +98,7 @@ export function appendDelta(entries: Entry[], piece: string, agent: string, at: 
 function Steps({ steps }: { steps: Step[] }) {
   const failed = steps.some((s) => s.error);
   return (
-    <details class="tsteps">
+    <details class="msteps">
       <summary>
         <Led tone={failed ? 'red' : 'grey'} word={steps.length === 1 ? 'Took 1 step' : `Took ${steps.length} steps`} />
       </summary>
@@ -128,15 +128,15 @@ export interface ThreadProps {
 
 export function Thread({ entries, agent, me, card, tail }: ThreadProps) {
   return (
-    <div class="thread" role="log" aria-label={'Conversation with the ' + agent}>
+    <div class="mthread" role="log" aria-label={'Conversation with the ' + agent}>
       {entries.map((e) => {
         switch (e.kind) {
           case 'msg':
             return (
-              <article class="tmsg" key={e.key}>
+              <article class="mmsg" key={e.key}>
                 {e.from === 'agent' ? <Mark agent={e.who} size={32} /> : <Avatar subject={e.who || me} size={32} />}
                 <div>
-                  <header class="tmsg-who">
+                  <header class="mmsg-who">
                     <b class="t-sub">{e.from === 'agent' ? e.who : personName(e.who || me)}</b>
                     <When at={e.at} />
                   </header>
@@ -148,7 +148,7 @@ export function Thread({ entries, agent, me, card, tail }: ThreadProps) {
             return <Steps steps={e.steps} key={e.key} />;
           case 'line':
             return (
-              <p class="tline" key={e.key}>
+              <p class="mline" key={e.key}>
                 <Led tone={e.tone} word={e.text} />
                 {e.at && <When at={e.at} />}
               </p>
@@ -157,7 +157,7 @@ export function Thread({ entries, agent, me, card, tail }: ThreadProps) {
             const c = card ? card(e.id) : null;
             if (c) return <div key={e.key}>{c}</div>;
             return (
-              <p class="tline" key={e.key}>
+              <p class="mline" key={e.key}>
                 <Glyph name="question" size={16} />
                 {e.question ? 'Asked you' : 'Asked for a decision'}
               </p>

@@ -56,9 +56,9 @@ const boxOf = (el: HTMLElement, text: string) => [...el.querySelectorAll('label'
 describe('SkillPicker', () => {
   it('groups the skills by origin with their descriptions', () => {
     const { el } = pick([]);
-    const heads = [...el.querySelectorAll('.pick-head .t-caption')].map((x) => x.textContent);
+    const heads = [...el.querySelectorAll('.sp-head .t-caption')].map((x) => x.textContent);
     expect(heads).toEqual(['Imported', 'Local', 'docs']);
-    expect(el.querySelector('.pick-row')!.textContent).toContain('Write Ansible roles.');
+    expect(el.querySelector('.sp-row')!.textContent).toContain('Write Ansible roles.');
   });
 
   it('writes the name of one skill', () => {

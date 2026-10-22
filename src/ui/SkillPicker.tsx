@@ -32,7 +32,7 @@ export function SkillPicker({ skills, value, onChange, label = 'Skills' }: Skill
     .map((g) => ({ g, items: words ? g.items.filter((s) => s.name.toLowerCase().includes(words) || s.description.toLowerCase().includes(words)) : g.items }))
     .filter((x) => x.items.length > 0);
   return (
-    <div class="picker" role="group" aria-label={label}>
+    <div class="skill-picker" role="group" aria-label={label}>
       {all.length > 6 && (
         <div class="find recess">
           <Glyph name="search" size={16} />
@@ -44,17 +44,17 @@ export function SkillPicker({ skills, value, onChange, label = 'Skills' }: Skill
       {shown.map(({ g, items }) => {
         const state = groupState(value, g);
         return (
-          <div class="pick-group" key={g.key}>
-            <label class="pick-head">
+          <div class="sp-group" key={g.key}>
+            <label class="sp-head">
               <input type="checkbox" checked={state === 'all'} indeterminate={state === 'some'} onChange={(e) => onChange(toggleGroup(value, g, (e.target as HTMLInputElement).checked))} />
               <span class="t-caption">{g.title}</span>
               <Chip>{g.items.length}</Chip>
-              {g.server && state === 'all' && value.includes(g.server + '/*') && <code class="glob">{g.server}/*</code>}
+              {g.server && state === 'all' && value.includes(g.server + '/*') && <code class="sp-glob">{g.server}/*</code>}
             </label>
             {items.map((s) => (
-              <label class="pick-row" key={s.name}>
+              <label class="sp-row" key={s.name}>
                 <input type="checkbox" checked={isOn(value, s)} onChange={(e) => onChange(toggleSkill(value, s, (e.target as HTMLInputElement).checked, all))} />
-                <span class="pick-text">
+                <span class="sp-text">
                   <span class="t-sub clip">{s.name}</span>
                   <span class="t-meta clip">{s.description}</span>
                 </span>

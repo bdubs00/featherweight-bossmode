@@ -3,7 +3,7 @@ import { act } from 'preact/test-utils';
 import { store } from '../state/store';
 import type { BossConfig, SkillsList } from '../api/types';
 import { DEFAULT_COMPACTION, NewAgent, emptyForm, formErrors, requestOf } from './NewAgent';
-import { click, fakeApi, fieldOf, keyNamed, mount, settle, typeIn, unmountAll } from './testkit';
+import { click, fakeApi, fieldOf, keyNamed, mount, settle, typeIn, unmountAll } from './testkit-c';
 
 const BASE: BossConfig = { manager: null, placement: 'queue', maxMembers: 16 };
 const TWO = [
@@ -78,7 +78,7 @@ describe('NewAgent', () => {
     typeIn(fieldOf(el, 'Name'), 'linter');
     typeIn(fieldOf(el, 'What it handles'), 'Lints roles.\nFix every warning.');
     typeIn(fieldOf(el, 'How many can work at once?'), '3');
-    click([...el.querySelectorAll('.pick-head input')].find((i) => i.closest('label')!.textContent!.startsWith('docs')));
+    click([...el.querySelectorAll('.sp-head input')].find((i) => i.closest('label')!.textContent!.startsWith('docs')));
     const adv = el.querySelector('details.advanced')!;
     typeIn(fieldOf(adv, 'Compact at, in tokens'), '131072');
     typeIn(fieldOf(adv, 'Ask before'), 'bash: git push*, destructive');

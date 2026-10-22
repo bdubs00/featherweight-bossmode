@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { PageMeta } from '../api/types';
 import { PageEditor, PageTree, PageView, foldersOf } from './Pages';
-import { click, fakeApi, fieldOf, keyNamed, mount, problem, settle, typeIn, unmountAll } from './testkit';
+import { click, fakeApi, fieldOf, keyNamed, mount, problem, settle, typeIn, unmountAll } from './testkit-c';
 
 const meta = (path: string, at = '2026-10-22T00:00:00Z'): PageMeta => ({ path, title: '', hash: 'h-' + path, size: 1, by: 'agent:writer', at });
 const page = (text: string, hash: string, by = 'alice@example.com') => ({ path: 'runbooks/deploy.md', title: 'Deploy', text, hash, version: 3, size: text.length, by, at: '2026-10-22T00:00:00Z' });
@@ -31,7 +31,7 @@ describe('the tree of the wiki', () => {
     const el = mount(<PageTree />);
     await settle();
     expect(el.querySelector('.group-head')!.textContent).toBe('runbooks1');
-    expect(el.querySelector('.prow .meta')!.textContent).toBe('deploy14 min');
+    expect(el.querySelector('.wrow .meta')!.textContent).toBe('deploy14 min');
     expect(el.textContent).not.toContain('.md');
   });
 });

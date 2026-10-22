@@ -21,7 +21,7 @@ import { Button, Help, Led, Mark, PaneHeader } from './primitives';
 import { Composer } from './Composer';
 import { DecisionCard } from './Decision';
 import { useCatalog } from './Skills';
-import { Thread, decisionOf, threadOf } from './Thread';
+import { Thread, decisionOf, threadOf } from './ManagerThread';
 
 /** The time between two reads of a run of the front. */
 export const POLL_MS = 3000;
@@ -170,7 +170,8 @@ export function Manager() {
 
   const lastUser = t.items.map((x) => x.kind).lastIndexOf('user');
   const answered = lastUser >= 0 && t.items.slice(lastUser + 1).some((x) => x.kind === 'assistant' || x.kind === 'ask' || (x.kind === 'end' && !!x.isError));
-  const waiting = !stopped && (!!sent || (lastUser >= 0 && !answered)) && !(run && run.state === 'input-required');
+  // A run that completed waits for nothing, also when its last turn gave no answer.
+  const waiting = !stopped && (!!sent || (lastUser >= 0 && !answered && !(run && run.state === 'completed'))) && !(run && run.state === 'input-required');
   // The Task of the manager sleeps between messages, so the first answer waits for it to wake.
   const waking = waiting && (!run || run.state === 'queued' || run.state === 'suspended') && !t.items.some((x) => x.kind === 'assistant');
   const pending = run ? decisionOf(run, res) : null;
@@ -193,10 +194,10 @@ export function Manager() {
   const tail = (
     <>
       {sent && (
-        <article class="tmsg sending">
+        <article class="mmsg sending">
           <Avatar subject={me} size={32} />
           <div>
-            <header class="tmsg-who">
+            <header class="mmsg-who">
               <b class="t-sub">{personName(me)}</b>
             </header>
             <p class="plain">{sent.text}</p>
@@ -204,9 +205,9 @@ export function Manager() {
         </article>
       )}
       {waiting && (
-        <div class="tmsg" role="status">
+        <div class="mmsg" role="status">
           <Mark agent={manager.agent} size={32} />
-          <div class="tmsg-who">
+          <div class="mmsg-who">
             <b class="t-sub">{manager.agent}</b>
             {waking ? (
               <Led tone="grey" word="waking" label="Waking the manager" />
@@ -220,7 +221,7 @@ export function Manager() {
         </div>
       )}
       {stopped && (
-        <p class="tline">
+        <p class="mline">
           <Led tone="grey" word="Stopped. Your next message starts a new conversation." />
         </p>
       )}
@@ -243,8 +244,8 @@ export function Manager() {
         }
       />
       <div class="scroll talk">
-        {!runId && !sent && <p class="thread-empty">Ask about the fleet, or ask for a bridge.</p>}
-        {runId && t.loading && <p class="thread-empty">Loading the conversation.</p>}
+        {!runId && !sent && <p class="mthread-empty">Ask about the fleet, or ask for a bridge.</p>}
+        {runId && t.loading && <p class="mthread-empty">Loading the conversation.</p>}
         {(runId || sent) && !t.loading && (
           <Thread
             entries={entries}

@@ -5,7 +5,7 @@ import type { SkillsList, Whoami } from '../api/types';
 import { catalogOf, skillGroups, toolGroups } from '../lib/catalog';
 import { SkillActions, SkillList, SkillMain, forgetTools } from './Skills';
 import { closeAddSkill, openAddSkill } from './AddSkill';
-import { click, fakeApi, fieldOf, keyNamed, mount, problem, settle, typeIn, unmountAll } from './testkit';
+import { click, fakeApi, fieldOf, keyNamed, mount, problem, settle, typeIn, unmountAll } from './testkit-c';
 
 const CONTRACT: SkillsList = {
   skills: [

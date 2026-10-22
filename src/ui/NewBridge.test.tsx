@@ -4,7 +4,7 @@ import { store } from '../state/store';
 import { forgetManagerRun } from '../state/manager';
 import type { BossConfig } from '../api/types';
 import { NewBridge, bodyOf, bridgeErrors, titleOf, type BridgeForm } from './NewBridge';
-import { click, fakeApi, keyNamed, mount, settle, typeIn, unmountAll } from './testkit';
+import { click, fakeApi, keyNamed, mount, settle, typeIn, unmountAll } from './testkit-c';
 
 const MANAGER: BossConfig = { manager: { agent: 'manager', member: 'default/manager-0', run: '' }, placement: 'queue', maxMembers: 16 };
 const AGENTS = [
