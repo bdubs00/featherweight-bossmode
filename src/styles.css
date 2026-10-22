@@ -431,6 +431,7 @@ h3.work { font: 700 20px/26px var(--font); letter-spacing: -.01em; overflow-wrap
 @media (pointer: coarse) {
   .btn, .btn.small, .icon-btn, .link, .rtoggle, .back, .reply-chip, .tree details > summary, .decide .more > summary, .steps > summary, .complete li, .menu > button, .count { min-height: 44px; }
   .icon-btn { width: 44px; height: 44px; }
+  .composer .send, .member .open { min-height: 44px; }
   .reacts { position: static; box-shadow: none; background: none; margin-top: 2px; }
   .sys .reacts { justify-content: center; }
 }

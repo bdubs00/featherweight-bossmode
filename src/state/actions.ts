@@ -59,7 +59,7 @@ export async function loadNewer(id: string): Promise<void> {
   }
 }
 
-let readTimer: ReturnType<typeof setTimeout> | null = null;
+const readTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 /** markRead tells the workbench what the person read, a moment later. */
 export function markRead(id: string): void {
@@ -67,12 +67,17 @@ export function markRead(id: string): void {
   if (!b) return;
   const seq = b.lastSeq;
   store.dispatch({ type: 'read', bridge: id, seq });
-  if (readTimer) clearTimeout(readTimer);
-  readTimer = setTimeout(() => {
-    api.markRead(id, seq).catch(() => {
-      // A lost read mark costs only a count. The next read sets it.
-    });
-  }, 800);
+  const old = readTimers.get(id);
+  if (old) clearTimeout(old);
+  readTimers.set(
+    id,
+    setTimeout(() => {
+      readTimers.delete(id);
+      api.markRead(id, seq).catch(() => {
+        // A lost read mark costs only a count. The next read sets it.
+      });
+    }, 800),
+  );
 }
 
 export async function postMessage(id: string, text: string, to: string[], replyTo?: number): Promise<Entry> {

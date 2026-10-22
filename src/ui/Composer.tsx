@@ -201,9 +201,7 @@ export function Composer(p: ComposerProps) {
           placeholder={p.disabled || p.placeholder}
           disabled={!!p.disabled}
           value={text}
-          role={p.members ? 'combobox' : undefined}
           aria-autocomplete={p.members ? 'list' : undefined}
-          aria-expanded={p.members ? !!comp : undefined}
           aria-controls={comp ? listId : undefined}
           aria-activedescendant={comp ? listId + '-' + pick : undefined}
           onInput={(e) => {
