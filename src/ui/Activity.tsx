@@ -6,7 +6,7 @@
 // r replies, and s seats a stopped seat again. The main pane shows the row
 // that has the focus: a decision as its card.
 
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { Decision, Member } from '../api/types';
 import { go, hrefOf } from '../lib/route';
 import { decisionTitle, excerpt, personName, senderName, since, commandOf } from '../lib/words';
@@ -214,6 +214,23 @@ export function ActivityList() {
       if (r) openRow(r);
     },
   });
+  // A row that leaves, such as a decision that the person just made, hands
+  // the main pane and the focus to the row that takes its place.
+  const lastIndex = useRef(0);
+  const keyList = rows.map((r) => r.key).join('\n');
+  useEffect(() => {
+    const i = rows.findIndex((r) => r.key === picked);
+    if (i >= 0) {
+      lastIndex.current = i;
+      return;
+    }
+    if (!picked || rows.length === 0) return;
+    const next = rows[Math.min(lastIndex.current, rows.length - 1)];
+    pick(next.key);
+    const lost = !document.activeElement || document.activeElement === document.body;
+    const el = list.current ? [...list.current.querySelectorAll<HTMLElement>('[data-key]')].find((x) => x.getAttribute('data-key') === next.key) : undefined;
+    if (lost && el) el.focus();
+  }, [keyList, picked]);
   const onKey = (e: KeyboardEvent) => {
     if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) return;
     const el = e.target as HTMLElement;

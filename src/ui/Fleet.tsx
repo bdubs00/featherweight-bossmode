@@ -4,14 +4,14 @@
 // pane holds the conversation with an agent that sits on no bridge, the
 // manager among them, as a run. The details pane holds the profile.
 
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
 import { peopleApi, type SlashSkill } from '../api/people';
 import { go, parseRoute, type Route } from '../lib/route';
 import { awakeWorkers } from '../lib/workers';
 import { store, useSelect } from '../state/store';
 import { loadAgents } from '../state/actions';
-import { ensureRosters, ensureRuns } from '../state/fetchers';
+import { ensureRosters, ensureRuns, refreshAfterReset } from '../state/fetchers';
 import { filterPeople, firstPerson, newestRun, parseSlash, peopleCount, peopleOf, slashCommands, workerLight, type PeopleGroup, type PersonRow } from '../state/people';
 import { workersOf } from '../lib/workers';
 import { useRoving } from './keys';
@@ -57,6 +57,14 @@ export function usePeople(): { groups: PeopleGroup[]; loaded: boolean } {
   useEffect(() => {
     if (bridges.loaded) ensureRosters();
   }, [bridges]);
+  // A stream that cannot resume leaves the records and the runs behind, so they load again.
+  const resets = useSelect((s) => s.resets);
+  const seen = useRef(resets);
+  useEffect(() => {
+    if (resets === seen.current) return;
+    seen.current = resets;
+    refreshAfterReset();
+  }, [resets]);
   const groups = useMemo(() => peopleOf({ bridges, rosters, runs, agents, fleet }), [bridges, rosters, runs, agents, fleet]);
   const working = groups
     .flatMap((g) => g.rows)

@@ -232,6 +232,7 @@ export function RunPane({ bridge, runId, handle }: { bridge: string; runId: stri
       />
       <div class="scroll">
         <RunView runId={runId} result={res} member={member} who={who} endSeq={end ? end.seq : undefined} />
+        {res && res.files && res.files.length > 0 && <FilesView runId={runId} result={res} />}
         <Conversation run={run} result={res} t={t} agentLabel={who} />
       </div>
     </section>

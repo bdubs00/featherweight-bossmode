@@ -14,8 +14,8 @@ import type { MemberTab } from '../lib/route';
 import { hrefOf } from '../lib/route';
 import { store, useSelect } from '../state/store';
 import { entriesOf } from '../state/reducer';
-import { fire, loadOlder, patchMember } from '../state/actions';
-import { ensureChannels, ensureRosters, ensureRuns } from '../state/fetchers';
+import { fire, loadBridge, loadOlder, patchMember } from '../state/actions';
+import { ensureChannels, ensureRuns } from '../state/fetchers';
 import { newestRun, parseSlash, seatRowLight, slashCommands } from '../state/people';
 import { directEntries, stepsOf, threadOf, withLive } from '../state/thread';
 import type { SlashSkill } from '../api/people';
@@ -66,10 +66,10 @@ function useLive(bridge: string, handle: string): string {
 function useSeat(bridge: string, handle: string) {
   const m = useSelect((s) => (s.rosters[bridge] ? s.rosters[bridge].byHandle[handle] : undefined));
   const loaded = useSelect((s) => !!s.rosters[bridge]);
-  const known = useSelect((s) => !!s.bridges.byId[bridge]);
+  // The record of the bridge holds the seat, also for a closed bridge.
   useEffect(() => {
-    if (!loaded) ensureRosters();
-  }, [bridge, loaded, known]);
+    if (!loaded) attempt(() => loadBridge(bridge));
+  }, [bridge, loaded]);
   return { m, loaded };
 }
 

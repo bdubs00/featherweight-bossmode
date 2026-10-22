@@ -88,3 +88,24 @@ describe('the inbox', () => {
     expect(el.querySelector('.empty')!.textContent).toBe('Nothing needs you.');
   });
 });
+
+describe('the inbox after a decision', () => {
+  it('hands the main pane and the focus to the row that takes the place of a decided one', () => {
+    const el = mount(
+      <>
+        <ActivityList />
+        <ActivityMain />
+      </>,
+    );
+    act(() => rows(el)[0].focus());
+    expect(el.querySelector('.inbox-main-pane h1')!.textContent).toBe('early');
+    // The decision lands: the run goes on, and the seat works.
+    act(() => {
+      store.dispatch({ type: 'run', run: run('run-early', 'migrator', 'running', { seq: 2 }) });
+      store.dispatch({ type: 'member', bridge: 'b1', member: seat('early', 'migrator', 'working') });
+    });
+    expect(rows(el).map((r) => r.querySelector('b')!.textContent)).toEqual(['late', 'broke']);
+    expect(el.querySelector('.inbox-main-pane h1')!.textContent).toBe('late');
+    expect(document.activeElement).toBe(rows(el)[0]);
+  });
+});

@@ -107,3 +107,32 @@ export function forgetLoads(): void {
   askedChannels.clear();
   for (const k of Object.keys(resultKeys)) delete resultKeys[k];
 }
+
+/**
+ * refreshAfterReset reads again what the stream could not resume: the
+ * record of each open bridge, and the newest run of each seat that works
+ * or waits for you, whose state the people list and the inbox show.
+ */
+let lastReset = 0;
+
+export function refreshAfterReset(): void {
+  const s = store.get();
+  // Several screens follow the resets: the first one reads, once per reset.
+  if (s.resets === lastReset) return;
+  lastReset = s.resets;
+  forgetLoads();
+  const open = s.bridges.order.filter((id) => s.bridges.byId[id] && s.bridges.byId[id].state === 'open');
+  void pool(open, 3, (id) => loadBridge(id));
+  const runs: string[] = [];
+  for (const id of open) {
+    const r = s.rosters[id];
+    if (!r) continue;
+    for (const h of r.order) {
+      const m = r.byHandle[h];
+      if (m && !m.fired && m.runs.length && (m.presence === 'working' || m.presence === 'needs-you')) runs.push(m.runs[m.runs.length - 1]);
+    }
+  }
+  void pool(runs, 3, async (id) => {
+    store.dispatch({ type: 'run', run: await api.run(id) });
+  });
+}
