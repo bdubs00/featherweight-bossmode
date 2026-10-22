@@ -11,6 +11,7 @@ import { store, useSelect } from '../state/store';
 import { loadAllCards, loadBridge, loadChannel, loadOlder, loadPages, markRead, patchBridge, postMessage } from '../state/actions';
 import { membersOf, type Channel as ChannelState } from '../state/reducer';
 import { senderName, since } from '../lib/words';
+import { decidedRuns, hiddenLine } from '../lib/lines';
 import { hrefOf, type BridgeTab } from '../lib/route';
 import { useRoving, smooth } from './keys';
 import { attempt } from './notice';
@@ -87,13 +88,19 @@ function ChannelComposer(p: { id: string; closed: boolean; reply: Entry | null; 
 
 const shapes = new WeakMap<object, { day: string; shape: Shape }>();
 
-/** channelShape reads the shapes of the loaded entries as one string. An entry keeps its shape until it changes. */
+/**
+ * channelShape reads the shapes of the loaded entries as one string. An
+ * entry keeps its shape until it changes. A line that says a decision
+ * leaves the channel when the channel holds the card that shows it.
+ */
 function channelShape(ch: ChannelState | undefined): string | undefined {
   if (!ch) return undefined;
   const today = new Date().toDateString();
   const out: Shape[] = [];
+  const decided = decidedRuns(ch.seqs.map((seq) => ch.bySeq[seq] as Entry));
   for (const seq of ch.seqs) {
     const e = ch.bySeq[seq] as Entry;
+    if (hiddenLine(e, decided)) continue;
     let c = shapes.get(e);
     if (!c || c.day !== today) {
       c = { day: today, shape: shapeOf(e) };

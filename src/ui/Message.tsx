@@ -10,6 +10,7 @@ import type { Entry, Member, ReactionKind } from '../api/types';
 import { useSelect } from '../state/store';
 import { dayWords, excerpt, list, personName, senderName } from '../lib/words';
 import { hrefOf } from '../lib/route';
+import { lineWords, whoName } from '../lib/lines';
 import type { Tone } from '../lib/presence';
 import { decide, react } from '../state/actions';
 import { attempt } from './notice';
@@ -209,6 +210,7 @@ export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, fresh, li
   const runHandle = useSelect((s) => (decisionRun ? handleOfRun(s.rosters[bridge] ? s.rosters[bridge].byHandle : undefined, decisionRun) : ''));
   const handle = e && e.from.kind === 'agent' ? e.from.handle || '' : runHandle;
   const agent = useSelect((s) => (handle ? agentOf(s.rosters[bridge] ? s.rosters[bridge].byHandle : undefined, handle) : ''));
+  const me = useSelect((s) => (s.me ? s.me.principal : null));
   // A card that arrives on the stream after the channel loaded settles once. A card on load never moves.
   const [settle] = useState(() => arrived(bridge, seq));
   if (!e) return null;
@@ -220,19 +222,22 @@ export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, fresh, li
     </p>
   );
   if (e.from.kind === 'system' && !e.decision) {
+    // The page words the line from its event, and keeps the sentence of the backend for the tooltip.
+    const w = lineWords(e, me);
+    const page = w.page || e.page;
     return (
       <>
         {dayLine}
         <div class={'sys' + (e.event ? ' ev-' + e.event : '')} id={id} data-item data-seq={seq}>
           <p>
             <LineLed tone={toneOfEvent(e.event)} />
-            <span class="sys-text">
-              <InlineMarkdown text={e.text} />
-              {e.page && (
+            <span class="sys-text" title={w.title}>
+              {w.raw ? <InlineMarkdown text={w.text} /> : w.text}
+              {page && (
                 <>
                   {' '}
-                  <a class="sys-page" href={hrefOf({ place: 'pages', path: e.page, mode: 'read' })}>
-                    {e.page}
+                  <a class="sys-page" href={hrefOf({ place: 'pages', path: page, mode: 'read' })}>
+                    {page}
                   </a>
                 </>
               )}
@@ -277,13 +282,15 @@ export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, fresh, li
     senderName(prev.from) === name &&
     new Date(e.at).getTime() - new Date(prev.at).getTime() < 5 * 60_000;
   const mine = e.from.kind === 'person';
+  // The author line of a message of the person who reads the page says You.
+  const author = mine ? whoName(e.from.name, me, e.from.display) : name;
   const to = e.to || [];
   const r = e.reactions || {};
   const chips = (r.up || []).length + (r.down || []).length + (r.heart || []).length > 0;
   return (
     <>
       {dayLine}
-      <article class={'msg' + (sameAsPrev ? ' compact' : '') + (mine ? ' by-person' : ' by-agent') + (chips ? ' has-rx' : '')} id={id} data-item data-seq={seq} data-reply="1" aria-label={name + ', ' + excerpt(plain(e.text), 60)}>
+      <article class={'msg' + (sameAsPrev ? ' compact' : '') + (mine ? ' by-person' : ' by-agent') + (chips ? ' has-rx' : '')} id={id} data-item data-seq={seq} data-reply="1" aria-label={author + ', ' + excerpt(plain(e.text), 60)}>
         {sameAsPrev ? (
           <span class="gutter" />
         ) : e.from.kind === 'agent' ? (
@@ -294,7 +301,7 @@ export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, fresh, li
         <div class="body">
           {!sameAsPrev && (
             <header>
-              <b>{name}</b>
+              <b>{author}</b>
               <When at={e.at} />
               {to.length > 0 && <span class="to">to {list(to)}</span>}
               {e.pinned && <Chip>pinned</Chip>}

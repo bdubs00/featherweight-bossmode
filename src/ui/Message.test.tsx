@@ -111,11 +111,25 @@ describe('the system lines', () => {
     expect(a.textContent).toBe('bridges/b-msg/plan.md');
     expect(a.getAttribute('href')).toBe('#pages/bridges/b-msg/plan.md');
   });
+
+  it('say the words of the page for their event, with the sentence of the backend in the tooltip', () => {
+    const text = (seq: number) => row(seq).querySelector('.sys-text')!;
+    expect(text(2).firstChild!.textContent).toBe('tester woke up');
+    expect(text(2).getAttribute('title')).toBeNull();
+    expect(text(3).firstChild!.textContent).toBe('writer failed');
+    expect(text(3).getAttribute('title')).toBe('writer failed: The run reached its limit of 40 turns.');
+    expect(text(5).firstChild!.textContent).toBe('migrator-1 changed a page');
+  });
 });
 
 describe('the messages', () => {
   it('name the addressees in words', () => {
     expect(row(7).querySelector('.to')!.textContent).toBe('to reviewer and tester');
+  });
+
+  it('name the person who reads the page You on a message of their own', () => {
+    expect(row(7).querySelector('header b')!.textContent).toBe('You');
+    expect(row(10).querySelector('header b')!.textContent).toBe('reviewer');
   });
 
   it('mark a pinned message with a quiet chip, and keep its header after a message of the same sender', () => {

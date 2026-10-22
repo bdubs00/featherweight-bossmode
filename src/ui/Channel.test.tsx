@@ -90,6 +90,38 @@ describe('the channel', () => {
     expect(el.querySelector('#entry-b-chan-8 .card')).not.toBeNull();
   });
 
+  it('leaves out the line of a decision whose card the channel holds, and words the other lines', async () => {
+    const D = 'b-dec';
+    const dec: Entry[] = [
+      sys(1, 'started', 'migrator-2 started: Migrate the nginx module. Read the plan with front.pages_read.'),
+      entryOf(2, { ...card(2, 'deny'), decision: { ...card(2, 'deny').decision!, decidedBy: 'token', note: 'No remote.' } }),
+      entryOf(3, { from: { kind: 'system' }, event: 'decided', text: 'the token of the fleet denied the call of migrator-2, with the note: No remote.', mirrors: { run: 'run-migrator-2', seq: 7, type: 'fw.approval.decided' } }),
+      entryOf(4, { from: { kind: 'system' }, event: 'decided', text: 'alice@example.com allowed the call of migrator-9.', mirrors: { run: 'run-migrator-9', seq: 4, type: 'fw.approval.decided' } }),
+      entryOf(5, { from: { kind: 'person', name: 'token' }, text: 'Push it.' }),
+      sys(6, 'asleep', 'migrator-2 went to sleep. A message wakes its Task.'),
+    ];
+    const g = fakeFetch([
+      ['GET', /^\/v1\/bridges\/b-dec$/, () => ({ ...bridgeOf(D, { lastSeq: 6, read: 6 }), members: [memberOf('migrator-2')] })],
+      ['GET', /^\/v1\/bridges\/b-dec\/messages/, () => ({ bridge: D, messages: dec, next: 0, prev: 0 })],
+      ['PUT', /\/read$/, () => null],
+    ]);
+    try {
+      act(() => {
+        store.dispatch({ type: 'me', me: { principal: { subject: 'token', kind: 'token' }, roles: {}, admin: false, canCreate: true } });
+        store.dispatch({ type: 'bridges', bridges: [bridgeOf(B, { title: 'Migrate the remaining Puppet modules', lastSeq: 9, read: 9 }), bridgeOf(D, { lastSeq: 6, read: 6 })] });
+      });
+      const el = mount(<Channel id={D} />);
+      await settle();
+      expect(el.querySelector('#entry-b-dec-3')).toBeNull();
+      expect(el.querySelector('#entry-b-dec-2 .decided p')!.firstChild!.textContent).toBe('You denied this');
+      const lines = [...el.querySelectorAll('.sys .sys-text')].map((x) => x.textContent);
+      expect(lines).toEqual(['migrator-2 took the seat', "alice allowed migrator-9's command", 'migrator-2 went to sleep']);
+      expect(el.querySelector('#entry-b-dec-5 header b')!.textContent).toBe('You');
+    } finally {
+      g.restore();
+    }
+  });
+
   it('says once that the seats run in waves', async () => {
     const el = mount(<Channel id={B} />);
     await settle();

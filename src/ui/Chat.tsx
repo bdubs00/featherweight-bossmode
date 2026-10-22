@@ -21,7 +21,7 @@ import { slashCommands } from '../state/people';
 import { runStatus } from '../lib/presence';
 import { go, hrefOf } from '../lib/route';
 import { parseSlash } from '../lib/mention';
-import { personName, since } from '../lib/words';
+import { since } from '../lib/words';
 import { answerSeqs, chatTitle, defaultTools, findChats, historyGroups, isQuickChat, lastSeq, newestFirst, startBody, toggle, toolId, usageParts, works } from '../lib/chat';
 import { isOn, skillOf } from '../lib/catalog';
 import { useRoving } from './keys';
@@ -397,7 +397,7 @@ function ChatRun({ chat, runId }: { chat: QuickChat; runId: string }) {
   const tail = (
     <>
       {sent && (
-        <Msg face={<Avatar subject={me} display={meName} size={32} />} name={personName(me, meName)}>
+        <Msg face={<Avatar subject={me} display={meName} size={32} />} name="You">
           <p class="tmsg-plain sending">{sent.text}</p>
         </Msg>
       )}

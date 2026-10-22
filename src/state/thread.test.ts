@@ -31,6 +31,15 @@ describe('the direct thread', () => {
     expect(directEntries(channel, 'migrator-1', ['run-m1']).map((e) => e.seq)).toEqual([2, 4, 5, 7, 8, 11]);
   });
 
+  it('leaves out the line of a decision whose card the thread holds', () => {
+    const decided: Entry[] = [
+      entry(1, 0, sys, 'migrator-1 wants to run a command.', { event: 'needs-you', decision: { run: 'run-m1', id: 'ap1', label: 'Run command', state: 'deny', decidedBy: 'token' } }),
+      entry(2, 1, sys, 'the token of the fleet denied the call of migrator-1.', { event: 'decided', mirrors: { run: 'run-m1', seq: 6, type: 'fw.approval.decided' } }),
+      entry(3, 2, sys, 'the token of the fleet allowed the call of migrator-1.', { event: 'decided', mirrors: { run: 'run-m1b', seq: 2, type: 'fw.approval.decided' } }),
+    ];
+    expect(directEntries(decided, 'migrator-1', ['run-m1', 'run-m1b']).map((e) => e.seq)).toEqual([1, 3]);
+  });
+
   it('leaves out a message to everyone, a message to another seat, and a line about a longer handle', () => {
     const seqs = directEntries(channel, 'migrator-1', ['run-m1']).map((e) => e.seq);
     expect(seqs).not.toContain(3);

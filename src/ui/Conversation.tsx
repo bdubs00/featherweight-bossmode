@@ -14,7 +14,7 @@ import type { Item, Result, Run } from '../api/types';
 import { store, useSelect } from '../state/store';
 import { stepsOf, type Step } from '../state/thread';
 import { decisionOf } from '../lib/decision';
-import { personName } from '../lib/words';
+import { whoName } from '../lib/lines';
 import { showError } from './notice';
 import { Markdown } from './common';
 import { DecisionCard } from './Decision';
@@ -165,8 +165,9 @@ export interface ConversationProps {
 
 export function Conversation(props: ConversationProps) {
   const { run, t } = props;
-  const me = useSelect((s) => (s.me && s.me.principal ? s.me.principal.subject : ''));
-  const meName = useSelect((s) => (s.me && s.me.principal ? s.me.principal.name : undefined));
+  const principal = useSelect((s) => (s.me ? s.me.principal : null));
+  const me = principal ? principal.subject : '';
+  const meName = principal ? principal.name : undefined;
   const agent = run ? run.agent : '';
   const pending = run ? decisionOf(run, props.result) : null;
   const blocks = blocksOf(t.items);
@@ -201,7 +202,7 @@ export function Conversation(props: ConversationProps) {
           case 'user': {
             const who = it.who || me;
             return (
-              <Msg face={<Avatar subject={who} display={who === me ? meName : undefined} size={32} />} name={personName(who, who === me ? meName : undefined)} at={it.time} compact={compact}>
+              <Msg face={<Avatar subject={who} display={who === me ? meName : undefined} size={32} />} name={whoName(who, principal)} at={it.time} compact={compact}>
                 <p class="tmsg-plain">{it.text}</p>
               </Msg>
             );
@@ -225,7 +226,7 @@ export function Conversation(props: ConversationProps) {
             prev = null;
             return (
               <Quiet tone={it.text === 'allow' ? 'green' : 'grey'} at={it.time}>
-                {personName(it.who)} {it.text === 'allow' ? 'allowed' : 'denied'} it{it.detail ? ': ' + it.detail : ''}
+                {whoName(it.who, principal)} {it.text === 'allow' ? 'allowed' : 'denied'} it{it.detail ? ': ' + it.detail : ''}
               </Quiet>
             );
           case 'note':

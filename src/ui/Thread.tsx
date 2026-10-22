@@ -12,6 +12,8 @@ import { sameSender } from '../state/thread';
 import { react } from '../state/actions';
 import { useSelect } from '../state/store';
 import { dayWords, personName } from '../lib/words';
+import { lineWords, whoName } from '../lib/lines';
+import { hrefOf } from '../lib/route';
 import type { Tone } from '../lib/presence';
 import { attempt } from './notice';
 import { InlineMarkdown, Markdown, When } from './common';
@@ -50,12 +52,14 @@ export function Msg(p: { face: ComponentChildren; name: string; at?: string; com
   );
 }
 
-/** Quiet is a quiet line in the middle of the thread: a system line or a step, with an optional light. */
-export function Quiet({ tone, at, err, children }: { tone?: Tone; at?: string; err?: boolean; children: ComponentChildren }) {
+/** Quiet is a quiet line in the middle of the thread: a system line or a step, with an optional light. title is the tooltip of its text. */
+export function Quiet({ tone, at, err, title, children }: { tone?: Tone; at?: string; err?: boolean; title?: string; children: ComponentChildren }) {
   return (
     <div class={'tline' + (err ? ' err' : '')}>
       {tone && <LineLed tone={tone} />}
-      <span class="tline-text">{children}</span>
+      <span class="tline-text" title={title}>
+        {children}
+      </span>
       {at && <When at={at} />}
     </div>
   );
@@ -173,10 +177,22 @@ const reacted = (e: Entry): boolean => KINDS.some((k) => ((e.reactions || {})[k]
 /** EntryMsg draws one entry of a bridge in a thread. */
 function EntryMsg({ bridge, e, prev, agentOf, handles, runHref }: { bridge: string; e: Entry; prev?: Entry; agentOf: (handle: string) => string; handles?: string[]; runHref?: string }) {
   const [heart, setHeart] = useState(false);
+  const me = useSelect((s) => (s.me ? s.me.principal : null));
   if (e.from.kind === 'system' && !e.decision) {
+    // The page words the line from its event, and keeps the sentence of the backend for the tooltip.
+    const w = lineWords(e, me);
+    const page = w.page || e.page;
     return (
-      <Quiet tone={eventTone(e.event)} at={e.at}>
-        <InlineMarkdown text={e.text} />
+      <Quiet tone={eventTone(e.event)} at={e.at} title={w.title}>
+        {w.raw ? <InlineMarkdown text={w.text} /> : w.text}
+        {page && (
+          <>
+            {' '}
+            <a class="sys-page" href={hrefOf({ place: 'pages', path: page, mode: 'read' })}>
+              {page}
+            </a>
+          </>
+        )}
       </Quiet>
     );
   }
@@ -189,7 +205,8 @@ function EntryMsg({ bridge, e, prev, agentOf, handles, runHref }: { bridge: stri
     );
   }
   const agent = e.from.kind === 'agent';
-  const name = agent ? e.from.handle || 'an agent' : personName(e.from.name, e.from.display);
+  // The author line of a message of the person who reads the page says You.
+  const name = agent ? e.from.handle || 'an agent' : whoName(e.from.name, me, e.from.display);
   const face = agent ? <Mark agent={agentOf(e.from.handle || '')} size={32} /> : <Avatar subject={e.from.name || ''} display={e.from.display} size={32} />;
   return (
     <Msg face={face} name={name} at={e.at} compact={sameSender(prev, e) && !e.pinned && !reacted(e)} id={'t-' + e.seq} tag={e.pinned ? <Chip>pinned</Chip> : undefined} corner={<Reactions bridge={bridge} e={e} onHeart={() => setHeart(true)} />}>

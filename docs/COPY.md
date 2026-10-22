@@ -255,6 +255,24 @@ Capacity shows where seating happens:
 | new | add | `pinned`, a quiet chip after the clock time of a pinned message, which keeps its header after a message of the same sender | done |
 | `Question from <who>`, `Permission for <who>` (labels) | change | `Question from <who>`, `Decision for <who>` | A |
 | system lines: the icon before the line | change | the light of the event: green for started, amber for needs you, red for failed, grey for the rest | A |
+| the sentence of the backend on a system line, such as `migrator-2 went to sleep. A message wakes its Task.` | change | the words of the page for the event of the line, from `lineWords` of `src/lib/lines.ts`, in the channel and in the thread of a seat. The sentence sits in a tooltip where the words leave part of it out. A line of an event that the page does not know keeps the sentence. | done |
+| `<handle> woke up` (started, for a worker that wakes again) | add | | done |
+| `<handle> took the seat` (any other started) | add | never the task | done |
+| `<handle> went to sleep` (asleep) | add | no second sentence | done |
+| `<by> allowed <handle>'s command`, `<by> denied <handle>'s command`, `<by> answered <handle>`, `<by> declined <handle>'s question`, `<by> decided` (decided) | add | only where the view does not hold the card that the line decides. The card shows the decision, and the note stays on the card. | done |
+| `<by> opened the bridge`, `<by> closed the bridge`, `<by> reopened the bridge`, `The bridge opened`, `The bridge closed`, `The bridge opened again` | add | | done |
+| `<by> seated <handle>` (joined) | add | the word of the key Seat | done |
+| `<by> fired <handle>`, `<handle> is fired` | add | | done |
+| `<by> muted <handle>`, `<by> unmuted <handle>`, `A member is muted` | add | | done |
+| `<handle> has a new task`, `<by> seated <handle> again` (task) | add | | done |
+| `The report is in the wiki` with the link of the page, `<by> changed the settings`, `<who> changed a page` with the link of the page, `No report`, `The bridge changed` (changed) | add | | done |
+| `<handle> finished` | add | | done |
+| `<handle> stopped`, `<by> stopped <handle>` (canceled) | add | the word of the key Stop | done |
+| `<handle> needs you`, `<handle> asks you` (a line of needs-you or asked without its card) | add | | done |
+| `<handle> failed`, `<handle> did not take the seat`, `<handle> did not get a message`, `<handle> did not stop`, `<handle> did not start`, `<handle> stopped waiting for its decision`, `The report failed`, `Failed` (failed) | add | | done |
+| `The bridge reached its cap of N messages`, `The bridge reached its cap of N a minute`, `<handle> stopped at a limit`, `<handle> cannot take messages`, `<a> and <b> reached their cap`, `The bridge reached a cap` (cap) | add | | done |
+| `You` (the author line of a message of the person who reads the page, the person of a line, and the line of a decided card) | add | the subject or the name of `/v1/whoami` matches the sender or the decider, so a person who signs in with the token of the fleet never reads `token` for themself | done |
+| `Someone`, `token` (a line whose sentence names nobody, or the token of the fleet for another person) | add | | done |
 
 ### src/ui/Decision.tsx
 

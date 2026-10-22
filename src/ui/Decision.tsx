@@ -9,7 +9,9 @@
 import { useState } from 'preact/hooks';
 import type { Decision } from '../api/types';
 import { formOf, type Field as SchemaField } from '../lib/schema';
-import { commandOf, decisionTitle, personName, rawInput, whyWords } from '../lib/words';
+import { commandOf, decisionTitle, rawInput, whyWords } from '../lib/words';
+import { whoName } from '../lib/lines';
+import { useSelect } from '../state/store';
 import { alwaysAllow, decide } from '../state/actions';
 import { attempt } from './notice';
 import { When } from './common';
@@ -62,6 +64,7 @@ function Details({ d, id }: { d: Decision; id: string }) {
  * decider, and a note that says why.
  */
 export function DecidedLine({ d }: { d: Decision }) {
+  const me = useSelect((s) => (s.me ? s.me.principal : null));
   if (d.state === 'unknown') {
     return d.note ? <p class="decided">{d.note}</p> : null;
   }
@@ -81,7 +84,7 @@ export function DecidedLine({ d }: { d: Decision }) {
       </div>
     );
   }
-  const who = personName(d.decidedBy);
+  const who = whoName(d.decidedBy, me);
   const q = !!d.question;
   const words = q ? (d.state === 'allow' ? `${who} answered: ${d.answer || ''}` : `${who} declined the question`) : d.state === 'allow' ? `${who} allowed this` : `${who} denied this`;
   return (

@@ -383,10 +383,11 @@ function decide(runId, approvalId, body, person) {
     const b = S.bridges.get(bid);
     const m = b.members.find((x) => x.runs.includes(runId));
     const who = m ? m.handle : run.agent;
-    const what = pending.input && pending.input.command ? '`' + pending.input.command + '`' : pending.tool;
+    // The line says what the backend says (decidedText of the bridges of the workbench).
+    const note = body.note ? ', with the note: ' + body.note : '';
     const line = question
-      ? decision === 'allow' ? `${person.name.toLowerCase()} answered the question of ${who}: ${words}.` : `${person.name.toLowerCase()} declined the question of ${who}.`
-      : `${person.name.toLowerCase()} ${decision === 'allow' ? 'allowed' : 'denied'} ${what} for ${who}${body.note ? ', with a note' : ''}.`;
+      ? decision === 'allow' ? `${person.name.toLowerCase()} answered the question of ${who}: ${words}.` : `${person.name.toLowerCase()} declined the question of ${who}${note}.`
+      : `${person.name.toLowerCase()} ${decision === 'allow' ? 'allowed' : 'denied'} the call of ${who}${note}.`;
     system(bid, 'decided', line, { mirrors: { run: runId, seq, type: 'fw.approval.decided' } });
     if (m) {
       setMember(bid, m, { presence: 'working', activity: run.activity });

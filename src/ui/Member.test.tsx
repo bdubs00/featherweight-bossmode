@@ -27,6 +27,8 @@ const ENTRIES: Entry[] = [
   { seq: 2, at: at(2), from: alice, to: ['migrator-1'], text: 'How far is cron?' },
   { seq: 3, at: at(3), from: { kind: 'agent', handle: 'migrator-1', run: 'run-migrator-1' }, to: [], text: 'The role lints clean.' },
   { seq: 4, at: at(4), from: { kind: 'agent', handle: 'reviewer', run: 'run-reviewer' }, to: ['migrator-2'], text: 'Push the branch.' },
+  { seq: 5, at: at(5), from: { kind: 'system' }, to: [], event: 'started', text: 'migrator-1 started: Migrate cron. Read the plan with front.pages_read.', mirrors: { run: 'run-migrator-1', seq: 1, type: 'fw.run.queued' } },
+  { seq: 6, at: at(6), from: { kind: 'system' }, to: [], event: 'asleep', text: 'migrator-1 went to sleep. A message wakes its Task.' },
 ];
 
 beforeEach(() => {
@@ -97,6 +99,12 @@ describe('the member conversation', () => {
     expect(log.textContent).not.toContain('Push the branch.');
     await vi.waitFor(() => expect(el.querySelector('.tline code')).not.toBeNull());
     expect(el.querySelector('.tline code')!.textContent).toBe('ansible-lint roles/cron');
+    // The lines say the words of the page, never the task, and the person reads You on a message of their own.
+    const texts = [...el.querySelectorAll('.tline-text')].map((x) => x.textContent);
+    expect(texts).toContain('migrator-1 took the seat');
+    expect(texts).toContain('migrator-1 went to sleep');
+    expect(log.textContent).not.toContain('Read the plan');
+    expect([...el.querySelectorAll('.tmsg-head b')].map((b) => b.textContent)).toEqual(['You', 'migrator-1']);
   });
 
   it('streams the answer of a seat that works into a pending message, and the finished answer of the channel takes its place', async () => {

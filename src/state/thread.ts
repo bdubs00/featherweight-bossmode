@@ -5,6 +5,7 @@
 
 import type { Entry, Item } from '../api/types';
 import { commandOf } from '../lib/words';
+import { decidedRuns, hiddenLine } from '../lib/lines';
 
 /** One quiet line for one tool call of a run, such as Ran "ls" or Created a/b.yml. */
 export interface Step {
@@ -35,17 +36,20 @@ function aboutHandle(text: string, handle: string): boolean {
  * directEntries keeps the entries of a channel that belong to the direct
  * thread of a seat: its messages, the messages addressed to it, the cards
  * of its runs, and the system lines of its runs or about its handle. A
- * message to everyone stays in the channel.
+ * message to everyone stays in the channel. A line that says a decision
+ * leaves the thread when the thread holds the card that shows it.
  */
 export function directEntries(entries: Entry[], handle: string, runs: string[]): Entry[] {
   const mine = new Set(runs);
-  return entries.filter((e) => {
+  const kept = entries.filter((e) => {
     if (e.from.kind === 'agent' && e.from.handle === handle) return true;
     if (e.from.kind !== 'system') return !!e.to && e.to.includes(handle);
     if (e.decision) return mine.has(e.decision.run);
     if (e.mirrors && mine.has(e.mirrors.run)) return true;
     return aboutHandle(e.text, handle);
   });
+  const decided = decidedRuns(kept);
+  return kept.filter((e) => !hiddenLine(e, decided));
 }
 
 /** stepOf words one tool call as a quiet line, without a tool name where it can. */

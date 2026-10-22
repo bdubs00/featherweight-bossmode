@@ -19,7 +19,6 @@ import { askManager, ended, loadAgentSkills, setManagerRun } from '../state/acti
 import { managerRunOf } from '../state/reducer';
 import { slashCommands } from '../state/people';
 import { parseSlash } from '../lib/mention';
-import { personName } from '../lib/words';
 import { attempt, showError } from './notice';
 import { Avatar } from './common';
 import { Button, Help, Led, Mark, PaneHeader } from './primitives';
@@ -115,7 +114,7 @@ export function Manager() {
   const tail = (
     <>
       {sent && (
-        <Msg face={<Avatar subject={me} display={meName} size={32} />} name={personName(me, meName)}>
+        <Msg face={<Avatar subject={me} display={meName} size={32} />} name="You">
           <p class="tmsg-plain sending">{sent.text}</p>
         </Msg>
       )}
