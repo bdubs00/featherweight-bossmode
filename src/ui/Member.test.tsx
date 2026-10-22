@@ -3,6 +3,7 @@ import { act } from 'preact/test-utils';
 import type { Entry } from '../api/types';
 import { store } from '../state/store';
 import { MemberMain } from './Member';
+import { currentNotice } from './notice';
 import { at, fakeFetch, mount, seedFleet, unmountAll, type Call } from './testkit-b';
 
 let calls: Call[] = [];
@@ -76,6 +77,17 @@ const type = (box: HTMLTextAreaElement, v: string) =>
   });
 
 describe('the member conversation', () => {
+  it('says in place that the run of a seat is gone, and raises no notice', async () => {
+    // The fake answers 404 for the transcript, the run, and the result of run-reviewer, as the front does after a worker that held the run was replaced.
+    const el = mount(<MemberMain bridge="b1" handle="reviewer" tab="run" />);
+    await vi.waitFor(() => expect(el.textContent).toContain('This run is gone.'));
+    expect(currentNotice()).toBe('');
+    const chat = mount(<MemberMain bridge="b1" handle="reviewer" tab="chat" />);
+    await vi.waitFor(() => expect(chat.textContent).toContain('Push the branch.'));
+    expect(chat.textContent).not.toContain('This run is gone.');
+    expect(currentNotice()).toBe('');
+  });
+
   it('has the halo of the status, the bridge, and the tabs Chat, Run, and Files with the count of files', async () => {
     const el = mount(<MemberMain bridge="b1" handle="migrator-1" tab="chat" />);
     const mark = el.querySelector('header .mark')!;

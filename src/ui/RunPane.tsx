@@ -23,7 +23,8 @@ export function useResult(runId: string): Result | null {
   const [res, setRes] = useState<Result | null>(null);
   useEffect(() => {
     setRes(null);
-    if (runId && !store.get().runs[runId]) api.run(runId).then((r) => store.dispatch({ type: 'run', run: r })).catch(showError);
+    // A run that the fleet does not hold shows no result and raises no notice.
+    if (runId && !store.get().runs[runId]) api.run(runId).then((r) => store.dispatch({ type: 'run', run: r })).catch(() => {});
   }, [runId]);
   const key = run ? run.state + '|' + (run.pending ? run.pending.id : '') + '|' + (run.output || '').length : '';
   useEffect(() => {
@@ -32,7 +33,7 @@ export function useResult(runId: string): Result | null {
     api
       .result(runId)
       .then((r) => live && setRes(r))
-      .catch(showError);
+      .catch(() => {});
     return () => {
       live = false;
     };
@@ -165,7 +166,7 @@ export function StopKey({ runId, who }: { runId: string; who: string }) {
 }
 
 /** RunView is the result of a run: the title, the status, the answer, what it did, the limits, and the reactions. */
-export function RunView({ runId, result, member, who, endSeq }: { runId: string; result: Result | null; member?: Member; who: string; endSeq?: number }) {
+export function RunView({ runId, result, member, who, endSeq, gone }: { runId: string; result: Result | null; member?: Member; who: string; endSeq?: number; gone?: boolean }) {
   const run = useSelect((s) => s.runs[runId]);
   const res = result;
   const phrase = member && member.presence === 'working' && member.activity ? member.activity.phrase : '';
@@ -173,8 +174,9 @@ export function RunView({ runId, result, member, who, endSeq }: { runId: string;
     <div class="run-view">
       <div class="run-head">
         <h3 class="t-heading">{(res && res.title) || (run && run.title) || 'The run'}</h3>
-        <StopKey runId={runId} who={who} />
+        {!gone && <StopKey runId={runId} who={who} />}
       </div>
+      {gone && <p class="run-note">This run is gone.</p>}
       <p class="run-status">
         {run && <Light light={runStatus(run)} />}
         {run && <When at={run.createdAt} />}

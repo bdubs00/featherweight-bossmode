@@ -3,6 +3,7 @@ import { act } from 'preact/test-utils';
 import { setToken } from '../api/client';
 import type { Entry } from '../api/types';
 import { App } from './App';
+import { showError } from './notice';
 import { at, bridge, fakeFetch, FLEET, mount, seat, unmountAll } from './testkit-b';
 
 // The whole page against a small fake backend. A relative link without #
@@ -92,5 +93,18 @@ describe('the links of the page', () => {
     const keys = [...document.querySelectorAll('a')].filter((a) => a.textContent === 'Add skill');
     expect(keys.length).toBeGreaterThan(0);
     for (const k of keys) expect(k.getAttribute('href')).toBe('#skills/add');
+  });
+});
+
+describe('the notice of a failed action', () => {
+  it('clears when the person moves to another screen', async () => {
+    const el = mount(<App />);
+    await vi.waitFor(() => expect(el.querySelector('.appbar, nav')).not.toBeNull());
+    await visit('#wiki');
+    act(() => showError(new Error('The save failed.')));
+    await vi.waitFor(() => expect(el.querySelector('[role=alert]')).not.toBeNull());
+    expect(el.querySelector('[role=alert]')!.textContent).toContain('The save failed.');
+    await visit('#fleet');
+    expect(el.querySelector('[role=alert]')).toBeNull();
   });
 });

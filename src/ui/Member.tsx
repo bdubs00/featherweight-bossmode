@@ -269,7 +269,7 @@ export function MemberMain({ bridge, handle, tab }: { bridge: string; handle: st
       {tab === 'chat' && <Chat bridge={bridge} m={m} items={t.items} closed={!!b && b.state === 'closed'} stopped={stopped} reason={reason} />}
       {tab === 'run' && (
         <div class="scroll">
-          {runId ? <RunView runId={runId} result={res} member={m} who={handle} endSeq={end ? end.seq : undefined} /> : <p class="run-note">{handle + ' has no seat on this bridge, or no run yet.'}</p>}
+          {runId ? <RunView runId={runId} result={res} member={m} who={handle} endSeq={end ? end.seq : undefined} gone={t.gone} /> : <p class="run-note">{handle + ' has no seat on this bridge, or no run yet.'}</p>}
         </div>
       )}
       {tab === 'files' && <div class="scroll">{runId && <FilesView runId={runId} result={res} />}</div>}

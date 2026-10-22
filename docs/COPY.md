@@ -144,6 +144,7 @@ Capacity shows where seating happens:
 | `Your access token did not work.` | keep | | Lead |
 | `The workbench did not answer. Check the connection and try again.` | keep | | Lead |
 | `The workbench answered with something that is not JSON.` | change | `The workbench answered with something that is not JSON. Reload the page.` | done |
+| the notice stays until Dismiss or the next action that works | change | the notice also clears when the person moves to another screen | done |
 
 ### src/lib/presence.ts
 
@@ -433,6 +434,7 @@ Capacity shows where seating happens:
 | `Took N steps` (a fold of three or more steps) | keep | | done |
 | `Load earlier messages` | change | `Earlier messages` | B |
 | `Loading the conversation.` | keep | | B |
+| new | add | `This run is gone.`, in place of a conversation whose run the fleet does not hold, as after a worker that held it was replaced. A read that the page starts on its own never raises the notice; the sentence of another failure shows in the same place. | done |
 
 ### src/ui/Member.tsx and src/ui/Board.tsx
 

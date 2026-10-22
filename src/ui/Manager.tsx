@@ -19,7 +19,7 @@ import { askManager, ended, loadAgentSkills, setManagerRun } from '../state/acti
 import { managerRunOf } from '../state/reducer';
 import { slashCommands } from '../state/people';
 import { parseSlash } from '../lib/mention';
-import { attempt, showError } from './notice';
+import { attempt } from './notice';
 import { Avatar } from './common';
 import { Button, Help, Led, Mark, PaneHeader } from './primitives';
 import { Composer } from './Composer';
@@ -80,7 +80,7 @@ export function Manager() {
   useEffect(() => {
     setRes(null);
     if (!runId || !pendingId) return;
-    api.result(runId).then(setRes).catch(showError);
+    api.result(runId).then(setRes).catch(() => {});
   }, [runId, pendingId]);
 
   const commands = useMemo(() => slashCommands(skills, loadable), [skills, loadable]);

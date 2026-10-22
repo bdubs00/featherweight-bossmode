@@ -20,6 +20,11 @@ export function showError(e: unknown): void {
   tell();
 }
 
+/** currentNotice is the sentence that the notice shows, or "" when it is hidden. */
+export function currentNotice(): string {
+  return text;
+}
+
 /** clearNotice hides the notice. */
 export function clearNotice(): void {
   if (!text) return;

@@ -171,6 +171,11 @@ export function App() {
     if (open) lastBridge = open;
   }, [open]);
 
+  // A notice tells of a failed action on the screen where it happened. It clears when the person moves to another screen.
+  useEffect(() => {
+    clearNotice();
+  }, [route]);
+
   // The theme of the deployment: its accent and its logo, or the defaults.
   useEffect(() => {
     applyTheme(themeOf(config));

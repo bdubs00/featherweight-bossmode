@@ -9,6 +9,7 @@
 
 import type { ComponentChildren } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { ApiError } from '../api/client';
 import { api } from '../api/routes';
 import type { Item, Result, Run } from '../api/types';
 import { store, useSelect } from '../state/store';
@@ -26,6 +27,10 @@ export interface TranscriptState {
   items: Item[];
   prev: number;
   loading: boolean;
+  /** True when the fleet holds no run of this id, as after a worker that held it was replaced. */
+  gone: boolean;
+  /** The sentence of a first read that failed for another reason. */
+  problem: string;
   earlier: () => Promise<void>;
 }
 
@@ -34,6 +39,8 @@ export function useTranscript(runId: string): TranscriptState {
   const [items, setItems] = useState<Item[]>([]);
   const [prev, setPrev] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [gone, setGone] = useState(false);
+  const [problem, setProblem] = useState('');
   const run = useSelect((s) => (runId ? s.runs[runId] : undefined));
   const last = useRef(0);
   const busy = useRef(false);
@@ -43,6 +50,8 @@ export function useTranscript(runId: string): TranscriptState {
     setItems([]);
     setPrev(0);
     setLoading(!!runId);
+    setGone(false);
+    setProblem('');
     last.current = 0;
     if (!runId) return;
     api
@@ -54,7 +63,12 @@ export function useTranscript(runId: string): TranscriptState {
         last.current = t.items.length ? t.items[t.items.length - 1].seq : 0;
         store.dispatch({ type: 'run', run: t.run });
       })
-      .catch(showError)
+      .catch((e) => {
+        // A read that the page starts on its own never raises the notice of the page: the view says it in place.
+        if (!live) return;
+        if (e instanceof ApiError && e.status === 404) setGone(true);
+        else setProblem(e instanceof Error && e.message ? e.message : 'The conversation did not load.');
+      })
       .finally(() => live && setLoading(false));
     return () => {
       live = false;
@@ -75,7 +89,9 @@ export function useTranscript(runId: string): TranscriptState {
           setItems((old) => [...old, ...fresh]);
         }
       })
-      .catch(showError)
+      .catch(() => {
+        // The next change of the run reads again.
+      })
       .finally(() => {
         busy.current = false;
       });
@@ -91,7 +107,7 @@ export function useTranscript(runId: string): TranscriptState {
       showError(e);
     }
   };
-  return { items, prev, loading, earlier };
+  return { items, prev, loading, gone, problem, earlier };
 }
 
 /** The time between two reads of a run that works. */
@@ -184,6 +200,8 @@ export function Conversation(props: ConversationProps) {
         </div>
       )}
       {t.loading && <p class="tline">Loading the conversation.</p>}
+      {t.gone && <p class="tline">This run is gone.</p>}
+      {t.problem && <p class="tline">{t.problem}</p>}
       {blocks.map((b) => {
         if (b.kind === 'steps') {
           prev = null;
