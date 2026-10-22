@@ -225,13 +225,14 @@ export function AgentChat({ agent }: { agent: string }) {
   const skills = useSelect((s) => (s.skills ? (s.skills.skills as SlashSkill[]) : null));
   const face = useSelect((s) => s.faces[agent]);
   const manager = config && config.manager && config.manager.agent === agent ? config.manager : null;
-  const [runId, setRunId] = useState(() => (manager && manager.run) || readRun(agent));
+  // The conversation of this tab comes first, then the newest one of the manager.
+  const [runId, setRunId] = useState(() => readRun(agent) || (manager ? manager.run : ''));
   const run = useSelect((s) => (runId ? s.runs[runId] : undefined));
   const res = useResult(runId);
   const t = useTranscript(runId);
   usePoll(runId);
   useEffect(() => {
-    setRunId((manager && manager.run) || readRun(agent));
+    setRunId(readRun(agent) || (manager ? manager.run : ''));
   }, [agent, manager && manager.run]);
   const w = workersOf(fleet, agent);
   const light = workerLight(w);
@@ -249,7 +250,7 @@ export function AgentChat({ agent }: { agent: string }) {
         const r = await api.start(member, { agent, input: text });
         store.dispatch({ type: 'run', run: r });
         setRunId(r.id);
-        if (!manager) keepRun(agent, r.id);
+        keepRun(agent, r.id);
         return;
       }
       const skill = parseSlash(text, names);
