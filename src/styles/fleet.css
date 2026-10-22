@@ -912,6 +912,13 @@ a.people-title:hover {
   .file {
     min-height: var(--h-row);
   }
+  a.people-title,
+  .prof-link,
+  .member-where a {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--h-row);
+  }
   .board-light {
     width: var(--h-row);
     height: var(--h-row);

@@ -3,7 +3,7 @@
 
 import type { JSX } from 'preact';
 
-export type GlyphBName = 'board' | 'list';
+export type GlyphBName = 'board';
 
 const G: Record<GlyphBName, JSX.Element> = {
   // A panel of nine lights, for the board.
@@ -18,17 +18,6 @@ const G: Record<GlyphBName, JSX.Element> = {
       <rect x="4" y="16" width="4" height="4" rx="1" />
       <rect x="10" y="16" width="4" height="4" rx="1" />
       <rect x="16" y="16" width="4" height="4" rx="1" />
-    </>
-  ),
-  // Three rows, each a mark and a line, for the people list.
-  list: (
-    <>
-      <rect x="3" y="4" width="4" height="4" rx="1" />
-      <path d="M10 6h11" />
-      <rect x="3" y="10" width="4" height="4" rx="1" />
-      <path d="M10 12h11" />
-      <rect x="3" y="16" width="4" height="4" rx="1" />
-      <path d="M10 18h11" />
     </>
   ),
 };
