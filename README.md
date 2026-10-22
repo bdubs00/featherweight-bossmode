@@ -34,7 +34,8 @@ the backend.
 `docs/DESIGN.md` is the plan of the look: the subject, the tokens, the
 layout at three widths, the primitives, and the screens of the next stage.
 `docs/COPY.md` audits every string of the page. `docs/shots/` holds
-screenshots of the shell against the fake server.
+screenshots of every screen against the fake server, in both themes and at
+three widths.
 
 The code of the look:
 
@@ -44,8 +45,7 @@ The code of the look:
 | `src/styles/fonts.css`, `base.css` | The typeface and the base styles |
 | `src/ui/primitives/` | The primitives, with `primitives.css` and their tests |
 | `src/ui/Shell.tsx`, `src/styles/shell.css` | The app bar and the three panes |
-| `src/styles/channel.css`, `fleet.css`, `wiki.css` | The styles of the screens, one file per screen of the next stage |
-| `src/styles/legacy.css` | The classes of the old screens, until each screen moves to the primitives |
+| `src/styles/channel.css`, `fleet.css`, `wiki.css` | The styles of the screens: the bridges, the fleet and the people, and what you make |
 
 ## Build
 
@@ -95,11 +95,13 @@ Variables of the fake server:
 | `FAKE_QUIET=1` | No timers |
 | `FAKE_TICK` | The time between two timer steps in milliseconds, 5000 by default |
 | `FAKE_STREAM_MS` | The life of one stream in milliseconds before the fake server closes it, 15 minutes by default, as the workbench does |
-| `FAKE_THEME=0` | `GET /v1/bossmode` carries no theme, so the page keeps its defaults |
+| `FAKE_THEME=0` | The theme of `GET /v1/bossmode` names no organization, as the theme of a deployment without one |
 | `FAKE_ACCENT` | The accent of the theme, `#FF4D00` by default |
 | `FAKE_ORG` | The name of the organization of the theme, Example Org by default |
 | `FAKE_LOGO=1` | The theme names a logo, served at `/v1/bossmode/logo` |
 | `FAKE_PARTIAL=1` | A card goes out on the stream without its input and its schema, as the backend can send it, so the page reads it again |
+| `FAKE_ADMIN=1` | `whoami` says that the person is an admin, who adds and removes skills |
+| `FAKE_A=1` | The sample data shows each state of the bridges screen: a seat that waits for a worker, a fired seat, folds, a card in the state unknown, a second open bridge, and a closed one |
 
 A sign-in at `/ui/signin?as=bob` signs you in as bob@example.com.
 
