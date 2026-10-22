@@ -44,9 +44,14 @@ export function forgetProfiles(): void {
  * profile of GET /v1/agents/{name} with the role of the person, else the
  * agent of the fleet, else null.
  */
+/** useFleetAgent is the agent of the fleet or of the front of that name, with no read. */
+export function useFleetAgent(name: string): Agent | undefined {
+  return useSelect((s) => (selectAgents(s) || []).find((a) => a.name === name) || (s.agents || []).find((a) => a.name === name));
+}
+
 export function useProfile(name: string): Agent | null | undefined {
   const [got, setGot] = useState<{ name: string; a: Agent | null } | null>(() => (cache.has(name) ? { name, a: cache.get(name) || null } : null));
-  const fleetEntry = useSelect((s) => (selectAgents(s) || []).find((a) => a.name === name) || (s.agents || []).find((a) => a.name === name));
+  const fleetEntry = useFleetAgent(name);
   useEffect(() => {
     if (!name) return;
     let live = true;

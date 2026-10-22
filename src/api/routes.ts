@@ -27,6 +27,7 @@ import type {
   ReactionKind,
   Result,
   Run,
+  RunEvent,
   SearchHit,
   SkillCall,
   SkillFile,
@@ -149,6 +150,8 @@ export const api = {
   transcript: (id: string, q: PageQuery = {}) =>
     call<Transcript>(run(id) + '/transcript' + query({ before: q.before, from: q.from, limit: q.limit || 200 })),
   file: (id: string, path: string) => call<FileView>(run(id) + '/files/' + encPath(path)),
+  /** events reads a page of the ledger of a run, from the seq from. The front sends the call to the member that holds the run. */
+  events: (id: string, from: number, limit: number) => call<{ events: RunEvent[] }>(run(id) + '/events' + query({ from, limit })).then((r) => (r && r.events) || []),
   start: (member: string, body: NewRun) => call<Run>('/v1/runs' + query({ member }), { method: 'POST', body }),
   /** fleetRuns lists the runs of the whole fleet that the caller can see, newest first, narrowed by agent and person. */
   fleetRuns: (q: { agent?: string; principal?: string; limit?: number }) =>

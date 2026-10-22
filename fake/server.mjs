@@ -980,6 +980,20 @@ on('POST', '/v1/runs', async (c) => {
   return run;
 });
 on('GET', '/v1/runs/([^/]+)', (c, id) => runOr404(id));
+// The first event of the ledger of a run, fw.run.queued, with the inline
+// profile of a quick chat, its extra tools, and the resolved profile. The
+// fake keeps no other event, so a later seq answers no event.
+on('GET', '/v1/runs/([^/]+)/events', (c, id) => {
+  const run = runOr404(id);
+  const from = Number(c.url.searchParams.get('from') || 1);
+  if (from > 1) return { run, events: [], lines: [] };
+  const chat = run.metadata && run.metadata['fw.view'] === 'quickchat';
+  const resolved = run.resolved || { model: 'model-large', tools: TOOLS_OF[run.agent] || [], skills: allowlistOf(run.agent), policy: run.agent === 'migrator' ? { ask: ['bash: git push*'] } : undefined };
+  const data = { agent: run.agent, input: run.input || '', origin: run.origin || 'http', resolved };
+  if (chat) data.profile = { tools: resolved.tools, skills: resolved.skills };
+  if (run.extraTools) data.extraTools = run.extraTools;
+  return { run, events: [{ specversion: '1.0', id: id + '-1', source: 'fake', type: 'fw.run.queued', time: run.createdAt, subject: id, seq: 1, data }], lines: [] };
+});
 on('GET', '/v1/runs/([^/]+)/result', (c, id) => {
   const r = runOr404(id);
   return { ...S.results.get(id), status: r.state === 'input-required' ? 'needs-you' : S.results.get(id).status };

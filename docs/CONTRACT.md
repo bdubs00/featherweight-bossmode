@@ -342,8 +342,18 @@ reads these fields of the run object:
   the kernel resolved when it queued the run. The kernel records it in
   `fw.run.queued` and does not put it in the run object yet. The page
   shows the model when the field is there, and names the tools and the
-  skills of a chat from it. Without it, the page names the picks that it
-  sent, else the lists of the agent. The fake server sends it.
+  skills of a chat from it. Without it, the page reads the first event of
+  the run, `GET /v1/runs/{id}/events?from=1&limit=1` with `Accept:
+  application/json`, which answers `{"run", "events", "lines"}`. The event
+  `fw.run.queued` holds `profile`, the inline profile of the request,
+  `extraTools`, and `resolved`, with `tools`, `skills`, `model`, and
+  `policy`. The front sends the call to the member that holds the run, and
+  the page reads the event once per run. The fake server sends `resolved`
+  in the run object and serves the event.
+- The profile of an agent that a pool runs comes from `GET
+  /v1/agents/{name}` (section 13). Where the front does not answer it, the
+  profile reads the tools and the rules from the first event of the newest
+  run of a seat of the agent, when that run has no inline profile.
 
 ### 7.2 Decisions
 

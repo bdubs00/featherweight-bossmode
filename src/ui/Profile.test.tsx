@@ -2,6 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'preact/test-utils';
 import { KeepField, Profile } from './Profile';
 import { fakeFetch, mount, seedFleet, unmountAll, type Call } from './testkit-b';
+import { forgetProfiles } from '../state/profiles';
+import { store } from '../state/store';
+import { forgetQueued } from '../state/queued';
 
 let calls: Call[] = [];
 let restore = () => {};
@@ -10,6 +13,8 @@ let restore = () => {};
 const POOL = { name: 'crew', wanted: 1, actual: 1, ready: 1, tasks: [{ name: 'crew-0', phase: 'Running' }, { name: 'crew-9', phase: 'Running', current: false }] };
 
 beforeEach(() => {
+  forgetProfiles();
+  forgetQueued();
   const f = fakeFetch([
     ['PATCH', /^\/v1\/pools\/crew$/, (b) => ({ ...POOL, wanted: (b as { replicas: number }).replicas })],
     ['GET', /^\/v1\/pools\/crew$/, () => POOL],
@@ -114,6 +119,42 @@ describe('the profile', () => {
     const el = mount(<Profile agent="reviewer" />);
     await new Promise((r) => setTimeout(r, 20));
     expect(el.querySelector('button[aria-label="More for workers"]')).toBeNull();
+  });
+
+  it('shows the tools of a profile that a pool runs as chips, a glob as written, beside the rules', async () => {
+    const g = fakeFetch([
+      // The profile of the workers of a pool carries its tools and no abilities.
+      ['GET', /^\/v1\/agents\/migrator$/, () => ({ name: 'migrator', role: 'owner', pool: 'crew', tools: ['bash', 'files', 'front.pages_*'], policy: { ask: ['bash: git push*'] } })],
+    ]);
+    try {
+      const el = mount(<Profile agent="migrator" />);
+      await vi.waitFor(() => expect(el.querySelectorAll('.prof-chips .prof-tool').length).toBe(3));
+      expect([...el.querySelectorAll('.prof-chips .chip')].map((c) => c.textContent)).toEqual(['bash', 'files', 'front.pages_*', 'asks before git push']);
+    } finally {
+      g.restore();
+    }
+  });
+
+  it('names the tools from the start of a run of a seat when the front does not answer the profile', async () => {
+    const g = fakeFetch([
+      ['GET', /^\/v1\/runs\/run-migrator-1\/events\?from=1&limit=1$/, () => ({ events: [{ seq: 1, type: 'fw.run.queued', data: { agent: 'migrator', resolved: { tools: ['front.bridge_read', 'front.bridge_post'], policy: { ask: ['bash: git push*'] } } } }] })],
+    ]);
+    try {
+      const el = mount(<Profile agent="migrator" />);
+      await vi.waitFor(() => expect(el.querySelectorAll('.prof-chips .prof-tool').length).toBe(2));
+      expect([...el.querySelectorAll('.prof-chips .chip')].map((c) => c.textContent)).toEqual(['front.bridge_read', 'front.bridge_post', 'asks before git push']);
+    } finally {
+      g.restore();
+    }
+  });
+
+  it('never cuts the name of a worker, and puts the seat that it serves last', async () => {
+    act(() => store.dispatch({ type: 'run', run: { id: 'run-migrator-1', agent: 'migrator', state: 'running', seq: 2, createdAt: '', updatedAt: '', member: 'default/crew-0' } }));
+    const el = mount(<Profile agent="migrator" />);
+    await vi.waitFor(() => expect(el.querySelectorAll('.workers li').length).toBe(2));
+    const row = el.querySelectorAll('.workers li')[0];
+    expect(row.querySelector('.worker-name')!.classList.contains('clip')).toBe(false);
+    expect([...row.children].map((c) => c.className.split(' ')[0])).toEqual(['worker-name', 'status', 'worker-who']);
   });
 
   it('offers Edit and New face to an owner only', () => {

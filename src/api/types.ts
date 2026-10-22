@@ -298,11 +298,32 @@ export interface RunUsage {
   unpricedTokens?: number;
 }
 
-/** The parts of the resolved profile of a run that the page shows. */
+/** The parts of the resolved profile of a run that the page shows. A list that is missing gives every tool or every skill. */
 export interface ResolvedProfile {
   model?: string;
   tools?: string[];
-  skills?: string[];
+  skills?: string[] | null;
+  policy?: Rules | null;
+}
+
+/**
+ * The data of fw.run.queued, the first event of a run, in part: the inline
+ * profile of the request, the tools that it gives beyond the list of the
+ * agent, and the profile that the kernel resolved when it queued the run.
+ */
+export interface QueuedData {
+  agent?: string;
+  profile?: InlineProfile | null;
+  extraTools?: string[];
+  resolved?: ResolvedProfile | null;
+}
+
+/** One event of the ledger of a run, from GET /v1/runs/{id}/events. */
+export interface RunEvent {
+  seq: number;
+  type: string;
+  time?: string;
+  data?: unknown;
 }
 
 /** An inline profile of a new run: a tool or skill list replaces the list of the agent for that run. */

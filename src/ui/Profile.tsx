@@ -11,7 +11,8 @@ import { ApiError } from '../api/client';
 import type { Pool, Today } from '../api/types';
 import { store, useSelect } from '../state/store';
 import { loadAgentSkills, loadFaces } from '../state/actions';
-import { useProfile } from '../state/profiles';
+import { useFleetAgent, useProfile } from '../state/profiles';
+import { namedProfileOf, useQueued } from '../state/queued';
 import { ensureRuns } from '../state/fetchers';
 import { likedOf, newestRun, parseKeep, policyRules, rulesOf, seatOnWorker, seatsOfAgent } from '../state/people';
 import { poolNameOf } from '../lib/workers';
@@ -181,10 +182,10 @@ function Workers({ agent, owner, pool, setPool }: { agent: string; owner: boolea
             const who = seat || (t.phase === 'Suspended' ? sleptAt(t.name) : '');
             return (
               <li>
-                <span class="worker-name clip">{t.name}</span>
+                <span class="worker-name">{t.name}</span>
                 <Led tone={light.tone} word={light.word} label={light.label} />
-                {who && <span class="worker-who clip">{who}</span>}
                 {t.current === false && <Chip>old setup</Chip>}
+                {who && <span class="worker-who clip">{who}</span>}
               </li>
             );
           })}
@@ -334,8 +335,21 @@ function EditFace({ agent, onDone }: { agent: string; onDone: (said: string) => 
 /** Profile is the profile of an agent. back is the conversation that a narrow window goes back to. */
 export function Profile({ agent, back }: { agent: string; back?: { href: string; label: string } }) {
   const face = useSelect((s) => s.faces[agent]);
-  // The profile of GET /v1/agents/{name}, else the agent of the fleet.
-  const info = useProfile(agent) || undefined;
+  // The profile of GET /v1/agents/{name}, else the agent of the fleet,
+  // which also stands in while the profile loads.
+  const read = useProfile(agent);
+  const stand = useFleetAgent(agent);
+  const info = read === undefined ? stand : read || undefined;
+  // A profile that a pool runs can come without its lists, where the front
+  // does not answer it. The start of a run of a seat then names the tools
+  // and the rules that the kernel resolved for the agent.
+  const bridges = useSelect((s) => s.bridges);
+  const rosters = useSelect((s) => s.rosters);
+  const seatRun = useMemo(() => {
+    const seat = seatsOfAgent({ bridges, rosters }, agent).find((x) => !!newestRun(x.member));
+    return seat ? newestRun(seat.member) : '';
+  }, [bridges, rosters, agent]);
+  const started = namedProfileOf(useQueued(read !== undefined && !(read && read.tools) ? seatRun : ''));
   const loadable = useSelect((s) => s.agentSkills[agent]);
   const runs = useSelect((s) => s.runs);
   const channels = useSelect((s) => s.channels);
@@ -352,10 +366,12 @@ export function Profile({ agent, back }: { agent: string; back?: { href: string;
     loadAgentSkills(agent).catch(() => {});
   }, [agent]);
   const owner = !!info && info.role === 'owner';
-  const toolNames = info && info.tools ? info.tools : [];
+  // The names of the tools as the profile writes them, a glob as written.
+  const toolNames = (info && info.tools) || (started && started.tools) || [];
+  const policy = (info && info.policy) || (started && started.policy) || null;
   const skillCount = loadable ? loadable.length : 0;
   // The rules of the profile, and the rules that its decisions named.
-  const rules = useMemo(() => [...new Set([...policyRules(info && info.policy), ...rulesOf(agent, runs, channels)])].sort(), [info, agent, runs, channels]);
+  const rules = useMemo(() => [...new Set([...policyRules(policy), ...rulesOf(agent, runs, channels)])].sort(), [policy, agent, runs, channels]);
   const upload = async () => {
     const f = file.current && file.current.files && file.current.files[0];
     if (!f) return;

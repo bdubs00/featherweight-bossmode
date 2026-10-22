@@ -622,15 +622,25 @@ a.people-title:hover {
 }
 .workers li {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--s-2);
+  column-gap: var(--s-2);
   min-width: 0;
 }
+/* The name of a worker is never cut: a name longer than the row breaks
+   inside it. The light and its word follow it, and the seat that it serves
+   comes last, takes the rest of the row, and may cut. */
 .worker-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.workers .status {
   flex: none;
-  width: 72px;
 }
 .worker-who {
+  flex: 1 1 64px;
+  min-width: 64px;
   color: var(--muted);
 }
 .worker-gaps {
