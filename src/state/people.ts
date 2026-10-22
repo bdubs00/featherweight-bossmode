@@ -3,7 +3,7 @@
 // the agents that sit on no bridge. Each row has a status: a light and its
 // word. The functions here are pure, so the tests read them without a page.
 
-import type { Agent, Bridge, Fleet, Member, Rules, Run, Skill, SkillCall } from '../api/types';
+import type { Agent, Bridge, Fleet, Member, Rules, Run, Skill } from '../api/types';
 import { whyWords } from '../lib/words';
 import { presenceOf, seatLight, type Light } from '../lib/presence';
 import { hrefOf } from '../lib/route';
@@ -228,12 +228,6 @@ export function slashCommands(skills: Skill[] | null | undefined, loadable: stri
     .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 }
 
-/** parseSlash reads a slash command at the start of a text: /name args. A name outside the list is plain text. */
-export function parseSlash(text: string, names: string[]): SkillCall | null {
-  const m = /^\/([A-Za-z0-9._-]+)(?:\s+([\s\S]*))?$/.exec(text.trim());
-  if (!m || !names.includes(m[1])) return null;
-  return { name: m[1], args: (m[2] || '').trim() };
-}
 
 /* ---------- the Keep field ---------- */
 

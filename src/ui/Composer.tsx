@@ -1,6 +1,8 @@
 // The composer: a text box with @ completion over the roster, a slash menu
 // of commands in a one-on-one conversation, a reply chip that slides in,
-// the address line, and Cmd or Ctrl+Enter to send. A draft stays in
+// the address line, and Cmd or Ctrl+Enter to send. The argument hint of a
+// command has a slot of its own: in the menu beside the name, and in the
+// address line while the person types the arguments. A draft stays in
 // sessionStorage, so a move to another screen, a reload, or a sign-in keeps
 // it.
 
@@ -49,9 +51,25 @@ export interface ComposerProps {
   onSend: (text: string, to: string[]) => Promise<boolean>;
   /**
    * The slash commands of a one-on-one conversation, such as the skills of
-   * the agent. A / at the start of the text opens the menu.
+   * the agent, each with the hint of its arguments, such as <module>. A /
+   * at the start of the text opens the menu.
    */
-  commands?: { name: string; description: string }[];
+  commands?: ComposerCommand[];
+}
+
+/** A slash command of the composer. */
+export interface ComposerCommand {
+  name: string;
+  description: string;
+  /** The argument hint of the front matter of the skill, such as <module>. */
+  hint?: string;
+}
+
+/** argHintOf is the command whose arguments the person types now: the text is the command and nothing more yet. */
+export function argHintOf(text: string, commands: Map<string, ComposerCommand>): ComposerCommand | null {
+  const m = /^\/([A-Za-z0-9._/-]+)\s*$/.exec(text);
+  const c = m ? commands.get(m[1]) : undefined;
+  return c && c.hint ? c : null;
 }
 
 /** addressWords is the address line of a bridge composer: "To everyone", or "To a and b". */
@@ -170,6 +188,7 @@ export function Composer(p: ComposerProps) {
 
   const listId = 'complete-' + p.draft;
   const hint = p.members ? addressWords(to) : '';
+  const typing = argHintOf(text, byCommand);
   return (
     <form
       class="composer"
@@ -210,6 +229,7 @@ export function Composer(p: ComposerProps) {
                     {comp.sigil || '@'}
                     {h}
                   </b>
+                  {c && c.hint && <code class="arg-hint">{c.hint}</code>}
                   {m && <small>{m.task}</small>}
                   {c && <small>{c.description}</small>}
                 </li>
@@ -240,7 +260,7 @@ export function Composer(p: ComposerProps) {
           onBlur={() => setTimeout(() => setComp(null), 120)}
         />
         <div class="tools">
-          <span class="address">{hint}</span>
+          <span class="address">{typing ? <code class="arg-hint">{'/' + typing.name + ' ' + typing.hint}</code> : hint}</span>
           <span class="keys" aria-hidden="true">
             {keyWords()}
           </span>

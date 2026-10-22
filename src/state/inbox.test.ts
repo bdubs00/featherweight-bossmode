@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Bridge, Entry, Member, Result, Run } from '../api/types';
 import type { Channel, Roster } from './reducer';
-import { decisionOf, inboxRows, keyAction, sortInbox, type InboxInput, type InboxRow } from './inbox';
+import { inboxRows, keyAction, sortInbox, type InboxInput, type InboxRow } from './inbox';
+import { decisionOf } from '../lib/decision';
 
 const at = (min: number) => new Date(Date.UTC(2026, 9, 21, 20, min)).toISOString();
 
@@ -88,11 +89,11 @@ describe('the inbox', () => {
 
   it('builds the decision from the run and its result, and prefers the card of the channel', () => {
     const s = input();
-    const d = decisionOf(s.runs['run-late'], undefined, s.results['run-late'])!;
+    const d = decisionOf(s.runs['run-late'], s.results['run-late'])!;
     expect([d.label, d.effect, d.question, d.reason]).toEqual(['Run command', 'Runs git push.', false, 'rule: ask bash: git push*']);
     expect(decisionOf(s.runs['run-asker'])!.question).toBe(true);
     const card: Entry = { seq: 9, at: at(9), from: { kind: 'system' }, text: '', decision: { run: 'run-late', id: 'a1', label: 'Push', state: 'pending', always: true } };
-    expect(decisionOf(s.runs['run-late'], card)!.label).toBe('Push');
+    expect(decisionOf(s.runs['run-late'], undefined, card)!.label).toBe('Push');
   });
 
   it('shows the newest message after the read mark that is not your own', () => {

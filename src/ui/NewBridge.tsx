@@ -6,12 +6,14 @@
 // can do. The record goes to POST /v1/bridges. A job for the manager goes to
 // the conversation of the manager, which opens the bridge with its tools.
 
-import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import type { Caps, Delegation, Placement } from '../api/types';
 import type { NewBridge as NewBridgeBody } from '../api/routes';
 import { useSelect } from '../state/store';
 import { askManager, loadAgents, openNewBridge } from '../state/actions';
 import { handleReason, nextHandle } from '../lib/handles';
+import { taskOfGoal } from './seats';
+import { Picker } from './Picker';
 import { go } from '../lib/route';
 import { attempt } from './notice';
 import { Advanced, Button, Choices, Field, IconButton, Input, Mark, PaneHeader, TextArea } from './primitives';
@@ -127,10 +129,11 @@ export function NewBridge() {
     delegation: { approve: false, budget: false, members: false, report: true },
   }));
   const [adv, setAdv] = useState(false);
+  const [picking, setPicking] = useState(false);
+  const addKey = useRef<HTMLButtonElement>(null);
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<ReturnType<typeof bridgeErrors> | null>(null);
   const first = useRef<HTMLTextAreaElement>(null);
-  const usable = useMemo(() => (agents || []).filter((a) => a.role === 'owner' || a.role === 'operator'), [agents]);
   const max = (config && config.maxMembers) || 16;
 
   useEffect(() => {
@@ -142,9 +145,10 @@ export function NewBridge() {
     setF((x) => ({ ...x, ...p }));
     if (errors) setErrors(null);
   };
-  const setGoal = (goal: string) => setF((x) => ({ ...x, goal, seats: x.seats.map((s) => (s.own ? s : { ...s, task: goal.trim().split('\n')[0] })) }));
+  // A seat takes its task from the first sentence of the goal, as a seat of the members pane does, until the person changes it.
+  const setGoal = (goal: string) => setF((x) => ({ ...x, goal, seats: x.seats.map((s) => (s.own ? s : { ...s, task: taskOfGoal(goal) })) }));
   const addSeat = (agent: string) =>
-    setF((x) => ({ ...x, seats: [...x.seats, { key: ++seatKey, agent, handle: nextHandle(agent, x.seats.map((s) => s.handle)), task: x.goal.trim().split('\n')[0], own: false }] }));
+    setF((x) => (x.seats.length >= max ? x : { ...x, seats: [...x.seats, { key: ++seatKey, agent, handle: nextHandle(agent, x.seats.map((s) => s.handle)), task: taskOfGoal(x.goal), own: false }] }));
   const setSeat = (key: number, p: Partial<SeatRow>) => setF((x) => ({ ...x, seats: x.seats.map((s) => (s.key === key ? { ...s, ...p } : s)) }));
 
   const submit = async (e: Event) => {
@@ -199,15 +203,7 @@ export function NewBridge() {
               <h2 class="field-label" id="seats-head">
                 {hasManager ? 'Add a seat' : 'Seats'}
               </h2>
-              <div class="agent-keys">
-                {usable.map((a) => (
-                  <Button size="s" disabled={f.seats.length >= max} onClick={() => addSeat(a.name)} title={a.description}>
-                    <Mark agent={a.name} size={20} />
-                    {a.name}
-                  </Button>
-                ))}
-                {agents && usable.length === 0 && <p class="t-meta">No agent yet.</p>}
-              </div>
+
               {f.seats.map((s) => (
                 <div class="seat">
                   <Mark agent={s.agent} size={32} />
@@ -230,6 +226,12 @@ export function NewBridge() {
                   <IconButton icon="close" label={'Remove ' + s.handle} onClick={() => setF((x) => ({ ...x, seats: x.seats.filter((y) => y.key !== s.key) }))} />
                 </div>
               ))}
+              <span class="pick-anchor">
+                <Button ref={addKey} size="s" aria-haspopup="dialog" aria-expanded={picking} disabled={f.seats.length >= max} onClick={() => setPicking(!picking)}>
+                  Add
+                </Button>
+                {picking && <Picker bridge="" drafts={f.seats.map((s) => s.agent)} draftHandles={f.seats.map((s) => s.handle)} onPick={addSeat} onClose={() => setPicking(false)} anchor={addKey} place="key" />}
+              </span>
               {err.seats && (
                 <span class="field-error" role="alert">
                   {err.seats}

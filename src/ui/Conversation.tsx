@@ -1,35 +1,23 @@
 // The conversation of a run, from GET /v1/runs/{id}/transcript, in the look
 // of the channel: a message of a person or of the agent with its face, its
 // name, and its clock time, a quiet step line for each tool call, a fold of
-// many steps, and the decision that waits as a card. The manager and an
-// agent that sits on no bridge talk in this conversation.
+// many steps, and the decision that waits as a card. The manager, the run
+// pane of a seat, and an agent that sits on no bridge talk in this one
+// conversation.
 
+import type { ComponentChildren } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
-import type { Decision, Item, Result, Run } from '../api/types';
+import type { Item, Result, Run } from '../api/types';
 import { store, useSelect } from '../state/store';
-import { stepOf, stepsOf, type Step } from '../state/thread';
+import { stepsOf, type Step } from '../state/thread';
+import { decisionOf } from '../lib/decision';
 import { personName } from '../lib/words';
 import { showError } from './notice';
 import { Markdown } from './common';
 import { DecisionCard } from './Decision';
 import { Avatar, Button, Mark } from './primitives';
 import { Msg, Quiet, StepText, StepsFold } from './Thread';
-
-/** phraseOf words one tool call as /ui does, without a tool name where it can. */
-export function phraseOf(it: Item): string {
-  const s = stepOf(it);
-  return s.cmd ? `${s.text} "${s.cmd}"` : s.text;
-}
-
-/** decisionOfRun builds the card of the decision that a run waits for. */
-export function decisionOfRun(run: Run, res?: Result | null): Decision | null {
-  const p = res && res.pending ? res.pending : null;
-  if (p) return { run: run.id, id: p.id, tool: p.tool, label: p.label, question: p.question, reason: p.reason, effect: p.effect, input: p.input, schema: p.schema, state: 'pending' };
-  const q = run.pending;
-  if (!q) return null;
-  return { run: run.id, id: q.id, tool: q.tool, label: q.schema ? 'Answer' : 'Allow', question: !!q.schema, reason: q.reason, input: q.input, schema: q.schema, state: 'pending' };
-}
 
 export interface TranscriptState {
   items: Item[];
@@ -103,26 +91,32 @@ export function useTranscript(runId: string): TranscriptState {
   return { items, prev, loading, earlier };
 }
 
+/** The time between two reads of a run that works. */
+export const POLL_MS = 3000;
+
 /**
- * usePoll reads a run again every few seconds while it works. A run of the
+ * usePoll reads a run again every POLL_MS while it works, and while also
+ * is true, such as while an answer to a message is on its way. A run of the
  * front itself, such as a manager on the front, sends no run event on the
- * stream, so its conversation polls it while it is open.
+ * stream, so its conversation polls it while it is open. A hidden tab
+ * skips a read.
  */
-export function usePoll(runId: string, every = 3000): void {
+export function usePoll(runId: string, also = false): void {
   const state = useSelect((s) => (runId && s.runs[runId] ? s.runs[runId].state : ''));
-  const active = !!runId && !['completed', 'failed', 'canceled', 'input-required'].includes(state);
+  const active = !!runId && (also || !['completed', 'failed', 'canceled', 'input-required'].includes(state));
   useEffect(() => {
     if (!active) return;
     const t = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
       api
         .run(runId)
         .then((r) => store.dispatch({ type: 'run', run: r }))
         .catch(() => {
           // A missed poll waits for the next one.
         });
-    }, every);
+    }, POLL_MS);
     return () => clearInterval(t);
-  }, [runId, active, every]);
+  }, [runId, active]);
 }
 
 type Block = { kind: 'item'; it: Item } | { kind: 'steps'; steps: Step[] };
@@ -162,6 +156,8 @@ export interface ConversationProps {
   onDecide?: () => void;
   /** Text that a live stream sends for the answer that is not finished. It grows the last answer, or starts one. */
   live?: string;
+  /** What follows the last item, such as the message on its way and the status of its answer. */
+  tail?: ComponentChildren;
 }
 
 export function Conversation(props: ConversationProps) {
@@ -169,7 +165,7 @@ export function Conversation(props: ConversationProps) {
   const me = useSelect((s) => (s.me && s.me.principal ? s.me.principal.subject : ''));
   const meName = useSelect((s) => (s.me && s.me.principal ? s.me.principal.name : undefined));
   const agent = run ? run.agent : '';
-  const pending = run ? decisionOfRun(run, props.result) : null;
+  const pending = run ? decisionOf(run, props.result) : null;
   const blocks = blocksOf(t.items);
   const lastItem = [...blocks].reverse().find((b) => b.kind === 'item');
   const liveOnLast = !!props.live && !!lastItem && lastItem.kind === 'item' && lastItem.it.kind === 'assistant';
@@ -240,10 +236,12 @@ export function Conversation(props: ConversationProps) {
               </Quiet>
             );
           case 'end':
+            // The end of a turn says nothing that the answer above it does not, unless the turn failed.
+            if (!it.isError) return null;
             prev = null;
             return (
-              <Quiet tone={it.isError ? 'red' : 'grey'} at={it.time} err={it.isError}>
-                {it.isError ? 'The turn failed' : 'The turn ended'}
+              <Quiet tone="red" at={it.time} err>
+                The turn failed
               </Quiet>
             );
         }
@@ -259,6 +257,7 @@ export function Conversation(props: ConversationProps) {
           <Markdown text={props.live} />
         </Msg>
       )}
+      {props.tail}
     </div>
   );
 }

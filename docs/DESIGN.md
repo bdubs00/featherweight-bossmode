@@ -468,8 +468,8 @@ page works end to end from the start.
 6. A fake route goes in your file `fake/routes-<a|b|c>.mjs`. It gets the
    helpers of `fake/server.mjs` through `register`.
 7. As a file of yours moves to the primitives, it drops the classes of
-   `src/styles/legacy.css`. Once no screen uses that file, the lead removes
-   it.
+   the old screens. The lead removed `src/styles/legacy.css` once no screen
+   used it.
 8. Tests sit beside your files. `npm run build` and `npm test` pass before
    each commit.
 9. A change to a route, to the panes of a route, or to a shared file goes in

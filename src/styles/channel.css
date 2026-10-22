@@ -628,6 +628,12 @@
   font-size: var(--t-meta);
   color: var(--muted);
 }
+/* The argument hint of a command, such as <module>: in the menu beside the name, and in the address line. */
+.arg-hint {
+  flex: none;
+  font-size: var(--t-code);
+  color: var(--muted);
+}
 
 /* ---------- the tabs Wiki and Decisions ---------- */
 .tab-list {
@@ -808,6 +814,20 @@
   background: var(--card);
   box-shadow: var(--e-overlay);
   overflow: hidden;
+}
+/* Below the key Add of the new-bridge screen, the picker opens under its key. */
+.pick-anchor {
+  position: relative;
+  display: inline-flex;
+  align-self: flex-start;
+}
+.picker.picker-key {
+  top: calc(100% + 4px);
+  right: auto;
+  left: 0;
+  width: 316px;
+  max-width: calc(100vw - 32px);
+  max-height: 420px;
 }
 .pick-search {
   flex: none;

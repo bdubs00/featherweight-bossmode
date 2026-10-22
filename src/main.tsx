@@ -9,7 +9,6 @@ import './styles/tokens.css';
 import './styles/base.css';
 import './styles/primitives.css';
 import './styles/shell.css';
-import './styles/legacy.css';
 import './styles/channel.css';
 import './styles/fleet.css';
 import './styles/wiki.css';

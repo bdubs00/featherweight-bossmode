@@ -5,8 +5,11 @@
 // picker stays open for another add. Advanced opens the full form, and New
 // agent opens the screen that makes one.
 //
-// The picker is a layer over the members pane. Escape and a click outside
-// close it, and the focus goes back to the key Add.
+// The picker is a layer over the members pane, or below the key Add of the
+// new-bridge screen, for a bridge that does not exist yet. There the seats
+// of the form are the agents on this bridge, and the form holds its own
+// Advanced. Escape and a click outside close it, and the focus goes back to
+// the key Add.
 
 import type { JSX, RefObject } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
@@ -19,6 +22,7 @@ import { freeWords, pickGroups, seatReason, taskOfGoal, type PickRow } from './s
 import { Button, Field, Find, GrooveBand, Input, Led, Mark, TextArea } from './primitives';
 
 export interface PickerProps {
+  /** The bridge of the seats, or "" for a bridge that the new-bridge screen opens. */
   bridge: string;
   /** The agents of the new seats that wait in the members pane. */
   drafts: string[];
@@ -30,6 +34,8 @@ export interface PickerProps {
   anchor: RefObject<HTMLElement>;
   /** The height of the new seat rows, which the picker sits below. */
   below?: number;
+  /** pane: a layer at the top of the members pane. key: a layer below the key Add. */
+  place?: 'pane' | 'key';
 }
 
 function Row({ r, onPick }: { r: PickRow; onPick: (agent: string) => void }) {
@@ -113,7 +119,7 @@ function Advanced({ bridge, agents, taken, onDone }: { bridge: string; agents: P
   );
 }
 
-export function Picker({ bridge, drafts, draftHandles, onPick, onClose, anchor, below = 0 }: PickerProps) {
+export function Picker({ bridge, drafts, draftHandles, onPick, onClose, anchor, below = 0, place = 'pane' }: PickerProps) {
   const agents = useSelect((s) => s.agents);
   const faces = useSelect((s) => s.faces);
   const roster = useSelect((s) => s.rosters[bridge]);
@@ -122,9 +128,10 @@ export function Picker({ bridge, drafts, draftHandles, onPick, onClose, anchor, 
   const [mode, setMode] = useState<'list' | 'advanced'>('list');
   const panel = useRef<HTMLDivElement>(null);
   const field = useRef<HTMLInputElement>(null);
-  const seats = useMemo(() => membersOf(roster), [roster]);
+  // A bridge that does not exist yet has the seats of the form.
+  const seats = useMemo(() => (bridge ? membersOf(roster) : drafts.map((agent) => ({ agent, fired: false }))), [bridge, roster, drafts]);
   const groups = useMemo(() => pickGroups(agents || [], faces, seats, fleet, query, drafts), [agents, faces, seats, fleet, query, drafts]);
-  const taken = useMemo(() => [...seats.map((m) => m.handle), ...draftHandles], [seats, draftHandles]);
+  const taken = useMemo(() => [...membersOf(roster).map((m) => m.handle), ...draftHandles], [roster, draftHandles]);
   const all = useMemo(() => pickGroups(agents || [], faces, seats, fleet, '', drafts), [agents, faces, seats, fleet, drafts]);
 
   useEffect(() => {
@@ -169,7 +176,7 @@ export function Picker({ bridge, drafts, draftHandles, onPick, onClose, anchor, 
 
   const none = groups.here.length === 0 && groups.others.length === 0;
   return (
-    <div class="picker" role="dialog" aria-label="Add" ref={panel} onKeyDown={onKey} style={below ? { top: `calc(var(--h-header) + var(--groove) + ${below + 2}px)`, maxHeight: `calc(100% - var(--h-header) - var(--groove) - ${below + 18}px)` } : undefined}>
+    <div class={'picker' + (place === 'key' ? ' picker-key' : '')} role="dialog" aria-label="Add" ref={panel} onKeyDown={onKey} style={below && place === 'pane' ? { top: `calc(var(--h-header) + var(--groove) + ${below + 2}px)`, maxHeight: `calc(100% - var(--h-header) - var(--groove) - ${below + 18}px)` } : undefined}>
       <GrooveBand on="card" />
       {mode === 'list' ? (
         <>
@@ -214,9 +221,13 @@ export function Picker({ bridge, drafts, draftHandles, onPick, onClose, anchor, 
             {none && agents && <div class="pick-none" />}
           </div>
           <div class="pick-foot">
-            <button type="button" class="pick-link" onClick={() => setMode('advanced')}>
-              Advanced
-            </button>
+            {bridge ? (
+              <button type="button" class="pick-link" onClick={() => setMode('advanced')}>
+                Advanced
+              </button>
+            ) : (
+              <span />
+            )}
             <a class="pick-link" href="#new-agent">
               New agent
             </a>

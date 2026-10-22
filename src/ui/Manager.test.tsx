@@ -3,8 +3,9 @@ import { act } from 'preact/test-utils';
 import { store } from '../state/store';
 import { forgetManagerRun } from '../state/actions';
 import type { BossConfig, Item, Run } from '../api/types';
-import { Manager, POLL_MS, slashOf } from './Manager';
-import { appendDelta, threadOf } from './ManagerThread';
+import { Manager, POLL_MS } from './Manager';
+import { blocksOf } from './Conversation';
+import { parseSlash } from '../lib/mention';
 import { click, fakeApi, keyNamed, mount, settle, typeIn, unmountAll } from './testkit-c';
 
 const CONFIG: BossConfig = { manager: { agent: 'manager', member: 'default/manager-0', run: 'run-m' }, placement: 'queue', maxMembers: 16 };
@@ -24,7 +25,8 @@ beforeEach(() => {
   act(() => {
     store.dispatch({ type: 'config', config: CONFIG });
     store.dispatch({ type: 'me', me: { principal: { subject: 'alice@example.com' }, roles: {}, admin: false, canCreate: true } });
-    store.dispatch({ type: 'skills', skills: { skills: [{ name: 'ansible-style', description: 'Write roles.', origin: 'imported' }] } });
+    store.dispatch({ type: 'skills', skills: { skills: [{ name: 'ansible-style', description: 'Write roles.', origin: 'imported', argumentHint: '<role>' }] } });
+    store.dispatch({ type: 'agent-skills', agent: 'manager', skills: ['ansible-style'] });
   });
 });
 afterEach(() => {
@@ -55,7 +57,9 @@ describe('the manager', () => {
     });
     await settle();
     expect(runReads()).toBe(2);
-    expect([...el.querySelectorAll('.mmsg .md')].map((m) => m.textContent!.trim())).toEqual(['Two bridges are open.']);
+    expect([...el.querySelectorAll('.tmsg .md')].map((m) => m.textContent!.trim())).toEqual(['Two bridges are open.']);
+    // The end of a turn that did not fail says nothing.
+    expect(el.textContent).not.toContain('The turn ended');
     expect(el.querySelector('[role="status"] .status')).toBeNull();
     // The run completed and nothing waits, so the poll stops.
     await act(async () => {
@@ -112,7 +116,7 @@ describe('the manager', () => {
     const el = mount(<Manager />);
     await settle();
     click(keyNamed(el, 'New conversation'));
-    expect(el.querySelector('.mthread-empty')!.textContent).toBe('Ask about the fleet, or ask for a bridge.');
+    expect(el.querySelector('.thread-empty')!.textContent).toBe('Ask about the fleet, or ask for a bridge.');
     typeIn(el.querySelector('#composer'), 'Hello');
     click(keyNamed(el, 'Send'));
     await settle();
@@ -133,7 +137,7 @@ describe('the manager', () => {
 });
 
 describe('the thread', () => {
-  it('folds the tool calls between two messages, and a stream can append to the last answer', () => {
+  it('folds the tool calls between two messages into one block of steps', () => {
     const items: Item[] = [
       ASK,
       { seq: 2, time: T, kind: 'tool', tool: 'bash', callId: 'c1', input: { command: 'ls' } },
@@ -141,18 +145,27 @@ describe('the thread', () => {
       { seq: 4, time: T, kind: 'tool', tool: 'front.fleet', callId: 'c2' },
       { seq: 5, time: T, kind: 'assistant', text: 'Two' },
     ];
-    const t = threadOf(items, 'manager');
-    expect(t.map((e) => e.kind)).toEqual(['msg', 'steps', 'msg']);
-    expect(t[1].kind === 'steps' && t[1].steps.map((s) => s.phrase)).toEqual(['Ran "ls"', 'Used fleet']);
-    const more = appendDelta(t, ' bridges are open.', 'manager', T);
-    expect(more[2].kind === 'msg' && more[2].text).toBe('Two bridges are open.');
-    expect(more[0]).toBe(t[0]);
-    expect(appendDelta(t.slice(0, 2), 'Hi', 'manager', T).length).toBe(3);
+    const blocks = blocksOf(items);
+    expect(blocks.map((b) => b.kind)).toEqual(['item', 'steps', 'item']);
+    expect(blocks[1].kind === 'steps' && blocks[1].steps.map((x) => x.cmd || x.text)).toEqual(['ls', 'Used fleet']);
   });
 
-  it('reads a slash command of a known skill', () => {
-    expect(slashOf('/ansible-style roles/nginx', ['ansible-style'])).toEqual({ name: 'ansible-style', args: 'roles/nginx' });
-    expect(slashOf('/unknown x', ['ansible-style'])).toBeNull();
-    expect(slashOf('plain words', ['ansible-style'])).toBeNull();
+  it('reads a slash command of a known skill, also the skill of a server', () => {
+    expect(parseSlash('/ansible-style roles/nginx', ['ansible-style'])).toEqual({ name: 'ansible-style', args: 'roles/nginx' });
+    expect(parseSlash('/docs/quote the rule', ['docs/quote'])).toEqual({ name: 'docs/quote', args: 'the rule' });
+    expect(parseSlash('/unknown x', ['ansible-style'])).toBeNull();
+    expect(parseSlash('plain words', ['ansible-style'])).toBeNull();
+  });
+
+  it('offers the skills of the manager with the hint of their arguments in a slot of its own', async () => {
+    api = fakeApi({ 'GET /v1/runs/run-m/transcript': { run: run('completed', 3), items: [ASK, ...ANSWER], next: 0, prev: 0 } });
+    const el = mount(<Manager />);
+    await settle();
+    typeIn(el.querySelector('#composer'), '/');
+    const option = el.querySelector('[role="option"]')!;
+    expect(option.querySelector('b')!.textContent).toBe('/ansible-style');
+    expect(option.querySelector('.arg-hint')!.textContent).toBe('<role>');
+    typeIn(el.querySelector('#composer'), '/ansible-style ');
+    expect(el.querySelector('.composer .address .arg-hint')!.textContent).toBe('/ansible-style <role>');
   });
 });

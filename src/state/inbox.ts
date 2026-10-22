@@ -6,6 +6,7 @@
 import type { Bridge, Decision, Entry, Member, Result, Run } from '../api/types';
 import type { Channel, Roster } from './reducer';
 import { newestRun } from './people';
+import { decisionOf } from '../lib/decision';
 
 export type InboxKind = 'decision' | 'question' | 'failed' | 'stopped' | 'message';
 
@@ -55,31 +56,6 @@ function cardOf(ch: Channel | undefined, run: string, id: string): Entry | undef
   return undefined;
 }
 
-/**
- * decisionOf builds the decision that a run waits for: the card of the
- * channel when the page holds it, else the pending call of the run with the
- * label and the effect of its result.
- */
-export function decisionOf(run: Run, card?: Entry, res?: Result | null): Decision | null {
-  if (card && card.decision && card.decision.state === 'pending') return card.decision;
-  const p = run.pending;
-  if (!p) return null;
-  const rp = res && res.pending && res.pending.id === p.id ? res.pending : null;
-  const question = !!(p.schema || (rp && (rp.question || rp.schema)));
-  return {
-    run: run.id,
-    id: p.id,
-    tool: p.tool,
-    label: (rp && rp.label) || (question ? 'Answer' : 'Allow'),
-    question,
-    reason: p.reason || (rp ? rp.reason : undefined),
-    effect: rp ? rp.effect : undefined,
-    input: p.input !== undefined ? p.input : rp ? rp.input : undefined,
-    schema: p.schema !== undefined ? p.schema : rp ? rp.schema : undefined,
-    state: 'pending',
-  };
-}
-
 /** reasonOf says why the newest run of a seat stopped, in one line. */
 export function reasonOf(run: Run | undefined, res: Result | undefined): string {
   if (res && res.limits && res.limits.length) return res.limits[0];
@@ -114,7 +90,7 @@ export function inboxRows(s: InboxInput): InboxRow[] {
       const run = s.runs[id];
       const base = { bridge: b.id, bridgeTitle: b.title, handle: m.handle, agent: m.agent, run: id };
       if (m.presence === 'needs-you' && run && run.state === 'input-required' && run.pending) {
-        const d = decisionOf(run, cardOf(s.channels[b.id], run.id, run.pending.id), s.results[run.id]);
+        const d = decisionOf(run, s.results[run.id], cardOf(s.channels[b.id], run.id, run.pending.id));
         if (d) {
           rows.push({ ...base, key: 'd:' + run.id + '/' + d.id, kind: d.question || d.schema ? 'question' : 'decision', status: 'needs-you', decision: d, at: run.pending.requestedAt || run.updatedAt });
           continue;

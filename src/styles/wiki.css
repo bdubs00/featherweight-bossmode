@@ -174,6 +174,9 @@ button.group-head > .clip {
   max-width: 680px;
 }
 .make fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
   margin: 0;
   padding: 0;
   border: 0;
@@ -320,93 +323,6 @@ a.vrow:hover {
 }
 
 /* ---------- the manager ---------- */
-.mthread {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s-4);
-  padding: var(--s-4) var(--s-5) var(--s-5);
-}
-.mmsg {
-  display: grid;
-  grid-template-columns: 32px minmax(0, 1fr);
-  gap: var(--s-3);
-}
-.mmsg-who {
-  display: flex;
-  align-items: baseline;
-  gap: var(--s-2);
-  min-width: 0;
-}
-.mmsg time {
-  font-size: var(--t-meta);
-  color: var(--muted);
-}
-.mmsg .md,
-.mmsg .plain {
-  max-width: 72ch;
-}
-.mmsg .plain {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-.mmsg.sending .plain {
-  color: var(--muted);
-}
-.mmsg > .mmsg-who {
-  align-self: center;
-}
-.mline {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: var(--s-2);
-  font-size: var(--t-meta);
-  line-height: var(--t-meta-lh);
-  color: var(--muted);
-  text-align: center;
-}
-.mline time {
-  color: var(--muted);
-}
-.mline .status {
-  white-space: normal;
-  text-align: left;
-}
-.talk {
-  display: flex;
-  flex-direction: column;
-}
-.msteps {
-  align-self: center;
-  max-width: 560px;
-  font-size: var(--t-meta);
-  line-height: var(--t-meta-lh);
-  color: var(--muted);
-}
-.msteps > summary {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--s-2);
-  min-height: var(--h-small);
-  cursor: pointer;
-  list-style: none;
-}
-.msteps > summary::-webkit-details-marker {
-  display: none;
-}
-.msteps ol {
-  margin: var(--s-1) 0 0;
-  padding-left: 22px;
-}
-.mthread .card {
-  margin-left: calc(32px + var(--s-3));
-}
-.mthread-empty {
-  margin: auto;
-  padding: var(--s-6) var(--s-5);
-  text-align: center;
-  color: var(--muted);
-}
 .manager .pane-head .status {
   margin-left: var(--s-1);
 }
@@ -458,14 +374,6 @@ a.vrow:hover {
 .seat-handle .input {
   max-width: 200px;
   min-height: var(--h-small);
-}
-.agent-keys {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--s-2);
-}
-.agent-keys .key .mark {
-  margin-left: -6px;
 }
 .workers-out {
   display: flex;
@@ -718,15 +626,11 @@ code.slash {
 @media (pointer: coarse) {
   .sp-head,
   .sp-row,
-  .msteps > summary,
   .conflict details > summary {
     min-height: var(--h-row);
   }
 }
 @media (max-width: 799px) {
-  .mthread {
-    padding: var(--s-4);
-  }
   .avenues {
     padding: 0 var(--s-4);
   }

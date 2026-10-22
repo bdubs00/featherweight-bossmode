@@ -10,7 +10,6 @@ import {
   firstPerson,
   likedOf,
   parseKeep,
-  parseSlash,
   peopleCount,
   peopleOf,
   rulesOf,
@@ -21,6 +20,7 @@ import {
   workerLight,
   type PeopleInput,
 } from './people';
+import { parseSlash } from '../lib/mention';
 import { workersOf } from '../lib/workers';
 
 const bridge = (id: string, title: string, state: 'open' | 'closed' = 'open'): Bridge => ({

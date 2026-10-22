@@ -85,9 +85,10 @@ export function mentionsIn(text: string, handles: string[]): string[] {
 export function slashAt(text: string, caret: number, names: string[]): Completion | null {
   if (caret < 1 || caret > text.length || text[0] !== '/') return null;
   const word = text.slice(1, caret);
-  if (!/^[A-Za-z0-9._-]*$/.test(word)) return null;
+  // A skill of a server is named <server>/<name>, so a command can hold a slash.
+  if (!/^[A-Za-z0-9._/-]*$/.test(word)) return null;
   let end = caret;
-  while (end < text.length && HANDLE.test(text[end])) end++;
+  while (end < text.length && /[A-Za-z0-9._/-]/.test(text[end])) end++;
   const q = word.toLowerCase();
   const starts = names.filter((n) => n.toLowerCase().startsWith(q));
   const inside = q ? names.filter((n) => !n.toLowerCase().startsWith(q) && n.toLowerCase().includes(q)) : [];
@@ -95,3 +96,21 @@ export function slashAt(text: string, caret: number, names: string[]): Completio
   if (matches.length === 0) return null;
   return { start: 0, end, query: word, matches, sigil: '/' };
 }
+
+/** A slash command: the name of a skill and its arguments. */
+export interface SlashCall {
+  name: string;
+  args: string;
+}
+
+/**
+ * parseSlash reads a slash command at the start of a text: /name args. A
+ * name outside the list is plain text, so a path such as /etc/hosts stays a
+ * message.
+ */
+export function parseSlash(text: string, names: string[]): SlashCall | null {
+  const m = /^\/([A-Za-z0-9._/-]+)(?:\s+([\s\S]*))?$/.exec(text.trim());
+  if (!m || !names.includes(m[1])) return null;
+  return { name: m[1], args: (m[2] || '').trim() };
+}
+

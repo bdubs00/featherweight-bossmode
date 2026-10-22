@@ -40,8 +40,9 @@ describe('NewBridge', () => {
       { word: 'Keep warm workers', on: true, value: 'queue' },
       { word: 'Fresh sandbox per seat', on: false, value: 'spawn' },
     ]);
-    // An agent that the person cannot run offers no seat.
-    expect(keyNamed(el, 'secret')).toBeUndefined();
+    // The key Add opens the picker of the members pane, and an agent that the person cannot run offers no seat.
+    click(keyNamed(el, 'Add'));
+    expect([...el.querySelectorAll('.picker .pick-name')].map((x) => x.textContent)).toEqual(['Migrator', 'Reviewer']);
   });
 
   it('takes the default placement of the settings', () => {
@@ -55,8 +56,10 @@ describe('NewBridge', () => {
     api = fakeApi({ 'POST /v1/bridges': () => ({ status: 201, body: { id: 'br-new', title: 'Migrate logrotate', goal: 'g', operator: '', state: 'open', placement: 'spawn', createdAt: '', closedAt: null, delegation: { approve: false, budget: false, members: false, report: true }, caps: { maxMessages: 1, maxFanoutPerMinute: 1, maxPairMessages: 1 }, lastSeq: 0, read: 0, unread: 0, members: [] } }) });
     const el = mount(<NewBridge />);
     typeIn(el.querySelector('textarea'), 'Migrate logrotate. Then review it.');
-    click(keyNamed(el, 'migrator'));
-    click(keyNamed(el, 'migrator'));
+    click(keyNamed(el, 'Add'));
+    const migrator = () => [...el.querySelectorAll('.picker .pick-row')].find((r) => r.querySelector('.pick-name')!.textContent === 'Migrator');
+    click(migrator());
+    click(migrator());
     click(el.querySelector('input[value="spawn"]'));
     click(keyNamed(el, 'Open bridge'));
     await settle();
@@ -66,8 +69,8 @@ describe('NewBridge', () => {
       goal: 'Migrate logrotate. Then review it.',
       placement: 'spawn',
       members: [
-        { handle: 'migrator', agent: 'migrator', task: 'Migrate logrotate. Then review it.' },
-        { handle: 'migrator-2', agent: 'migrator', task: 'Migrate logrotate. Then review it.' },
+        { handle: 'migrator', agent: 'migrator', task: 'Migrate logrotate' },
+        { handle: 'migrator-2', agent: 'migrator', task: 'Migrate logrotate' },
       ],
       delegation: { approve: false, budget: false, members: false, report: true },
     });
@@ -89,7 +92,7 @@ describe('NewBridge', () => {
     const el = mount(<NewBridge />);
     typeIn(el.querySelector('textarea'), 'Write the release notes of 2.4.');
     click([...el.querySelectorAll('input[name="mode"]')][1]);
-    expect(el.querySelector('.agent-keys')).toBeNull();
+    expect(el.querySelector('.pick-anchor')).toBeNull();
     click(keyNamed(el, 'Open bridge'));
     await settle();
     const start = api.calls.find((c) => c.method === 'POST')!;

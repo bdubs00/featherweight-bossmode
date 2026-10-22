@@ -32,7 +32,7 @@ export const canSeat = (a: Agent): boolean => a.role === 'owner' || a.role === '
  * the new seats that wait, so a click on the last free worker shows the
  * agent as waiting for a worker at once.
  */
-export function pickGroups(agents: Agent[], faces: Record<string, FaceMeta>, seats: Member[], fleet: Fleet | null, query = '', drafts: string[] = []): PickGroups {
+export function pickGroups(agents: Agent[], faces: Record<string, FaceMeta>, seats: Pick<Member, 'agent' | 'fired'>[], fleet: Fleet | null, query = '', drafts: string[] = []): PickGroups {
   const q = query.trim().toLowerCase();
   const seated = new Set(seats.filter((m) => !m.fired).map((m) => m.agent));
   const here: PickRow[] = [];

@@ -159,6 +159,26 @@ a.people-title:hover {
 .tmsg-plain {
   white-space: pre-wrap;
 }
+/* The message of the person while it is on its way. */
+.tmsg-plain.sending {
+  color: var(--muted);
+}
+/* The status of an answer that is on its way: its light and the phrase of the step. */
+.tmsg-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: var(--t-meta);
+  color: var(--muted);
+}
+/* A conversation with no message yet: the invitation, in the middle of the pane. */
+.thread-empty {
+  margin: auto;
+  padding: var(--s-6) var(--s-5);
+  text-align: center;
+  color: var(--muted);
+}
 .tmsg-cut {
   margin-top: 2px;
   font-size: var(--t-meta);
@@ -806,61 +826,6 @@ a.people-title:hover {
 }
 .board-light:hover {
   background: var(--raised);
-}
-
-/* ---------- the conversation of the manager screen of C ----------
-   The manager screen still draws its waiting line and its sent text with
-   these classes, until it moves to the thread look. */
-.bubble {
-  max-width: min(80%, 68ch);
-  margin: 0 var(--s-5);
-  padding: var(--s-2) var(--s-3);
-  border: 1px solid var(--line);
-  border-radius: var(--r);
-  background: var(--paper);
-  overflow-wrap: anywhere;
-  white-space: pre-wrap;
-}
-.bubble.mine {
-  align-self: flex-end;
-  border-color: var(--raised-line);
-  background: var(--raised);
-}
-.bubble.mine.sending {
-  opacity: 0.7;
-}
-.cap {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  margin: 2px var(--s-5);
-  font-size: var(--t-meta);
-  line-height: var(--t-meta-lh);
-  color: var(--muted);
-  text-align: center;
-}
-.cap .ic {
-  width: 12px;
-  height: 12px;
-}
-.cap.err {
-  color: var(--word-red);
-}
-.cap.waiting {
-  justify-content: flex-start;
-  margin: var(--s-1) var(--s-5) var(--s-3);
-  text-align: left;
-}
-.typing {
-  display: inline-flex;
-  gap: 3px;
-}
-.typing i {
-  width: 6px;
-  height: 6px;
-  border-radius: var(--r-led);
-  background: var(--muted);
 }
 
 /* ---------- touch and narrow ---------- */
