@@ -72,6 +72,8 @@
   --t-caption-lh: 16px;
   --t-code: 13px;
   --t-code-lh: 18px;
+  --t-control: 14px;
+  --t-control-lh: 20px;
 
   /* Space, size, and radius. */
   --s-1: 4px;

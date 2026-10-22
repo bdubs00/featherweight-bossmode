@@ -38,14 +38,14 @@ describe('the list of bridges', () => {
     expect(toggle.textContent).toBe('Closed1');
     act(() => toggle.click());
     expect(rowOf(el, 'Release notes for 2.4').querySelector('.status')!.textContent).toBe('closed');
-    expect(el.querySelector('.list-filter')).toBeNull();
+    expect(el.querySelector('.list-find')).toBeNull();
   });
 
   it('shows a filter field above a list of more than ten bridges', () => {
     const many = Array.from({ length: FILTER_FROM + 1 }, (_, i) => bridgeOf('f' + i, { title: (i === 3 ? 'Migrate logrotate ' : 'Bridge ') + i, createdAt: '2026-10-2' + (i % 9) + 'T10:00:00Z' }));
     act(() => store.dispatch({ type: 'bridges', bridges: many }));
     const el = mount(<BridgeList current="" />);
-    const field = el.querySelector('.list-filter input') as HTMLInputElement;
+    const field = el.querySelector('.list-find input') as HTMLInputElement;
     expect(field.getAttribute('placeholder')).toBe('Find a bridge');
     act(() => {
       field.value = 'logrotate';

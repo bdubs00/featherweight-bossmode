@@ -16,7 +16,7 @@ import type { Tone } from '../lib/presence';
 import { attempt } from './notice';
 import { InlineMarkdown, Markdown, When } from './common';
 import { DecisionCard } from './Decision';
-import { Avatar, Button, IconButton, Mark, ReactionChip, TextArea } from './primitives';
+import { Avatar, Button, IconButton, LineLed, Mark, ReactionChip, TextArea } from './primitives';
 
 /** The light of a system line: green for started, amber for needs you and asked, red for failed, grey for the rest. */
 export function eventTone(event: string | undefined): Tone {
@@ -49,7 +49,7 @@ export function Msg(p: { face: ComponentChildren; name: string; at?: string; com
 export function Quiet({ tone, at, err, children }: { tone?: Tone; at?: string; err?: boolean; children: ComponentChildren }) {
   return (
     <div class={'tline' + (err ? ' err' : '')}>
-      {tone && <span class={'led led-' + tone} aria-hidden="true" />}
+      {tone && <LineLed tone={tone} />}
       <span class="tline-text">{children}</span>
       {at && <When at={at} />}
     </div>

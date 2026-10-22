@@ -19,9 +19,8 @@ import { phaseOf } from '../lib/presence';
 import { hrefOf } from '../lib/route';
 import { useCatalog } from './Skills';
 import { SkillPicker } from './SkillPicker';
-import { Glyph } from './icons';
 import { attempt } from './notice';
-import { Button, Chip, Field, Input, Led, Mark, PaneHeader, TextArea } from './primitives';
+import { Advanced, Button, Chip, Field, Input, Led, Mark, PaneHeader, TextArea } from './primitives';
 
 /** The default number of workers of a new agent, as fleet.DefaultWorkers of the backend. */
 export const DEFAULT_WORKERS = 2;
@@ -267,66 +266,60 @@ export function NewAgent() {
             </h2>
             {cat ? <SkillPicker skills={cat.skills} value={f.skills} onChange={(v) => set('skills', v)} /> : <p class="t-meta">Loading the skills.</p>}
           </section>
-          <details class="advanced" id="agent-advanced">
-            <summary>
-              <Glyph name="back" size={16} />
-              Advanced
-            </summary>
-            <div class="advanced-body">
-              <div class="field-row">
-                <Field label="Model">
-                  <Input value={f.model} spellcheck={false} onInput={text('model')} />
-                </Field>
-                <Field label="Effort">
-                  <select class="recess" value={f.effort} onChange={(e) => set('effort', (e.target as HTMLSelectElement).value)}>
-                    <option value="">Default</option>
-                    {EFFORTS.map((x) => (
-                      <option value={x}>{x}</option>
-                    ))}
-                  </select>
-                </Field>
-              </div>
-              <fieldset>
-                <legend>Budget of a run</legend>
-                <div class="field-row">
-                  <Field label="Turns" error={errors.turns}>
-                    <Input type="number" min={1} inputMode="numeric" value={f.turns} invalid={!!errors.turns} onInput={text('turns')} />
-                  </Field>
-                  <Field label="Tokens" error={errors.tokens}>
-                    <Input type="number" min={1} inputMode="numeric" value={f.tokens} invalid={!!errors.tokens} onInput={text('tokens')} />
-                  </Field>
-                  <Field label="Cost in dollars" error={errors.cost}>
-                    <Input type="number" min={0} step="0.01" inputMode="decimal" value={f.cost} invalid={!!errors.cost} onInput={text('cost')} />
-                  </Field>
-                </div>
-              </fieldset>
-              <fieldset>
-                <legend>Context compaction</legend>
-                <div class="field-row">
-                  <Field label="Compact at, in tokens" error={errors.compactAt}>
-                    <Input type="number" min={1024} step={1024} inputMode="numeric" value={f.compactAt} invalid={!!errors.compactAt} onInput={text('compactAt')} />
-                  </Field>
-                  <Field label="Compaction model">
-                    <Input value={f.compactModel} spellcheck={false} onInput={text('compactModel')} />
-                  </Field>
-                </div>
-              </fieldset>
-              <fieldset>
-                <legend>Rules</legend>
-                <div class="field-row">
-                  <Field label="Ask before">
-                    <Input value={f.ask} class="code-area" spellcheck={false} placeholder="bash: git push*" onInput={text('ask')} />
-                  </Field>
-                  <Field label="Never run">
-                    <Input value={f.deny} class="code-area" spellcheck={false} placeholder="bash: rm -rf*" onInput={text('deny')} />
-                  </Field>
-                </div>
-              </fieldset>
-              <Field label="Time zone" class="half">
-                <Input value={f.timeZone} spellcheck={false} placeholder="Europe/Berlin" onInput={text('timeZone')} />
+          <Advanced id="agent-advanced">
+            <div class="field-row">
+              <Field label="Model">
+                <Input value={f.model} spellcheck={false} onInput={text('model')} />
+              </Field>
+              <Field label="Effort">
+                <select class="recess" value={f.effort} onChange={(e) => set('effort', (e.target as HTMLSelectElement).value)}>
+                  <option value="">Default</option>
+                  {EFFORTS.map((x) => (
+                    <option value={x}>{x}</option>
+                  ))}
+                </select>
               </Field>
             </div>
-          </details>
+            <fieldset>
+              <legend>Budget of a run</legend>
+              <div class="field-row">
+                <Field label="Turns" error={errors.turns}>
+                  <Input type="number" min={1} inputMode="numeric" value={f.turns} invalid={!!errors.turns} onInput={text('turns')} />
+                </Field>
+                <Field label="Tokens" error={errors.tokens}>
+                  <Input type="number" min={1} inputMode="numeric" value={f.tokens} invalid={!!errors.tokens} onInput={text('tokens')} />
+                </Field>
+                <Field label="Cost in dollars" error={errors.cost}>
+                  <Input type="number" min={0} step="0.01" inputMode="decimal" value={f.cost} invalid={!!errors.cost} onInput={text('cost')} />
+                </Field>
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend>Context compaction</legend>
+              <div class="field-row">
+                <Field label="Compact at, in tokens" error={errors.compactAt}>
+                  <Input type="number" min={1024} step={1024} inputMode="numeric" value={f.compactAt} invalid={!!errors.compactAt} onInput={text('compactAt')} />
+                </Field>
+                <Field label="Compaction model">
+                  <Input value={f.compactModel} spellcheck={false} onInput={text('compactModel')} />
+                </Field>
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend>Rules</legend>
+              <div class="field-row">
+                <Field label="Ask before">
+                  <Input value={f.ask} class="code-area" spellcheck={false} placeholder="bash: git push*" onInput={text('ask')} />
+                </Field>
+                <Field label="Never run">
+                  <Input value={f.deny} class="code-area" spellcheck={false} placeholder="bash: rm -rf*" onInput={text('deny')} />
+                </Field>
+              </div>
+            </fieldset>
+            <Field label="Time zone" class="half">
+              <Input value={f.timeZone} spellcheck={false} placeholder="Europe/Berlin" onInput={text('timeZone')} />
+            </Field>
+          </Advanced>
           {shown && shown.saved.exists && (
             <p class="alert" role="alert">
               An agent named {shown.saved.name} exists. Pick another name.

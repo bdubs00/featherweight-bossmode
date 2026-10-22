@@ -8,36 +8,6 @@
 }
 
 /* ---------- the people list ---------- */
-.people-find {
-  flex: none;
-  padding: var(--s-2) var(--s-2) 0;
-}
-.people-search {
-  display: flex;
-  align-items: center;
-  gap: var(--s-2);
-  height: var(--h-small);
-  padding: 0 10px;
-  color: var(--muted);
-}
-.people-search:focus-within {
-  outline: 2px solid var(--ink);
-  outline-offset: 1px;
-}
-.people-search input {
-  flex: 1;
-  min-width: 0;
-  height: 100%;
-  border: 0;
-  background: transparent;
-  color: var(--ink);
-  font-size: 14px;
-  outline: none;
-}
-.people-search input::placeholder {
-  color: var(--muted);
-  opacity: 1;
-}
 .people-group {
   padding: 0 var(--s-2);
 }
@@ -365,7 +335,7 @@ a.people-title:hover {
   align-items: baseline;
   gap: 10px;
   padding: 6px 14px;
-  font-size: 14px;
+  font-size: var(--t-control);
 }
 .run-steps li + li {
   border-top: 1px solid var(--line-soft);
@@ -572,10 +542,6 @@ a.people-title:hover {
   gap: var(--s-2);
   min-height: var(--h-small);
 }
-/* The definition opens under the heading line, so it stays inside the narrow details pane. */
-.prof-sec-head .help {
-  position: static;
-}
 .liked {
   display: flex;
   flex-direction: column;
@@ -583,7 +549,7 @@ a.people-title:hover {
   margin: var(--s-2) 0 0;
   padding: 0;
   list-style: none;
-  font-size: 14px;
+  font-size: var(--t-control);
   line-height: 20px;
 }
 .liked li {
@@ -655,7 +621,7 @@ a.people-title:hover {
   flex-wrap: wrap;
   gap: var(--s-4);
   margin-top: var(--s-2);
-  font-size: 14px;
+  font-size: var(--t-control);
 }
 .today b {
   font-weight: 700;

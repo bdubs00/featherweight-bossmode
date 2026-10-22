@@ -14,8 +14,8 @@ import type { Tone } from '../lib/presence';
 import { decide, react } from '../state/actions';
 import { attempt } from './notice';
 import { InlineMarkdown, Markdown, When } from './common';
-import { DecisionCard, Light } from './Decision';
-import { Avatar, Button, IconButton, Mark, ReactionChip, TextArea } from './primitives';
+import { DecisionCard } from './Decision';
+import { Avatar, Button, IconButton, LineLed, Mark, ReactionChip, TextArea } from './primitives';
 
 /** plain drops the marks of Markdown from a text, for a label. */
 const plain = (t: string) => t.replace(/```[\s\S]*?```/g, ' code ').replace(/[*_`#>|[\]]/g, '');
@@ -225,7 +225,7 @@ export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, fresh, li
         {dayLine}
         <div class={'sys' + (e.event ? ' ev-' + e.event : '')} id={id} data-item data-seq={seq}>
           <p>
-            <Light tone={toneOfEvent(e.event)} />
+            <LineLed tone={toneOfEvent(e.event)} />
             <span class="sys-text">
               <InlineMarkdown text={e.text} />
               {e.page && (

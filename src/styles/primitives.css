@@ -185,7 +185,7 @@
 .key-m {
   min-height: var(--h-control);
   padding: 0 14px;
-  font-size: 14px;
+  font-size: var(--t-control);
 }
 .key-s {
   min-height: var(--h-small);
@@ -268,14 +268,14 @@ select.recess {
   width: 100%;
   min-height: var(--h-control);
   padding: 0 10px;
-  font-size: 14px;
+  font-size: var(--t-control);
 }
 .textarea {
   display: block;
   width: 100%;
   min-height: 88px;
   padding: 8px 10px;
-  font-size: 14px;
+  font-size: var(--t-control);
   line-height: 20px;
   resize: vertical;
 }
@@ -459,7 +459,7 @@ select.recess {
   border-bottom: 3px solid transparent;
   background: none;
   color: var(--muted);
-  font-size: 14px;
+  font-size: var(--t-control);
   font-weight: 600;
   text-decoration: none;
   cursor: pointer;
@@ -541,6 +541,130 @@ button.rchip:hover {
   object-fit: contain;
 }
 
+/* ---------- Find: the field that narrows a list ---------- */
+.find {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  height: var(--h-small);
+  padding: 0 10px;
+  color: var(--muted);
+}
+.find-m {
+  height: var(--h-control);
+}
+.find:focus-within {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+.find input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--t-control);
+  outline: none;
+}
+.find-m input {
+  font-size: var(--t-body);
+}
+.find input::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+.find .glyph {
+  flex: none;
+}
+/* The place of a find field at the top of a list pane. */
+.list-find {
+  flex: none;
+  padding: var(--s-2) var(--s-2) 0;
+}
+
+/* ---------- Choices: a visible choice of two or three ---------- */
+.choice-set {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.choice-set > legend {
+  margin-bottom: var(--s-2);
+  padding: 0;
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+  font-weight: 600;
+  color: var(--muted);
+}
+.choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--s-2);
+}
+.choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: var(--h-row);
+  padding: 10px var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  cursor: pointer;
+}
+.choice:hover {
+  border-color: var(--ink);
+}
+.choice.on {
+  background: var(--raised);
+  border-color: var(--raised-line);
+  box-shadow: var(--e-selected);
+}
+.choice input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  accent-color: var(--ink);
+}
+.choice .t-sub,
+.choice .t-meta {
+  display: block;
+}
+
+/* ---------- Advanced: the power behind one disclosure ---------- */
+.advanced {
+  border-top: 1px solid var(--line);
+}
+.advanced > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  min-height: var(--h-row);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  list-style: none;
+}
+.advanced > summary::-webkit-details-marker {
+  display: none;
+}
+.advanced > summary .glyph {
+  transform: rotate(180deg);
+}
+.advanced[open] > summary .glyph {
+  transform: rotate(-90deg);
+}
+.advanced-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  padding: var(--s-2) 0 var(--s-4);
+}
+
 /* ---------- Help: a definition behind a question mark ---------- */
 .help {
   position: relative;
@@ -581,6 +705,11 @@ button.rchip:hover {
   font-weight: 400;
   color: var(--ink);
 }
+/* A definition that would run past the end of its pane opens toward the start. */
+.help-pop.flip {
+  left: auto;
+  right: -8px;
+}
 
 /* ---------- Menus and dialogs: the floating layers ---------- */
 .pop {
@@ -613,7 +742,7 @@ button.rchip:hover {
   border-radius: var(--r);
   background: none;
   color: var(--ink);
-  font-size: 14px;
+  font-size: var(--t-control);
   text-align: left;
   text-decoration: none;
   cursor: pointer;
@@ -687,7 +816,8 @@ dialog.confirm .do {
   .menu > button,
   .menu > a,
   .tab,
-  .check {
+  .check,
+  .find {
     min-height: var(--h-row);
   }
   .key-icon,

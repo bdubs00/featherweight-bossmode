@@ -50,10 +50,6 @@
   line-height: var(--t-meta-lh);
   color: var(--muted);
 }
-.list-filter {
-  flex: none;
-  padding: var(--s-2) var(--s-2) 0;
-}
 .group-toggle {
   appearance: none;
   display: flex;
@@ -777,7 +773,7 @@
   flex-wrap: wrap;
   gap: var(--s-1) var(--s-4);
   margin-top: var(--s-1);
-  font-size: 14px;
+  font-size: var(--t-control);
 }
 .bridge-foot strong {
   font-weight: 700;
@@ -816,31 +812,6 @@
 .pick-search {
   flex: none;
   padding: var(--s-3) var(--s-3) var(--s-2);
-}
-.picker .search {
-  display: flex;
-  align-items: center;
-  gap: var(--s-2);
-  height: var(--h-control);
-  padding: 0 10px;
-  color: var(--muted);
-}
-.picker .search:focus-within {
-  outline: 2px solid var(--ink);
-  outline-offset: 1px;
-}
-.picker .search input {
-  flex: 1;
-  min-width: 0;
-  border: 0;
-  background: transparent;
-  color: var(--ink);
-  font-size: var(--t-body);
-  outline: none;
-}
-.picker .search input::placeholder {
-  color: var(--muted);
-  opacity: 1;
 }
 .pick-list {
   flex: 1;

@@ -3,7 +3,7 @@
 // and the page does not change them.
 
 import { setChoice, useChoice, type ThemeChoice } from '../lib/theme';
-import { PaneHeader } from './primitives';
+import { Choices, PaneHeader } from './primitives';
 
 export const CHOICES: [ThemeChoice, string][] = [
   ['system', 'Match the system'],
@@ -17,17 +17,9 @@ export function Appearance() {
     <section class="screen appearance" aria-labelledby="appearance-title">
       <PaneHeader id="appearance-title" title="Appearance" size="title" level={1} back={{ href: '#', label: 'Bridges', to: 'list' }} />
       <div class="scroll pad">
-        <fieldset class="make">
-          <legend>Theme</legend>
-          <div class="choices" role="radiogroup">
-            {CHOICES.map(([c, label]) => (
-              <label class={'choice' + (choice === c ? ' on' : '')}>
-                <input type="radio" name="theme" value={c} checked={choice === c} onChange={() => setChoice(c)} />
-                <span class="t-sub">{label}</span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
+        <div class="make">
+          <Choices name="theme" legend="Theme" value={choice} options={CHOICES.map(([id, label]) => ({ id, label }))} onChange={setChoice} />
+        </div>
       </div>
     </section>
   );

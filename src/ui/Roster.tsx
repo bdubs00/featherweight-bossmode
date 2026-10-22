@@ -10,9 +10,8 @@ import { memo } from 'preact/compat';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { Member, UsageSum } from '../api/types';
 import { useSelect } from '../state/store';
-import { addMember, fire, loadPages, patchMember } from '../state/actions';
+import { addMember, fire, loadPages, loadRunOnce, patchMember } from '../state/actions';
 import { errorReason } from '../lib/words';
-import { loadRunOnce } from '../state/actions';
 import { seatLight } from '../lib/presence';
 import { hrefOf, go } from '../lib/route';
 import { useRoving } from './keys';
@@ -21,7 +20,7 @@ import { Confirm, Empty, Menu } from './common';
 import { Picker } from './Picker';
 import { draftOf, seatReason, type Draft } from './seats';
 import { pagesOfBridge } from './Channel';
-import { Button, Chip, Field, Input, Led, Mark, PaneHeader, TextArea, buttonClass } from './primitives';
+import { Button, Chip, Field, Input, Led, Mark, PaneHeader, TextArea } from './primitives';
 
 const DRAG_TYPE = 'application/x-fw-member';
 
@@ -285,11 +284,11 @@ export function Roster({ bridge, current }: { bridge: string; current?: string }
     };
   }, [order]);
 
-  // The key Add is a plain button with the look of a key, so the picker can give the focus back to it.
+  // The picker gives the focus back to the key Add when it closes.
   const addButton = (
-    <button ref={addKey} type="button" class={buttonClass('secondary', 's')} aria-haspopup="dialog" aria-expanded={picker} onClick={() => setPicker(!picker)}>
+    <Button ref={addKey} size="s" aria-haspopup="dialog" aria-expanded={picker} onClick={() => setPicker(!picker)}>
       Add
-    </button>
+    </Button>
   );
   return (
     <section class="screen roster" ref={pane} aria-labelledby="roster-title">

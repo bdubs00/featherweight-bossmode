@@ -18,15 +18,14 @@ import { ensureChannels, ensureRuns } from '../state/fetchers';
 import { newestRun, parseSlash, seatRowLight, slashCommands } from '../state/people';
 import { directEntries, stepsOf, threadOf, withLive } from '../state/thread';
 import { attempt } from './notice';
-import { Confirm } from './common';
+import { Confirm, Menu, type MenuItem } from './common';
 import { Composer } from './Composer';
 import { useTranscript } from './Conversation';
 import { FilesView, RunView, useResult } from './RunPane';
 import { ThreadView, useStickToEnd } from './Thread';
 import { Profile } from './Profile';
 import { ProfileLink, rememberOpen } from './Fleet';
-import { Button, Field, Led, PaneHeader, Tabs, TextArea, buttonClass } from './primitives';
-import { Glyph } from './icons';
+import { Button, Field, Led, PaneHeader, Tabs, TextArea } from './primitives';
 
 /* ---------- the live tail of an answer ---------- */
 
@@ -107,77 +106,17 @@ export function TaskDialog({ bridge, m, again, onClose }: { bridge: string; m: M
 
 /** SeatMenu is the More key of the header: Mute, Seat again, Change task, and Fire. */
 function SeatMenu({ bridge, m, stopped }: { bridge: string; m: MemberT; stopped: boolean }) {
-  const [open, setOpen] = useState(false);
   const [dialog, setDialog] = useState<'' | 'again' | 'task' | 'fire'>('');
-  const btn = useRef<HTMLButtonElement>(null);
-  const list = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const first = list.current && (list.current.querySelector('button') as HTMLButtonElement | null);
-    if (first) first.focus();
-    const away = (e: Event) => {
-      const t = e.target as Node;
-      if (list.current && !list.current.contains(t) && btn.current && !btn.current.contains(t)) setOpen(false);
-    };
-    document.addEventListener('pointerdown', away);
-    return () => document.removeEventListener('pointerdown', away);
-  }, [open]);
-  const pick = (f: () => void) => {
-    setOpen(false);
-    f();
-  };
-  const items: { label: string; danger?: boolean; run: () => void }[] = [];
-  if (!m.fired) {
-    items.push({ label: m.muted ? 'Unmute' : 'Mute', run: () => attempt(() => patchMember(bridge, m.handle, { muted: !m.muted })) });
-    if (stopped) items.push({ label: 'Seat again', run: () => setDialog('again') });
-    items.push({ label: 'Change task', run: () => setDialog('task') });
-    items.push({ label: 'Fire', danger: true, run: () => setDialog('fire') });
-  }
-  if (!items.length) return null;
+  if (m.fired) return null;
+  const items: MenuItem[] = [
+    { label: m.muted ? 'Unmute' : 'Mute', onSelect: () => attempt(() => patchMember(bridge, m.handle, { muted: !m.muted })) },
+    ...(stopped ? [{ label: 'Seat again', onSelect: () => setDialog('again') }] : []),
+    { label: 'Change task', onSelect: () => setDialog('task') },
+    { label: 'Fire', danger: true, onSelect: () => setDialog('fire') },
+  ];
   return (
-    <span class="pop">
-      <button
-        ref={btn}
-        type="button"
-        class={buttonClass('secondary', 's', 'key-icon')}
-        aria-label={'More for ' + m.handle}
-        title={'More for ' + m.handle}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen(!open)}
-      >
-        <Glyph name="more" size={18} />
-      </button>
-      {open && (
-        <div
-          ref={list}
-          class="menu"
-          role="menu"
-          aria-label={'More for ' + m.handle}
-          onKeyDown={(e) => {
-            const all = [...(list.current ? list.current.querySelectorAll('button') : [])] as HTMLButtonElement[];
-            const i = all.indexOf(document.activeElement as HTMLButtonElement);
-            if (e.key === 'Escape') {
-              e.preventDefault();
-              e.stopPropagation();
-              setOpen(false);
-              if (btn.current) btn.current.focus();
-            } else if (e.key === 'ArrowDown' || e.key === 'j') {
-              e.preventDefault();
-              all[(i + 1) % all.length].focus();
-            } else if (e.key === 'ArrowUp' || e.key === 'k') {
-              e.preventDefault();
-              all[(i - 1 + all.length) % all.length].focus();
-            } else if (e.key === 'Tab') setOpen(false);
-          }}
-        >
-          {items.map((it) => (
-            <button type="button" role="menuitem" class={it.danger ? 'danger' : ''} onClick={() => pick(it.run)}>
-              <span class="t">{it.label}</span>
-            </button>
-          ))}
-        </div>
-      )}
+    <>
+      <Menu label={'More for ' + m.handle} kind="secondary" items={items} />
       {(dialog === 'again' || dialog === 'task') && <TaskDialog bridge={bridge} m={m} again={dialog === 'again'} onClose={() => setDialog('')} />}
       {dialog === 'fire' && (
         <Confirm
@@ -193,7 +132,7 @@ function SeatMenu({ bridge, m, stopped }: { bridge: string; m: MemberT; stopped:
           <p>Its open runs stop, and it gets no more messages.</p>
         </Confirm>
       )}
-    </span>
+    </>
   );
 }
 

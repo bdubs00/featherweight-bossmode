@@ -15,9 +15,8 @@ import { addMember, loadAgents } from '../state/actions';
 import { membersOf } from '../state/reducer';
 import { nextHandle } from '../lib/handles';
 import { attempt } from './notice';
-import { Glyph } from './icons';
 import { freeWords, pickGroups, seatReason, taskOfGoal, type PickRow } from './seats';
-import { Button, Field, GrooveBand, Input, Led, Mark, TextArea } from './primitives';
+import { Button, Field, Find, GrooveBand, Input, Led, Mark, TextArea } from './primitives';
 
 export interface PickerProps {
   bridge: string;
@@ -175,24 +174,21 @@ export function Picker({ bridge, drafts, draftHandles, onPick, onClose, anchor, 
       {mode === 'list' ? (
         <>
           <div class="pick-search">
-            <label class="recess search">
-              <Glyph name="search" size={16} />
-              <span class="sr">Who</span>
-              <input
-                ref={field}
-                type="search"
-                placeholder="Who?"
-                value={query}
-                onInput={(e) => setQuery((e.target as HTMLInputElement).value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    const r = groups.here[0] || groups.others[0];
-                    if (r) onPick(r.agent);
-                  }
-                }}
-              />
-            </label>
+            <Find
+              label="Who"
+              placeholder="Who?"
+              size="m"
+              inputRef={field}
+              value={query}
+              onInput={setQuery}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  const r = groups.here[0] || groups.others[0];
+                  if (r) onPick(r.agent);
+                }
+              }}
+            />
           </div>
           <div class="pick-list">
             {groups.here.length > 0 && (

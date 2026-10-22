@@ -174,6 +174,7 @@ keeps the weight free, and the low-level property overrides it.
 | `--t-meta` | 13 / 18 | 400 to 600 | 100% | 0 | Times, tasks, secondary lines, status words |
 | `--t-caption` | 12 / 16 | 600 to 700 | 100% | 0 | Chips, group labels, app bar labels |
 | `--t-code` | 13 / 18 | 400 | | 0 | Commands, paths, code, in the monospace of the system |
+| `--t-control` | 14 / 20 | 400 to 700 | 100% | 0 | Keys, fields, tabs, menu items, and the figures of a foot, such as the turns and the cost of a bridge |
 
 Body is 15 pixels. That is one step above the 14-pixel body of the
 reference ramp of a workplace design system. Archivo sets smaller than its
@@ -337,13 +338,17 @@ color, radius, shadow, or type size of its own.
 
 | Primitive | What it draws | States |
 |---|---|---|
-| `Help` | A 22-pixel question mark that opens a definition in a small layer | open, closed by Escape or a click elsewhere |
-| `Led` | A 9-pixel square light and its word | Green, amber (breathes), red, and grey. Struck for fired. Quiet: no word on screen, the word in a tooltip and the accessible name. |
+| `Help` | A 22-pixel question mark that opens a definition in a small layer | open, closed by Escape or a click elsewhere. The layer opens toward the end of the line and flips toward the start where it would run past the edge of its pane. |
+| `Menu` | A key with the glyph More that opens a list of actions, in `common.tsx` | quiet in a row, secondary on the header of a pane; a danger item for Fire and Remove |
+| `Led` | A 9-pixel square light and its word | Green, amber (breathes), red, and grey. Struck for fired. Quiet: no word on screen, the word in a tooltip and the accessible name. Still: the amber light holds, for a status that waits for nothing. |
+| `LineLed` | The bare light of a line whose text is its word: a system line, a decided line | The four tones. It never breathes. |
 | `Mark` | The face of an agent: a 5 by 5 symmetric glyph from the hash of the name on a raised square, or the custom picture of the backend | Sizes 20, 32, 36, and 72. A halo of a status color in the header of a member conversation. Selected: the well turns paper. |
 | `Avatar` | A person: initials in on-ink on an ink square | sizes 20, 32, 36 |
 | `Chip` | A count or a short state on a heading line | plain (line edge, muted), ink (unread), amber (decisions), with an optional `Led` inside |
-| `Button` | A key | Primary: accent, 2px edge, raised 1px. Secondary: key ground, 1px edge, 1px drop. Quiet: no edge, no ground. Danger: a secondary key with the red word, for Fire and Remove. Sizes 36 and 32, and 44 on touch. Disabled, pressed, and a link with `href`. `IconButton` is a key with one glyph and a name. |
-| `Recess` | `Input`, `TextArea`, `Command`, and `Field`: a label, the control, and the reason of a failure | focus, invalid, disabled |
+| `Button` | A key | Primary: accent, 2px edge, raised 1px. Secondary: key ground, 1px edge, 1px drop. Quiet: no edge, no ground. Danger: a secondary key with the red word, for Fire and Remove. Sizes 36 and 32, and 44 on touch. Disabled, pressed, and a link with `href`. Its ref reaches the element, so a layer can give the focus back to it. `IconButton` is a key with one glyph and a name. |
+| `Recess` | `Input`, `TextArea`, `Command`, and `Field`: a label, the control, and the reason of a failure. `Find`: the field that narrows a list, with the glyph of a search and a name for a screen reader | focus, invalid, disabled. `Find` is 32 pixels at the top of a list and 36 in the picker. |
+| `Choices` | A visible choice of two or three: radio rows under a legend, the picked one on the ground of a selected row | picked, hover, the reason of a failure |
+| `Advanced` | The one disclosure that holds the fields that most people never change | open, closed |
 | `GrooveBand` | The 8-pixel band of fine grooves | on paper, on a card |
 | `PaneHeader` | The 56-pixel header of a pane: a back link, the heading, its chip, the actions, and the groove band under it | Title (main pane) or heading (list and details). The back link shows where its column is out of sight (`to: 'list'` or `'main'`), or always (`to: 'here'`). |
 | `Card` | A surface with a hard edge, a groove band, a title with an optional light, a body, and actions at the end | Settle: once, on arrival. Quiet: a line edge, no drop, no breath, for a card that waits for nothing. |

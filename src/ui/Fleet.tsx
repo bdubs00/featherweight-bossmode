@@ -21,8 +21,7 @@ import { useResult } from './RunPane';
 import { useStickToEnd } from './Thread';
 import { Profile } from './Profile';
 import { EmptyPane } from './Shell';
-import { Glyph } from './icons';
-import { Button, Chip, Led, Mark, PaneHeader, buttonClass } from './primitives';
+import { Button, Chip, Find, IconButton, Led, Mark, PaneHeader } from './primitives';
 import type { Tone } from '../lib/presence';
 
 /** The width from which two panes show side by side, as App names it. */
@@ -126,16 +125,7 @@ export function FleetList({ current, member }: { current?: string; member?: stri
         countLabel={count === 1 ? '1 member' : count + ' members'}
         actions={
           <>
-            <button
-              type="button"
-              class={buttonClass('quiet', 's', 'key-icon')}
-              aria-label="Board"
-              title="Board"
-              aria-pressed={board}
-              onClick={() => go(board ? { place: 'fleet' } : { place: 'fleet', board: true })}
-            >
-              <Glyph name="board" size={18} />
-            </button>
+            <IconButton icon="board" label="Board" aria-pressed={board} onClick={() => go(board ? { place: 'fleet' } : { place: 'fleet', board: true })} />
             <Button href="#new-agent" size="s" icon="plus" class="key-icon" aria-label="New agent" title="New agent" />
           </>
         }
@@ -146,12 +136,8 @@ export function FleetList({ current, member }: { current?: string; member?: stri
           </Chip>
         )}
       </PaneHeader>
-      <div class="people-find">
-        <label class="recess people-search">
-          <Glyph name="search" size={16} />
-          <span class="sr">Find a member</span>
-          <input type="search" placeholder="Find a member" value={q} onInput={(e) => setQ((e.target as HTMLInputElement).value)} />
-        </label>
+      <div class="list-find">
+        <Find label="Find a member" value={q} onInput={setQ} />
       </div>
       <div class="scroll" ref={list}>
         {shown.map((g) => (

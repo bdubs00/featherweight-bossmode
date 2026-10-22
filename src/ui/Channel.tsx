@@ -17,10 +17,9 @@ import { attempt } from './notice';
 import { Confirm, Empty, Menu } from './common';
 import { EntryRow, markLoaded } from './Message';
 import { Composer } from './Composer';
-import { Light } from './Decision';
 import { foldOf, foldShapes, foldWords, shapeKey, shapeOf, shapesOf, type Item, type Shape } from './fold';
 import { wavesLine } from './seats';
-import { Button, Chip, Led, PaneHeader, Tabs, countText } from './primitives';
+import { Button, Chip, Led, LineLed, PaneHeader, Tabs, countText } from './primitives';
 import { Glyph } from './icons';
 
 /** Delegations is the dialog of what the manager can do in this bridge. */
@@ -269,7 +268,7 @@ function Posts({ id, closed }: { id: string; closed: boolean }) {
         {seqs && waves && (
           <div class="sys waves" role="note">
             <p>
-              <Light tone="grey" />
+              <LineLed tone="grey" />
               <span class="sys-text">{waves}</span>
             </p>
           </div>

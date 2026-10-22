@@ -14,8 +14,7 @@ import { askManager, loadAgents, openNewBridge } from '../state/actions';
 import { handleReason, nextHandle } from '../lib/handles';
 import { go } from '../lib/route';
 import { attempt } from './notice';
-import { Glyph } from './icons';
-import { Button, Field, IconButton, Input, Mark, PaneHeader, TextArea } from './primitives';
+import { Advanced, Button, Choices, Field, IconButton, Input, Mark, PaneHeader, TextArea } from './primitives';
 
 /** One seat of the form. task follows the goal until the person changes it. */
 export interface SeatRow {
@@ -183,19 +182,16 @@ export function NewBridge() {
           </Field>
 
           {hasManager && (
-            <fieldset>
-              <legend>Seats</legend>
-              <div class="choices" role="radiogroup">
-                <label class={'choice' + (f.mode === 'pick' ? ' on' : '')}>
-                  <input type="radio" name="mode" checked={f.mode === 'pick'} onChange={() => patch({ mode: 'pick' })} />
-                  <span class="t-sub">Pick the seats</span>
-                </label>
-                <label class={'choice' + (f.mode === 'manager' ? ' on' : '')}>
-                  <input type="radio" name="mode" checked={f.mode === 'manager'} onChange={() => patch({ mode: 'manager' })} />
-                  <span class="t-sub">Let the manager split it</span>
-                </label>
-              </div>
-            </fieldset>
+            <Choices
+              name="mode"
+              legend="Seats"
+              value={f.mode}
+              options={[
+                { id: 'pick', label: 'Pick the seats' },
+                { id: 'manager', label: 'Let the manager split it' },
+              ]}
+              onChange={(mode) => patch({ mode })}
+            />
           )}
 
           {f.mode === 'pick' && (
@@ -242,53 +238,32 @@ export function NewBridge() {
             </section>
           )}
 
-          <fieldset>
-            <legend>Placement</legend>
-            <div class="choices" role="radiogroup">
-              {PLACEMENTS.map((p) => (
-                <label class={'choice' + (f.placement === p.id ? ' on' : '')}>
-                  <input type="radio" name="placement" value={p.id} checked={f.placement === p.id} onChange={() => patch({ placement: p.id })} />
-                  <span class="t-sub">{p.label}</span>
+          <Choices name="placement" legend="Placement" value={f.placement} options={PLACEMENTS} onChange={(placement) => patch({ placement })} error={err.placement} />
+
+          <Advanced open={adv} onToggle={setAdv}>
+            <Field label="Title">
+              <Input value={f.title} maxLength={120} placeholder={titleOf(f.goal)} onInput={(e) => patch({ title: (e.target as HTMLInputElement).value })} />
+            </Field>
+            <fieldset>
+              <legend>Caps</legend>
+              <div class="field-row">
+                {CAPS.map(([k, label]) => (
+                  <Field label={label} error={err.caps[k]}>
+                    <Input type="number" min={1} inputMode="numeric" value={f.caps[k] || ''} invalid={!!err.caps[k]} onInput={(e) => patch({ caps: { ...f.caps, [k]: (e.target as HTMLInputElement).value } })} />
+                  </Field>
+                ))}
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend>What the manager can do here</legend>
+              {DELEGATION.map(([k, label]) => (
+                <label class="check">
+                  <input type="checkbox" checked={f.delegation[k]} onChange={(e) => patch({ delegation: { ...f.delegation, [k]: (e.target as HTMLInputElement).checked } })} />
+                  <span>{label}</span>
                 </label>
               ))}
-            </div>
-            {err.placement && (
-              <span class="field-error" role="alert">
-                {err.placement}
-              </span>
-            )}
-          </fieldset>
-
-          <details class="advanced" open={adv} onToggle={(e) => setAdv((e.target as HTMLDetailsElement).open)}>
-            <summary>
-              <Glyph name="back" size={16} />
-              Advanced
-            </summary>
-            <div class="advanced-body">
-              <Field label="Title">
-                <Input value={f.title} maxLength={120} placeholder={titleOf(f.goal)} onInput={(e) => patch({ title: (e.target as HTMLInputElement).value })} />
-              </Field>
-              <fieldset>
-                <legend>Caps</legend>
-                <div class="field-row">
-                  {CAPS.map(([k, label]) => (
-                    <Field label={label} error={err.caps[k]}>
-                      <Input type="number" min={1} inputMode="numeric" value={f.caps[k] || ''} invalid={!!err.caps[k]} onInput={(e) => patch({ caps: { ...f.caps, [k]: (e.target as HTMLInputElement).value } })} />
-                    </Field>
-                  ))}
-                </div>
-              </fieldset>
-              <fieldset>
-                <legend>What the manager can do here</legend>
-                {DELEGATION.map(([k, label]) => (
-                  <label class="check">
-                    <input type="checkbox" checked={f.delegation[k]} onChange={(e) => patch({ delegation: { ...f.delegation, [k]: (e.target as HTMLInputElement).checked } })} />
-                    <span>{label}</span>
-                  </label>
-                ))}
-              </fieldset>
-            </div>
-          </details>
+            </fieldset>
+          </Advanced>
 
           <div class="form-end">
             <Button href="#">Cancel</Button>

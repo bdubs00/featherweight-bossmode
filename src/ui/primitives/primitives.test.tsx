@@ -5,7 +5,10 @@ import { setFetch, type FetchLike } from '../../api/client';
 import { store } from '../../state/store';
 import { markOf, markPath } from '../../lib/mark';
 import { forgetFaces } from '../../lib/faces';
-import { Avatar, Button, Card, Chip, Command, Field, GrooveBand, Help, IconButton, Input, Led, LogoWell, Mark, PaneHeader, ReactionChip, Tabs, countText, glyphPx, initialsOf } from './index';
+import { createRef } from 'preact';
+import { Advanced, Avatar, Button, Card, Chip, Choices, Command, Field, Find, GrooveBand, Help, IconButton, Input, Led, LineLed, LogoWell, Mark, PaneHeader, ReactionChip, Tabs, countText, glyphPx, initialsOf } from './index';
+import { flipOf } from './Help';
+import { Menu } from '../common';
 
 let box: HTMLElement;
 
@@ -277,3 +280,65 @@ describe('Help', () => {
     expect(el.querySelector('[role="note"]')).toBeNull();
   });
 });
+
+describe('the primitives of the next stage', () => {
+  it('holds an amber light still for a status that waits for nothing, and draws a bare light for a line', () => {
+    let el = mount(<Led tone="amber" word="asked" still />);
+    expect(el.querySelector('.breathe')).toBeNull();
+    act(() => render(null, el));
+    el = mount(<LineLed tone="amber" />);
+    expect(el.querySelector('.led-amber')!.getAttribute('aria-hidden')).toBe('true');
+    expect(el.querySelector('.breathe')).toBeNull();
+  });
+
+  it('hands the element of a key to its ref', () => {
+    const ref = createRef<HTMLButtonElement>();
+    mount(<Button ref={ref}>Add</Button>);
+    expect(ref.current!.tagName).toBe('BUTTON');
+    expect(ref.current!.textContent).toBe('Add');
+  });
+
+  it('draws the key of a menu as a secondary key on a header', () => {
+    const el = mount(<Menu label="More for migrator-1" kind="secondary" items={[{ label: 'Mute', onSelect: () => {} }]} />);
+    const key = el.querySelector('button')!;
+    expect(key.className).toContain('key-secondary');
+    act(() => key.click());
+    expect([...el.querySelectorAll('[role="menuitem"]')].map((b) => b.textContent)).toEqual(['Mute']);
+  });
+
+  it('flips a definition that would run past the end of its pane', () => {
+    expect(flipOf({ right: 1300 }, { right: 1440 })).toBe(false);
+    expect(flipOf({ right: 1470 }, { right: 1440 })).toBe(true);
+  });
+
+  it('narrows a list with a find field that a screen reader names', () => {
+    const seen: string[] = [];
+    const el = mount(<Find label="Find a member" value="" onInput={(v) => seen.push(v)} />);
+    const input = el.querySelector('input')!;
+    expect(input.getAttribute('placeholder')).toBe('Find a member');
+    expect(el.querySelector('.sr')!.textContent).toBe('Find a member');
+    act(() => {
+      input.value = 'mig';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(seen).toEqual(['mig']);
+  });
+
+  it('offers a visible choice, and keeps the power behind Advanced', () => {
+    const picked: string[] = [];
+    const el = mount(
+      <>
+        <Choices name="placement" legend="Placement" value="queue" options={[{ id: 'queue', label: 'Keep warm workers' }, { id: 'spawn', label: 'Fresh sandbox per seat' }]} onChange={(id) => picked.push(id)} />
+        <Advanced>
+          <p>Title</p>
+        </Advanced>
+      </>,
+    );
+    expect(el.querySelector('legend')!.textContent).toBe('Placement');
+    expect([...el.querySelectorAll('.choice')].map((c) => c.classList.contains('on'))).toEqual([true, false]);
+    act(() => (el.querySelectorAll('.choice input')[1] as HTMLInputElement).click());
+    expect(picked).toEqual(['spawn']);
+    expect(el.querySelector('details.advanced summary')!.textContent).toBe('Advanced');
+  });
+});
+

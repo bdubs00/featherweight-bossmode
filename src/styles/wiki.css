@@ -5,36 +5,6 @@
 
 /* ---------- the parts that the screens of C share ---------- */
 
-/* A find field at the top of a list, recessed. */
-.find {
-  display: flex;
-  align-items: center;
-  gap: var(--s-2);
-  margin: var(--s-2) var(--s-2) 0;
-  padding: 0 10px;
-}
-.find:focus-within {
-  outline: 2px solid var(--ink);
-  outline-offset: 1px;
-}
-.find input {
-  flex: 1;
-  min-width: 0;
-  min-height: var(--h-small);
-  border: 0;
-  background: none;
-  outline: none;
-  font-size: var(--t-body);
-}
-.find input::placeholder {
-  color: var(--muted);
-  opacity: 1;
-}
-.find .glyph {
-  flex: none;
-  color: var(--muted);
-}
-
 /* The groups of a list: a heading with its count, then the rows. */
 .group {
   padding-top: var(--s-2);
@@ -235,76 +205,6 @@ button.group-head > .clip {
   font-family: var(--mono);
   font-size: var(--t-code);
   line-height: var(--t-code-lh);
-}
-
-/* A visible choice of two or three: each option a row with its radio. The
-   picked one takes the look of a selected row. */
-.choices {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: var(--s-2);
-}
-.choice {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  min-height: var(--h-row);
-  padding: 10px var(--s-3);
-  border: 1px solid var(--line);
-  border-radius: var(--r);
-  cursor: pointer;
-}
-.choice:hover {
-  border-color: var(--ink);
-}
-.choice.on {
-  background: var(--raised);
-  border-color: var(--raised-line);
-  box-shadow: var(--e-selected);
-}
-.choice input {
-  flex: none;
-  width: 18px;
-  height: 18px;
-  margin: 2px 0 0;
-  accent-color: var(--ink);
-}
-.choice .t-sub {
-  display: block;
-}
-.choice .t-meta {
-  display: block;
-}
-
-/* Advanced: the power behind one disclosure. */
-.advanced {
-  border-top: 1px solid var(--line);
-}
-.advanced > summary {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--s-1);
-  min-height: var(--h-row);
-  font-weight: 700;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  cursor: pointer;
-  list-style: none;
-}
-.advanced > summary::-webkit-details-marker {
-  display: none;
-}
-.advanced > summary .glyph {
-  transform: rotate(180deg);
-}
-.advanced[open] > summary .glyph {
-  transform: rotate(-90deg);
-}
-.advanced-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s-4);
-  padding: var(--s-2) 0 var(--s-4);
 }
 
 /* A notice in a pane: a line on the raised ground. */
@@ -769,9 +669,6 @@ code.slash {
   flex-direction: column;
   gap: var(--s-3);
 }
-.skill-picker .find {
-  margin: 0;
-}
 .sp-group {
   display: flex;
   flex-direction: column;
@@ -819,7 +716,6 @@ code.slash {
 
 /* A target on a touch screen is at least 44 pixels. */
 @media (pointer: coarse) {
-  .find input,
   .sp-head,
   .sp-row,
   .msteps > summary,

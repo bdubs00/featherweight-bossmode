@@ -130,8 +130,10 @@ export interface MenuItem {
 /**
  * Menu is a button that opens a list of actions. ArrowUp and ArrowDown move
  * in the list, Enter picks, and Escape closes it and gives the focus back.
+ * The key is quiet in a row, and a secondary key, with its edge and its
+ * drop, on the header of a pane.
  */
-export function Menu({ label, items, icon = 'more', class: cls }: { label: string; items: MenuItem[]; icon?: 'more' | 'gear'; class?: string }) {
+export function Menu({ label, items, icon = 'more', kind = 'quiet', class: cls }: { label: string; items: MenuItem[]; icon?: 'more' | 'gear'; kind?: 'quiet' | 'secondary'; class?: string }) {
   const [open, setOpen] = useState(false);
   const btn = useRef<HTMLButtonElement>(null);
   const list = useRef<HTMLDivElement>(null);
@@ -171,7 +173,7 @@ export function Menu({ label, items, icon = 'more', class: cls }: { label: strin
   };
   return (
     <span class={'pop' + (cls ? ' ' + cls : '')}>
-      <button ref={btn} type="button" class={buttonClass('quiet', 's', 'key-icon')} aria-label={label} title={label} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
+      <button ref={btn} type="button" class={buttonClass(kind, 's', 'key-icon')} aria-label={label} title={label} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
         <Glyph name={icon} size={18} />
       </button>
       {open && (

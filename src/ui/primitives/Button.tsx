@@ -4,7 +4,8 @@
 // danger key is a secondary key with the red word, for an action that
 // cannot be undone. With href, the key is a link.
 
-import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ComponentChildren } from 'preact';
+import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ComponentChildren, Ref, VNode } from 'preact';
+import { forwardRef } from 'preact/compat';
 import { Glyph, type GlyphName } from '../icons';
 
 export type ButtonKind = 'primary' | 'secondary' | 'quiet' | 'danger';
@@ -25,7 +26,14 @@ export function buttonClass(kind: ButtonKind = 'secondary', size: 'm' | 's' = 'm
   return 'key key-' + kind + ' key-' + size + (extra ? ' ' + extra : '');
 }
 
-export function Button(p: ButtonProps | LinkButtonProps) {
+/** The two shapes of Button: a button, or a link with href. Each takes the ref of its element. */
+type ButtonComponent = {
+  (p: ButtonProps & { ref?: Ref<HTMLButtonElement> }): VNode | null;
+  (p: LinkButtonProps & { ref?: Ref<HTMLAnchorElement> }): VNode | null;
+};
+
+/** Button is a key. Its ref reaches the button or the link, so a screen can give the focus back to it. */
+export const Button = forwardRef(function Button(p: ButtonProps | LinkButtonProps, ref: Ref<HTMLButtonElement | HTMLAnchorElement>) {
   const { kind = 'secondary', size = 'm', icon, children, class: cls, ...rest } = p;
   const inner = (
     <>
@@ -35,18 +43,18 @@ export function Button(p: ButtonProps | LinkButtonProps) {
   );
   if (typeof p.href === 'string') {
     return (
-      <a {...(rest as AnchorHTMLAttributes<HTMLAnchorElement>)} class={buttonClass(kind, size, cls)}>
+      <a ref={ref as Ref<HTMLAnchorElement>} {...(rest as AnchorHTMLAttributes<HTMLAnchorElement>)} class={buttonClass(kind, size, cls)}>
         {inner}
       </a>
     );
   }
   const b = rest as ButtonHTMLAttributes<HTMLButtonElement>;
   return (
-    <button type="button" {...b} class={buttonClass(kind, size, cls)}>
+    <button ref={ref as Ref<HTMLButtonElement>} type="button" {...b} class={buttonClass(kind, size, cls)}>
       {inner}
     </button>
   );
-}
+}) as unknown as ButtonComponent;
 
 /** IconButton is a key with one glyph and a name for a screen reader and a tooltip. */
 export function IconButton(p: Omit<ButtonProps, 'children' | 'icon'> & { icon: GlyphName; label: string }) {

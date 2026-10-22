@@ -8,8 +8,7 @@
 import { useMemo, useState } from 'preact/hooks';
 import type { Skill } from '../api/types';
 import { groupState, isOn, skillGroups, skillOf, toggleGroup, toggleSkill, type CatalogSkill } from '../lib/catalog';
-import { Glyph } from './icons';
-import { Chip } from './primitives';
+import { Chip, Find } from './primitives';
 
 export interface SkillPickerProps {
   /** The skills of the catalog: state.skills.skills, or the skills of catalogOf. */
@@ -34,10 +33,7 @@ export function SkillPicker({ skills, value, onChange, label = 'Skills' }: Skill
   return (
     <div class="skill-picker" role="group" aria-label={label}>
       {all.length > 6 && (
-        <div class="find recess">
-          <Glyph name="search" size={16} />
-          <input type="search" placeholder="Find a skill" aria-label="Find a skill" value={q} onInput={(e) => setQ((e.target as HTMLInputElement).value)} />
-        </div>
+        <Find label="Find a skill" value={q} onInput={setQ} />
       )}
       {all.length === 0 && <p class="t-meta">No skill yet.</p>}
       {all.length > 0 && shown.length === 0 && <p class="t-meta">No skill holds those words.</p>}

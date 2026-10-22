@@ -19,7 +19,7 @@ import { useRoving } from './keys';
 import { attempt, showError } from './notice';
 import { Markdown } from './common';
 import { Glyph } from './icons';
-import { Button, Card, Chip, Command, Field, Input, PaneHeader, TextArea } from './primitives';
+import { Button, Card, Chip, Command, Field, Find, Input, PaneHeader, TextArea } from './primitives';
 
 /** byName names the writer of a page: a person, an agent, a run, the fleet token, or bossmode. */
 export function byName(by: string): string {
@@ -125,9 +125,8 @@ export function PageTree({ current }: { current?: string }) {
         }
       />
       <div class="scroll" ref={list}>
-        <form class="find recess" role="search" onSubmit={(e) => e.preventDefault()}>
-          <Glyph name="search" size={16} />
-          <input type="search" placeholder="Search the wiki" aria-label="Search the wiki" value={q} onInput={(e) => setQ((e.target as HTMLInputElement).value)} />
+        <form class="list-find" role="search" onSubmit={(e) => e.preventDefault()}>
+          <Find label="Search the wiki" value={q} onInput={setQ} />
         </form>
         {hits ? (
           <div class="c-rows hits" role="list" aria-label="Pages that hold the words">

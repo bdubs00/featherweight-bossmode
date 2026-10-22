@@ -13,13 +13,7 @@ import { commandOf, decisionTitle, personName, rawInput, whyWords } from '../lib
 import { alwaysAllow, decide } from '../state/actions';
 import { attempt } from './notice';
 import { When } from './common';
-import type { Tone } from '../lib/presence';
-import { Button, Card, Command, Field, Input, TextArea } from './primitives';
-
-/** Light is the bare light beside a sentence that is its word, as the title light of a card. */
-export function Light({ tone }: { tone: Tone }) {
-  return <span class={'led led-' + tone} aria-hidden="true" />;
-}
+import { Button, Card, Command, Field, Input, LineLed, TextArea } from './primitives';
 
 
 /** canAlways reports whether a card offers Always allow, with the rule of /ui. */
@@ -74,7 +68,7 @@ export function DecidedLine({ d }: { d: Decision }) {
   if (!d.decidedBy && d.state === 'deny') {
     return (
       <div class="decided">
-        <Light tone="grey" />
+        <LineLed tone="grey" />
         <p>
           No decision: {d.note || ''}
           {d.decidedAt && (
@@ -92,7 +86,7 @@ export function DecidedLine({ d }: { d: Decision }) {
   const words = q ? (d.state === 'allow' ? `${who} answered: ${d.answer || ''}` : `${who} declined the question`) : d.state === 'allow' ? `${who} allowed this` : `${who} denied this`;
   return (
     <div class="decided">
-      <Light tone={d.state === 'allow' ? 'green' : 'red'} />
+      <LineLed tone={d.state === 'allow' ? 'green' : 'red'} />
       <p>
         {words}
         {d.decidedAt && (

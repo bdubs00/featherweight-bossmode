@@ -11,7 +11,7 @@ import { useRoving } from './keys';
 import { LiveStatus } from './Shell';
 import { Glyph } from './icons';
 import { unreadText } from '../lib/words';
-import { Button, Chip, Input, Led, PaneHeader } from './primitives';
+import { Button, Chip, Find, Led, PaneHeader } from './primitives';
 
 /** The number of bridges above which the list shows its filter field. */
 export const FILTER_FROM = 10;
@@ -93,8 +93,8 @@ export function BridgeList({ current }: { current: string }) {
         }
       />
       {many && (
-        <div class="list-filter">
-          <Input type="search" aria-label="Find a bridge" placeholder="Find a bridge" value={filter} onInput={(e) => setFilter((e.target as HTMLInputElement).value)} />
+        <div class="list-find">
+          <Find label="Find a bridge" value={filter} onInput={setFilter} />
         </div>
       )}
       <div class="scroll" ref={list}>
