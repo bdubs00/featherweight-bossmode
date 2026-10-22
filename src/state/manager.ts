@@ -12,17 +12,25 @@ import { store } from './store';
 
 /** The run that the person picked: null follows the settings, "" is a new conversation. */
 let picked: string | null = null;
+/** The person who picked it. Another person who signs in follows the settings. */
+let pickedBy = '';
 const listeners = new Set<() => void>();
+
+const subject = (): string => {
+  const me = store.get().me;
+  return (me && me.principal && me.principal.subject) || '';
+};
 
 /** managerRunOf is the run of the conversation: the one that the person picked, else the one of the settings. */
 export function managerRunOf(config: BossConfig | null | undefined): string {
-  if (picked !== null) return picked;
+  if (picked !== null && pickedBy === subject()) return picked;
   return config && config.manager ? config.manager.run : '';
 }
 
 /** setManagerRun opens a conversation, or a new one with "". */
 export function setManagerRun(id: string): void {
   picked = id;
+  pickedBy = subject();
   for (const f of [...listeners]) f();
 }
 
