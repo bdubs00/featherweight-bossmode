@@ -145,7 +145,7 @@ Capacity shows where seating happens:
 | `Your access token did not work.` | keep | | Lead |
 | `The workbench did not answer. Check the connection and try again.` | keep | | Lead |
 | `The workbench answered with something that is not JSON.` | change | `The workbench answered with something that is not JSON. Reload the page.` | done |
-| the notice stays until Dismiss or the next action that works | change | the notice also clears when the person moves to another screen | done |
+| the notice stays until Dismiss or the next action that works | change | when the person moves to another screen, the notice also clears | done |
 
 ### src/lib/presence.ts
 
@@ -162,6 +162,7 @@ Capacity shows where seating happens:
 | `canceled` (run) | change | `stopped`, the word of the Stop key | done |
 | `Is queued, running, or paused.` | change | `waiting for a worker` for queued, and `Runs, or pauses between two steps.` for running | done |
 | new | add | `waiting for a worker`, with `Every worker of its agent is busy. It starts when one is free.` | done |
+| the word of a status from three sources: the presence of the bridge, the phases of the stream, and the read of the pool | change | one word for one status on every screen, from `statusOf` of `src/lib/status.ts`. The counts `N awake` and `N workers awake` take it, and so do the people list and the board. The halo of a conversation, a row of the members, the run pane, and the Workers of a profile take it too. The words stay the words of this section. | done |
 
 ### src/lib/words.ts
 
@@ -257,10 +258,11 @@ Capacity shows where seating happens:
 | new | add | `pinned`, a quiet chip after the clock time of a pinned message, which keeps its header after a message of the same sender | done |
 | `Question from <who>`, `Permission for <who>` (labels) | change | `Question from <who>`, `Decision for <who>` | A |
 | system lines: the icon before the line | change | the light of the event: green for started, amber for needs you, red for failed, grey for the rest | A |
-| the sentence of the backend on a system line, such as `migrator-2 went to sleep. A message wakes its Task.` | change | the words of the page for the event of the line, from `lineWords` of `src/lib/lines.ts`, in the channel and in the thread of a seat. The sentence sits in a tooltip where the words leave part of it out. A line of an event that the page does not know keeps the sentence. | done |
+| the sentence of the backend on a system line, such as `migrator-2 went to sleep. A message wakes its Task.` | change | the words of the page for the event of the line, in the channel and in the thread of a seat. `lineWords` of `src/lib/lines.ts` gives them. The sentence sits in a tooltip where the words leave part of it out. A line of an event that the page does not know keeps the sentence. | done |
 | `<handle> woke up` (started, for a worker that wakes again) | add | | done |
 | `<handle> took the seat` (any other started) | add | never the task | done |
 | `<handle> went to sleep` (asleep) | add | no second sentence | done |
+| `<handle> slept and woke up`, `<handle> slept and woke up N times` (a sleep line and a wake line of one seat with nothing between them, and a run of such pairs) | add | one quiet line with a grey light, in the channel and in the thread of a seat, at the clock time of its last line. It does not open. A sleep line that no wake line follows stays, because it says where the worker is now. In a fold of lines, the quiet line counts as one update. | done |
 | `<by> allowed <handle>'s command`, `<by> denied <handle>'s command`, `<by> answered <handle>`, `<by> declined <handle>'s question`, `<by> decided` (decided) | add | only where the view does not hold the card that the line decides. The card shows the decision, and the note stays on the card. | done |
 | `<by> opened the bridge`, `<by> closed the bridge`, `<by> reopened the bridge`, `The bridge opened`, `The bridge closed`, `The bridge opened again` | add | | done |
 | `<by> seated <handle>` (joined) | add | the word of the key Seat | done |
@@ -273,7 +275,7 @@ Capacity shows where seating happens:
 | `<handle> needs you`, `<handle> asks you` (a line of needs-you or asked without its card) | add | | done |
 | `<handle> failed`, `<handle> did not take the seat`, `<handle> did not get a message`, `<handle> did not stop`, `<handle> did not start`, `<handle> stopped waiting for its decision`, `The report failed`, `Failed` (failed) | add | | done |
 | `The bridge reached its cap of N messages`, `The bridge reached its cap of N a minute`, `<handle> stopped at a limit`, `<handle> cannot take messages`, `<a> and <b> reached their cap`, `The bridge reached a cap` (cap) | add | | done |
-| `You` (the author line of a message of the person who reads the page, the person of a line, and the line of a decided card) | add | the subject or the name of `/v1/whoami` matches the sender or the decider, so a person who signs in with the token of the fleet never reads `token` for themself | done |
+| `You` (the author line of a message of the person who reads the page, a person of a line, and a decided card) | add | the subject or the name of `/v1/whoami` matches the sender or the decider. A person who signs in with the token of the fleet thus never reads `token` for themself. | done |
 | `Someone`, `token` (a line whose sentence names nobody, or the token of the fleet for another person) | add | | done |
 
 ### src/ui/Decision.tsx
@@ -391,7 +393,7 @@ Capacity shows where seating happens:
 | `Saved.`, `The new face is up.` | keep | | B |
 | new | add | the profile: `Workers` with its chip, `Keep`, and the question mark `What is a worker` with `A worker runs the work of one agent, one seat at a time. Keep is how many it keeps ready.` | B |
 | new | add | `What people liked` with its chip and `Open page` | B |
-| one sentence per heart, from `agents/<agent>/learned.md` | change | the parts of the entry: what the agent did as the main line, what the person asked as a muted line, the note when there is one, and the link `Open the run` to the run pane of the bridge, newest first, as the front writes them | done |
+| one sentence per heart, from `agents/<agent>/learned.md` | change | the parts of the entry, newest first, as the front writes them. What the agent did is the main line, and what the person asked is a muted line. Then come the note of the person and the link `Open the run` to the run pane of the bridge. An entry without a note leaves it out. | done |
 | `Open the run` | add | the link of a heart to its run | done |
 | new | add | `Today` with runs, cost, and decisions | B |
 | new | add | `N skills`, the one line of the profile that counts them | done |
@@ -404,8 +406,8 @@ Capacity shows where seating happens:
 | `Tools and rules` (the list of chips) | add | an accessible name | done |
 | `Edit` (the key of an owner on the profile) | add | | done |
 | `Keep is a whole number, 0 or more.` | add | the error of the Keep field | done |
-| `Remove workers`, with Confirm: `Remove the workers of <agent>?`, `Every worker of <agent> stops. A seat of <agent> waits for a worker.`, and the key `Remove workers` | change | an owner only, as the danger item of the menu `More for workers` beside Keep, so no destructive key sits in plain sight | done |
-| `N runs`, `$N`, `N decisions` (Today) | add | `1 run` and `1 decision` for one, and `$N so far` when a run reports no cost | done |
+| `Remove workers`, with the dialog `Remove the workers of <agent>?`, `Every worker of <agent> stops. A seat of <agent> waits for a worker.`, and the key `Remove workers` | change | an owner only, as the danger item of the menu `More for workers` beside Keep, so no destructive key sits in plain sight | done |
+| `N runs`, `$N`, `N decisions` (Today) | add | `1 run` and `1 decision` for one. If a run reports no cost, `$N so far`. | done |
 
 ### src/ui/RunPane.tsx and src/ui/Conversation.tsx
 
@@ -435,7 +437,8 @@ Capacity shows where seating happens:
 | `Took N steps` (a fold of three or more steps) | keep | | done |
 | `Load earlier messages` | change | `Earlier messages` | B |
 | `Loading the conversation.` | keep | | B |
-| new | add | `This run is gone.`, in place of a conversation whose run the fleet does not hold, as after a worker that held it was replaced. A read that the page starts on its own never raises the notice; the sentence of another failure shows in the same place. | done |
+| new | add | `This run is gone.`, in place of a conversation whose run the fleet does not hold, as after a worker that held it was replaced. A read that the page starts on its own never raises the notice. The sentence of another failure shows in the same place. | done |
+| new | add | `This read wakes the worker.`, one short line in place while the worker that holds the run sleeps. It shows on the tabs Run and Files of a seat and in the run pane of a bridge. The tab reads the run because the person opened it, and the line goes once the worker is awake. The Chat tab reads nothing of a worker that sleeps, so it needs no such line. The line is the one sentence of explanation of these views: without it, a worker that wakes for a read looks like a fault. | done |
 
 ### src/ui/Member.tsx and src/ui/Board.tsx
 
@@ -514,7 +517,7 @@ Capacity shows where seating happens:
 | `What the manager can do here` and its four rows | change | in Advanced, with the words of screen A | C |
 | `Each member starts a run as you. A bridge spends through the budgets of the pools of its members.` | remove | | C |
 | `Cancel`, `Open the bridge` | change | `Cancel`, `Open bridge` | done |
-| `Seats`, `Pick the seats`, `Let the manager split it` | add | the choice of who seats the bridge, when the settings name a manager | done |
+| `Seats`, `Pick the seats`, `Let the manager split it` | add | if the settings name a manager, the choice of who seats the bridge | done |
 | `Add a seat` (the heading of the seats beside that choice), `Add` (the key that opens the picker of the members pane) | add | | done |
 | `Placement`, `Title`, `Caps`, `Most messages`, `Most messages a minute`, `Most messages between two members` | add | Title and Caps in Advanced | done |
 | `Write a whole number.` | add | the error of a cap | done |
@@ -531,7 +534,8 @@ Capacity shows where seating happens:
 | `New agent` | keep | | done |
 | `A new agent starts with a name and the number of workers it keeps. The form comes with the next stage.` | remove | the form: `Name` first, then `How many can work at once?` with 2 as the default, and Advanced | done |
 | `Name`, `What it handles`, `How many can work at once?`, `Template`, `Skills` | add | the fields before Advanced. The skills sit outside Advanced. | done |
-| `Model`, `Effort`, `Default`, `Budget of a run`, `Turns`, `Tokens`, `Cost in dollars`, `Context compaction`, `Compact at, in tokens`, `Compaction model`, `Rules`, `Ask before`, `Never run`, `Time zone` | add | in Advanced | done |
+| `Model`, `Effort`, `Default`, `Budget of a run`, `Turns`, `Tokens`, `Cost in dollars` | add | in Advanced | done |
+| `Context compaction`, `Compact at, in tokens`, `Compaction model`, `Rules`, `Ask before`, `Never run`, `Time zone` | add | in Advanced | done |
 | `Create agent`, `Preview`, `saved`, `Open <name>`, `Workers`, `N workers start when you create the agent.` | add | | done |
 | `Write the name of the agent.`, `A name holds letters, digits, dots, dashes, or underscores, at most 64.`, `An agent named <name> exists. Pick another name.`, `Pick a number from 1 to 32.`, `Write a whole number.`, `Write an amount in dollars, such as 2.50.`, `Write a whole number of tokens, at least 1024.` | add | the errors, each at the moment the person hits it | done |
 | `Appearance`, `Theme`, `Match the system`, `Light`, `Graphite` | keep | | C |
@@ -564,24 +568,24 @@ Capacity shows where seating happens:
 | new | add | `New`, the key of a new chat on the header of the list, the word of the other lists | done |
 | new | add | `Find a chat`, the field above the history | done |
 | new | add | `Today`, `Yesterday`, and the date, such as `Monday, October 19`, the quiet heading of each day of the history | done |
-| new | add | a row of the history: the title of the run, the status of the run as a light with its word (`working`, `waiting for a worker`, `needs you`, `ready`, `ended`, `failed`, `stopped`), and `since()`, such as `25 min`. A run without a title shows the start of its first message, else `Chat`. | done |
+| new | add | a row of the history: the title of the run, the status of the run, and `since()`, such as `25 min`. The status is a light with its word: `working`, `waiting for a worker`, `needs you`, `ready`, `ended`, `failed`, or `stopped`. A run without a title shows the start of its first message, else `Chat`. | done |
 | new | add | `Loading the chats.`, `No chat holds those words.` | done |
 | new | add | `No chat yet.` with the key `New chat` | done |
 | new | add | `New chat`, the title of a chat before its first message | done |
-| new | add | `Tools`, `Skills`, the two headings of the picks, each with the count chip of the picks that are on, `N of M` for a screen reader | done |
+| new | add | `Tools`, `Skills`, the two headings of the picks. Each has the count chip of the picks that are on, with `N of M` for a screen reader. | done |
 | the picks of `Tools` from the catalog of the front | change | `Tools` holds the tool list of the profile of the agent: each tool of the catalog that an entry names, and an entry that names none, such as `front.pages_*`, as one chip by its name. Every chip of `Tools` starts on. | done |
 | `More tools` | add | the heading of the other tools of the catalog, which start off, with its count chip. `spawn_task`, `await_task`, `propose_agent`, and `ask_user` never start on, so they sit here. | done |
 | new | add | `Find a tool`, `Find a skill`, the fields of a row of picks that holds more than twelve | done |
 | new | add | `Loading the tools.`, while the picks wait for the catalogs | done |
-| new | add | `A chat needs at least one tool. Pick one.`, the error of the picks when every tool is off, because an empty tool list gives a run every tool | done |
+| new | add | `A chat needs at least one tool. Pick one.`, the error of the picks with every tool off. An empty tool list gives a run every tool. | done |
 | new | add | `Ask a question` (placeholder), `Message to <agent>` (label) | done |
 | new | add | `working`, or `waiting for a worker`, with the phrase of the step, the status of an answer on its way | done |
 | new | add | `Stopped. Your next message starts a new chat.` | done |
 | new | add | `This chat`, the heading of the details, and `This chat, <status>`, the name of the mark that opens it | done |
 | new | add | `Tools`, `Skills` with the count chip, `1 tool` and `N tools`, `1 skill` and `N skills` for a screen reader | done |
-| `Tools 0` (This chat of a chat whose picks the page cannot tell) | remove | `Tools` names the tools that the chat started with: the resolved profile of the run, the picks of the tab, the first event of the run, else the list of the profile with the tools for this chat. The section leaves out where the page cannot tell. | done |
+| `Tools 0` (This chat of a chat whose picks the page cannot tell) | remove | `Tools` names the tools that the chat started with. They come from the resolved profile of the run, the picks of the tab, or the first event of the run. Else they are the list of the profile with the tools for this chat. The section leaves out where the page cannot tell. | done |
 | new | add | `for this chat`, the quiet word on the chip of a tool that the picks gave beyond the list of the agent | done |
-| new | add | `Model`, with the model of the resolved profile, when the run object carries it | done |
+| new | add | `Model`, with the model of the resolved profile. It shows only for a run object that carries it. | done |
 | new | add | `Usage`, with `N turns`, `N tokens`, and `$N`, and `so far` while the run works. `1 turn` and `1 token` for one. | done |
 | new | add | `No quick chat is set up.` with the question mark `Where the quick chat is set up` and `The setting workbench.bossmode.chat names the agent of the quick chat.` | done |
 | `Rename`, `Save as agent` | remove | the backend has no route that sets the title of a run, and the new-agent screen takes no run to start from | done |
@@ -590,7 +594,7 @@ Capacity shows where seating happens:
 
 | Now | Verdict | New text | Who |
 |---|---|---|---|
-| new | add | `Working: <tool>`, a quiet line while the model calls a tool, without the prefix `front.`. It goes when the model call ends. | done |
+| new | add | `Working: <tool>`, a quiet line while the model calls a tool, without the prefix `front.`. When the model call ends, it goes. | done |
 | new | add | `Live view is busy`, a quiet line while the run has as many live clients as it takes, and the view reads the run with its poll | done |
 | new | add | the pending answer: the face and the name of the agent, and the text as the model writes it, with no clock time | done |
 

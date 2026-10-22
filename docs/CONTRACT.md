@@ -145,7 +145,9 @@ plan plus two fields:
 
 `presence` is one word of the table of section 6.5 of the plan: `working`,
 `needs-you`, `idle`, `asleep`, `error`, or `fired`. `activity` is the K4
-activity of the newest run of the member, or null.
+activity of the newest run of the member, or null. The page derives the
+presence of a seat itself where it holds the facts (section 10.1), and
+takes this field only where it lacks them.
 
 ### 5.2 The read mark
 
@@ -330,7 +332,12 @@ thumb down with `{"decision": "deny"}` (section 7.2).
 The page reads the existing routes `GET /v1/runs/{id}`,
 `GET /v1/runs/{id}/result`, `GET /v1/runs/{id}/transcript`, and
 `GET /v1/runs/{id}/files/{path}` with `Accept: application/json`, as `/ui`
-reads them. The run object carries two fields of the kernel changes:
+reads them. The front sends the last three to the member that holds the
+run, and the router of ax wakes a worker that sleeps for them. So the page
+reads them only while the worker is awake, or on an action of the person
+(section 10.1). A later front will answer `GET /v1/runs/{id}` from its
+view for a member that sleeps. Until then, that read wakes the worker too,
+so the page polls it only while the run works. The run object carries two fields of the kernel changes:
 `activity` (K4) and `reactions`, the counts of K2. The quick chat also
 reads these fields of the run object:
 
@@ -617,16 +624,49 @@ The `activity` of a `run` event carries `phrase`. The `activity` of
 `GET /v1/runs/{id}` has no `phrase`, so a screen takes the phrase from the
 stream or from the member of a bridge. `run` events come only for the runs
 of other fleet members: a run of the front itself, such as a manager that
-runs on the front, needs a poll of `GET /v1/runs/{id}`. The page uses `member` and
-`task` on the Fleet screen: a `member` event changes the state of a fleet
-member, and a `task` event changes the phase of the Task of a pool whose
-`atespace/name` is `member`. A Task that is gone leaves its pool on the
-screen. The page reads `GET /v1/fleet` when the screen opens and after a
-`reset`.
+runs on the front, needs a poll of `GET /v1/runs/{id}`. A `member` event
+changes the state of a fleet member. A `task` event changes the phase of
+the Task of a pool whose `atespace/name` is `member`. A Task that is gone
+leaves its pool on the screen. A `task` event for a Task that the fleet
+view does not list makes the page read `GET /v1/fleet` again, so a new
+worker shows. The page reads `GET /v1/fleet` at boot and after a `reset`.
 
 A `bridge.message` or `bridge.member` event for a bridge that the page does
 not know makes the page read that bridge with `GET /v1/bridges/{id}`. A
 bridge that the manager opens therefore shows in the rail.
+
+### 10.1 One state per worker
+
+The page keeps one state per worker from the stream, and derives every
+status from it in `src/lib/status.ts`.
+
+- The phase of its Task comes from the `task` events.
+- The state of its member comes from the `member` events.
+- The runs that it holds come from the `run` events and from
+  `GET /v1/fleet/runs?state=active`. The page reads that route at boot and
+  after a `reset`. The state `active` keeps every run that is not
+  finished, as on `GET /v1/runs` of the kernel. The front answers it from
+  its view, so the read wakes no worker. The page needs `member` on each
+  run, as `atespace/name` or the name alone.
+
+The presence of a seat is the presence of section 6.5 of the plan. The
+page derives it from the newest run of the seat and the phase of the
+worker that holds it. A worker that sleeps or starts counts as asleep, and
+a worker that fails, stops, or says that it is blocked counts as an error.
+The `presence` of a member of a bridge stands only where the page lacks
+the facts. That is a newest run that the page does not hold, or a finished
+run on a worker whose phase the page does not know. A worker is busy while
+it holds an open run. Until the page reads the open runs, the `active`
+count of `GET /v1/fleet` stands in.
+
+A read of the result, the transcript, or the files of a run wakes a worker
+that sleeps. The Chat tab of a seat reads nothing of such a worker. It
+shows the entries of the channel, the live answer, and the steps that the
+page read while the run worked. The inbox reads no result of such a
+worker. For a run whose worker sleeps, three views read them: the tab Run
+of a seat, the tab Files of a seat, and the run pane of a bridge. Each
+reads them as soon as the person opens it, and says so in place:
+`This read wakes the worker.`
 
 ## 11. Rules of the backend that the page follows
 
@@ -757,8 +797,10 @@ the new-agent screen read this one list. The free workers of an agent come
 from its pool.
 
 The page never says pool to a person: the profile says Workers and Keep.
-The profile reads the status of the workers every 10 seconds while it is
-open, because no event of the stream carries it.
+While the profile is open, it reads `GET /v1/pools/{name}` every 10
+seconds. That read gives Keep (`wanted`) and the `gaps`, which no event of
+the stream carries. The workers and their phases come from the stream (section 10.1),
+never from that read.
 
 ## 14. What the page does not call yet
 

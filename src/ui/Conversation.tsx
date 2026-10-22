@@ -34,7 +34,7 @@ export interface TranscriptState {
   earlier: () => Promise<void>;
 }
 
-/** The transcripts that the page read, by run, so a view that may not read its worker shows what the page has. */
+/** The transcripts that the page read, by run. A view that must not read a worker that sleeps shows what the page has. */
 const read = new Map<string, { items: Item[]; prev: number }>();
 
 /** forgetTranscripts drops the transcripts that the page read, for the tests. */

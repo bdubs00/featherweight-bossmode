@@ -171,8 +171,8 @@ const OPEN_STATES = ['queued', 'running', 'input-required', 'suspended'];
  * loadOpenRuns reads the runs of the fleet that are not finished, from the
  * view of the front, so the page knows the runs that each worker holds.
  * The run events keep them current after that. A run that the page holds
- * as open and that the answer leaves out finished while the stream could
- * not resume, so the page reads it again.
+ * as open and that the answer leaves out finished during a gap of the
+ * stream, so the page reads it again.
  */
 export async function loadOpenRuns(): Promise<void> {
   const runs = await once('open-runs', () => api.fleetRuns({ state: 'active' }));

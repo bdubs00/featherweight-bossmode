@@ -238,8 +238,8 @@ transition. `prefers-reduced-motion: reduce` turns all three off: the amber
 light holds a steady glow, and the card and the chip appear in place.
 
 The answer that a live stream sends is not a motion. Its text grows as the
-model writes it, in a pending message with no clock time, no cursor, and no
-fade, so reduced motion changes nothing there.
+model writes it, in a pending message. The message has no clock time, no
+cursor, and no fade, so reduced motion changes nothing there.
 
 ### 4.6 Layers
 
@@ -353,8 +353,8 @@ color, radius, shadow, or type size of its own.
 
 | Primitive | What it draws | States |
 |---|---|---|
-| `Help` | A 22-pixel question mark that opens a definition in a small layer | open, closed by Escape or a click elsewhere. The layer opens toward the end of the line and flips toward the start where it would run past the edge of its pane. |
-| `Menu` | A key with the glyph More that opens a list of actions, in `common.tsx` | quiet in a row, secondary on the header of a pane; a danger item for Fire and Remove |
+| `Help` | A 22-pixel question mark that opens a definition in a small layer | open, closed by Escape or a click elsewhere. The layer opens toward the end of the line. Where it runs past the edge of its pane, it flips toward the start. |
+| `Menu` | A key with the glyph More that opens a list of actions, in `common.tsx` | quiet in a row, secondary on the header of a pane, and a danger item for Fire and Remove |
 | `Led` | A 9-pixel square light and its word | Green, amber (breathes), red, and grey. Struck for fired. Quiet: no word on screen, the word in a tooltip and the accessible name. Still: the amber light holds, for a status that waits for nothing. |
 | `LineLed` | The bare light of a line whose text is its word: a system line, a decided line | The four tones. It never breathes. |
 | `Mark` | The face of an agent: a 5 by 5 symmetric glyph from the hash of the name on a raised square, or the custom picture of the backend | Sizes 20, 32, 36, and 72. A halo of a status color in the header of a member conversation. Selected: the well turns paper. |
@@ -518,8 +518,12 @@ The work:
   started, amber for needs you and asked, red for failed, grey for the rest,
   including `finished`. An entry from the handle `manager` draws the mark of
   the manager.
-- The folding of system lines and agent chatter. Three or more system lines
-  in a row fold into one line, such as `5 updates`, that opens in place.
+- The folding of system lines and agent chatter. A sleep line and a wake
+  line of one seat with nothing between them fold into one quiet line, such
+  as `migrator-1 slept and woke up 4 times`, and so does a run of such
+  pairs. That line does not open. Three or more system lines in a row fold
+  into one line, such as `5 updates`, that opens in place. The quiet line of
+  the pairs counts as one of them.
   Messages that agents send only to agents fold into one line, such as
   `migrator-1 and reviewer: 4 messages`. A decision card never folds.
 - The decision card. `Card` with the title Needs your decision and the amber
@@ -534,8 +538,9 @@ The work:
   workers.` The counts come from `workersOf` of `src/lib/workers.ts`.
 - The members pane. Rows of the mockup: the mark at 36, the handle, the
   status, the task, the phrase of the activity, and the reason of an error,
-  such as `Stopped at 40 turns`. The status comes from `seatLight`, which
-  says waiting for a worker for a queued run. A row that needs you takes `--wash-need`. The More
+  such as `Stopped at 40 turns`. The status comes from `statusOf` (section
+  11.8), which says waiting for a worker for a queued run. A row that needs
+  you takes `--wash-need`. The More
   menu holds Open conversation (to `#member/<bridge>/<handle>`), Mute, Seat
   again, Change task, and Fire. The foot shows This bridge with turns, cost,
   and pages from `usage`, for runs that report it.
@@ -564,24 +569,28 @@ The work:
   the state of their workers. A Find a member field on top. The header has
   the count chip, an `N awake` chip with a green light, and the key New
   agent. The list loads the record of each open bridge, and the stream
-  keeps it current.
+  keeps it current. Every status of the list and of its header comes from
+  `statusOf` (section 11.8).
 - The member conversation, at `#member/<bridge>/<handle>`. The header has
   the mark at 36 with the halo of its status. The word of the status is in
   the tooltip and the accessible name. The handle is the title, and
   `in <bridge>` is a link. The tabs are Chat, Run, and Files, with the count
-  of files. The More key opens the menu of the seat. Chat shows the transcript of the runs of the seat in
-  the look of the channel, with the composer `Message <handle>`. Its slash
+  of files. The More key opens the menu of the seat. Chat shows the
+  conversation that the page has from the channel and the stream, in the
+  look of the channel, with the composer `Message <handle>`. Its slash
   menu offers the skills of the agent through the `commands` of `Composer`.
   Run shows the result, what it did, the limits, and the reactions. Files
   shows the files and the viewer. The `activity` of `GET /v1/runs/{id}` has
-  no phrase, so the phrase comes from the member of the bridge.
+  no phrase, so the phrase comes from the member of the bridge. For the
+  reads of each tab, see section 11.8.
 - The profile of the agent, in the details pane. The mark at 72, the
   tagline, the tools as chips, a rule as an amber word, and the key New
   face. What people liked, from `agents/<agent>/learned.md`, with a count
   chip and Open page. Workers, with its chip, the question mark What is a
   worker, and Keep as a number field in place. Each worker: its name, its
   status, and the seat it serves or the time it slept, as `since()` gives
-  it. The one line `N skills`, and the picker of skills of C. Today: runs,
+  it. The workers and their statuses come from the stream (section 11.8).
+  The read of the pool every 10 seconds gives only Keep and the gaps. The one line `N skills`, and the picker of skills of C. Today: runs,
   cost, and decisions.
 - Activity. The inbox in the order of attention: the decisions that wait,
   then the errors, then the messages to you, then the rest. j and k move,
@@ -617,9 +626,9 @@ The work:
   of A once it lands, and until then from the rows of today. Advanced holds
   the title, the handles, and what the manager can do.
 - New agent, at `#new-agent`. One question first: the name, beside what
-  it handles. Then How many can work at once?, with 2 as the default, which
-  the profile shows as Keep, and the template of its workers when the
-  settings offer more than one. Then the skills, with the `SkillPicker`,
+  it handles. Then How many can work at once?, with 2 as the default. The
+  profile shows that number as Keep. If the settings offer more than one
+  template of workers, the template comes next. Then the skills, with the `SkillPicker`,
   outside Advanced, because the skills decide what the agent can do.
   Advanced holds the model, the effort, the budget of a run, the context
   compaction, the rules, and the time zone. `PUT /v1/agents/{name}` with
@@ -658,47 +667,50 @@ The last screen adds the Chat place and the live answer. The files are
   thread and the composer of a member on no bridge, the slash menu
   included. A new chat shows the picks above the composer: `Tools` and
   `Skills`, each a row of chips with check boxes and a count chip, and a
-  field to find one past twelve. The details pane holds `This chat`: the
-  tools and the skills in use as chips, an extra tool with `for this chat`,
-  the model, and the usage, with `so far` while the run works. Without
+  field to find one past twelve. The details pane holds `This chat`. It
+  shows the tools and the skills in use as chips, and an extra tool with
+  `for this chat`. It also shows the model, and the usage, with `so far`
+  while the run works. Without
   `chat` in the settings, the place says `No quick chat is set up.` beside
   a question mark that names the setting.
 - The live answer. Only a one-on-one view opens the live stream of a
   run: the quick chat, the manager, an agent on no bridge, and the Chat
   tab of a seat. The answer grows in a pending message at the end of the
-  thread, a quiet line `Working: <tool>` names the tool that the model
-  calls until the call ends, and the real item takes the place of the
-  pending message once the view holds it. A 429 leaves the view on its
-  poll with the quiet line `Live view is busy`. The bridge channel, the
-  inbox of Activity, and the board never open the stream, because many
-  answers that grow at once in a group view are too much to read.
+  thread. A quiet line `Working: <tool>` names the tool that the model
+  calls, until the call ends. Once the view holds the real item, it takes
+  the place of the pending message. A 429 leaves the view on its poll with
+  the quiet line `Live view is busy`. The bridge channel, the inbox of
+  Activity, and the board never open the stream. Many answers that grow at
+  once in a group view are too much to read.
 - The profile. `Remove workers` sits in a More menu of the section of the
   workers, so no destructive key sits in plain sight on the profile.
 - Left out. The page has no key to rename a chat, because the backend has
-  no route that sets the title of a run, and no key to save a chat as an
-  agent, because the new-agent screen takes no run to start from
+  no route that sets the title of a run. It has no key to save a chat as an
+  agent. The new-agent screen takes no run to start from
   (`docs/CONTRACT.md`, section 14).
 
 ### 11.6 Screenshots
 
 `docs/shots/` holds the merged page against the fake server, run with
-`FAKE_ADMIN=1 FAKE_A=1 FAKE_QUIET=1`, at 1440 by 900, 800 by 900, and 390 by
-844 on touch. The shots of the Chat place add `FAKE_LIVE=1 FAKE_LIVE_HOLD=1`,
-so the answer stops near its middle while it streams in. Each name says the
-theme, the width, and the screen: `final-<light|graphite>-<width>-<screen>.png`.
+`FAKE_ADMIN=1 FAKE_A=1 FAKE_QUIET=1`. The sizes are 1440 by 900, 800 by
+900, and 390 by 844 on touch. The shots of the Chat place add
+`FAKE_LIVE=1 FAKE_LIVE_HOLD=1`, so the answer stops near its middle while
+it streams in. Each name says the theme, the width, and the screen:
+`final-<light|graphite>-<width>-<screen>.png`.
 
-After a walk of the page on a real fleet, the light shots of `channel`,
-`channel-picker`, `fleet`, `chat`, and `chat-new` show the fixes of that
-walk: the agents of the fleet in the picker, the lines of the channel in
-the words of the page, the person as You, the room of the title, the tool
-chips and the hearts of the profile, and the picks of the profile in a new
-chat. The graphite shots of these screens show the page before the walk.
+A walk of the page on a real fleet gave fixes. The light shots of
+`channel`, `channel-picker`, `fleet`, `chat`, and `chat-new` show them.
+The picker shows the agents of the fleet, and the channel shows its lines
+in the words of the page. The person reads You, and the title has its
+room. The profile shows its tool chips and its hearts, and a new chat
+shows the picks of the profile. The graphite shots of these screens show
+the page before the walk.
 
 | Screen | What | Widths and themes |
 |---|---|---|
 | `channel-picker` | The first board: a decision that waits, the reply chip, the picker of Add open, and a new seat row | 1440, both |
-| `channel` | The third board: the channel with the reply chip and the members | 1440, both; 800, both; 390, both |
-| `fleet` | The second board: the people list, the conversation with migrator-1, and the profile | 1440, both; 800, both; 390, both |
+| `channel` | The third board: the channel with the reply chip and the members | 1440, 800, and 390, in both themes |
+| `fleet` | The second board: the people list, the conversation with migrator-1, and the profile | 1440, 800, and 390, in both themes |
 | `skills-add` | The Skills place with the chooser on the preview of a skill of a marketplace | 1440, both |
 | `new-agent` | New agent with a name, Keep, the template, and the skills | 1440, both |
 | `new-bridge` | Open a bridge with a goal, two seats, and the picker below Add | 1440, both |
@@ -709,7 +721,7 @@ chat. The graphite shots of these screens show the page before the walk.
 | `members` | Two panes: the channel with its tabs in a strip, and the members | 800, graphite |
 | `list` | One pane: the bridges, with the places at the bottom | 390, light |
 | `theme` | A deployment with a logo and a green accent | 1440, light |
-| `chat` | The quick chat: the history by day, a chat whose answer streams in after a tool call, and This chat with a tool for this chat | 1440, both; 390, light |
+| `chat` | The quick chat: the history by day, a chat whose answer streams in after a tool call, and This chat with a tool for this chat | 1440 in both themes, and 390 in light |
 | `chat-new` | A new chat with the picks of tools and skills and a question in the composer | 1440, light |
 
 ### 11.7 The shared files of the lead
@@ -731,10 +743,54 @@ another:
 | Need | Where |
 |---|---|
 | Faces | `markOf` in `src/lib/mark.ts`, and `Mark` |
-| Statuses | `seatLight`, `WAITING`, `phaseOf`, and `runStatus` in `src/lib/presence.ts` |
-| Capacity | `workersOf` and `awakeWorkers` in `src/lib/workers.ts` |
+| Statuses | `statusOf`, `seatPresence`, `awakeCount`, and `awakeFor` in `src/lib/status.ts`, and `runStatus` in `src/lib/presence.ts` |
+| Capacity | `workersOf` in `src/lib/workers.ts` |
 | Seats | `nextHandle` and `handleReason` in `src/lib/handles.ts` |
 | Times | `since` in `src/lib/words.ts` |
 | The slash menu | `slashAt` in `src/lib/mention.ts`, and the `commands` of `Composer` |
 | Skills | `loadSkills` and `state.skills` |
 | A cut card on the stream | `completeEvent` in `src/state/actions.ts`, already in the stream |
+
+### 11.8 The statuses and the reads of a worker
+
+The page keeps one state per worker, from the stream. The task events give
+the phase of its Task. The member events give the state of its member. The
+run events and `GET /v1/fleet/runs?state=active` give the runs that it
+holds. `statusOf` of `src/lib/status.ts` derives every status from that
+state, and `src/lib/status.test.ts` tests it. The counts `N awake` and `N
+workers awake` take their words from it, and so do the people list and the
+board. The halo of a conversation, a row of the members, the run pane, and
+the Workers of a profile do too. Thus they say the same word at the same
+moment.
+
+- A worker shows the phase of its Task: awake, asleep, starting, failed,
+  or stopping.
+- An agent with a worker that is up shows awake. Else an agent with a
+  worker that starts shows starting. An agent whose every worker failed
+  shows failed. Any other agent shows asleep.
+- A seat shows the presence that `derivePresence` gives from its newest
+  run and the phase of the worker that holds it. A seat whose run waits in
+  the queue shows waiting for a worker.
+- The presence that a bridge sends stands only where the page lacks the
+  facts. That is a newest run that the page does not hold, or a finished
+  run on a worker whose phase the page does not know.
+- A worker is busy while it holds an open run. Until the page reads the
+  open runs, the count of active runs of the fleet view stands in.
+
+A read of the result, the transcript, or the files of a run goes to the
+worker that holds it. That read wakes a worker that sleeps. So the page
+reads them only while the worker is awake, or on an action of the person.
+
+- The Chat tab of a seat reads nothing of a worker that sleeps. It shows
+  the entries of the channel, the live answer, and the steps that the page
+  read while the run worked.
+- The tabs Run and Files read the run as soon as the person opens them.
+  While the worker sleeps, they say `This read wakes the worker.` in place.
+- The run pane of a bridge does the same, because a person opens it.
+- A conversation polls `GET /v1/runs/{id}` only while its run works, or
+  while an answer to a message of the person is on its way.
+- The inbox never reads the result of a run whose worker sleeps.
+
+The wakes that the person causes still show as lines in the channel. A
+sleep line and a wake line of one seat with nothing between them fold into
+one quiet line, as section 11.2 says.

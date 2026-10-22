@@ -60,21 +60,24 @@ npm run build
 `npm run build` checks the types with TypeScript and writes the page to
 `dist/`. The page expects to live at `/bossmode/`.
 
-`npm test` runs the unit tests with vitest: the API client, the presence
-lights, the `@` completion, the reducer of the stream, the routes, the
-question forms, the Markdown sanitizer against hostile input, the live
-answer of a run, the quick chat, the agents of the fleet, the words of a
-system line, and the links of every screen of the page.
+`npm test` runs the unit tests with vitest. They test the API client, the
+presence lights, the `@` completion, the reducer of the stream, and the
+routes. They test the question forms and the Markdown sanitizer against
+hostile input. They test the live answer of a run, the quick chat, and the
+agents of the fleet. They test the statuses of the workers and the seats,
+and the reads of a worker that sleeps. They test the words and the folds of
+a system line, and the links of every screen of the page.
 
 ## Run against the fake server
 
 The fake server in `fake/` is for development only. It keeps its data in
 memory, trusts any token that starts with `fake-`, and checks nothing that a
 real workbench checks. It serves every route of `docs/CONTRACT.md` with
-sample data: two bridges, a channel of forty entries, an approval card and a
-question card, a manager conversation, a quick chat with a history of six
-chats, a fleet with two pools, a wiki of eight pages, and a face for every
-agent. Timers move members between presences and post messages every few
+sample data. The data holds two bridges, a channel of forty entries, an
+approval card, and a question card. It also holds a manager conversation
+and a quick chat with a history of six chats. Last come a fleet with two
+pools, a wiki of eight pages, and a face for every agent. Timers move members between
+presences, with their runs and their workers, and post messages every few
 seconds.
 
 1. Start the fake server: `npm run fake`. It listens on
@@ -85,9 +88,9 @@ seconds.
 3. Open http://localhost:5173/bossmode/. The page goes to the fake sign-in,
    which signs you in as alice@example.com and comes back.
 
-The fake server also serves `dist/` at http://127.0.0.1:8787/bossmode/ with
-the content security policy of the page, so you can check a build under that
-policy after `npm run build`.
+The fake server also serves `dist/`, at the address
+`http://127.0.0.1:8787/bossmode/`. It sends the content security policy of
+the page, so you can check a build under that policy after `npm run build`.
 
 Variables of the fake server:
 
@@ -105,7 +108,7 @@ Variables of the fake server:
 | `FAKE_PARTIAL=1` | A card goes out on the stream without its input and its schema, as the backend can send it, so the page reads it again |
 | `FAKE_ADMIN=1` | `whoami` says that the person is an admin, who adds and removes skills |
 | `FAKE_A=1` | The sample data shows each state of the bridges screen: a seat that waits for a worker, a fired seat, folds, a card in the state unknown, a second open bridge, and a closed one |
-| `FAKE_LIVE=1` | `GET /v1/runs/{id}/live` streams each answer outside a bridge in pieces, as the model writes it. The quick chat calls one tool first. Without it, the route sends no piece, and `idle` when the run stops working. |
+| `FAKE_LIVE=1` | `GET /v1/runs/{id}/live` streams each answer outside a bridge in pieces, as the model writes it. The quick chat calls one tool first. Without it, the route sends no piece. It sends `idle` once the run stops working. |
 | `FAKE_LIVE_MS` | The time between two pieces of a live answer in milliseconds, 120 by default |
 | `FAKE_LIVE_HOLD=1` | A live answer stops near its middle and waits there, for a screenshot of an answer that streams in |
 
@@ -118,7 +121,7 @@ There are two ways.
 - Development. Start the page with the address of the workbench:
   `FW_URL=http://localhost:8080 npm run dev`. Vite sends `/v1` and `/ui` to
   the workbench. The browser sign-in of the workbench returns to the address
-  of the workbench, not to Vite, so paste an access token in the token form
+  of the workbench, not to Vite. So paste an access token in the token form
   of the page instead.
 - A build. Run `npm run build`, and set `workbench.bossmode.dir` (or
   `FW_WORKBENCH_BOSSMODE_DIR`) to the `dist/` directory. The workbench then
@@ -136,7 +139,7 @@ page loads nothing from another origin.
 |---|---|
 | `preact` | Draws the components. It is small, and it has the component model of React. |
 | `marked` | Turns the Markdown of agents and of the wiki into HTML. The page shows raw HTML in the Markdown as text. |
-| `dompurify` | Removes from that HTML every tag and attribute outside a short allow list, so a message or a page holds no script, no event attribute, no style, no SVG, and no image. |
+| `dompurify` | Removes from that HTML every tag and attribute outside a short allow list. A message or a page thus holds no script, no event attribute, no style, no SVG, and no image. |
 | `@fontsource-variable/archivo` | The typeface Archivo, under the SIL Open Font License 1.1, with the width and the weight axes. The build copies its files into `dist/assets`. |
 
 The build and the tests use four more packages. None of them reaches the
