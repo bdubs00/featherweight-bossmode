@@ -774,46 +774,31 @@ a.people-title:hover {
   margin-bottom: var(--s-2);
 }
 .strip {
-  flex: none;
   display: flex;
-  gap: 2px;
-  width: 160px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--s-2);
   margin-left: auto;
 }
 .strip-seg {
   appearance: none;
-  position: relative;
-  flex-basis: 0;
-  min-width: 8px;
-  height: 16px;
-  padding: 0;
-  border: 0;
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 7px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
   background: none;
+  font-size: var(--t-caption);
+  font-weight: 700;
   cursor: pointer;
 }
-.strip-seg::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 4px;
-  height: 8px;
-  border-radius: var(--r-led);
-  background: var(--led-grey);
-  box-shadow: var(--led-ring);
+.strip-seg:hover,
+.strip-seg[aria-pressed='true'] {
+  border-color: var(--ink);
 }
-.strip-seg.tone-green::before {
-  background: var(--led-green);
-}
-.strip-seg.tone-amber::before {
-  background: var(--led-amber);
-}
-.strip-seg.tone-red::before {
-  background: var(--led-red);
-}
-.strip-seg[aria-pressed='true']::before {
-  outline: 2px solid var(--ink);
-  outline-offset: 1px;
+.strip-seg .status {
+  font-size: inherit;
 }
 .board-lights {
   display: flex;
@@ -868,18 +853,21 @@ a.people-title:hover {
   .strip-seg {
     height: var(--h-row);
   }
-  .strip-seg::before {
-    top: 18px;
-  }
   .keep-label .input {
     height: var(--h-row);
     min-height: var(--h-row);
   }
 }
+/* Two panes: the tabs of a conversation draw closer, so its menu stays inside the header. */
+@media (max-width: 1199px) {
+  .member-main .pane-head .tabs {
+    gap: var(--s-4);
+  }
+}
 @media (max-width: 799px) {
   /* One pane: the handle, the tabs, and the menu share the header, so the bridge and the mark leave it. */
   .member-where,
-  .member-main .pane-head > .mark {
+  .member-main:not(.agent-chat) .pane-head > .mark-link {
     display: none;
   }
   .member-main .pane-head > h1 {

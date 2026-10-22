@@ -12,7 +12,7 @@
 // the key Add.
 
 import type { JSX, RefObject } from 'preact';
-import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useSelect } from '../state/store';
 import { addMember, loadAgents } from '../state/actions';
 import { membersOf } from '../state/reducer';
@@ -139,6 +139,17 @@ export function Picker({ bridge, drafts, draftHandles, onPick, onClose, anchor, 
     if (field.current) field.current.focus();
   }, []);
 
+  // Below a key, the layer takes the height below it, at least 240 pixels,
+  // and scrolls into view when the window has less. A new seat moves the key.
+  const [fit, setFit] = useState(0);
+  useLayoutEffect(() => {
+    if (place !== 'key' || !panel.current) return;
+    const top = panel.current.getBoundingClientRect().top;
+    const room = Math.floor(window.innerHeight - top - 16);
+    setFit(Math.max(240, Math.min(420, room)));
+    if (room < 240 && typeof panel.current.scrollIntoView === 'function') panel.current.scrollIntoView({ block: 'nearest' });
+  }, [place, drafts.length]);
+
   // A click outside the picker and the key Add closes it.
   useEffect(() => {
     const away = (e: Event) => {
@@ -176,7 +187,14 @@ export function Picker({ bridge, drafts, draftHandles, onPick, onClose, anchor, 
 
   const none = groups.here.length === 0 && groups.others.length === 0;
   return (
-    <div class={'picker' + (place === 'key' ? ' picker-key' : '')} role="dialog" aria-label="Add" ref={panel} onKeyDown={onKey} style={below && place === 'pane' ? { top: `calc(var(--h-header) + var(--groove) + ${below + 2}px)`, maxHeight: `calc(100% - var(--h-header) - var(--groove) - ${below + 18}px)` } : undefined}>
+    <div
+      class={'picker' + (place === 'key' ? ' picker-key' : '')}
+      role="dialog"
+      aria-label="Add"
+      ref={panel}
+      onKeyDown={onKey}
+      style={below && place === 'pane' ? { top: `calc(var(--h-header) + var(--groove) + ${below + 2}px)`, maxHeight: `calc(100% - var(--h-header) - var(--groove) - ${below + 18}px)` } : place === 'key' && fit ? { maxHeight: fit + 'px' } : undefined}
+    >
       <GrooveBand on="card" />
       {mode === 'list' ? (
         <>

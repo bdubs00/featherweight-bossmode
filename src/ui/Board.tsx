@@ -2,8 +2,8 @@
 // fleet too large for a list. A light is a 12-pixel target, 44 on touch,
 // with the handle in its tooltip and its status for a screen reader. A
 // click opens the member. A status strip on each group heading counts the
-// statuses of the group, and a segment of the strip filters the board to
-// that status.
+// statuses of the group in words, such as 2 working, and a key of the strip
+// filters the board to that status.
 
 import { useMemo, useState } from 'preact/hooks';
 import { filterStatus, stripOf, type PeopleGroup, type PersonRow } from '../state/people';
@@ -11,22 +11,16 @@ import { useRoving } from './keys';
 import { usePeople } from './Fleet';
 import { Led, PaneHeader } from './primitives';
 
-/** Strip is the status strip of a group: one segment per status, as wide as its count. */
+/** Strip is the status strip of a group: one key per status, with its light and its count in words. */
 export function Strip({ rows, title, active, onPick }: { rows: PersonRow[]; title: string; active: string; onPick: (word: string) => void }) {
   const segs = stripOf(rows);
   if (!segs.length) return null;
   return (
     <div class="strip" role="group" aria-label={'Statuses of ' + title}>
       {segs.map((s) => (
-        <button
-          type="button"
-          class={'strip-seg tone-' + s.tone}
-          style={{ flexGrow: s.count }}
-          aria-pressed={active === s.word}
-          aria-label={s.count + ' ' + s.word}
-          title={s.count + ' ' + s.word}
-          onClick={() => onPick(active === s.word ? '' : s.word)}
-        />
+        <button type="button" class="strip-seg" aria-pressed={active === s.word} onClick={() => onPick(active === s.word ? '' : s.word)}>
+          <Led tone={s.tone} word={s.count + ' ' + s.word} still />
+        </button>
       ))}
     </div>
   );

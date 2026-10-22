@@ -420,9 +420,10 @@ Capacity shows where seating happens:
 | `Loading the member.` | keep | | B |
 | `Board` | keep | | done |
 | `The board shows one light per member. It comes with the next stage.` | remove | the board | done |
-| `Statuses of <bridge>` (the strip of a group of the board) | add | an accessible name | done |
+| `Statuses of <bridge>` (the strip of a group of the board) | add | an accessible name. Each key of the strip says its count and its status, such as `2 working`, with its light. | done |
 | `Messages with <handle>` (the log of a seat), `Conversation with <handle>` (its tabs) | add | accessible names | done |
 | `Profile of <agent>, <status>` (the mark at the head of a conversation) | add | the name of the link to the profile, which a window narrower than three panes keeps out of sight | done |
+| `Profile` (the first item of the More menu of a seat) | add | a narrow window hides the mark, so the menu reaches the profile there | done |
 | `stopped` (a seat whose newest run was canceled) | add | the status beside `error`, with a grey light, and the key `Seat again` | done |
 
 ## 6. Screen C

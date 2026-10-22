@@ -163,6 +163,9 @@ function Reactions({ bridge, e, onHeart }: { bridge: string; e: Entry; onHeart: 
   );
 }
 
+/** reacted reports whether an entry has a reaction, whose chips need the header line of the entry. */
+const reacted = (e: Entry): boolean => KINDS.some((k) => ((e.reactions || {})[k] || []).length > 0);
+
 /** EntryMsg draws one entry of a bridge in a thread. */
 function EntryMsg({ bridge, e, prev, agentOf, handles, runHref }: { bridge: string; e: Entry; prev?: Entry; agentOf: (handle: string) => string; handles?: string[]; runHref?: string }) {
   const [heart, setHeart] = useState(false);
@@ -185,7 +188,7 @@ function EntryMsg({ bridge, e, prev, agentOf, handles, runHref }: { bridge: stri
   const name = agent ? e.from.handle || 'an agent' : personName(e.from.name, e.from.display);
   const face = agent ? <Mark agent={agentOf(e.from.handle || '')} size={32} /> : <Avatar subject={e.from.name || ''} display={e.from.display} size={32} />;
   return (
-    <Msg face={face} name={name} at={e.at} compact={sameSender(prev, e) && !e.pinned} id={'t-' + e.seq} tag={e.pinned ? <Chip>pinned</Chip> : undefined} corner={<Reactions bridge={bridge} e={e} onHeart={() => setHeart(true)} />}>
+    <Msg face={face} name={name} at={e.at} compact={sameSender(prev, e) && !e.pinned && !reacted(e)} id={'t-' + e.seq} tag={e.pinned ? <Chip>pinned</Chip> : undefined} corner={<Reactions bridge={bridge} e={e} onHeart={() => setHeart(true)} />}>
       <Markdown text={e.text} handles={handles} />
       {e.cut && (
         <p class="tmsg-cut">

@@ -72,10 +72,11 @@ describe('the board', () => {
 
   it('filters to the status of a segment of a strip, and back', () => {
     const el = mount(<Board />);
-    const seg = el.querySelector('.strip-seg[aria-label="1 needs you"]') as HTMLButtonElement;
+    // Each key of the strip says its status in words.
+    const seg = [...el.querySelectorAll('.strip-seg')].find((b) => b.textContent === '1 needs you') as HTMLButtonElement;
     act(() => seg.click());
     expect([...el.querySelectorAll('a.board-light')].map((a) => a.textContent)).toEqual(['migrator-2, needs you']);
-    expect(el.querySelector('.strip-seg[aria-pressed="true"]')!.getAttribute('aria-label')).toBe('1 needs you');
+    expect(el.querySelector('.strip-seg[aria-pressed="true"]')!.textContent).toBe('1 needs you');
     act(() => (el.querySelector('.strip-seg[aria-pressed="true"]') as HTMLButtonElement).click());
     expect(el.querySelectorAll('a.board-light').length).toBe(4);
   });

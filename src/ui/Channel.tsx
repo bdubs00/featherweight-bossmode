@@ -104,6 +104,9 @@ function channelShape(ch: ChannelState | undefined): string | undefined {
   return shapeKey(out);
 }
 
+/** The width of the channel under which its tabs leave the header for a strip. */
+const CRAMPED = 560;
+
 /** useMedia reports whether a media query matches, and follows its changes. */
 function useMedia(query: string): boolean {
   const read = () => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(query).matches;
@@ -416,9 +419,21 @@ export function Channel({ id, tab: tabProp }: { id: string; tab?: BridgeTab }) {
   const firstLoaded = useSelect((s) => (s.channels[id] ? s.channels[id].prev === 0 : false));
   const tab: BridgeTab = tabProp || 'posts';
   const [confirm, setConfirm] = useState<'close' | 'delegation' | null>(null);
-  // Where the window is not wide, Close bridge moves into More, and in a narrow window the tabs take a strip of their own.
+  // Where the window is not wide, Close bridge moves into More. In a
+  // narrow window, or where the members pane leaves the channel cramped,
+  // the tabs take a strip of their own, so the title stays in sight.
   const wide = useMedia('(min-width: 1200px)');
   const narrow = useMedia('(max-width: 799px)');
+  // The channel can first draw its loading state, so a callback ref finds the section once it is there.
+  const [box, setBox] = useState<HTMLElement | null>(null);
+  const [cramped, setCramped] = useState(false);
+  useLayoutEffect(() => {
+    if (!box || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => setCramped(box.clientWidth < CRAMPED));
+    ro.observe(box);
+    return () => ro.disconnect();
+  }, [box]);
+  const strip = narrow || cramped;
 
   // Open the bridge: its record, its roster, and the recent end of its channel.
   useEffect(() => {
@@ -485,7 +500,7 @@ export function Channel({ id, tab: tabProp }: { id: string; tab?: BridgeTab }) {
     />
   );
   return (
-    <section class="screen channel" aria-labelledby="channel-title">
+    <section class="screen channel" ref={setBox} aria-labelledby="channel-title">
       <PaneHeader
         id="channel-title"
         title={b.title}
@@ -513,9 +528,9 @@ export function Channel({ id, tab: tabProp }: { id: string; tab?: BridgeTab }) {
         }
       >
         {closed && <Led tone="grey" word="closed" />}
-        {!narrow && tabs}
+        {!strip && tabs}
       </PaneHeader>
-      {narrow && <div class="tab-strip">{tabs}</div>}
+      {strip && <div class="tab-strip">{tabs}</div>}
       {tab === 'posts' && <Posts id={id} closed={closed} />}
       {tab === 'wiki' && <WikiTab id={id} />}
       {tab === 'decisions' && loadedChannel && <DecisionsTab id={id} />}

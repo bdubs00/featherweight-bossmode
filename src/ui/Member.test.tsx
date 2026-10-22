@@ -123,16 +123,16 @@ describe('the member conversation', () => {
     expect(calls.find((c) => c.method === 'POST')).toEqual({ method: 'POST', path: '/v1/bridges/b1/messages', body: { text: 'Go ahead with logrotate.', to: ['migrator-1'] } });
   });
 
-  it('opens the menu of the seat with Mute, Change task, and Fire, and Seat again for a seat that stopped', () => {
+  it('opens the menu of the seat with Profile, Mute, Change task, and Fire, and Seat again for a seat that stopped', () => {
     const el = mount(<MemberMain bridge="b1" handle="migrator-1" tab="chat" />);
     act(() => (el.querySelector('button[aria-label="More for migrator-1"]') as HTMLButtonElement).click());
-    expect([...el.querySelectorAll('[role="menuitem"]')].map((b) => b.textContent)).toEqual(['Mute', 'Change task', 'Fire']);
+    expect([...el.querySelectorAll('[role="menuitem"]')].map((b) => b.textContent)).toEqual(['Profile', 'Mute', 'Change task', 'Fire']);
     act(() => {
       store.dispatch({ type: 'run', run: { id: 'run-reviewer', agent: 'reviewer', state: 'canceled', seq: 2, createdAt: at(0), updatedAt: at(5) } });
     });
     const other = mount(<MemberMain bridge="b1" handle="reviewer" tab="chat" />);
     act(() => (other.querySelector('button[aria-label="More for reviewer"]') as HTMLButtonElement).click());
-    expect([...other.querySelectorAll('[role="menuitem"]')].map((b) => b.textContent)).toEqual(['Mute', 'Seat again', 'Change task', 'Fire']);
+    expect([...other.querySelectorAll('[role="menuitem"]')].map((b) => b.textContent)).toEqual(['Profile', 'Mute', 'Seat again', 'Change task', 'Fire']);
     expect(other.querySelector('.seat-bar .status-word')!.textContent).toBe('stopped');
   });
 

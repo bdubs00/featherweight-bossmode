@@ -255,7 +255,7 @@ export function AgentChat({ agent }: { agent: string }) {
     });
   const name = (face && face.displayName) || agent;
   return (
-    <section class="screen member-main" aria-labelledby="agent-chat-title">
+    <section class="screen member-main agent-chat" aria-labelledby="agent-chat-title">
       <PaneHeader
         id="agent-chat-title"
         title={agent}

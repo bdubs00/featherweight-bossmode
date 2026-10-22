@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { Member as MemberT } from '../api/types';
 import type { MemberTab } from '../lib/route';
-import { hrefOf } from '../lib/route';
+import { go, hrefOf } from '../lib/route';
 import { parseSlash } from '../lib/mention';
 import { store, useSelect } from '../state/store';
 import { entriesOf } from '../state/reducer';
@@ -105,11 +105,15 @@ export function TaskDialog({ bridge, m, again, onClose }: { bridge: string; m: M
   );
 }
 
-/** SeatMenu is the More key of the header: Mute, Seat again, Change task, and Fire. */
+/**
+ * SeatMenu is the More key of the header: Profile, which a narrow window
+ * reaches only here, Mute, Seat again, Change task, and Fire.
+ */
 function SeatMenu({ bridge, m, stopped }: { bridge: string; m: MemberT; stopped: boolean }) {
   const [dialog, setDialog] = useState<'' | 'again' | 'task' | 'fire'>('');
   if (m.fired) return null;
   const items: MenuItem[] = [
+    { label: 'Profile', onSelect: () => go({ place: 'member', bridge, handle: m.handle, tab: 'chat', profile: true }) },
     { label: m.muted ? 'Unmute' : 'Mute', onSelect: () => attempt(() => patchMember(bridge, m.handle, { muted: !m.muted })) },
     ...(stopped ? [{ label: 'Seat again', onSelect: () => setDialog('again') }] : []),
     { label: 'Change task', onSelect: () => setDialog('task') },

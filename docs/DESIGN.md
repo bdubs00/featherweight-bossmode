@@ -661,16 +661,23 @@ another:
 
 ### 11.6 Screenshots
 
-`docs/shots/` holds the shell against the fake server, at 1440 by 900, 1024
-by 768, and 390 by 844, in both themes.
+`docs/shots/` holds the merged page against the fake server, run with
+`FAKE_ADMIN=1 FAKE_A=1 FAKE_QUIET=1`, at 1440 by 900, 800 by 900, and 390 by
+844 on touch. Each name says the theme, the width, and the screen:
+`final-<light|graphite>-<width>-<screen>.png`.
 
-| File | What |
-|---|---|
-| `wide-light-channel.png` | The channel with a decision that waits, the bridges, and the members |
-| `wide-graphite-channel.png` | The same in graphite |
-| `wide-light-theme.png` | A deployment with a logo and a green accent, after a decision, read again from a cut card |
-| `wide-light-fleet.png` | The fleet with the workers of each agent and the profile of an agent |
-| `wide-graphite-skills.png` | The Skills place in graphite |
-| `medium-graphite-members.png` | Two panes: the channel and the members |
-| `narrow-light-list.png` | One pane: the bridges, with the places at the bottom |
-| `narrow-graphite-channel.png` | One pane: the channel, with the back link and the composer |
+| Screen | What | Widths and themes |
+|---|---|---|
+| `channel-picker` | The first board: a decision that waits, the reply chip, the picker of Add open, and a new seat row | 1440, both |
+| `channel` | The third board: the channel with the reply chip and the members | 1440, both; 800, both; 390, both |
+| `fleet` | The second board: the people list, the conversation with migrator-1, and the profile | 1440, both; 800, both; 390, both |
+| `skills-add` | The Skills place with the chooser on the preview of a skill of a marketplace | 1440, both |
+| `new-agent` | New agent with a name, Keep, the template, and the skills | 1440, both |
+| `new-bridge` | Open a bridge with a goal, two seats, and the picker below Add | 1440, both |
+| `wiki` | A page of the wiki with its meta and the tree | 1440, both |
+| `manager` | The conversation with the manager and the slash menu with the hint of an argument | 1440, both |
+| `activity` | The inbox with a decision in the main pane | 1440, both |
+| `board` | The board with the strip of statuses of each group | 1440, both |
+| `members` | Two panes: the channel with its tabs in a strip, and the members | 800, graphite |
+| `list` | One pane: the bridges, with the places at the bottom | 390, light |
+| `theme` | A deployment with a logo and a green accent | 1440, light |
