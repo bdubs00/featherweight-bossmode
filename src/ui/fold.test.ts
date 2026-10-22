@@ -1,24 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import type { EntryA } from '../state/bridges-a';
+import type { Entry } from '../api/types';
 import { FOLD_CHAT, FOLD_LINES, foldOf, foldShapes, foldWords, shapeKey, shapeOf, shapesOf, type Item } from './fold';
 
 const NOW = new Date('2026-10-21T12:00:00Z');
 let seq = 0;
 
-function line(event = 'started', at = '2026-10-21T10:00:00Z'): EntryA {
+function line(event = 'started', at = '2026-10-21T10:00:00Z'): Entry {
   return { seq: ++seq, at, from: { kind: 'system' }, text: 'a line', event };
 }
-function chat(from: string, to: string[], at = '2026-10-21T10:00:00Z'): EntryA {
+function chat(from: string, to: string[], at = '2026-10-21T10:00:00Z'): Entry {
   return { seq: ++seq, at, from: { kind: 'agent', handle: from, run: 'r' }, to, text: 'hello' };
 }
-function msg(at = '2026-10-21T10:00:00Z'): EntryA {
+function msg(at = '2026-10-21T10:00:00Z'): Entry {
   return { seq: ++seq, at, from: { kind: 'person', name: 'alice@example.com' }, text: 'hi' };
 }
-function card(): EntryA {
+function card(): Entry {
   return { seq: ++seq, at: '2026-10-21T10:00:00Z', from: { kind: 'system' }, text: 'x wants to run a command.', event: 'needs-you', decision: { run: 'r', id: 'a', label: 'Run command', state: 'pending' } };
 }
 
-const fold = (entries: EntryA[]): Item[] => foldShapes(shapesOf(shapeKey(entries.map((e) => shapeOf(e, NOW)))));
+const fold = (entries: Entry[]): Item[] => foldShapes(shapesOf(shapeKey(entries.map((e) => shapeOf(e, NOW)))));
 const kinds = (items: Item[]) => items.map((i) => (i.kind === 'fold' ? 'fold:' + i.seqs.length : 'entry'));
 
 describe('shapeOf', () => {

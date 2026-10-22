@@ -5,13 +5,16 @@
 // can load it. The details pane holds Add skill, which opens the chooser of
 // AddSkill.tsx in the main pane, and the actions on the item: Copy of the
 // slash command, and Remove for an imported skill. An admin alone adds and
-// removes skills.
+// removes skills. The catalog names no agent, so while the place is open
+// the page reads the skills of each agent of the fleet, and forgets them
+// when the place closes.
 
 import { useEffect, useMemo, useState } from 'preact/hooks';
-import { make, type SkillDoc } from '../api/make';
-import { useSelect } from '../state/store';
-import { loadSkills } from '../state/actions';
-import { catalogOf, skillGroups, toolGroups, toolOf, type CatalogSkill, type CatalogTool, type Group } from '../lib/catalog';
+import { api } from '../api/routes';
+import type { Tool } from '../api/types';
+import { store, useSelect } from '../state/store';
+import { forgetAgentSkills, loadAgentSkills, loadAgents, loadSkills } from '../state/actions';
+import { catalogOf, docOf, skillGroups, toolGroups, type CatalogSkill, type CatalogTool, type Group, type SkillDoc } from '../lib/catalog';
 import { go, hrefOf, type SkillItem } from '../lib/route';
 import { useRoving } from './keys';
 import { attempt, showError } from './notice';
@@ -27,8 +30,8 @@ import { AddSkill, closeAddSkill, openAddSkill, useAddSkillOpen } from './AddSki
  * The tools of GET /v1/tools, for a backend whose catalog of skills holds
  * no tools. The three panes share one read.
  */
-let toolsRead: Promise<CatalogTool[]> | null = null;
-let toolsCache: CatalogTool[] | null = null;
+let toolsRead: Promise<Tool[]> | null = null;
+let toolsCache: Tool[] | null = null;
 
 /** forgetTools drops the tools of GET /v1/tools, for the tests. */
 export function forgetTools(): void {
@@ -44,17 +47,18 @@ export interface Catalog {
 /** useCatalog reads the skills and the tools of the fleet, or null while they load. */
 export function useCatalog(): Catalog | null {
   const raw = useSelect((s) => s.skills);
-  const cat = useMemo(() => catalogOf(raw), [raw]);
-  const [tools, setTools] = useState<CatalogTool[] | null>(toolsCache);
+  const skillsOf = useSelect((s) => s.agentSkills);
+  const agents = useSelect((s) => s.agents);
+  const [tools, setTools] = useState<Tool[] | null>(toolsCache);
   useEffect(() => {
     if (!raw) attempt(loadSkills);
   }, []);
   useEffect(() => {
-    if (!raw || cat.tools.length > 0) return;
+    if (!raw || (raw.tools && raw.tools.length > 0)) return;
     if (!toolsRead) {
-      toolsRead = make
+      toolsRead = api
         .tools()
-        .then((list) => (toolsCache = list.map((t) => toolOf(t))))
+        .then((list) => (toolsCache = list))
         .catch(() => (toolsCache = []));
     }
     let live = true;
@@ -63,8 +67,33 @@ export function useCatalog(): Catalog | null {
       live = false;
     };
   }, [raw]);
-  if (!raw) return null;
-  return { skills: cat.skills, tools: cat.tools.length > 0 ? cat.tools : tools || [] };
+  const cat = useMemo(() => (raw ? catalogOf(raw, tools, { skillsOf, agents }) : null), [raw, tools, skillsOf, agents]);
+  return cat;
+}
+
+/** agentsOfFleet names every agent that the page knows: the agents of GET /v1/agents and the agents of the members of the fleet. */
+function agentsOfFleet(): string[] {
+  const s = store.get();
+  const names = new Set((s.agents || []).map((a) => a.name));
+  for (const m of (s.fleet && s.fleet.members) || []) for (const a of m.agents || []) names.add(a.name);
+  return [...names].sort();
+}
+
+/**
+ * useLoaders reads the skills that each agent of the fleet can load, while
+ * the Skills place is open, so the place can name the agents that can load
+ * a skill. It forgets them when the place closes.
+ */
+function useLoaders(): void {
+  const agents = useSelect((s) => s.agents);
+  const fleet = useSelect((s) => s.fleet);
+  useEffect(() => {
+    if (!agents) attempt(loadAgents);
+  }, []);
+  useEffect(() => {
+    for (const a of agentsOfFleet()) loadAgentSkills(a).catch(() => {});
+  }, [agents, fleet]);
+  useEffect(() => () => forgetAgentSkills(), []);
 }
 
 /** useAdmin reports whether whoami says the person is an admin. */
@@ -105,6 +134,7 @@ function GroupRows<T extends { name: string; description: string }>({ g, kind, i
 }
 
 export function SkillList({ current }: { current?: SkillItem }) {
+  useLoaders();
   const cat = useCatalog();
   const admin = useAdmin();
   const list = useRoving<HTMLDivElement>();
@@ -184,13 +214,10 @@ function AgentsThatLoad({ agents }: { agents: string[] }) {
   );
 }
 
-/** chipsOf are the keys of the front matter of a skill, as chips: the doc first, the catalog where the doc has none. */
+/** chipsOf are the keys of the front matter of a skill, as chips: the text first, the catalog where the text has none. */
 function chipsOf(s: CatalogSkill, doc: SkillDoc | null): [string, string][] {
   const out: [string, string][] = doc ? [...doc.frontMatter] : [];
-  const has = (k: string) => out.some(([x]) => x === k);
-  if (s.license && !has('license')) out.push(['license', s.license]);
-  if (s.allowedTools.length && !has('allowed-tools')) out.push(['allowed-tools', s.allowedTools.join(', ')]);
-  if (s.argumentHint && !has('argument-hint')) out.push(['argument-hint', s.argumentHint]);
+  if (s.argumentHint && !out.some(([x]) => x === 'argument-hint')) out.push(['argument-hint', s.argumentHint]);
   return out;
 }
 
@@ -201,9 +228,9 @@ function SkillView({ s }: { s: CatalogSkill }) {
     let live = true;
     setDoc(null);
     setFailed('');
-    make
-      .skill(s.name)
-      .then((d) => live && setDoc(d))
+    api
+      .skillFile(s.name)
+      .then((d) => live && setDoc(docOf(d)))
       .catch((e) => live && setFailed(e instanceof Error ? e.message : 'The action failed. Try it again.'));
     return () => {
       live = false;
@@ -213,14 +240,8 @@ function SkillView({ s }: { s: CatalogSkill }) {
   return (
     <>
       <p class="c-lede">{s.description}</p>
-      {(chips.length > 0 || s.source) && (
+      {chips.length > 0 && (
         <ul class="fm" aria-label="Front matter">
-          {s.kind === 'imported' && s.source && (
-            <li>
-              <span class="fm-key">source</span>
-              <span class="fm-value">{s.source}</span>
-            </li>
-          )}
           {chips.map(([k, v]) => (
             <li>
               <span class="fm-key">{k}</span>
@@ -342,7 +363,7 @@ function RemoveSkill({ s, onDone }: { s: CatalogSkill; onDone: () => void }) {
       onConfirm={async () => {
         setBusy(true);
         const ok = await attempt(async () => {
-          await make.remove(s.name);
+          await api.removeSkill(s.name);
           await loadSkills();
         });
         setBusy(false);
@@ -369,7 +390,6 @@ function ImportedList({ skills }: { skills: CatalogSkill[] }) {
             <a href={hrefOf({ place: 'skills', item: { kind: 'skill', id: s.name } })} class="t-sub">
               {s.name}
             </a>
-            {s.source && <span class="t-meta clip">{s.source}</span>}
           </li>
         ))}
       </ul>
@@ -404,7 +424,6 @@ export function SkillActions({ item }: { item?: SkillItem }) {
             <h2 class="sec-head t-sub">{skill.slash ? <code class="slash">{skill.slash}</code> : skill.name}</h2>
             <p class="t-meta">
               {skill.kind === 'server' ? skill.server : skill.kind === 'imported' ? 'Imported' : 'Local'}
-              {skill.kind === 'imported' && skill.source ? '  ' + skill.source : ''}
             </p>
             <div class="dsec-keys">
               <CopyKey slash={skill.slash} />

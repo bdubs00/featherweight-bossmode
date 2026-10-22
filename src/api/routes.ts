@@ -4,6 +4,8 @@
 import { call, enc, encPath, query, send, ApiError } from './client';
 import type {
   Agent,
+  AgentSaved,
+  AgentSkills,
   BossConfig,
   Bridge,
   Caps,
@@ -12,24 +14,30 @@ import type {
   FaceMeta,
   FileView,
   Fleet,
+  Marketplace,
   Member,
   MessagePage,
+  NewProfile,
   Page,
   PageMeta,
   PageVersion,
   Placement,
+  Pool,
   ReactionKind,
   Result,
   Run,
   SearchHit,
-  Skill,
+  SkillCall,
+  SkillFile,
+  SkillInstalled,
   SkillPreview,
   SkillSource,
-  SkillText,
   SkillsList,
-  Marketplace,
+  Today,
+  Tool,
   Transcript,
   Whoami,
+  WorkersAsk,
 } from './types';
 
 const bridge = (id: string) => '/v1/bridges/' + enc(id);
@@ -56,6 +64,27 @@ export interface NewBridge {
   caps?: Partial<Caps>;
 }
 
+/** A message of the person to a channel. to names the seats, and a slash command goes as skill. */
+export interface NewMessage {
+  text: string;
+  to?: string[];
+  replyTo?: number;
+  pinned?: boolean;
+  skill?: SkillCall;
+}
+
+/** orNull answers null for a 404, so a missing thing is an empty state and not an error. */
+async function orNull<T>(p: Promise<T>): Promise<T | null> {
+  try {
+    return await p;
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) return null;
+    throw e;
+  }
+}
+
+const pool = (name: string) => '/v1/pools/' + enc(name);
+
 export const api = {
   whoami: () => call<Whoami>('/v1/whoami'),
 
@@ -77,8 +106,17 @@ export const api = {
   markRead: (id: string, seq: number) => call<null>(bridge(id) + '/read', { method: 'PUT', body: { seq } }),
   messages: (id: string, q: PageQuery = {}) =>
     call<MessagePage>(bridge(id) + '/messages' + query({ before: q.before, from: q.from, limit: q.limit })),
-  post: (id: string, m: { text: string; to?: string[]; replyTo?: number }) =>
-    call<Entry>(bridge(id) + '/messages', { method: 'POST', body: m }),
+  /** post sends a message. A field that is not set stays out of the body, because the backend refuses an unknown or empty field. */
+  post: (id: string, m: NewMessage) => {
+    const body: Record<string, unknown> = {};
+    // A slash command carries the text of the person that follows the skill, and the text can be empty.
+    if (m.text || !m.skill) body.text = m.text;
+    if (m.to && m.to.length) body.to = m.to;
+    if (m.replyTo) body.replyTo = m.replyTo;
+    if (m.pinned) body.pinned = true;
+    if (m.skill) body.skill = m.skill.args ? { name: m.skill.name, args: m.skill.args } : { name: m.skill.name };
+    return call<Entry>(bridge(id) + '/messages', { method: 'POST', body });
+  },
   react: (id: string, seq: number, reaction: ReactionKind, note?: string) =>
     call<Entry>(bridge(id) + '/messages/' + enc(seq) + '/reactions', { method: 'POST', body: note ? { reaction, note } : { reaction } }),
   addMember: (id: string, m: NewMember) => call<Member>(bridge(id) + '/members', { method: 'POST', body: m }),
@@ -88,6 +126,20 @@ export const api = {
 
   fleet: () => call<Fleet>('/v1/fleet'),
   agents: () => call<{ agents: Agent[] }>('/v1/agents').then((r) => (r && r.agents) || []),
+  /** agentSkills reads the skills that the profile of an agent allows, resolved against the catalog of the front. */
+  agentSkills: (agent: string) => call<AgentSkills>('/v1/agents/' + enc(agent) + '/skills'),
+  /** putAgent saves a profile with its workers, or with dryRun checks it and saves nothing. The answer carries pool when the front made workers. */
+  putAgent: (name: string, profile: NewProfile, workers: WorkersAsk, dryRun = false) =>
+    call<AgentSaved>('/v1/agents/' + enc(name) + query({ dryRun: dryRun ? 'true' : undefined }), { method: 'PUT', body: { ...profile, name, workers } }),
+
+  /** The workers of an agent, by the name of their pool, or null when there is no such pool. poolNameOf of src/lib/workers.ts names it. */
+  pool: (name: string) => orNull(call<Pool>(pool(name))),
+  /** setKeep changes the number of workers that an agent keeps. Only an owner can. */
+  setKeep: (name: string, replicas: number) => call<Pool>(pool(name), { method: 'PATCH', body: { replicas } }),
+  /** removeWorkers removes every worker of an agent. Only an owner can. */
+  removeWorkers: (name: string) => call<null>(pool(name), { method: 'DELETE' }),
+  /** The counts of the day of an agent, or null where the workbench has no such route. */
+  today: (agent: string) => orNull(call<Today>('/v1/bossmode/agents/' + enc(agent) + '/today')),
 
   run: (id: string) => call<Run>(run(id)),
   result: (id: string) => call<Result>(run(id) + '/result'),
@@ -129,13 +181,25 @@ export const api = {
   search: (q: string, signal?: AbortSignal) =>
     call<{ q: string; results: SearchHit[]; cut: boolean }>('/v1/pages/search' + query({ q }), { signal }),
 
-  /** The skills and the tools of the fleet. docs/CONTRACT.md, section 12, names the shapes. */
+  /** The skills of the front. docs/CONTRACT.md, section 12, names the shapes. */
   skills: () => call<SkillsList>('/v1/bossmode/skills').then((r) => ({ skills: (r && r.skills) || [], tools: (r && r.tools) || [] })),
-  skill: (name: string) => call<SkillText>('/v1/bossmode/skills/' + enc(name)),
+  /** skillFile reads a skill from the kernel: the whole SKILL.md as body, and its other files. The backend has no such route of its own. */
+  skillFile: (name: string) => call<SkillFile>('/v1/skills/' + enc(name)),
+  /** tools reads the capabilities of the kernel, each tool with its plain phrase in text. */
+  tools: () => call<{ tools: Tool[] }>('/v1/tools').then((r) => (r && r.tools) || []),
   marketplaces: () => call<{ marketplaces: Marketplace[] }>('/v1/bossmode/marketplaces').then((r) => (r && r.marketplaces) || []),
-  previewSkill: (source: SkillSource) => call<SkillPreview>('/v1/bossmode/skills/preview', { method: 'POST', body: { source } }),
-  installSkill: (token: string) => call<Skill>('/v1/bossmode/skills/install', { method: 'POST', body: { token } }),
+  /** previewSkill checks a source and installs nothing. */
+  previewSkill: (src: SkillSource) => call<SkillPreview>('/v1/bossmode/skills/preview', { method: 'POST', body: src }),
+  /**
+   * installSkill writes the skill that a preview showed. digest is the
+   * digest of that preview, so a source that changed since answers 409.
+   * replace takes the place of the imported skill of that name.
+   */
+  installSkill: (src: SkillSource, digest: string, replace = false) =>
+    call<SkillInstalled>('/v1/bossmode/skills', { method: 'POST', body: { ...src, ...(replace ? { replace: true } : {}), ...(digest ? { digest } : {}) } }),
   removeSkill: (name: string) => call<null>('/v1/bossmode/skills/' + enc(name), { method: 'DELETE' }),
+  /** runSkill hands a skill to a run as a slash command of the person. The answer is 202 with the run. */
+  runSkill: (run: string, s: SkillCall) => call<Run>('/v1/bossmode/runs/' + enc(run) + '/skill', { method: 'POST', body: s.args ? { name: s.name, args: s.args } : { name: s.name } }),
 
   faces: () => call<{ faces: FaceMeta[] }>('/v1/faces').then((r) => (r && r.faces) || []),
   /** faceBlob reads a face as SVG bytes behind the token. */

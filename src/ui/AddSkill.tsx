@@ -7,9 +7,11 @@
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { ApiError } from '../api/client';
-import { make, type AddSource, type Marketplace, type Preview } from '../api/make';
+import { api } from '../api/routes';
+import type { Marketplace, SkillSource } from '../api/types';
 import { loadSkills } from '../state/actions';
-import { go } from '../lib/route';
+import { previewOf, type Preview } from '../lib/catalog';
+import { go, parseRoute } from '../lib/route';
 import { Markdown } from './common';
 import { Button, Chip, Field, IconButton, Input, Led, PaneHeader, Tabs, TextArea } from './primitives';
 
@@ -38,6 +40,9 @@ export function closeAddSkill(): void {
   if (!open) return;
   open = false;
   tell();
+  // The address #skills/add opens the chooser, so a close leaves it.
+  const r = parseRoute(location.hash);
+  if (r.place === 'skills' && r.add) go({ place: 'skills' }, true);
 }
 
 /** useAddSkillOpen reports whether the chooser is open, and redraws when it opens or closes. */
@@ -78,7 +83,7 @@ export const MAX_FILES = 64;
 
 /* ---------- the preview ---------- */
 
-type Step = { kind: 'idle' } | { kind: 'busy' } | { kind: 'ready'; src: AddSource; p: Preview } | { kind: 'failed'; text: string };
+type Step = { kind: 'idle' } | { kind: 'busy' } | { kind: 'ready'; src: SkillSource; p: Preview } | { kind: 'failed'; text: string };
 
 function PreviewView({ p, busy, conflict, onInstall, onCancel }: { p: Preview; busy: boolean; conflict: string; onInstall: (replace: boolean) => void; onCancel: () => void }) {
   const blocks = p.problems.some((x) => x.blocks);
@@ -153,12 +158,12 @@ function PreviewView({ p, busy, conflict, onInstall, onCancel }: { p: Preview; b
 
 /* ---------- the avenues ---------- */
 
-function MarketplaceAvenue({ onPick }: { onPick: (src: AddSource) => void }) {
+function MarketplaceAvenue({ onPick }: { onPick: (src: SkillSource) => void }) {
   const [list, setList] = useState<Marketplace[] | null>(null);
   const [picked, setPicked] = useState('');
   const [error, setError] = useState('');
   useEffect(() => {
-    make
+    api
       .marketplaces()
       .then(setList)
       .catch((e) => setError(e instanceof Error ? e.message : 'The action failed. Try it again.'));
@@ -206,7 +211,7 @@ function MarketplaceAvenue({ onPick }: { onPick: (src: AddSource) => void }) {
   );
 }
 
-function AddressAvenue({ onPick, busy }: { onPick: (src: AddSource) => void; busy: boolean }) {
+function AddressAvenue({ onPick, busy }: { onPick: (src: SkillSource) => void; busy: boolean }) {
   const [url, setUrl] = useState('');
   const [error, setError] = useState('');
   const submit = () => {
@@ -238,7 +243,7 @@ function AddressAvenue({ onPick, busy }: { onPick: (src: AddSource) => void; bus
   );
 }
 
-function PasteAvenue({ onPick, busy }: { onPick: (src: AddSource) => void; busy: boolean }) {
+function PasteAvenue({ onPick, busy }: { onPick: (src: SkillSource) => void; busy: boolean }) {
   const [text, setText] = useState('');
   return (
     <form
@@ -267,7 +272,7 @@ function pathOf(f: File): string {
   return parts.length > 1 ? parts.slice(1).join('/') : f.name;
 }
 
-function UploadAvenue({ onPick, busy }: { onPick: (src: AddSource) => void; busy: boolean }) {
+function UploadAvenue({ onPick, busy }: { onPick: (src: SkillSource) => void; busy: boolean }) {
   const [files, setFiles] = useState<{ path: string; text: string; size: number }[]>([]);
   const [error, setError] = useState('');
   const pickFiles = useRef<HTMLInputElement>(null);
@@ -328,11 +333,11 @@ export function AddSkill({ initial = 'marketplace' }: { initial?: Avenue }) {
   const [conflict, setConflict] = useState('');
   const top = useRef<HTMLDivElement>(null);
 
-  const preview = async (src: AddSource) => {
+  const preview = async (src: SkillSource) => {
     setStep({ kind: 'busy' });
     setConflict('');
     try {
-      setStep({ kind: 'ready', src, p: await make.preview(src) });
+      setStep({ kind: 'ready', src, p: previewOf(await api.previewSkill(src)) });
       requestAnimationFrame(() => {
         const el = top.current && top.current.querySelector('.preview');
         if (el && 'scrollIntoView' in el) el.scrollIntoView({ block: 'start' });
@@ -346,12 +351,16 @@ export function AddSkill({ initial = 'marketplace' }: { initial?: Avenue }) {
     if (step.kind !== 'ready') return;
     setBusy(true);
     try {
-      const r = await make.install(step.src, step.p, replace);
+      const r = await api.installSkill(step.src, step.p.digest, replace);
       await loadSkills().catch(() => {});
       closeAddSkill();
-      go({ place: 'skills', item: { kind: 'skill', id: r.name } });
+      go({ place: 'skills', item: { kind: 'skill', id: (r && r.skill && r.skill.name) || step.p.name } });
     } catch (e) {
-      if (e instanceof ApiError && e.status === 409 && !replace) setConflict(e.message);
+      // A 409 means that an imported skill took the name since the
+      // preview, which Replace can take the place of, or that the files
+      // changed since the preview, which a new preview shows.
+      const taken = e instanceof ApiError && e.status === 409 && !replace && !/digest|changed/i.test(e.message);
+      if (taken) setConflict(e.message);
       else setStep({ kind: 'failed', text: e instanceof Error && e.message ? e.message : 'The action failed. Try it again.' });
     }
     setBusy(false);

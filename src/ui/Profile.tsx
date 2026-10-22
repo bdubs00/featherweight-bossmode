@@ -8,12 +8,12 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
 import { ApiError } from '../api/client';
-import { peopleApi, type PoolView, type Today } from '../api/people';
-import type { Agent } from '../api/types';
-import { useSelect } from '../state/store';
-import { loadFaces } from '../state/actions';
+import type { Pool, Today } from '../api/types';
+import { store, useSelect } from '../state/store';
+import { loadAgentSkills, loadFaces } from '../state/actions';
 import { ensureRuns } from '../state/fetchers';
-import { likedOf, newestRun, parseKeep, rulesOf, seatOnWorker, seatsOfAgent } from '../state/people';
+import { likedOf, newestRun, parseKeep, policyRules, rulesOf, seatOnWorker, seatsOfAgent } from '../state/people';
+import { poolNameOf } from '../lib/workers';
 import { phaseOf } from '../lib/presence';
 import { hrefOf } from '../lib/route';
 import { since } from '../lib/words';
@@ -22,26 +22,24 @@ import { InlineMarkdown } from './common';
 import { Glyph } from './icons';
 import { Button, Chip, Field, Help, Input, Led, Mark, PaneHeader } from './primitives';
 
-/** The agent view, with the fields that a backend branch adds: the resolved skills and the rules. */
-type AgentView = Agent & { skills?: { name: string }[]; rules?: string[] };
-
 const WORKER_HELP = 'A worker runs the work of one agent, one seat at a time. Keep is how many it keeps ready.';
 const POLL_MS = 10_000;
 
 /** usePool reads the workers of an agent now and every 10 seconds while the profile is open. */
-function usePool(agent: string): [PoolView | null | undefined, (p: PoolView | null) => void, Today | null | undefined] {
-  const [pool, setPool] = useState<PoolView | null | undefined>(undefined);
+function usePool(agent: string): [Pool | null | undefined, (p: Pool | null) => void, Today | null | undefined] {
+  const [pool, setPool] = useState<Pool | null | undefined>(undefined);
   const [today, setToday] = useState<Today | null | undefined>(undefined);
+  const name = useSelect((s) => poolNameOf(s.fleet, agent));
   useEffect(() => {
     let live = true;
     setPool(undefined);
     setToday(undefined);
     const read = () => {
-      peopleApi
-        .pool(agent)
+      api
+        .pool(name)
         .then((p) => live && setPool(p))
         .catch(() => live && setPool((old) => (old === undefined ? null : old)));
-      peopleApi
+      api
         .today(agent)
         .then((t) => live && setToday(t))
         .catch(() => live && setToday((old) => (old === undefined ? null : old)));
@@ -52,7 +50,7 @@ function usePool(agent: string): [PoolView | null | undefined, (p: PoolView | nu
       live = false;
       clearInterval(t);
     };
-  }, [agent]);
+  }, [agent, name]);
   return [pool, setPool, today];
 }
 
@@ -79,7 +77,7 @@ function useLiked(agent: string): { path: string; items: string[] | null } {
 }
 
 /** KeepField is the number of workers that an agent keeps, changed in place by an owner. */
-export function KeepField({ agent, value, owner, onSaved }: { agent: string; value: number; owner: boolean; onSaved: (p: PoolView) => void }) {
+export function KeepField({ agent, value, owner, onSaved }: { agent: string; value: number; owner: boolean; onSaved: (p: Pool) => void }) {
   const [text, setText] = useState(String(value));
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -98,7 +96,7 @@ export function KeepField({ agent, value, owner, onSaved }: { agent: string; val
     setError('');
     if (k.value === value) return;
     setBusy(true);
-    const ok = await attempt(async () => onSaved(await peopleApi.setKeep(agent, k.value)));
+    const ok = await attempt(async () => onSaved(await api.setKeep(poolNameOf(store.get().fleet, agent), k.value)));
     setBusy(false);
     if (!ok) setText(String(value));
   };
@@ -147,7 +145,7 @@ export function KeepField({ agent, value, owner, onSaved }: { agent: string; val
 }
 
 /** Workers is the section of the workers of an agent: the count, the question mark, Keep, and one row per worker. */
-function Workers({ agent, owner, pool, setPool }: { agent: string; owner: boolean; pool: PoolView | null | undefined; setPool: (p: PoolView | null) => void }) {
+function Workers({ agent, owner, pool, setPool }: { agent: string; owner: boolean; pool: Pool | null | undefined; setPool: (p: Pool | null) => void }) {
   const bridges = useSelect((s) => s.bridges);
   const rosters = useSelect((s) => s.rosters);
   const seats = useMemo(() => seatsOfAgent({ bridges, rosters }, agent), [bridges, rosters, agent]);
@@ -300,9 +298,8 @@ function EditFace({ agent, onDone }: { agent: string; onDone: (said: string) => 
 /** Profile is the profile of an agent. back is the conversation that a narrow window goes back to. */
 export function Profile({ agent, back }: { agent: string; back?: { href: string; label: string } }) {
   const face = useSelect((s) => s.faces[agent]);
-  const info = useSelect((s) => (s.agents || []).find((a) => a.name === agent)) as AgentView | undefined;
-  const tools = useSelect((s) => (s.skills ? s.skills.tools : null));
-  const skills = useSelect((s) => (s.skills ? s.skills.skills : null));
+  const info = useSelect((s) => (s.agents || []).find((a) => a.name === agent));
+  const loadable = useSelect((s) => s.agentSkills[agent]);
   const runs = useSelect((s) => s.runs);
   const channels = useSelect((s) => s.channels);
   const [pool, setPool, today] = usePool(agent);
@@ -314,10 +311,14 @@ export function Profile({ agent, back }: { agent: string; back?: { href: string;
     setEdit(false);
     setSaid('');
   }, [agent]);
+  useEffect(() => {
+    loadAgentSkills(agent).catch(() => {});
+  }, [agent]);
   const owner = !!info && info.role === 'owner';
-  const toolNames = useMemo(() => (tools || []).filter((t) => (t.agents || []).includes(agent)).map((t) => t.name), [tools, agent]);
-  const skillCount = info && info.skills ? info.skills.length : (skills || []).filter((x) => (x.agents || []).includes(agent)).length;
-  const rules = useMemo(() => (info && info.rules ? info.rules : rulesOf(agent, runs, channels)), [info, agent, runs, channels]);
+  const toolNames = info && info.tools ? info.tools : [];
+  const skillCount = loadable ? loadable.length : 0;
+  // The rules of the profile, and the rules that its decisions named.
+  const rules = useMemo(() => [...new Set([...policyRules(info && info.policy), ...rulesOf(agent, runs, channels)])].sort(), [info, agent, runs, channels]);
   const upload = async () => {
     const f = file.current && file.current.files && file.current.files[0];
     if (!f) return;
@@ -381,7 +382,7 @@ export function Profile({ agent, back }: { agent: string; back?: { href: string;
                     ))}
                   </ul>
                 )}
-                {skills !== null && (
+                {loadable && (
                   <a class="prof-link prof-skills" href="#skills">
                     {skillCount === 1 ? '1 skill' : skillCount + ' skills'}
                   </a>

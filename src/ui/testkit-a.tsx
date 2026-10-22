@@ -81,8 +81,19 @@ export function memberOf(handle: string, over: Partial<Member> = {}): Member {
   return { handle, agent: handle.replace(/-\d+$/, ''), task: 'Do the work of ' + handle, runs: ['run-' + handle], fired: false, muted: false, presence: 'idle', activity: null, ...over };
 }
 
+/**
+ * The time of the newest fixture entry. The entries reach back 100 minutes,
+ * so close after midnight they start at noon, and no day line splits them.
+ */
+function entryBase(): number {
+  const now = new Date();
+  if (now.getHours() >= 2) return now.getTime();
+  now.setHours(12, 0, 0, 0);
+  return now.getTime();
+}
+
 export function entryOf(seq: number, over: Partial<Entry> & Record<string, unknown> = {}): Entry {
-  return { seq, at: new Date(Date.now() - (100 - seq) * 60_000).toISOString(), from: { kind: 'agent', handle: 'migrator-1', run: 'run-migrator-1' }, to: [], replyTo: null, text: 'message ' + seq, reactions: { up: [], down: [], heart: [] }, decision: null, ...over } as Entry;
+  return { seq, at: new Date(entryBase() - (100 - seq) * 60_000).toISOString(), from: { kind: 'agent', handle: 'migrator-1', run: 'run-migrator-1' }, to: [], replyTo: null, text: 'message ' + seq, reactions: { up: [], down: [], heart: [] }, decision: null, ...over } as Entry;
 }
 
 /** settle waits for the promises of the page and draws again. */

@@ -10,7 +10,9 @@
 // an SVG on the profile.
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { make, templatesOf, type AgentSaved, type NewProfile, type Template, type WorkersAsk } from '../api/make';
+import { api } from '../api/routes';
+import type { AgentSaved, NewProfile, Template, WorkersAsk } from '../api/types';
+import { templatesOf } from '../lib/workers';
 import { useSelect } from '../state/store';
 import { loadAgents, loadFaces, loadFleet } from '../state/actions';
 import { phaseOf } from '../lib/presence';
@@ -141,7 +143,7 @@ function Workers({ saved, dry }: { saved: AgentSaved; dry: boolean }) {
     <section class="workers-out" aria-labelledby="workers-out">
       <h2 class="sec-head t-sub" id="workers-out">
         Workers <Chip>{pool.wanted}</Chip>
-        {(pool as { template?: string }).template && <span class="t-meta">{(pool as { template?: string }).template}</span>}
+        {pool.template && <span class="t-meta">{pool.template}</span>}
       </h2>
       {dry || tasks.length === 0 ? (
         <p class="t-meta">{pool.wanted === 1 ? '1 worker starts when you create the agent.' : pool.wanted + ' workers start when you create the agent.'}</p>
@@ -208,7 +210,7 @@ export function NewAgent() {
     const { profile, workers } = requestOf(f, templates);
     setBusy(true);
     await attempt(async () => {
-      const saved = await make.putAgent(f.name.trim(), profile, workers, dry);
+      const saved = await api.putAgent(f.name.trim(), profile, workers, dry);
       setOut({ saved: { ...saved, name: saved.name || f.name.trim() }, dry });
       // The answer shows below the form, so it comes into view.
       requestAnimationFrame(() => {

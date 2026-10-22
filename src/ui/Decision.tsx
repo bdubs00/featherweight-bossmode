@@ -11,7 +11,6 @@ import type { Decision } from '../api/types';
 import { formOf, type Field as SchemaField } from '../lib/schema';
 import { commandOf, decisionTitle, personName, rawInput, whyWords } from '../lib/words';
 import { alwaysAllow, decide } from '../state/actions';
-import type { DecisionA } from '../state/bridges-a';
 import { attempt } from './notice';
 import { When } from './common';
 import type { Tone } from '../lib/presence';
@@ -22,11 +21,9 @@ export function Light({ tone }: { tone: Tone }) {
   return <span class={'led led-' + tone} aria-hidden="true" />;
 }
 
-/** A decision of the shared type, or one with the state unknown of the backend. */
-export type AnyDecision = Decision | DecisionA;
 
 /** canAlways reports whether a card offers Always allow, with the rule of /ui. */
-export function canAlways(d: AnyDecision): boolean {
+export function canAlways(d: Decision): boolean {
   if (d.always !== undefined) return d.always;
   const r = d.reason || '';
   return !!d.tool && (r === 'default' || /^rule: ask /.test(r)) && !/^rule: ask (readonly|read-only|idempotent|destructive|parallel|parallelsafe)$/i.test(r);
@@ -41,7 +38,7 @@ function RuleWords({ reason }: { reason?: string }) {
 }
 
 /** Details shows the tool, the reason, and the raw input of a call behind a key. */
-function Details({ d, id }: { d: AnyDecision; id: string }) {
+function Details({ d, id }: { d: Decision; id: string }) {
   const [open, setOpen] = useState(false);
   const raw = rawInput(d.input);
   if (!d.tool && !d.reason && !raw) return null;
@@ -70,7 +67,7 @@ function Details({ d, id }: { d: AnyDecision; id: string }) {
  * A card whose run stopped waiting without a decision has state deny, no
  * decider, and a note that says why.
  */
-export function DecidedLine({ d }: { d: AnyDecision }) {
+export function DecidedLine({ d }: { d: Decision }) {
   if (d.state === 'unknown') {
     return d.note ? <p class="decided">{d.note}</p> : null;
   }
@@ -112,7 +109,7 @@ export function DecidedLine({ d }: { d: AnyDecision }) {
 
 let ids = 0;
 
-export function ApprovalCard({ d, who, onDecide, settle }: { d: AnyDecision; who: string; onDecide?: () => void; settle?: boolean }) {
+export function ApprovalCard({ d, who, onDecide, settle }: { d: Decision; who: string; onDecide?: () => void; settle?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
   const [id] = useState(() => 'details-' + ++ids);
@@ -177,7 +174,7 @@ function valueOf(el: HTMLInputElement | HTMLSelectElement, f: SchemaField): unkn
   return f.type === 'number' || f.type === 'integer' ? Number(el.value) : el.value;
 }
 
-export function QuestionCard({ d, who, onDecide, settle }: { d: AnyDecision; who: string; onDecide?: () => void; settle?: boolean }) {
+export function QuestionCard({ d, who, onDecide, settle }: { d: Decision; who: string; onDecide?: () => void; settle?: boolean }) {
   const [busy, setBusy] = useState(false);
   const form = formOf(d.schema);
   const pending = d.state === 'pending';
@@ -288,7 +285,7 @@ export function QuestionCard({ d, who, onDecide, settle }: { d: AnyDecision; who
 }
 
 /** UnknownCard is a card whose decision the page cannot confirm: no key, and the note of the backend. */
-function UnknownCard({ d, who }: { d: AnyDecision; who: string }) {
+function UnknownCard({ d, who }: { d: Decision; who: string }) {
   const title = d.question ? d.reason || 'A question for you' : decisionTitle(who, d as Decision);
   const cmd = commandOf(d.input);
   return (
@@ -303,7 +300,7 @@ function UnknownCard({ d, who }: { d: AnyDecision; who: string }) {
  * DecisionCard picks the card of a decision. settle is true for a card that
  * arrives on the stream after the channel loaded: it settles once.
  */
-export function DecisionCard({ d, who, onDecide, settle }: { d: AnyDecision; who: string; onDecide?: () => void; settle?: boolean }) {
+export function DecisionCard({ d, who, onDecide, settle }: { d: Decision; who: string; onDecide?: () => void; settle?: boolean }) {
   if (d.state === 'unknown') return <UnknownCard d={d} who={who} />;
   return d.question || d.schema ? <QuestionCard d={d} who={who} onDecide={onDecide} settle={settle} /> : <ApprovalCard d={d} who={who} onDecide={onDecide} settle={settle} />;
 }

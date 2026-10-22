@@ -9,16 +9,14 @@
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { Member as MemberT } from '../api/types';
-import { peopleApi } from '../api/people';
 import type { MemberTab } from '../lib/route';
 import { hrefOf } from '../lib/route';
 import { store, useSelect } from '../state/store';
 import { entriesOf } from '../state/reducer';
-import { fire, loadBridge, loadOlder, patchMember } from '../state/actions';
+import { fire, loadAgentSkills, loadBridge, loadOlder, patchMember, sendMessage } from '../state/actions';
 import { ensureChannels, ensureRuns } from '../state/fetchers';
 import { newestRun, parseSlash, seatRowLight, slashCommands } from '../state/people';
 import { directEntries, stepsOf, threadOf, withLive } from '../state/thread';
-import type { SlashSkill } from '../api/people';
 import { attempt } from './notice';
 import { Confirm } from './common';
 import { Composer } from './Composer';
@@ -218,8 +216,12 @@ function SeatBar({ bridge, m, how, reason }: { bridge: string; m: MemberT; how: 
 function Chat({ bridge, m, items, closed, stopped, reason }: { bridge: string; m: MemberT; items: ReturnType<typeof useTranscript>['items']; closed: boolean; stopped: '' | 'failed' | 'stopped'; reason: string }) {
   const ch = useSelect((s) => s.channels[bridge]);
   const roster = useSelect((s) => s.rosters[bridge]);
-  const skills = useSelect((s) => (s.skills ? (s.skills.skills as SlashSkill[]) : null));
+  const skills = useSelect((s) => (s.skills ? s.skills.skills : null));
+  const loadable = useSelect((s) => s.agentSkills[m.agent]);
   const live = useLive(bridge, m.handle);
+  useEffect(() => {
+    loadAgentSkills(m.agent).catch(() => {});
+  }, [m.agent]);
   const [busyOlder, setBusyOlder] = useState(false);
   useEffect(() => {
     ensureChannels([bridge]);
@@ -232,7 +234,7 @@ function Chat({ bridge, m, items, closed, stopped, reason }: { bridge: string; m
     const steps = stepsOf(items).filter((x) => new Date(x.at).getTime() >= from);
     return withLive(threadOf(mine, steps), m.handle, live, new Date().toISOString());
   }, [ch, items, m.handle, m.runs, live]);
-  const commands = useMemo(() => slashCommands(skills, m.agent), [skills, m.agent]);
+  const commands = useMemo(() => slashCommands(skills, loadable), [skills, loadable]);
   const names = useMemo(() => commands.map((c) => c.name), [commands]);
   const handles = useMemo(() => (roster ? roster.order : undefined), [roster]);
   const agentOf = (h: string) => (roster && roster.byHandle[h] ? roster.byHandle[h].agent : h === 'manager' ? (store.get().config?.manager?.agent ?? 'manager') : h.replace(/-\d+$/, ''));
@@ -270,10 +272,8 @@ function Chat({ bridge, m, items, closed, stopped, reason }: { bridge: string; m
         commands={commands}
         onSend={async (text) => {
           const skill = parseSlash(text, names);
-          return attempt(async () => {
-            const e = await peopleApi.direct(bridge, m.handle, text, skill);
-            if (e && typeof e.seq === 'number') store.dispatch({ type: 'entry', bridge, entry: e });
-          });
+          // A slash command goes as skill, and its arguments leave the text.
+          return attempt(() => sendMessage(bridge, skill ? { text: '', to: [m.handle], skill } : { text, to: [m.handle] }));
         }}
       />
     </>

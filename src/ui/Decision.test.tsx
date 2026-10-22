@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { act } from 'preact/test-utils';
 import type { Decision } from '../api/types';
-import type { DecisionA } from '../state/bridges-a';
 import { DecisionCard, canAlways } from './Decision';
 import { fakeFetch, mount, settle, unmountAll } from './testkit-a';
 
@@ -108,7 +107,7 @@ describe('the decided card', () => {
 
 describe('the card in the state unknown', () => {
   it('shows the note and no key, and changes in place when the state lands', () => {
-    const unknown: DecisionA = { ...push, state: 'unknown', note: 'The run stopped before the decision reached it.' };
+    const unknown: Decision = { ...push, state: 'unknown', note: 'The run stopped before the decision reached it.' };
     const el = mount(<DecisionCard d={unknown} who="tester" />);
     const card = el.querySelector('section.card')!;
     expect(card.classList.contains('quiet')).toBe(true);

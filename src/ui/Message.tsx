@@ -6,13 +6,12 @@
 
 import { memo } from 'preact/compat';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import type { Member, ReactionKind } from '../api/types';
+import type { Entry, Member, ReactionKind } from '../api/types';
 import { useSelect } from '../state/store';
 import { dayWords, excerpt, list, personName, senderName } from '../lib/words';
 import { hrefOf } from '../lib/route';
 import type { Tone } from '../lib/presence';
 import { decide, react } from '../state/actions';
-import { asDecision, type EntryA } from '../state/bridges-a';
 import { attempt } from './notice';
 import { InlineMarkdown, Markdown, When } from './common';
 import { DecisionCard, Light } from './Decision';
@@ -109,7 +108,7 @@ function HeartNote({ onSave, onCancel }: { onSave: (note: string) => void; onCan
  * On a card that waits, a thumb up allows and a thumb down denies, as the
  * keys of the card do.
  */
-export function Reactions({ bridge, e, onReply }: { bridge: string; e: EntryA; onReply?: (seq: number) => void }) {
+export function Reactions({ bridge, e, onReply }: { bridge: string; e: Entry; onReply?: (seq: number) => void }) {
   const me = useSelect((s) => (s.me && s.me.principal ? s.me.principal.subject : ''));
   const [heart, setHeart] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -176,7 +175,7 @@ export function jumpTo(bridge: string, seq: number): void {
 
 /** ReplyChip names the entry that a message answers, and jumps to it. */
 function ReplyChip({ bridge, seq }: { bridge: string; seq: number }) {
-  const target = useSelect((s) => (s.channels[bridge] ? (s.channels[bridge].bySeq[seq] as EntryA | undefined) : undefined));
+  const target = useSelect((s) => (s.channels[bridge] ? (s.channels[bridge].bySeq[seq] as Entry | undefined) : undefined));
   return (
     <button type="button" class="reply-chip" onClick={() => jumpTo(bridge, seq)} disabled={!target} title={target ? 'Go to the message' : 'Earlier messages hold it'}>
       <span class="reply-who">{target ? senderName(target.from) : 'An earlier message'}</span>
@@ -201,8 +200,8 @@ export interface EntryProps {
 
 /** EntryRow draws one entry. It reads its own entry, so a change redraws only it. */
 export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, fresh, listed, onReply }: EntryProps) {
-  const e = useSelect((s) => (s.channels[bridge] ? (s.channels[bridge].bySeq[seq] as EntryA | undefined) : undefined));
-  const prev = useSelect((s) => (prevSeq && s.channels[bridge] ? (s.channels[bridge].bySeq[prevSeq] as EntryA | undefined) : undefined));
+  const e = useSelect((s) => (s.channels[bridge] ? (s.channels[bridge].bySeq[seq] as Entry | undefined) : undefined));
+  const prev = useSelect((s) => (prevSeq && s.channels[bridge] ? (s.channels[bridge].bySeq[prevSeq] as Entry | undefined) : undefined));
   // A row reads strings of the roster, never the roster itself, so a change
   // of presence redraws the roster row and no message.
   const handles = useSelect((s) => (s.rosters[bridge] ? s.rosters[bridge].order : undefined));
@@ -258,7 +257,7 @@ export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, fresh, li
               <b>{who}</b>
               <When at={e.at} />
             </header>
-            <DecisionCard d={asDecision(d)} who={who} settle={settle} />
+            <DecisionCard d={d} who={who} settle={settle} />
           </div>
           <Reactions bridge={bridge} e={e} />
         </article>

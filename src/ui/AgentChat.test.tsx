@@ -27,7 +27,8 @@ beforeEach(() => {
   seedFleet();
   act(() => {
     store.dispatch({ type: 'config', config: { manager: { agent: 'manager', member: 'default/boss-0', run: '' }, placement: 'queue', maxMembers: 16 } });
-    store.dispatch({ type: 'skills', skills: { skills: [{ name: 'plan', description: 'Plan a module.', origin: 'local', agents: ['manager'] }], tools: [] } });
+    store.dispatch({ type: 'skills', skills: { skills: [{ name: 'plan', description: 'Plan a module.', origin: 'local' }] } });
+    store.dispatch({ type: 'agent-skills', agent: 'manager', skills: ['plan'] });
   });
 });
 

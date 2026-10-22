@@ -12,10 +12,10 @@ const TWO = [
 ];
 const SKILLS: SkillsList = {
   skills: [
-    { name: 'ansible-style', description: 'Write roles.', origin: 'imported', agents: [] },
-    { name: 'docs/search', description: 'Search the docs.', origin: 'server', server: 'docs', agents: [] },
+    { name: 'ansible-style', description: 'Write roles.', origin: 'imported' },
+    { name: 'docs/search', description: 'Search the docs.', origin: 'mcp', server: 'docs' },
   ],
-  tools: [{ id: 'bash', name: 'bash', description: 'Run a command.', origin: 'builtin', agents: [] }],
+  tools: [{ id: 'bash', name: 'bash', description: 'Run a command.', origin: 'builtin' }],
 };
 
 let api: ReturnType<typeof fakeApi>;

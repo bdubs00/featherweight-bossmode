@@ -1,9 +1,10 @@
 // The actions of the page: each one calls the API and puts the answer into
 // the store. The stream keeps the store current between them.
 
-import { api, type NewBridge, type NewMember } from '../api/routes';
+import { api, type NewBridge, type NewMember, type NewMessage } from '../api/routes';
 import { openStream, type StreamHandle } from '../api/stream';
-import type { Entry, MessageEventData, ReactionKind, StreamEvent } from '../api/types';
+import type { Entry, MessageEventData, ReactionKind, RunState, StreamEvent } from '../api/types';
+import { managerRunOf } from './reducer';
 import { store } from './store';
 import { ApiError, type SigninNeeded } from '../api/client';
 
@@ -46,6 +47,24 @@ export async function loadOlder(id: string): Promise<boolean> {
   return page.prev !== 0;
 }
 
+/** The most pages of 500 entries that loadAllCards reads. */
+export const CARD_PAGES = 8;
+
+/**
+ * loadAllCards reads the channel back to its first entry, at most
+ * CARD_PAGES pages of 500, so the tab Decisions lists every card of the
+ * bridge. The entries join the loaded part of the channel, so the stream
+ * keeps each card current.
+ */
+export async function loadAllCards(id: string): Promise<void> {
+  for (let i = 0; i < CARD_PAGES; i++) {
+    const ch = store.get().channels[id];
+    if (!ch || ch.prev === 0) return;
+    const page = await api.messages(id, { before: ch.prev, limit: 500 });
+    store.dispatch({ type: 'channel', bridge: id, page, mode: 'older' });
+  }
+}
+
 /** loadNewer reads what the stream missed, after a reset. */
 export async function loadNewer(id: string): Promise<void> {
   const ch = store.get().channels[id];
@@ -81,8 +100,13 @@ export function markRead(id: string): void {
 }
 
 export async function postMessage(id: string, text: string, to: string[], replyTo?: number): Promise<Entry> {
-  const e = await api.post(id, { text, to: to.length ? to : undefined, replyTo });
-  store.dispatch({ type: 'entry', bridge: id, entry: e });
+  return sendMessage(id, { text, to, replyTo });
+}
+
+/** sendMessage posts a message with any field of the route, such as the skill of a slash command, and puts the entry into the channel. */
+export async function sendMessage(id: string, m: NewMessage): Promise<Entry> {
+  const e = await api.post(id, m);
+  if (e && typeof e.seq === 'number') store.dispatch({ type: 'entry', bridge: id, entry: e });
   return e;
 }
 
@@ -152,6 +176,101 @@ export async function loadSkills(): Promise<void> {
     }
     throw e;
   }
+}
+
+/* ---------- runs ---------- */
+
+const askedRuns = new Set<string>();
+
+/**
+ * loadRunOnce reads a run that the store does not hold, once per page
+ * load. A row needs its state: a queued run shows waiting for a worker,
+ * and a failed run gives the reason of an error. The stream keeps the run
+ * current after that.
+ */
+export async function loadRunOnce(id: string): Promise<void> {
+  if (!id || askedRuns.has(id) || store.get().runs[id]) return;
+  askedRuns.add(id);
+  try {
+    const run = await api.run(id);
+    store.dispatch({ type: 'run', run });
+  } catch {
+    // The row shows the presence alone. The next stream event of the run fills it.
+  }
+}
+
+/** forgetRuns clears the memory of loadRunOnce, after a reset of the stream and for the tests. */
+export function forgetRuns(): void {
+  askedRuns.clear();
+}
+
+/* ---------- the skills of each agent ---------- */
+
+/**
+ * loadAgentSkills reads the skills that an agent can load, once while the
+ * page holds them. The Skills place reads them for every agent and forgets
+ * them when it closes, so the next visit reads them again.
+ */
+export async function loadAgentSkills(agent: string): Promise<void> {
+  if (!agent || store.get().agentSkills[agent]) return;
+  try {
+    const r = await once('agent-skills:' + agent, () => api.agentSkills(agent));
+    store.dispatch({ type: 'agent-skills', agent, skills: ((r && r.skills) || []).map((x) => x.name) });
+  } catch (e) {
+    // An agent that the caller cannot see, or a workbench without the route, loads no skill.
+    if (e instanceof ApiError && (e.status === 404 || e.status === 403)) store.dispatch({ type: 'agent-skills', agent, skills: [] });
+    else throw e;
+  }
+}
+
+/** forgetAgentSkills drops the skills of every agent. */
+export function forgetAgentSkills(): void {
+  store.dispatch({ type: 'agent-skills-forget' });
+}
+
+/* ---------- the manager ---------- */
+
+/** ended reports whether a run takes no more messages, so the next one starts a new conversation. */
+export function ended(state: RunState | string | undefined): boolean {
+  return state === 'failed' || state === 'canceled';
+}
+
+/** setManagerRun opens a conversation with the manager, or a new one with "". */
+export function setManagerRun(run: string): void {
+  const s = store.get();
+  store.dispatch({ type: 'manager-pick', pick: { run, by: s.me && s.me.principal ? s.me.principal.subject : '' } });
+}
+
+/** forgetManagerRun follows the settings again, for the tests and a sign-out. */
+export function forgetManagerRun(): void {
+  store.dispatch({ type: 'manager-pick', pick: null });
+}
+
+/**
+ * askManager sends a message to the manager: a follow-up of the
+ * conversation, or the first message of a new run when there is none or
+ * the last one ended. It returns the run.
+ */
+export async function askManager(text: string): Promise<string> {
+  const s = store.get();
+  const m = s.config && s.config.manager;
+  if (!m) throw new Error('No manager is set up.');
+  const id = managerRunOf(s);
+  const run = id ? s.runs[id] : undefined;
+  if (id && !ended(run && run.state)) {
+    try {
+      await api.sendRun(id, text);
+      return id;
+    } catch (e) {
+      // A run that ended since the page read it refuses the message, and
+      // the message starts a new conversation.
+      if (!(e instanceof ApiError) || e.status !== 409) throw e;
+    }
+  }
+  const r = await api.start(m.member, { agent: m.agent, input: text });
+  store.dispatch({ type: 'run', run: r });
+  setManagerRun(r.id);
+  return r.id;
 }
 
 export async function loadFaces(): Promise<void> {

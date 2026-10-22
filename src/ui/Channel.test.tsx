@@ -2,7 +2,6 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { act } from 'preact/test-utils';
 import { store } from '../state/store';
 import type { Entry, Fleet } from '../api/types';
-import type { EntryA } from '../state/bridges-a';
 import { Channel, cardOrder, pagesOfBridge } from './Channel';
 import { bridgeOf, entryOf, fakeFetch, memberOf, mount, settle, unmountAll } from './testkit-a';
 
@@ -106,7 +105,7 @@ describe('the channel', () => {
     expect(el.querySelector('.tab.on')!.firstChild!.textContent).toBe('Decisions');
     expect([...el.querySelectorAll('.cards article')].map((a) => a.id)).toEqual(['entry-b-chan-9', 'entry-b-chan-8']);
     expect(el.querySelector('.composer')).toBeNull();
-    const list = [card(1, 'allow'), card(2, 'pending'), { ...card(3, 'pending') }, { ...card(4, 'allow'), decision: { ...card(4, 'allow').decision!, state: 'unknown' } }, entryOf(5)] as EntryA[];
+    const list = [card(1, 'allow'), card(2, 'pending'), { ...card(3, 'pending') }, { ...card(4, 'allow'), decision: { ...card(4, 'allow').decision!, state: 'unknown' } }, entryOf(5)] as Entry[];
     expect(cardOrder(list)).toEqual([2, 3, 4, 1]);
   });
 

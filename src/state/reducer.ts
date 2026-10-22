@@ -52,8 +52,17 @@ export interface State {
   agents: Agent[] | null;
   /** The members and the pools of the fleet, from GET /v1/fleet and the member and task events. */
   fleet: Fleet | null;
-  /** The skills and the tools of the fleet, from GET /v1/bossmode/skills. */
+  /** The skills of the front, from GET /v1/bossmode/skills. */
   skills: SkillsList | null;
+  /** The names of the skills that each agent can load, from GET /v1/agents/{name}/skills, for the agents that the page read. */
+  agentSkills: Record<string, string[]>;
+  /**
+   * The conversation with the manager that a person picked: a run, or ""
+   * for a new conversation. null follows the newest run of the settings.
+   * by names the person, so another person who signs in follows the
+   * settings.
+   */
+  managerPick: { run: string; by: string } | null;
   /** The bridge that the person reads now, or "". */
   open: string;
   stream: { status: StreamStatus; lastId: string };
@@ -73,6 +82,8 @@ export const initialState: State = {
   agents: null,
   fleet: null,
   skills: null,
+  agentSkills: {},
+  managerPick: null,
   open: '',
   stream: { status: 'connecting', lastId: '' },
   resets: 0,
@@ -94,6 +105,9 @@ export type Action =
   | { type: 'agents'; agents: Agent[] }
   | { type: 'fleet'; fleet: Fleet }
   | { type: 'skills'; skills: SkillsList | null }
+  | { type: 'agent-skills'; agent: string; skills: string[] }
+  | { type: 'agent-skills-forget' }
+  | { type: 'manager-pick'; pick: { run: string; by: string } | null }
   | { type: 'faces'; faces: FaceMeta[] }
   | { type: 'face'; face: FaceMeta }
   | { type: 'stream'; event: StreamEvent }
@@ -132,7 +146,11 @@ function bridgeOf(b: Bridge, old: Bridge | undefined, open: string): Bridge {
   if (b.id === open) {
     next.read = Math.max(next.read, next.lastSeq);
     next.unread = 0;
+    next.unreadMore = false;
   }
+  // Only GET /v1/bridges/{id} carries usage. A list item or a PATCH answer
+  // keeps the last sum, so the foot of the members does not blink.
+  if (next.usage === undefined && old && old.usage) next.usage = old.usage;
   if (members) {
     next.memberCount = members.length;
     next.needsYou = members.filter((m) => m.presence === 'needs-you').length;
@@ -407,7 +425,7 @@ export function reduce(state: State, a: Action): State {
     case 'read': {
       const b = state.bridges.byId[a.bridge];
       if (!b || (b.read >= a.seq && b.unread === 0)) return state;
-      return { ...state, bridges: { ...state.bridges, byId: { ...state.bridges.byId, [a.bridge]: { ...b, read: Math.max(b.read, a.seq), unread: 0 } } } };
+      return { ...state, bridges: { ...state.bridges, byId: { ...state.bridges.byId, [a.bridge]: { ...b, read: Math.max(b.read, a.seq), unread: 0, unreadMore: false } } } };
     }
     case 'open':
       return state.open === a.bridge ? state : { ...state, open: a.bridge };
@@ -430,6 +448,15 @@ export function reduce(state: State, a: Action): State {
       return { ...state, fleet: a.fleet };
     case 'skills':
       return { ...state, skills: a.skills };
+    case 'agent-skills': {
+      const old = state.agentSkills[a.agent];
+      if (old && old.length === a.skills.length && old.every((x, i) => x === a.skills[i])) return state;
+      return { ...state, agentSkills: { ...state.agentSkills, [a.agent]: a.skills } };
+    }
+    case 'agent-skills-forget':
+      return Object.keys(state.agentSkills).length ? { ...state, agentSkills: {} } : state;
+    case 'manager-pick':
+      return { ...state, managerPick: a.pick };
     case 'faces': {
       const faces: Record<string, FaceMeta> = {};
       for (const f of a.faces) faces[f.agent] = state.faces[f.agent] && state.faces[f.agent].hash === f.hash && JSON.stringify(state.faces[f.agent]) === JSON.stringify(f) ? state.faces[f.agent] : f;
@@ -456,4 +483,14 @@ export function entriesOf(ch: Channel | undefined): Entry[] {
 /** membersOf returns the members of a roster, in the order of the seats. */
 export function membersOf(r: Roster | undefined): Member[] {
   return r ? r.order.map((h) => r.byHandle[h]) : [];
+}
+
+/**
+ * managerRunOf is the run of the conversation with the manager: the one
+ * that the person picked, else the newest one of the settings.
+ */
+export function managerRunOf(state: State): string {
+  const me = state.me && state.me.principal ? state.me.principal.subject : '';
+  if (state.managerPick && state.managerPick.by === me) return state.managerPick.run;
+  return state.config && state.config.manager ? state.config.manager.run : '';
 }

@@ -6,11 +6,10 @@
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
-import { peopleApi, type SlashSkill } from '../api/people';
 import { go, hrefOf, parseRoute, type Route } from '../lib/route';
 import { awakeWorkers } from '../lib/workers';
 import { store, useSelect } from '../state/store';
-import { loadAgents } from '../state/actions';
+import { loadAgentSkills, loadAgents } from '../state/actions';
 import { ensureRosters, ensureRuns, refreshAfterReset } from '../state/fetchers';
 import { filterPeople, firstPerson, newestRun, parseSlash, peopleCount, peopleOf, slashCommands, workerLight, type PeopleGroup, type PersonRow } from '../state/people';
 import { workersOf } from '../lib/workers';
@@ -23,7 +22,6 @@ import { useStickToEnd } from './Thread';
 import { Profile } from './Profile';
 import { EmptyPane } from './Shell';
 import { Glyph } from './icons';
-import { GlyphB } from './glyphs-b';
 import { Button, Chip, Led, Mark, PaneHeader, buttonClass } from './primitives';
 import type { Tone } from '../lib/presence';
 
@@ -136,7 +134,7 @@ export function FleetList({ current, member }: { current?: string; member?: stri
               aria-pressed={board}
               onClick={() => go(board ? { place: 'fleet' } : { place: 'fleet', board: true })}
             >
-              <GlyphB name="board" />
+              <Glyph name="board" size={18} />
             </button>
             <Button href="#new-agent" size="s" icon="plus" class="key-icon" aria-label="New agent" title="New agent" />
           </>
@@ -223,8 +221,12 @@ export function AgentChat({ agent }: { agent: string }) {
   useEffect(() => rememberOpen(hrefOf({ place: 'fleet', agent })), [agent]);
   const config = useSelect((s) => s.config);
   const fleet = useSelect((s) => s.fleet);
-  const skills = useSelect((s) => (s.skills ? (s.skills.skills as SlashSkill[]) : null));
+  const skills = useSelect((s) => (s.skills ? s.skills.skills : null));
+  const loadable = useSelect((s) => s.agentSkills[agent]);
   const face = useSelect((s) => s.faces[agent]);
+  useEffect(() => {
+    loadAgentSkills(agent).catch(() => {});
+  }, [agent]);
   const manager = config && config.manager && config.manager.agent === agent ? config.manager : null;
   // The conversation of this tab comes first, then the newest one of the manager.
   const [runId, setRunId] = useState(() => readRun(agent) || (manager ? manager.run : ''));
@@ -241,7 +243,7 @@ export function AgentChat({ agent }: { agent: string }) {
   const member = manager
     ? manager.member
     : ((fleet ? fleet.members : []).filter((m) => m.agents.some((a) => a.name === agent)).sort((a, b) => (a.state === 'live' ? 0 : 1) - (b.state === 'live' ? 0 : 1))[0] || { name: '' }).name;
-  const commands = useMemo(() => slashCommands(skills, agent), [skills, agent]);
+  const commands = useMemo(() => slashCommands(skills, loadable), [skills, loadable]);
   const names = useMemo(() => commands.map((c) => c.name), [commands]);
   const box = useStickToEnd<HTMLDivElement>(t.items.length);
   const stopped = !!run && ['failed', 'canceled'].includes(run.state);
@@ -255,8 +257,12 @@ export function AgentChat({ agent }: { agent: string }) {
         return;
       }
       const skill = parseSlash(text, names);
-      if (skill) await peopleApi.runSkill(runId, skill);
-      else await api.sendRun(runId, text);
+      if (skill) {
+        const r = await api.runSkill(runId, skill);
+        if (r && r.id) store.dispatch({ type: 'run', run: r });
+        return;
+      }
+      await api.sendRun(runId, text);
       const r = await api.run(runId);
       store.dispatch({ type: 'run', run: r });
     });

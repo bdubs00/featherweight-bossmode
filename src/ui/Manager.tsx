@@ -10,10 +10,10 @@
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
-import { make } from '../api/make';
 import type { Item, Result, Run } from '../api/types';
 import { store, useSelect } from '../state/store';
-import { askManager, ended, setManagerRun, useManagerRun } from '../state/manager';
+import { askManager, ended, setManagerRun } from '../state/actions';
+import { managerRunOf } from '../state/reducer';
 import { personName } from '../lib/words';
 import { attempt, showError } from './notice';
 import { Avatar } from './common';
@@ -136,7 +136,7 @@ export function Manager() {
   const config = useSelect((s) => s.config);
   const me = useSelect((s) => (s.me && s.me.principal ? s.me.principal.subject : ''));
   const manager = config ? config.manager : null;
-  const runId = useManagerRun(config);
+  const runId = useSelect(managerRunOf);
   const run = useSelect((s) => (runId ? s.runs[runId] : undefined));
   const cat = useCatalog();
   const [sent, setSent] = useState<{ text: string; run: string; users: number } | null>(null);
@@ -181,7 +181,7 @@ export function Manager() {
     const slash = runId && !stopped ? slashOf(text, commands.map((c) => c.name)) : null;
     const ok = await attempt(async () => {
       if (slash) {
-        const r = await make.sendSkill(runId, slash.name, slash.args);
+        const r = await api.runSkill(runId, slash);
         if (r && r.id) store.dispatch({ type: 'run', run: r });
       } else {
         await askManager(text);

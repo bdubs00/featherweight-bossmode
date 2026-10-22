@@ -1,13 +1,14 @@
 // The catalog of skills and tools, as the Skills place, the picker of
-// skills, and the slash menu of the manager read it. The routes answer two
-// shapes: the shape of docs/CONTRACT.md section 12, which the fake server
-// serves, and the shape of the backend, where origin is "imported", empty
-// for a local skill, or names a server. catalogOf reads both into one shape.
-// Screen C owns this file.
+// skills, and the slash menus read it. GET /v1/bossmode/skills answers the
+// skills, each with its origin: local, imported, or mcp with its server.
+// The tools come from GET /v1/tools of the kernel. The catalog names no
+// agent: GET /v1/agents/{name}/skills names the skills that each agent can
+// load, and the profile of an agent names its tools. catalogOf joins them
+// into one shape.
 
-import type { Skill, SkillsList, Tool } from '../api/types';
+import type { Agent, Skill, SkillFile, SkillPreview, SkillProblem, SkillExisting, SkillsList, Tool } from '../api/types';
 
-/** The three kinds of origin of a skill. */
+/** The three kinds of origin of a skill. A skill of an MCP server has the kind server. */
 export type SkillKind = 'imported' | 'local' | 'server';
 
 /** One skill of the catalog, in the one shape that the screens read. */
@@ -17,11 +18,7 @@ export interface CatalogSkill {
   kind: SkillKind;
   /** The tool server of a skill of kind server, else "". */
   server: string;
-  /** For an imported skill: the marketplace or the address it came from. */
-  source: string;
-  license: string;
-  allowedTools: string[];
-  /** The agents that can load the skill. The backend can leave them out. */
+  /** The agents that can load the skill, as far as the page read them. */
   agents: string[];
   /** The slash command, such as /ansible-style, or "" when no person can hand the skill to a run. */
   slash: string;
@@ -35,6 +32,7 @@ export interface CatalogTool {
   description: string;
   builtin: boolean;
   server: string;
+  /** The agents whose profile names the tool. */
   agents: string[];
 }
 
@@ -46,56 +44,72 @@ export interface Group<T> {
   items: T[];
 }
 
-const str = (v: unknown): string => (typeof v === 'string' ? v : '');
-const strs = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : typeof v === 'string' && v ? v.split(',').map((x) => x.trim()).filter(Boolean) : []);
+/** Who can load what: the skills that each agent can load, and the agents with their profiles. */
+export interface Loaders {
+  /** The names of the skills of each agent, from GET /v1/agents/{name}/skills. */
+  skillsOf?: Record<string, string[]>;
+  agents?: Agent[] | null;
+}
 
-/** skillOf reads one skill of either shape. */
-export function skillOf(raw: Partial<Skill> & Record<string, unknown>): CatalogSkill {
+const str = (v: unknown): string => (typeof v === 'string' ? v : '');
+
+/** kindOf reads the origin of a skill. An origin that names no kind, from an older backend, names its server. */
+function kindOf(origin: string, server: string): { kind: SkillKind; server: string } {
+  if (origin === 'imported') return { kind: 'imported', server: '' };
+  if ((origin === 'local' || origin === '') && !server) return { kind: 'local', server: '' };
+  return { kind: 'server', server: server || (origin === 'mcp' ? 'server' : origin) };
+}
+
+/** skillOf reads one skill of the catalog. agents are the agents that can load it. */
+export function skillOf(raw: Partial<Skill>, agents: string[] = []): CatalogSkill {
   const name = str(raw.name);
-  const origin = str(raw.origin);
-  const server = str(raw.server);
-  let kind: SkillKind;
-  let sv = '';
-  if (origin === 'imported') kind = 'imported';
-  else if ((origin === '' || origin === 'local') && !server) kind = 'local';
-  else {
-    kind = 'server';
-    // The contract says origin server and names it in server. The backend
-    // can also put the name of the server in origin.
-    sv = server || (origin === 'server' || origin === 'mcp' ? 'server' : origin);
-  }
-  const slash = typeof raw.slash === 'string' ? raw.slash : raw.userInvocable === false ? '' : '/' + name;
+  const k = kindOf(str(raw.origin), str(raw.server));
   return {
     name,
     description: str(raw.description),
-    kind,
-    server: sv,
-    source: str(raw.source),
-    license: str(raw.license),
-    allowedTools: strs(raw['allowed-tools']),
-    agents: strs(raw.agents),
-    slash,
+    kind: k.kind,
+    server: k.server,
+    agents,
+    slash: raw.userInvocable === false ? '' : '/' + name,
     argumentHint: str(raw.argumentHint),
   };
 }
 
-/** toolOf reads one tool of the contract, or one capability of GET /v1/tools. */
-export function toolOf(raw: Partial<Tool> & Record<string, unknown>): CatalogTool {
+/** toolOf reads one capability of GET /v1/tools. agents are the agents whose profile names it. */
+export function toolOf(raw: Partial<Tool>, agents: string[] = []): CatalogTool {
   const name = str(raw.name);
   const source = str(raw.source);
   const origin = str(raw.origin);
   const builtin = origin ? origin === 'builtin' : !source || source === 'builtin';
   const server = builtin ? '' : str(raw.server) || (source && source !== 'builtin' ? source : '') || 'server';
   const id = str(raw.id) || (builtin || name.startsWith(server + '/') ? name : server + '/' + name);
-  return { id, name, description: str(raw.text) || str(raw.description), builtin, server, agents: strs(raw.agents) };
+  return { id, name, description: str(raw.text) || str(raw.description), builtin, server, agents };
 }
 
-/** catalogOf reads the answer of GET /v1/bossmode/skills, sorted by name in each kind. */
-export function catalogOf(list: SkillsList | null | undefined): { skills: CatalogSkill[]; tools: CatalogTool[] } {
+/** loadersOf inverts the skills of each agent: the agents of each skill. */
+function loadersOf(skillsOf: Record<string, string[]>): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  for (const agent of Object.keys(skillsOf).sort()) {
+    for (const name of skillsOf[agent]) out.set(name, [...(out.get(name) || []), agent]);
+  }
+  return out;
+}
+
+/** toolUsersOf names the agents whose profile names a tool, by its name or its id. */
+function toolUsersOf(t: CatalogTool, agents: Agent[]): string[] {
+  return agents.filter((a) => (a.tools || []).some((x) => x === t.name || x === t.id)).map((a) => a.name).sort();
+}
+
+/** catalogOf reads the skills of the front and the tools, with the agents that can load each one. */
+export function catalogOf(list: SkillsList | null | undefined, tools?: Tool[] | null, who: Loaders = {}): { skills: CatalogSkill[]; tools: CatalogTool[] } {
   if (!list) return { skills: [], tools: [] };
-  const skills = (list.skills || []).map((s) => skillOf(s as Skill & Record<string, unknown>)).filter((s) => s.name);
-  const tools = (list.tools || []).map((t) => toolOf(t as Tool & Record<string, unknown>)).filter((t) => t.name);
-  return { skills, tools };
+  const loaders = loadersOf(who.skillsOf || {});
+  const agents = who.agents || [];
+  const skills = (list.skills || []).map((s) => skillOf(s, loaders.get(s.name) || [])).filter((s) => s.name);
+  const raw = list.tools && list.tools.length ? list.tools : tools || [];
+  const out = raw.map((t) => toolOf(t)).filter((t) => t.name);
+  for (const t of out) t.agents = toolUsersOf(t, agents);
+  return { skills, tools: out };
 }
 
 const byName = <T extends { name: string }>(a: T, b: T) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
@@ -202,4 +216,53 @@ export function valueText(v: unknown): string {
   if (Array.isArray(v)) return v.map(valueText).join(', ');
   if (v && typeof v === 'object') return JSON.stringify(v);
   return v === undefined || v === null ? '' : String(v);
+}
+
+/** The skill of the catalog that holds the name of a preview, as the page shows it. */
+export type Existing = SkillExisting;
+
+/** What an install would write, and what the checks found, as the chooser shows it. */
+export interface Preview {
+  name: string;
+  description: string;
+  /** The keys of the front matter, without name and description, as text. */
+  frontMatter: [string, string][];
+  body: string;
+  files: { path: string; size: number }[];
+  problems: SkillProblem[];
+  exists: Existing | null;
+  installable: boolean;
+  /** The digest of what the preview read, which the install sends back. */
+  digest: string;
+}
+
+/** previewOf reads the answer of POST /v1/bossmode/skills/preview. */
+export function previewOf(raw: SkillPreview): Preview {
+  const keys = Object.entries(raw.frontMatter || {})
+    .filter(([k]) => k !== 'name' && k !== 'description')
+    .map(([k, v]) => [k, valueText(v)] as [string, string]);
+  return {
+    name: raw.name || '',
+    description: raw.description || '',
+    frontMatter: keys,
+    body: raw.body || '',
+    files: raw.files || [],
+    problems: raw.problems || [],
+    exists: raw.exists || null,
+    installable: raw.installable !== false,
+    digest: raw.digest || '',
+  };
+}
+
+/** The text of a skill as the Skills place shows it: the keys of its front matter, its body, and its files. */
+export interface SkillDoc {
+  frontMatter: [string, string][];
+  body: string;
+  files: { path: string; size?: number }[];
+}
+
+/** docOf reads the answer of GET /v1/skills/{name}, whose body is the whole SKILL.md. */
+export function docOf(raw: SkillFile | null): SkillDoc {
+  const fm = frontMatterOf((raw && raw.body) || '');
+  return { frontMatter: fm.keys.filter(([k]) => k !== 'name' && k !== 'description'), body: fm.body, files: ((raw && raw.files) || []).map((path) => ({ path })) };
 }

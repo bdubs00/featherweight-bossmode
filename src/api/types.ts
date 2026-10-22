@@ -22,13 +22,32 @@ export interface Whoami {
   links?: Record<string, string>;
 }
 
-/** The answer of GET /v1/bossmode: the settings that the page reads. */
+/**
+ * The answer of GET /v1/bossmode: the settings that the page reads, in the
+ * order of the keys of the backend.
+ */
 export interface BossConfig {
   manager: ManagerConfig | null;
   placement: Placement;
   maxMembers: number;
-  /** The theme of the deployment. A workbench without one leaves it out. */
+  /** The theme of the deployment. The backend sends every key, with "" for a key that the deployment leaves out. */
   theme?: ThemeSettings | null;
+  /** The worker templates for a new agent, in the order of the configuration. [] without templates. */
+  templates?: Template[];
+  /** The quick chat, or null when the configuration names no profile for it. */
+  chat?: QuickChat | null;
+}
+
+/** A worker template of the settings: its name, and whether a new agent gets it when the page names none. */
+export interface Template {
+  name: string;
+  default: boolean;
+}
+
+/** The quick chat of the settings: its profile, and the fleet member that runs it, or "". */
+export interface QuickChat {
+  agent: string;
+  member: string;
 }
 
 /** The theme of a deployment, from GET /v1/bossmode. Each field is optional. */
@@ -123,6 +142,8 @@ export interface Bridge {
   memberCount?: number;
   /** The number of members with the presence needs-you. */
   needsYou?: number;
+  /** True when the unread entries reached past the bound of 2000 that the backend counts. */
+  unreadMore?: boolean;
   /** The sum of the usage of the runs of the bridge. Only GET /v1/bridges/{id} carries it. */
   usage?: UsageSum;
 }
@@ -162,6 +183,12 @@ export interface Mirror {
 
 export type ReactionKind = 'up' | 'down' | 'heart';
 
+/**
+ * The state of a decision. unknown means that the backend cannot tell
+ * whether the decision reached the run, such as when the run stopped first.
+ */
+export type DecisionState = 'pending' | 'allow' | 'deny' | 'unknown';
+
 /** A pending or decided approval or question, on a channel entry. */
 export interface Decision {
   run: string;
@@ -174,7 +201,7 @@ export interface Decision {
   effect?: string;
   input?: unknown;
   schema?: unknown;
-  state: 'pending' | 'allow' | 'deny';
+  state: DecisionState;
   decidedBy?: string;
   decidedAt?: string;
   note?: string;
@@ -198,6 +225,12 @@ export interface Entry {
   mirrors?: Mirror | null;
   reactions?: Partial<Record<ReactionKind, string[]>>;
   decision?: Decision | null;
+  /** True when each delivery of the message is pinned, so it survives every compaction of the runs of the members. */
+  pinned?: boolean;
+  /** The wiki path that a system line is about. The text of the line holds no link to it. */
+  page?: string;
+  /** The slash command of a message, such as {name: "ansible-style", args: "roles/nginx"}. */
+  skill?: SkillCall | null;
   /**
    * True on a stream event that carries a cut entry: a card without
    * decision.input and decision.schema. The page reads the entry again with
@@ -360,8 +393,17 @@ export interface TaskStatus {
   note?: string;
 }
 
+/**
+ * The workers of one agent, as GET /v1/fleet lists them and GET
+ * /v1/pools/{name} answers. The page never says pool: the profile shows
+ * Workers, and wanted is Keep.
+ */
 export interface Pool {
   name: string;
+  /** config for a pool of the configuration, runtime for one that the page made. */
+  source?: string;
+  /** The worker template of a pool that the page made. */
+  template?: string;
   atespace: string;
   agent: string;
   intake: string;
@@ -373,6 +415,17 @@ export interface Pool {
   tasks: TaskStatus[];
   gaps?: string[];
   checkedAt: string;
+  by?: string;
+  at?: string;
+  deleting?: boolean;
+}
+
+/** The counts of the day of an agent, from GET /v1/bossmode/agents/{agent}/today. partial is true when a run reports no cost. */
+export interface Today {
+  runs: number;
+  costUSD?: number;
+  decisions: number;
+  partial?: boolean;
 }
 
 /** The answer of GET /v1/fleet. */
@@ -382,11 +435,20 @@ export interface Fleet {
   pools?: Pool[];
 }
 
-/** One agent of GET /v1/agents (view.AgentView, in part). */
+/** The rules of a profile: the tools that ask first, and the tools that never run. */
+export interface Rules {
+  ask?: string[];
+  deny?: string[];
+}
+
+/** One agent of GET /v1/agents (view.AgentView, in part). skills is the allowlist of the profile: null allows every skill. */
 export interface Agent {
   name: string;
   description?: string;
   role: string;
+  tools?: string[];
+  skills?: string[] | null;
+  policy?: Rules | null;
 }
 
 /** The display of an agent: GET /v1/faces and PATCH /v1/faces/{agent}. */
@@ -489,74 +551,205 @@ export interface FleetChange {
 /* ---------- skills and tools ---------- */
 
 /**
- * Where a skill comes from: imported by an admin (from a marketplace, a
- * URL, a pasted SKILL.md, or uploaded files), local to the configuration,
- * or offered by a tool server.
+ * Where a skill comes from: local to a skills directory of the
+ * configuration, imported by an admin, or offered by an MCP server, which
+ * server names.
  */
-export type SkillOrigin = 'imported' | 'local' | 'server';
+export type SkillOrigin = 'local' | 'imported' | 'mcp';
+
+/** A named argument of a skill, for its placeholders. */
+export interface SkillArgument {
+  name: string;
+  description?: string;
+}
 
 /**
- * A skill of GET /v1/bossmode/skills: the keys of the front matter of its
- * SKILL.md, where it comes from, and the agents that can load it.
+ * A skill of GET /v1/bossmode/skills: the keys of its front matter that a
+ * slash command reads, and where it comes from. A skill of a server is
+ * named <server>/<name>.
  */
 export interface Skill {
   name: string;
   description: string;
   origin: SkillOrigin;
-  /** The tool server of a skill of origin server. */
+  /** The tools.mcp entry of a skill of origin mcp. */
   server?: string;
-  /** For an imported skill: the marketplace or the address it came from. */
-  source?: string;
-  license?: string;
-  'allowed-tools'?: string[];
-  /** The agents that can load the skill. */
-  agents: string[];
-  /** The slash command of the skill in a one-on-one composer, such as /ansible-style. */
-  slash?: string;
+  /** The URI of the skill of a server, else the path of its SKILL.md in its skills directory. */
+  uri?: string;
+  /** False when the front matter says user-invocable: false, so no person hands the skill to a run. */
+  userInvocable?: boolean;
+  /** False when the front matter says disable-model-invocation: true. */
+  modelInvocable?: boolean;
+  /** The argument-hint of the front matter, such as "<role>". */
+  argumentHint?: string;
+  arguments?: SkillArgument[];
+  /** The other files of the skill directory. */
+  files?: string[];
 }
 
-/** A tool of GET /v1/bossmode/skills: built in, or from a tool server. */
-export interface Tool {
-  /** The id of the tool, unique over the fleet, such as bash or github/create_issue. */
-  id: string;
+/** A skill as the view of an agent names it, in GET /v1/agents/{name}/skills. */
+export interface SkillRef {
   name: string;
   description: string;
-  origin: 'builtin' | 'server';
+  origin: SkillOrigin;
   server?: string;
-  agents: string[];
 }
 
-/** The answer of GET /v1/bossmode/skills. */
+/** The answer of GET /v1/agents/{name}/skills: the allowlist of the profile, null for every skill, and the skills that it allows. */
+export interface AgentSkills {
+  agent: string;
+  pool?: string;
+  allowlist: string[] | null;
+  skills: SkillRef[];
+}
+
+/** The answer of GET /v1/skills/{name} of the kernel: the skill, the whole SKILL.md as body, and the other files. */
+export interface SkillFile {
+  name: string;
+  description: string;
+  origin: string;
+  server?: string;
+  uri?: string;
+  body: string;
+  files: string[];
+}
+
+/**
+ * A tool of the fleet. The catalog of the backend holds no tools, so the
+ * page reads the capabilities of GET /v1/tools: each with its name, its
+ * source, builtin or a server, and its plain phrase in text.
+ */
+export interface Tool {
+  /** The id of the tool, unique over the fleet, such as bash or github/create_issue. */
+  id?: string;
+  name: string;
+  description?: string;
+  text?: string;
+  origin?: 'builtin' | 'server';
+  source?: string;
+  server?: string;
+}
+
+/** The answer of GET /v1/bossmode/skills. tools is there only in an older shape. */
 export interface SkillsList {
   skills: Skill[];
-  tools: Tool[];
+  tools?: Tool[];
 }
 
-/** The answer of GET /v1/bossmode/skills/{name}: the skill and the text of its SKILL.md. */
-export interface SkillText extends Skill {
-  text: string;
-  files?: { path: string; size: number }[];
+/** A skill of a marketplace. */
+export interface MarketSkill {
+  name: string;
+  description: string;
+  url?: string;
+  path?: string;
 }
 
-/** A marketplace that the admin configured, from GET /v1/bossmode/marketplaces. */
+/** A marketplace that the admin configured, from GET /v1/bossmode/marketplaces. error says why its index did not load. */
 export interface Marketplace {
   name: string;
   url: string;
-  skills: { name: string; description: string }[];
+  kind?: string;
+  skills: MarketSkill[];
+  notes?: string[];
+  error?: string;
+  fetchedAt?: string;
 }
 
-/** The source of a skill to preview: the four avenues of Add skill. */
-export type SkillSource =
-  | { kind: 'marketplace'; marketplace: string; skill: string }
-  | { kind: 'url'; url: string }
-  | { kind: 'text'; text: string }
-  | { kind: 'files'; files: { path: string; text: string }[] };
+/** Where a new skill comes from: exactly one of url, marketplace with name, text, and files. */
+export type SkillSource = { url: string } | { marketplace: string; name: string } | { text: string } | { files: { path: string; text: string }[] };
 
-/** The answer of POST /v1/bossmode/skills/preview: what Install would add. */
-export interface SkillPreview {
-  /** The token of the preview, for POST /v1/bossmode/skills/install. */
-  token: string;
-  skill: Skill;
+/** A finding of the checks of a preview. A finding that blocks stops an install. */
+export interface SkillProblem {
+  code: string;
+  path?: string;
   text: string;
+  blocks: boolean;
+}
+
+/** The skill of the catalog, or a directory, that holds the name of a preview. Only an imported skill is replaceable. */
+export interface SkillExisting {
+  origin: string;
+  replaceable: boolean;
+  digest?: string;
+  directory?: boolean;
+}
+
+/** The source of an imported skill, as a preview names it. */
+export interface SkillRecord {
+  kind: 'url' | 'marketplace' | 'text' | 'files';
+  url?: string;
+  marketplace?: string;
+  name?: string;
+  digest?: string;
+  installedBy?: string;
+  installedAt?: string;
+  files?: { path: string; size: number }[];
+}
+
+/** The answer of POST /v1/bossmode/skills/preview: what an install will write, and what the checks found. Nothing is installed. */
+export interface SkillPreview {
+  name: string;
+  description: string;
+  frontMatter: Record<string, unknown> | null;
+  entry: Skill;
+  body: string;
   files: { path: string; size: number }[];
+  /** The digest of what the preview read. An install from a URL or a marketplace sends it back. */
+  digest: string;
+  source: SkillRecord;
+  exists: SkillExisting | null;
+  problems: SkillProblem[] | null;
+  installable: boolean;
+}
+
+/** The answer of POST /v1/bossmode/skills: the entry of the catalog, whether it replaced an imported skill, and the preview of what it wrote. */
+export interface SkillInstalled {
+  skill: Skill;
+  replaced: boolean;
+  preview: SkillPreview;
+}
+
+/** A slash command: the name of a skill and its arguments. */
+export interface SkillCall {
+  name: string;
+  args?: string;
+}
+
+/* ---------- a new agent ---------- */
+
+/** The budget of each run of a profile. */
+export interface Budget {
+  maxTurns?: number;
+  maxTokens?: number;
+  maxCostUSD?: number;
+}
+
+/** The profile that the new-agent screen sends, a part of the profile of the kernel. */
+export interface NewProfile {
+  description?: string;
+  instructions?: string[];
+  /** The names of the skills, and server/* for every skill of a server. */
+  skills: string[];
+  model?: string;
+  effort?: string;
+  timeZone?: string;
+  policy?: Rules;
+  budget?: Budget;
+  compaction?: { at: number; model?: string };
+}
+
+/** The workers of a new agent: how many work at once, and the template when the settings offer several. */
+export interface WorkersAsk {
+  template?: string;
+  replicas: number;
+}
+
+/** The answer of PUT /v1/agents/{name}: the view of the agent, and its workers when the front made them. */
+export interface AgentSaved {
+  name: string;
+  description?: string;
+  role?: string;
+  /** True on a dry run when an agent of that name exists. */
+  exists?: boolean;
+  pool?: Pool | null;
 }

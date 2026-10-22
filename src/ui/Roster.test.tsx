@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { act } from 'preact/test-utils';
 import { store } from '../state/store';
-import { forgetRuns } from '../state/bridges-a';
+import { forgetRuns } from '../state/actions';
 import type { Fleet } from '../api/types';
 import { Roster, usageParts } from './Roster';
 import { bridgeOf, fakeFetch, memberOf, mount, settle, unmountAll } from './testkit-a';

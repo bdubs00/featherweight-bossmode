@@ -11,7 +11,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'preac
 import type { Member, UsageSum } from '../api/types';
 import { useSelect } from '../state/store';
 import { addMember, fire, loadPages, patchMember } from '../state/actions';
-import { errorReason, loadRunOnce } from '../state/bridges-a';
+import { errorReason } from '../lib/words';
+import { loadRunOnce } from '../state/actions';
 import { seatLight } from '../lib/presence';
 import { hrefOf, go } from '../lib/route';
 import { useRoving } from './keys';

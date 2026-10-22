@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { act } from 'preact/test-utils';
 import { store } from '../state/store';
-import { forgetManagerRun } from '../state/manager';
+import { forgetManagerRun } from '../state/actions';
 import type { BossConfig } from '../api/types';
 import { NewBridge, bodyOf, bridgeErrors, titleOf, type BridgeForm } from './NewBridge';
 import { click, fakeApi, keyNamed, mount, settle, typeIn, unmountAll } from './testkit-c';

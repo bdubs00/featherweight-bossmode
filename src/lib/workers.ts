@@ -4,7 +4,7 @@
 // its pools. A worker is busy while its fleet member has an active run, and
 // free otherwise, also while it sleeps, because a request wakes it.
 
-import type { Fleet } from '../api/types';
+import type { BossConfig, Fleet, Template } from '../api/types';
 
 export interface Worker {
   /** The name of the worker, such as crew-0. */
@@ -50,4 +50,29 @@ export function awakeWorkers(fleet: Fleet | null | undefined): number {
   let n = 0;
   for (const p of fleet.pools || []) for (const t of p.tasks || []) if (t.phase === 'Running') n++;
   return n;
+}
+
+/**
+ * poolName is the name of the pool that the front makes for a new agent:
+ * the name in lower case, with a hyphen for each character that is not a
+ * letter or a digit, and no hyphen at either end.
+ */
+export function poolName(agent: string): string {
+  return String(agent || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+/** poolNameOf names the pool that runs an agent: the pool of the fleet view, else the pool that the front makes for it. */
+export function poolNameOf(fleet: Fleet | null | undefined, agent: string): string {
+  const p = fleet && fleet.pools ? fleet.pools.find((x) => x.agent === agent) : undefined;
+  return p ? p.name : poolName(agent);
+}
+
+/** templatesOf reads the worker templates of the settings, or [] without them. */
+export function templatesOf(config: BossConfig | null | undefined): Template[] {
+  const t = config ? config.templates : null;
+  if (!Array.isArray(t)) return [];
+  return t.filter((x) => !!x && typeof x.name === 'string' && x.name !== '').map((x) => ({ name: x.name, default: !!x.default }));
 }

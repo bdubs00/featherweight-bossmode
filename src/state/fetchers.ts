@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import { api } from '../api/routes';
 import type { Result } from '../api/types';
-import { loadBridge, loadChannel } from './actions';
+import { forgetRuns, loadBridge, loadChannel, loadRunOnce } from './actions';
 import { store } from './store';
 
 /** pool runs the loads of a list with at most n at a time. */
@@ -35,17 +35,14 @@ export function ensureRosters(): void {
   void pool(ids, 3, (id) => loadBridge(id).finally(() => askedBridges.delete(id)));
 }
 
-const askedRuns = new Set<string>();
-
-/** ensureRuns reads the runs that the store does not hold yet. */
+/** ensureRuns reads the runs that the store does not hold yet, three at a time, each once, as loadRunOnce reads one. */
 export function ensureRuns(ids: string[]): void {
   const s = store.get();
-  const want = ids.filter((id) => id && !s.runs[id] && !askedRuns.has(id));
-  for (const id of want) askedRuns.add(id);
-  void pool(want, 3, async (id) => {
-    const r = await api.run(id);
-    store.dispatch({ type: 'run', run: r });
-  });
+  void pool(
+    ids.filter((id) => id && !s.runs[id]),
+    3,
+    loadRunOnce,
+  );
 }
 
 const askedChannels = new Set<string>();
@@ -103,7 +100,7 @@ export function useResults(): Record<string, Result> {
 /** forgetLoads clears the marks of the loads, so a reset of the stream reads again. */
 export function forgetLoads(): void {
   askedBridges.clear();
-  askedRuns.clear();
+  forgetRuns();
   askedChannels.clear();
   for (const k of Object.keys(resultKeys)) delete resultKeys[k];
 }

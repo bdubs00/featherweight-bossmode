@@ -10,7 +10,7 @@ import { hrefOf } from '../lib/route';
 import { useRoving } from './keys';
 import { LiveStatus } from './Shell';
 import { Glyph } from './icons';
-import { unreadText, type BridgeA } from '../state/bridges-a';
+import { unreadText } from '../lib/words';
 import { Button, Chip, Input, Led, PaneHeader } from './primitives';
 
 /** The number of bridges above which the list shows its filter field. */
@@ -27,7 +27,7 @@ export function matches(title: string, filter: string): boolean {
 }
 
 const BridgeRow = memo(function BridgeRow({ id, current }: { id: string; current: boolean }) {
-  const b = useSelect((s) => s.bridges.byId[id] as BridgeA | undefined);
+  const b = useSelect((s) => s.bridges.byId[id]);
   // A roster that the page holds shows whether a member works. The list loads no roster for it.
   const working = useSelect((s) => {
     const r = s.rosters[id];

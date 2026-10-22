@@ -1,6 +1,6 @@
 // Plain words for times, people, and decisions.
 
-import type { Decision, ResultDecision, Sender } from '../api/types';
+import type { Bridge, Decision, ResultDecision, Run, Sender } from '../api/types';
 
 /** cap gives a text a capital first letter. */
 export const cap = (s: string): string => (s ? s[0].toUpperCase() + s.slice(1) : s);
@@ -143,4 +143,24 @@ export function list(words: string[]): string {
 export function excerpt(text: string, n = 80): string {
   const s = String(text || '').replace(/\s+/g, ' ').trim();
   return s.length > n ? s.slice(0, n - 1).trimEnd() + '…' : s;
+}
+
+/** unreadText writes the unread count of a bridge: 2000+ past the bound of the backend, else 99+ above 99. */
+export function unreadText(b: Pick<Bridge, 'unread' | 'unreadMore'>): string {
+  if (b.unreadMore) return '2000+';
+  return b.unread > 99 ? '99+' : String(b.unread || 0);
+}
+
+/**
+ * errorReason is the short reason of a stopped run for a row of the
+ * members, such as "Stopped at 40 turns". A limit gives that form. Another
+ * error gives its first sentence.
+ */
+export function errorReason(run: Pick<Run, 'state' | 'error'> | undefined): string {
+  if (!run || !run.error) return '';
+  const text = run.error.trim();
+  const limit = /\blimit of (.+?)\.?$/i.exec(text.split(/(?<=\.)\s/)[0]);
+  if (limit) return 'Stopped at ' + limit[1].trim();
+  const first = text.split(/(?<=[.!?])\s/)[0].replace(/\.$/, '');
+  return first.length > 80 ? first.slice(0, 79).trimEnd() + '…' : first;
 }

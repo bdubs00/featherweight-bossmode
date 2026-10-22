@@ -8,9 +8,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { Delegation, Entry } from '../api/types';
 import { store, useSelect } from '../state/store';
-import { loadBridge, loadChannel, loadOlder, loadPages, markRead, patchBridge, postMessage } from '../state/actions';
+import { loadAllCards, loadBridge, loadChannel, loadOlder, loadPages, markRead, patchBridge, postMessage } from '../state/actions';
 import { membersOf, type Channel as ChannelState } from '../state/reducer';
-import { loadAllCards, type EntryA } from '../state/bridges-a';
 import { senderName, since } from '../lib/words';
 import { hrefOf, type BridgeTab } from '../lib/route';
 import { useRoving, smooth } from './keys';
@@ -95,7 +94,7 @@ function channelShape(ch: ChannelState | undefined): string | undefined {
   const today = new Date().toDateString();
   const out: Shape[] = [];
   for (const seq of ch.seqs) {
-    const e = ch.bySeq[seq] as EntryA;
+    const e = ch.bySeq[seq] as Entry;
     let c = shapes.get(e);
     if (!c || c.day !== today) {
       c = { day: today, shape: shapeOf(e) };
@@ -355,7 +354,7 @@ const RANK: Record<string, number> = { pending: 0, unknown: 1, allow: 2, deny: 2
  * wait, the oldest first, then the cards in the state unknown, then the
  * decided ones, the newest first.
  */
-export function cardOrder(entries: EntryA[]): number[] {
+export function cardOrder(entries: Entry[]): number[] {
   return entries
     .filter((e) => !!e.decision)
     .sort((a, b) => {
@@ -372,7 +371,7 @@ function waitingCards(ch: ChannelState | undefined): number {
   if (!ch) return 0;
   let n = 0;
   for (const seq of ch.seqs) {
-    const d = (ch.bySeq[seq] as EntryA).decision;
+    const d = (ch.bySeq[seq] as Entry).decision;
     if (d && d.state === 'pending') n++;
   }
   return n;
@@ -382,7 +381,7 @@ function DecisionsTab({ id }: { id: string }) {
   const [loading, setLoading] = useState(true);
   const key = useSelect((s) => {
     const ch = s.channels[id];
-    return ch ? cardOrder(ch.seqs.map((q) => ch.bySeq[q] as EntryA)).join(',') : '';
+    return ch ? cardOrder(ch.seqs.map((q) => ch.bySeq[q] as Entry)).join(',') : '';
   });
   const list = useRoving<HTMLDivElement>();
   useEffect(() => {

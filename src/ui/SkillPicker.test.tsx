@@ -23,10 +23,10 @@ function mount(node: ComponentChildren): HTMLElement {
 }
 
 const SKILLS = [
-  { name: 'ansible-style', description: 'Write Ansible roles.', origin: 'imported', agents: [] },
-  { name: 'wiki-writer', description: 'Write a page of the wiki.', origin: 'local', agents: [] },
-  { name: 'docs/search', description: 'Search the docs.', origin: 'server', server: 'docs', agents: [] },
-  { name: 'docs/quote', description: 'Quote the docs.', origin: 'server', server: 'docs', agents: [] },
+  { name: 'ansible-style', description: 'Write Ansible roles.', origin: 'imported' },
+  { name: 'wiki-writer', description: 'Write a page of the wiki.', origin: 'local' },
+  { name: 'docs/search', description: 'Search the docs.', origin: 'mcp', server: 'docs' },
+  { name: 'docs/quote', description: 'Quote the docs.', origin: 'mcp', server: 'docs' },
 ] as Skill[];
 
 /** Harness keeps the value of the picker, as a screen does. */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { entriesOf, initialState, membersOf, reduce, type State } from './reducer';
+import { entriesOf, initialState, managerRunOf, membersOf, reduce, type State } from './reducer';
 import type { Bridge, Entry, Member, StreamEvent } from '../api/types';
 
 const me = { principal: { subject: 'alice@example.com', name: 'Alice' }, roles: {}, admin: false, canCreate: true };
@@ -223,3 +223,34 @@ describe('the reducer', () => {
     expect(s1).toBe(s0);
   });
 });
+
+describe('the state of the next stage', () => {
+  it('keeps the usage of a bridge when a record arrives without it', () => {
+    const usage = { turns: 41, costUSD: 0.62, reported: 3, final: 2, missing: 0, partial: false };
+    let s = reduce(setup(), { type: 'bridge', bridge: { ...bridge('b1'), usage } });
+    expect(s.bridges.byId.b1.usage).toEqual(usage);
+    s = reduce(s, { type: 'bridges', bridges: [bridge('b1', { title: 'Renamed' })] });
+    expect(s.bridges.byId.b1.title).toBe('Renamed');
+    expect(s.bridges.byId.b1.usage).toEqual(usage);
+  });
+
+  it('keeps the skills that each agent can load until the page forgets them', () => {
+    let s = reduce(initialState, { type: 'agent-skills', agent: 'migrator', skills: ['plan'] });
+    const same = reduce(s, { type: 'agent-skills', agent: 'migrator', skills: ['plan'] });
+    expect(same).toBe(s);
+    s = reduce(s, { type: 'agent-skills', agent: 'scribe', skills: [] });
+    expect(s.agentSkills).toEqual({ migrator: ['plan'], scribe: [] });
+    expect(reduce(s, { type: 'agent-skills-forget' }).agentSkills).toEqual({});
+  });
+
+  it('follows the conversation with the manager that the person picked, and the settings for another person', () => {
+    let s = reduce(initialState, { type: 'me', me });
+    s = reduce(s, { type: 'config', config: { manager: { agent: 'manager', member: 'default/manager-0', run: 'run-1' }, placement: 'queue', maxMembers: 16 } });
+    expect(managerRunOf(s)).toBe('run-1');
+    s = reduce(s, { type: 'manager-pick', pick: { run: '', by: 'alice@example.com' } });
+    expect(managerRunOf(s)).toBe('');
+    s = reduce(s, { type: 'me', me: { ...me, principal: { subject: 'bob@example.com' } } });
+    expect(managerRunOf(s)).toBe('run-1');
+  });
+});
+

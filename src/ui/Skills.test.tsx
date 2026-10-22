@@ -7,18 +7,18 @@ import { SkillActions, SkillList, SkillMain, forgetTools } from './Skills';
 import { closeAddSkill, openAddSkill } from './AddSkill';
 import { click, fakeApi, fieldOf, keyNamed, mount, problem, settle, typeIn, unmountAll } from './testkit-c';
 
+/** The catalog as the backend answers it: the skills, with no agent and no tool. */
 const CONTRACT: SkillsList = {
   skills: [
-    { name: 'release-notes', description: 'Draft release notes.', origin: 'imported', source: 'https://x.test/SKILL.md', agents: ['scribe'], slash: '/release-notes' },
-    { name: 'ansible-style', description: 'Write roles.', origin: 'imported', agents: ['migrator', 'reviewer'], slash: '/ansible-style', license: 'MIT' },
-    { name: 'wiki-writer', description: 'Write a page.', origin: 'local', agents: [] },
-    { name: 'search-docs', description: 'Search the docs.', origin: 'server', server: 'docs', agents: [] },
-  ],
-  tools: [
-    { id: 'bash', name: 'bash', description: 'Run a command.', origin: 'builtin', agents: [] },
-    { id: 'github/create_issue', name: 'create_issue', description: 'Open an issue.', origin: 'server', server: 'github', agents: [] },
+    { name: 'release-notes', description: 'Draft release notes.', origin: 'imported', userInvocable: true },
+    { name: 'ansible-style', description: 'Write roles.', origin: 'imported', userInvocable: true },
+    { name: 'wiki-writer', description: 'Write a page.', origin: 'local' },
+    { name: 'docs/search-docs', description: 'Search the docs.', origin: 'mcp', server: 'docs' },
   ],
 };
+
+/** The capabilities of GET /v1/tools of the kernel. */
+const TOOLS = { tools: [{ name: 'bash', text: 'Run a command.', source: 'builtin' }, { name: 'create_issue', text: 'Open an issue.', source: 'github' }] };
 
 const ADMIN: Whoami = { principal: { subject: 'alice@example.com' }, roles: {}, admin: true, canCreate: true };
 
@@ -38,11 +38,11 @@ afterEach(() => {
 
 describe('the catalog', () => {
   it('groups the skills by origin: Imported, Local, then one group per server', () => {
-    const c = catalogOf(CONTRACT);
+    const c = catalogOf(CONTRACT, TOOLS.tools);
     expect(skillGroups(c.skills).map((g) => [g.title, g.items.map((s) => s.name)])).toEqual([
       ['Imported', ['ansible-style', 'release-notes']],
       ['Local', ['wiki-writer']],
-      ['docs', ['search-docs']],
+      ['docs', ['docs/search-docs']],
     ]);
     expect(toolGroups(c.tools).map((g) => g.title)).toEqual(['Built in', 'github']);
   });
@@ -64,7 +64,7 @@ describe('the catalog', () => {
 
   it('reads the tools of GET /v1/tools when the catalog holds none', async () => {
     act(() => store.dispatch({ type: 'skills', skills: { skills: CONTRACT.skills, tools: [] } }));
-    api = fakeApi({ 'GET /v1/tools': { tools: [{ name: 'bash', description: 'x', text: 'Runs a shell command.', source: 'builtin' }, { name: 'search', description: 'y', text: 'Searches.', source: 'docs' }] } });
+    api = fakeApi({ 'GET /v1/tools': { tools: [{ name: 'bash', description: 'x', text: 'Runs a shell command.', source: 'builtin' }, { name: 'search', description: 'y', text: 'Searches.', source: 'docs' }] }, 'GET /v1/agents': { agents: [] } });
     const el = mount(<SkillList />);
     await settle();
     const heads = [...el.querySelectorAll('.group-head span:first-child')].map((x) => x.textContent);
@@ -74,16 +74,36 @@ describe('the catalog', () => {
 });
 
 describe('the Skills place', () => {
-  it('lists the groups with their counts, and each row with a name and a description', () => {
-    api = fakeApi({});
+  it('lists the groups with their counts, and each row with a name and a description', async () => {
+    api = fakeApi({ 'GET /v1/tools': TOOLS, 'GET /v1/agents': { agents: [] } });
     const el = mount(<SkillList />);
+    await settle();
     const groups = [...el.querySelectorAll('.group-head')].map((g) => g.textContent);
     expect(groups).toEqual(['Imported2', 'Local1', 'docs1', 'Built in1', 'github1']);
     expect(el.querySelector('.srow')!.textContent).toBe('ansible-styleWrite roles.');
   });
 
+  it('reads the skills of each agent of the fleet while the place is open, and forgets them when it closes', async () => {
+    act(() => store.dispatch({ type: 'agents', agents: [{ name: 'migrator', role: 'owner' }, { name: 'scribe', role: 'operator' }] }));
+    api = fakeApi({
+      'GET /v1/tools': TOOLS,
+      'GET /v1/agents/migrator/skills': { agent: 'migrator', allowlist: ['ansible-*'], skills: [{ name: 'ansible-style', description: '', origin: 'imported' }] },
+      'GET /v1/agents/scribe/skills': { agent: 'scribe', allowlist: null, skills: [{ name: 'ansible-style', description: '', origin: 'imported' }, { name: 'release-notes', description: '', origin: 'imported' }] },
+    });
+    const el = mount(<SkillList />);
+    await settle();
+    expect(store.get().agentSkills).toEqual({ migrator: ['ansible-style'], scribe: ['ansible-style', 'release-notes'] });
+    expect(el.querySelector('.srow')).toBeTruthy();
+    unmountAll();
+    expect(store.get().agentSkills).toEqual({});
+  });
+
   it('shows the text of a skill with its front matter and the agents that can load it', async () => {
-    api = fakeApi({ 'GET /v1/bossmode/skills/ansible-style': { ...CONTRACT.skills[1], text: '---\nname: ansible-style\ndescription: Write roles.\nlicense: MIT\nallowed-tools: [bash, files]\n---\n\n# Ansible style\n\n<script>bad()</script>Handlers start with a verb.\n', files: [{ path: 'SKILL.md', size: 120 }] } });
+    act(() => {
+      store.dispatch({ type: 'agent-skills', agent: 'migrator', skills: ['ansible-style'] });
+      store.dispatch({ type: 'agent-skills', agent: 'reviewer', skills: ['ansible-style', 'wiki-writer'] });
+    });
+    api = fakeApi({ 'GET /v1/skills/ansible-style': { name: 'ansible-style', description: 'Write roles.', origin: 'local', body: '---\nname: ansible-style\ndescription: Write roles.\nlicense: MIT\nallowed-tools: [bash, files]\n---\n\n# Ansible style\n\n<script>bad()</script>Handlers start with a verb.\n', files: ['scripts/lint.sh'] } });
     const el = mount(<SkillMain item={{ kind: 'skill', id: 'ansible-style' }} />);
     await settle();
     expect([...el.querySelectorAll('.fm li')].map((x) => x.textContent)).toEqual(['licenseMIT', 'allowed-toolsbash, files']);
@@ -92,9 +112,9 @@ describe('the Skills place', () => {
     expect([...el.querySelectorAll('.loaders li')].map((x) => x.textContent)).toEqual(['migrator', 'reviewer']);
   });
 
-  it('reads the body of the kernel when the bossmode route has none', async () => {
-    api = fakeApi({ 'GET /v1/bossmode/skills/ansible-style': () => problem(405, 'method not allowed'), 'GET /v1/skills/ansible-style': { name: 'ansible-style', body: 'From the kernel.', files: ['notes.md'] } });
-    const el = mount(<SkillMain item={{ kind: 'skill', id: 'ansible-style' }} />);
+  it('reads the text of a skill of a server from the kernel, with its name escaped', async () => {
+    api = fakeApi({ 'GET /v1/skills/docs%2Fsearch-docs': { name: 'docs/search-docs', description: 'Search the docs.', origin: 'mcp', server: 'docs', body: 'From the kernel.', files: [] } });
+    const el = mount(<SkillMain item={{ kind: 'skill', id: 'docs/search-docs' }} />);
     await settle();
     expect(el.querySelector('.skill-text')!.textContent!.trim()).toBe('From the kernel.');
   });
@@ -137,6 +157,7 @@ describe('Add skill', () => {
     problems: [{ code: 'binary', path: 'logo.png', text: 'The import leaves out a binary file.', blocks: false }],
     exists: { origin: 'imported', replaceable: true },
     installable: true,
+    digest: 'sha256:5eed',
   };
 
   const openChooser = () => {
@@ -179,7 +200,7 @@ describe('Add skill', () => {
     click(keyNamed(pv, 'Install'));
     await settle();
     const install = api.calls.find((c) => c.method === 'POST' && c.path === '/v1/bossmode/skills')!;
-    expect(install.body).toEqual({ text: '---\nname: ansible-style\n---\n', replace: true });
+    expect(install.body).toEqual({ text: '---\nname: ansible-style\n---\n', replace: true, digest: 'sha256:5eed' });
     expect(location.hash).toBe('#skills/skill/ansible-style');
   });
 
@@ -198,11 +219,11 @@ describe('Add skill', () => {
     click(keyNamed(el, 'Install'));
     await settle();
     const posts = () => api.calls.filter((c) => c.method === 'POST' && c.path === '/v1/bossmode/skills');
-    expect(posts()[0].body).toEqual({ url: 'https://skills.test/molecule-ci/SKILL.md' });
+    expect(posts()[0].body).toEqual({ url: 'https://skills.test/molecule-ci/SKILL.md', digest: 'sha256:5eed' });
     expect(el.querySelector('.preview [role="alert"]')!.textContent).toBe('A skill named molecule-ci exists: an imported skill holds the name.');
     click(keyNamed(el, 'Replace molecule-ci'));
     await settle();
-    expect(posts()[1].body).toEqual({ url: 'https://skills.test/molecule-ci/SKILL.md', replace: true });
+    expect(posts()[1].body).toEqual({ url: 'https://skills.test/molecule-ci/SKILL.md', replace: true, digest: 'sha256:5eed' });
   });
 
   it('blocks Install when a problem blocks', async () => {
@@ -216,22 +237,37 @@ describe('Add skill', () => {
     expect(el.querySelector('.problems .status')!.textContent).toBe('blocks');
   });
 
-  it('picks a skill of a marketplace and sends the shape of the contract to a server that refuses the shape of the backend', async () => {
+  it('picks a skill of a marketplace, previews it, and installs it with the digest of the preview', async () => {
     api = fakeApi({
       'GET /v1/bossmode/marketplaces': { marketplaces: [{ name: 'team-skills', url: 'https://x.test', skills: [{ name: 'molecule-ci', description: 'Run molecule.' }] }] },
-      'POST /v1/bossmode/skills/preview': (c) => ((c.body as { source?: unknown }).source ? { body: { token: 'pv-1', skill: { name: 'molecule-ci', description: 'Run molecule.' }, text: '---\nname: molecule-ci\ndescription: Run molecule.\n---\n\nBody.', files: [{ path: 'SKILL.md', size: 60 }] } } : problem(400, 'unknown field marketplace')),
-      'POST /v1/bossmode/skills/install': () => ({ status: 201, body: { name: 'molecule-ci' } }),
+      'POST /v1/bossmode/skills/preview': { ...PREVIEW, name: 'molecule-ci', description: 'Run molecule.', frontMatter: { name: 'molecule-ci', description: 'Run molecule.' }, body: 'Body.', exists: null, problems: null },
+      'POST /v1/bossmode/skills': () => ({ status: 201, body: { skill: { name: 'molecule-ci' }, replaced: false } }),
       'GET /v1/bossmode/skills': CONTRACT,
     });
     const el = openChooser();
     await settle();
     click([...el.querySelectorAll('.markets button')].find((b) => b.textContent!.startsWith('molecule-ci')));
     await settle();
-    const previews = api.calls.filter((c) => c.path === '/v1/bossmode/skills/preview');
-    expect(previews.map((c) => c.body)).toEqual([{ marketplace: 'team-skills', name: 'molecule-ci' }, { source: { kind: 'marketplace', marketplace: 'team-skills', skill: 'molecule-ci' } }]);
+    expect(api.calls.filter((c) => c.path === '/v1/bossmode/skills/preview').map((c) => c.body)).toEqual([{ marketplace: 'team-skills', name: 'molecule-ci' }]);
     expect(el.querySelector('.preview-body')!.textContent!.trim()).toBe('Body.');
     click(keyNamed(el, 'Install'));
     await settle();
-    expect(api.calls.find((c) => c.path === '/v1/bossmode/skills/install')!.body).toEqual({ token: 'pv-1' });
+    expect(api.calls.find((c) => c.method === 'POST' && c.path === '/v1/bossmode/skills')!.body).toEqual({ marketplace: 'team-skills', name: 'molecule-ci', digest: 'sha256:5eed' });
+  });
+
+  it('asks for a new preview when the files changed since the preview, and offers no Replace', async () => {
+    api = fakeApi({
+      'POST /v1/bossmode/skills/preview': { ...PREVIEW, name: 'molecule-ci', exists: null, problems: [] },
+      'POST /v1/bossmode/skills': () => problem(409, 'the preview had the digest sha256:5eed, and the source now gives sha256:0ther; read the preview again'),
+    });
+    const el = openChooser();
+    click([...el.querySelectorAll('[role="tab"]')][1]);
+    typeIn(fieldOf(el, 'Address'), 'https://skills.test/molecule-ci/SKILL.md');
+    click(keyNamed(el, 'Preview'));
+    await settle();
+    click(keyNamed(el, 'Install'));
+    await settle();
+    expect(keyNamed(el, 'Replace molecule-ci')).toBeUndefined();
+    expect(el.querySelector('[role="alert"]')!.textContent).toContain('read the preview again');
   });
 });

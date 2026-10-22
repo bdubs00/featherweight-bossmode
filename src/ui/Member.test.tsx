@@ -36,13 +36,14 @@ beforeEach(() => {
       type: 'skills',
       skills: {
         skills: [
-          { name: 'plan', description: 'Plan a module.', origin: 'local', agents: ['migrator'] },
-          { name: 'notes', description: 'Write notes.', origin: 'local', agents: ['scribe'] },
-          { name: 'quiet', description: 'Only for the model.', origin: 'local', agents: ['migrator'], userInvocable: false } as never,
+          { name: 'plan', description: 'Plan a module.', origin: 'local' },
+          { name: 'notes', description: 'Write notes.', origin: 'local' },
+          { name: 'quiet', description: 'Only for the model.', origin: 'local', userInvocable: false },
         ],
-        tools: [],
       },
     });
+    store.dispatch({ type: 'agent-skills', agent: 'migrator', skills: ['plan', 'quiet'] });
+    store.dispatch({ type: 'agent-skills', agent: 'scribe', skills: ['notes'] });
   });
 });
 
@@ -107,7 +108,8 @@ describe('the member conversation', () => {
       box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true }));
     });
     await vi.waitFor(() => expect(calls.some((c) => c.method === 'POST')).toBe(true));
-    expect(calls.find((c) => c.method === 'POST')!.body).toEqual({ text: '/plan cron', to: ['migrator-1'], skill: { name: 'plan', args: 'cron' } });
+    // The arguments go in the skill, so no text of the person follows it.
+    expect(calls.find((c) => c.method === 'POST')!.body).toEqual({ to: ['migrator-1'], skill: { name: 'plan', args: 'cron' } });
   });
 
   it('sends a plain message to the seat alone', async () => {

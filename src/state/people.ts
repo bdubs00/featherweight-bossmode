@@ -3,9 +3,8 @@
 // the agents that sit on no bridge. Each row has a status: a light and its
 // word. The functions here are pure, so the tests read them without a page.
 
-import type { Agent, Bridge, Fleet, Member, Run } from '../api/types';
+import type { Agent, Bridge, Fleet, Member, Rules, Run, Skill, SkillCall } from '../api/types';
 import { whyWords } from '../lib/words';
-import type { SkillCall, SlashSkill } from '../api/people';
 import { presenceOf, seatLight, type Light } from '../lib/presence';
 import { hrefOf } from '../lib/route';
 import { workersOf, type Workers } from '../lib/workers';
@@ -204,23 +203,28 @@ export function seatsOfAgent(s: Pick<PeopleInput, 'bridges' | 'rosters'>, agent:
 /* ---------- the slash menu ---------- */
 
 /** invocable reports whether a person can call a skill with a slash. A skill says so in its front matter, and true is the default. */
-export function invocable(s: SlashSkill): boolean {
-  return s.userInvocable !== false && s['user-invocable'] !== false;
+export function invocable(s: Pick<Skill, 'userInvocable'>): boolean {
+  return s.userInvocable !== false;
 }
 
-/** hintOf is the argument hint of a skill, such as <module>, or "". */
-export const hintOf = (s: SlashSkill): string => String(s.argumentHint || s['argument-hint'] || '');
+/** A command of the slash menu: the name of a skill, its description, and the hint of its arguments. */
+export interface SlashCommand {
+  name: string;
+  description: string;
+  hint?: string;
+}
 
 /**
  * slashCommands lists the skills that a person can call with a slash in a
- * one-on-one conversation with an agent: the skills the agent can load,
- * that a person can invoke, each with its argument hint before its
- * description.
+ * one-on-one conversation with an agent: the skills of the catalog that the
+ * agent can load, from GET /v1/agents/{name}/skills, and that a person can
+ * invoke, each with the hint of its arguments.
  */
-export function slashCommands(skills: SlashSkill[] | null | undefined, agent: string): { name: string; description: string }[] {
+export function slashCommands(skills: Skill[] | null | undefined, loadable: string[] | null | undefined): SlashCommand[] {
+  const can = new Set(loadable || []);
   return (skills || [])
-    .filter((s) => invocable(s) && (s.agents || []).includes(agent))
-    .map((s) => ({ name: s.name, description: [hintOf(s), s.description].filter(Boolean).join(' ') }))
+    .filter((s) => invocable(s) && can.has(s.name))
+    .map((s) => (s.argumentHint ? { name: s.name, description: s.description, hint: s.argumentHint } : { name: s.name, description: s.description }))
     .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 }
 
@@ -267,6 +271,17 @@ export const presenceWord = (p: string): string => presenceOf(p).word;
  * from the decisions of its runs, such as asks before git push. The agent
  * view of the backend can carry them instead.
  */
+/** policyRules words the rules of a profile that ask first, such as asks before git push. */
+export function policyRules(policy: Rules | null | undefined): string[] {
+  const out = new Set<string>();
+  for (const e of (policy && policy.ask) || []) {
+    const w = whyWords(/^[a-z0-9_.-]+(: .+)?$/i.test(e) ? 'rule: ask ' + e : e);
+    const m = /^Rule: ask before (.+)$/.exec(w);
+    if (m) out.add('asks before ' + m[1]);
+  }
+  return [...out].sort();
+}
+
 export function rulesOf(agent: string, runs: Record<string, Run>, channels: Record<string, Channel>): string[] {
   const reasons = new Set<string>();
   for (const r of Object.values(runs)) if (r.agent === agent && r.pending && r.pending.reason) reasons.add(r.pending.reason);

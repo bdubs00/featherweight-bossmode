@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'preact/test-utils';
 import { store } from '../state/store';
-import { forgetManagerRun } from '../state/manager';
+import { forgetManagerRun } from '../state/actions';
 import type { BossConfig, Item, Run } from '../api/types';
 import { Manager, POLL_MS, slashOf } from './Manager';
 import { appendDelta, threadOf } from './ManagerThread';
@@ -24,7 +24,7 @@ beforeEach(() => {
   act(() => {
     store.dispatch({ type: 'config', config: CONFIG });
     store.dispatch({ type: 'me', me: { principal: { subject: 'alice@example.com' }, roles: {}, admin: false, canCreate: true } });
-    store.dispatch({ type: 'skills', skills: { skills: [{ name: 'ansible-style', description: 'Write roles.', origin: 'imported', agents: [], slash: '/ansible-style' }], tools: [] } });
+    store.dispatch({ type: 'skills', skills: { skills: [{ name: 'ansible-style', description: 'Write roles.', origin: 'imported' }] } });
   });
 });
 afterEach(() => {

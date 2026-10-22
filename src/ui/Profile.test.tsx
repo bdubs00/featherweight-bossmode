@@ -6,12 +6,13 @@ import { fakeFetch, mount, seedFleet, unmountAll, type Call } from './testkit-b'
 let calls: Call[] = [];
 let restore = () => {};
 
-const POOL = { name: 'migrator', wanted: 1, actual: 1, ready: 1, tasks: [{ name: 'crew-0', phase: 'Running' }, { name: 'crew-9', phase: 'Running', current: false }] };
+// The fleet names crew as the pool of migrator, so the profile reads that pool.
+const POOL = { name: 'crew', wanted: 1, actual: 1, ready: 1, tasks: [{ name: 'crew-0', phase: 'Running' }, { name: 'crew-9', phase: 'Running', current: false }] };
 
 beforeEach(() => {
   const f = fakeFetch([
-    ['PATCH', /^\/v1\/pools\/migrator$/, (b) => ({ ...POOL, wanted: (b as { replicas: number }).replicas })],
-    ['GET', /^\/v1\/pools\/migrator$/, () => POOL],
+    ['PATCH', /^\/v1\/pools\/crew$/, (b) => ({ ...POOL, wanted: (b as { replicas: number }).replicas })],
+    ['GET', /^\/v1\/pools\/crew$/, () => POOL],
     ['GET', /^\/v1\/bossmode\/agents\/migrator\/today$/, () => ({ runs: 7, costUSD: 1.9, decisions: 2 })],
     ['GET', /^\/v1\/pages\/agents\/migrator\/learned\.md$/, () => ({ path: 'agents/migrator/learned.md', text: '# Liked\n\n## a\n\nAlice hearted: Kept the names.\n\n## b\n\nBob hearted: Ran the lint.\n' })],
     ['GET', /^\/v1\/runs\/run-migrator-2$/, () => ({ id: 'run-migrator-2', agent: 'migrator', state: 'completed', seq: 1, createdAt: '', updatedAt: '' })],
@@ -56,7 +57,7 @@ describe('the Keep field', () => {
     typeIn(input, '5');
     enter(input);
     await vi.waitFor(() => expect(saved).toHaveBeenCalled());
-    expect(calls.find((c) => c.method === 'PATCH')).toEqual({ method: 'PATCH', path: '/v1/pools/migrator', body: { replicas: 5 } });
+    expect(calls.find((c) => c.method === 'PATCH')).toEqual({ method: 'PATCH', path: '/v1/pools/crew', body: { replicas: 5 } });
     expect(saved.mock.calls[0][0].wanted).toBe(5);
   });
 
@@ -79,7 +80,7 @@ describe('the profile', () => {
     const heads = [...el.querySelectorAll('.prof-sec h3')].map((h) => h.textContent);
     expect(heads).toEqual(['What people liked', 'Workers', 'Today']);
     expect([...el.querySelectorAll('.liked li')].map((x) => x.textContent)).toEqual(['Ran the lint.', 'Kept the names.']);
-    expect(el.querySelector('.prof-link')!.getAttribute('href')).toBe('#pages/agents/migrator/learned.md');
+    expect([...el.querySelectorAll('.prof-link')].map((a) => a.getAttribute('href'))).toContain('#pages/agents/migrator/learned.md');
     expect(el.querySelector('.help-key')!.getAttribute('aria-label')).toBe('What is a worker');
     expect((el.querySelector('.keep input') as HTMLInputElement).value).toBe('1');
     const row = el.querySelectorAll('.workers li')[0];
@@ -88,7 +89,7 @@ describe('the profile', () => {
     expect(el.querySelectorAll('.workers li')[1].textContent).toContain('old setup');
     expect(el.querySelector('.today')!.textContent).toBe('7 runs$1.902 decisions');
     expect(el.textContent!.toLowerCase()).not.toContain('pool');
-    expect(calls.some((c) => c.path === '/v1/pools/migrator')).toBe(true);
+    expect(calls.some((c) => c.path === '/v1/pools/crew')).toBe(true);
   });
 
   it('offers Edit and New face to an owner only', () => {

@@ -8,7 +8,7 @@
 // a decision that changes an entry redraws its own row and not the channel.
 
 import { dayWords, list } from '../lib/words';
-import type { EntryA } from '../state/bridges-a';
+import type { Entry } from '../api/types';
 
 /** line is a plain system line, chat a message of an agent to agents, card a decision, msg any other message. */
 export type ShapeKind = 'line' | 'chat' | 'card' | 'msg';
@@ -29,7 +29,7 @@ export const FOLD_LINES = 3;
 export const FOLD_CHAT = 2;
 
 /** shapeOf names what an entry is, for the folding. */
-export function shapeOf(e: EntryA, now?: Date): Shape {
+export function shapeOf(e: Entry, now?: Date): Shape {
   const day = dayWords(e.at, now);
   if (e.from.kind === 'system') {
     if (e.decision) return { seq: e.seq, kind: 'card', day, who: [], failed: false };

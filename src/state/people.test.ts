@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Agent, Bridge, Fleet, Member, Run } from '../api/types';
-import { poolName } from '../api/people';
+import type { Agent, Bridge, Fleet, Member, Run, Skill } from '../api/types';
+import { poolName } from '../lib/workers';
 import type { Roster } from './reducer';
 import {
   NOT_ON_A_BRIDGE,
@@ -179,21 +179,22 @@ describe('the board', () => {
 });
 
 describe('the slash menu', () => {
-  const skills = [
-    { name: 'plan', description: 'Plan a module.', origin: 'local' as const, agents: ['migrator'], argumentHint: '<module>' },
-    { name: 'hidden', description: 'Only for the model.', origin: 'local' as const, agents: ['migrator'], userInvocable: false },
-    { name: 'also-hidden', description: 'Only for the model.', origin: 'local' as const, agents: ['migrator'], 'user-invocable': false },
-    { name: 'notes', description: 'Write notes.', origin: 'imported' as const, agents: ['scribe'] },
-    { name: 'audit', description: 'Audit a role.', origin: 'server' as const, agents: ['migrator'], 'argument-hint': '[role]' },
+  const skills: Skill[] = [
+    { name: 'plan', description: 'Plan a module.', origin: 'local', argumentHint: '<module>' },
+    { name: 'hidden', description: 'Only for the model.', origin: 'local', userInvocable: false },
+    { name: 'notes', description: 'Write notes.', origin: 'imported' },
+    { name: 'docs/audit', description: 'Audit a role.', origin: 'mcp', server: 'docs', argumentHint: '[role]' },
   ];
+  const migrator = ['plan', 'hidden', 'docs/audit'];
 
-  it('offers the skills of the agent that a person can invoke, with the argument hint first', () => {
-    expect(slashCommands(skills, 'migrator')).toEqual([
-      { name: 'audit', description: '[role] Audit a role.' },
-      { name: 'plan', description: '<module> Plan a module.' },
+  it('offers the skills that the agent can load and a person can invoke, each with the hint of its arguments', () => {
+    expect(slashCommands(skills, migrator)).toEqual([
+      { name: 'docs/audit', description: 'Audit a role.', hint: '[role]' },
+      { name: 'plan', description: 'Plan a module.', hint: '<module>' },
     ]);
-    expect(slashCommands(skills, 'scribe')).toEqual([{ name: 'notes', description: 'Write notes.' }]);
-    expect(slashCommands(null, 'scribe')).toEqual([]);
+    expect(slashCommands(skills, ['notes'])).toEqual([{ name: 'notes', description: 'Write notes.' }]);
+    expect(slashCommands(null, ['notes'])).toEqual([]);
+    expect(slashCommands(skills, undefined)).toEqual([]);
   });
 
   it('reads a command of the list at the start of the text, and leaves any other text alone', () => {
