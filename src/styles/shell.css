@@ -211,6 +211,11 @@
 .signin .key {
   width: 100%;
 }
+.signin form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
 .token-way summary {
   cursor: pointer;
   min-height: var(--h-row);

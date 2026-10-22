@@ -690,7 +690,7 @@ dialog.confirm .do {
     width: var(--h-row);
     height: var(--h-row);
   }
-  .rchip {
+  button.rchip {
     height: var(--h-row);
     padding: 0 12px;
   }
