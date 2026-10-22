@@ -18,7 +18,7 @@ import { phaseOf } from '../lib/presence';
 import { hrefOf } from '../lib/route';
 import { since } from '../lib/words';
 import { attempt, showError } from './notice';
-import { InlineMarkdown } from './common';
+import { Confirm, InlineMarkdown } from './common';
 import { Glyph } from './icons';
 import { Button, Chip, Field, Help, Input, Led, Mark, PaneHeader } from './primitives';
 
@@ -195,7 +195,39 @@ function Workers({ agent, owner, pool, setPool }: { agent: string; owner: boolea
           ))}
         </ul>
       )}
+      {owner && pool && <RemoveWorkers agent={agent} onDone={() => setPool(null)} />}
     </section>
+  );
+}
+
+/** RemoveWorkers removes every worker of an agent, for an owner, after Confirm. */
+function RemoveWorkers({ agent, onDone }: { agent: string; onDone: () => void }) {
+  const [ask, setAsk] = useState(false);
+  const [busy, setBusy] = useState(false);
+  return (
+    <div class="workers-remove">
+      <Button size="s" kind="danger" onClick={() => setAsk(true)}>
+        Remove workers
+      </Button>
+      {ask && (
+        <Confirm
+          title={'Remove the workers of ' + agent + '?'}
+          confirm="Remove workers"
+          danger
+          busy={busy}
+          onCancel={() => setAsk(false)}
+          onConfirm={async () => {
+            setBusy(true);
+            const ok = await attempt(() => api.removeWorkers(poolNameOf(store.get().fleet, agent)));
+            setBusy(false);
+            setAsk(false);
+            if (ok) onDone();
+          }}
+        >
+          <p>Every worker of {agent} stops. A seat of {agent} waits for a worker.</p>
+        </Confirm>
+      )}
+    </div>
   );
 }
 
@@ -246,6 +278,7 @@ function TodaySec({ agent, today }: { agent: string; today: Today | null | undef
         {typeof today.costUSD === 'number' && (
           <span>
             <b>${today.costUSD.toFixed(2)}</b>
+            {today.partial && ' so far'}
           </span>
         )}
         <span>

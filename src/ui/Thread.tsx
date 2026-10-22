@@ -16,7 +16,7 @@ import type { Tone } from '../lib/presence';
 import { attempt } from './notice';
 import { InlineMarkdown, Markdown, When } from './common';
 import { DecisionCard } from './Decision';
-import { Avatar, Button, IconButton, LineLed, Mark, ReactionChip, TextArea } from './primitives';
+import { Avatar, Button, Chip, IconButton, LineLed, Mark, ReactionChip, TextArea } from './primitives';
 
 /** The light of a system line: green for started, amber for needs you and asked, red for failed, grey for the rest. */
 export function eventTone(event: string | undefined): Tone {
@@ -27,7 +27,7 @@ export function eventTone(event: string | undefined): Tone {
 }
 
 /** Msg is one message: the face, the name and the clock time, and the text. */
-export function Msg(p: { face: ComponentChildren; name: string; at?: string; compact?: boolean; label?: string; id?: string; corner?: ComponentChildren; children: ComponentChildren }) {
+export function Msg(p: { face: ComponentChildren; name: string; at?: string; compact?: boolean; label?: string; id?: string; corner?: ComponentChildren; tag?: ComponentChildren; children: ComponentChildren }) {
   return (
     <article class={'tmsg' + (p.compact ? ' compact' : '')} id={p.id} aria-label={p.label}>
       {p.compact ? <span class="tmsg-gutter" /> : p.face}
@@ -36,6 +36,7 @@ export function Msg(p: { face: ComponentChildren; name: string; at?: string; com
           <header class="tmsg-head">
             <b>{p.name}</b>
             {p.at && <When at={p.at} />}
+            {p.tag}
           </header>
         )}
         {p.children}
@@ -184,7 +185,7 @@ function EntryMsg({ bridge, e, prev, agentOf, handles, runHref }: { bridge: stri
   const name = agent ? e.from.handle || 'an agent' : personName(e.from.name, e.from.display);
   const face = agent ? <Mark agent={agentOf(e.from.handle || '')} size={32} /> : <Avatar subject={e.from.name || ''} display={e.from.display} size={32} />;
   return (
-    <Msg face={face} name={name} at={e.at} compact={sameSender(prev, e)} id={'t-' + e.seq} corner={<Reactions bridge={bridge} e={e} onHeart={() => setHeart(true)} />}>
+    <Msg face={face} name={name} at={e.at} compact={sameSender(prev, e) && !e.pinned} id={'t-' + e.seq} tag={e.pinned ? <Chip>pinned</Chip> : undefined} corner={<Reactions bridge={bridge} e={e} onHeart={() => setHeart(true)} />}>
       <Markdown text={e.text} handles={handles} />
       {e.cut && (
         <p class="tmsg-cut">

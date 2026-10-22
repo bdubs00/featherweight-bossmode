@@ -28,6 +28,7 @@ const entries: Entry[] = [
   entryOf(9, { from: { kind: 'agent', handle: 'manager' }, text: 'I opened the bridge.' }),
   entryOf(10, { from: { kind: 'agent', handle: 'reviewer', run: 'run-reviewer' }, text: 'Will do.', replyTo: 7 }),
   entryOf(11, { from: { kind: 'agent', handle: 'reviewer', run: 'run-reviewer' }, text: 'About that.', replyTo: 1000 }),
+  entryOf(12, { from: { kind: 'person', name: ALICE, display: 'Alice' }, text: 'Keep the template names.', pinned: true }),
 ];
 
 beforeAll(() => {
@@ -115,6 +116,12 @@ describe('the system lines', () => {
 describe('the messages', () => {
   it('name the addressees in words', () => {
     expect(row(7).querySelector('.to')!.textContent).toBe('to reviewer and tester');
+  });
+
+  it('mark a pinned message with a quiet chip, and keep its header after a message of the same sender', () => {
+    const el = row(12, 7);
+    expect(el.querySelector('header .chip-plain')!.textContent).toBe('pinned');
+    expect(row(7).querySelector('header .chip')).toBeNull();
   });
 
   it('say that the channel cut a long text, and link the whole text', () => {

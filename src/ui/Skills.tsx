@@ -19,8 +19,7 @@ import { go, hrefOf, type SkillItem } from '../lib/route';
 import { useRoving } from './keys';
 import { attempt, showError } from './notice';
 import { Confirm, Markdown } from './common';
-import { Glyph } from './icons';
-import { Button, Chip, Mark, PaneHeader } from './primitives';
+import { Button, Chip, Find, Mark, PaneHeader } from './primitives';
 import { EmptyPane } from './Shell';
 import { AddSkill, closeAddSkill, openAddSkill, useAddSkillOpen } from './AddSkill';
 
@@ -161,9 +160,8 @@ export function SkillList({ current }: { current?: SkillItem }) {
       />
       <div class="scroll" ref={list}>
         {many && (
-          <div class="find recess">
-            <Glyph name="search" size={16} />
-            <input type="search" placeholder="Find a skill" aria-label="Find a skill or a tool" value={q} onInput={(e) => setQ((e.target as HTMLInputElement).value)} />
+          <div class="list-find">
+            <Find label="Find a skill or a tool" placeholder="Find a skill" value={q} onInput={setQ} />
           </div>
         )}
         {!cat && <p class="empty">Loading the skills.</p>}

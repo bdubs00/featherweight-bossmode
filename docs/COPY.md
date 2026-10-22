@@ -51,6 +51,7 @@ marked done is in the code already.
 | A SKILL.md that an agent can load | skill | plugin, extension |
 | A function that an agent can call | tool | function, capability |
 | The person who runs the page | you | the operator, the user |
+| A message that each delivery pins, so it survives every compaction of the runs | pinned, a quiet chip on the entry | sticky, starred, saved |
 
 The statuses of a seat: `working`, `needs you`, `waiting for a worker`,
 `idle`, `asleep`, `error`, and `fired`. The statuses of a worker: `awake`,
@@ -124,6 +125,15 @@ Capacity shows where seating happens:
 |---|---|---|---|
 | `Cancel` (dialog) | keep | | done |
 | `Back to <place>` (back link) | keep | the old back link said only the place, beside an arrow | done |
+| `More` (the name of a menu key on a header), `More for <handle>` (in a row) | add | the screen-reader name of the key of a menu | done |
+| `Back to <handle>`, `Back to <agent>` (the back link of a profile) | add | the profile goes back to the conversation that opened it | done |
+
+### src/ui/primitives
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| the name of a `Find` field, such as `Find a member` | add | the placeholder takes the name unless a screen gives a shorter one | done |
+| `Advanced` (the summary of the disclosure) | keep | one word, in every form | done |
 
 ### src/ui/notice.ts, src/api/client.ts
 
@@ -184,6 +194,8 @@ Capacity shows where seating happens:
 | `No bridge is open.` | keep | with the key `Open a bridge` | done |
 | `Loading the bridges.` | keep | | A |
 | `Closed` with the count chip | keep | | done |
+| `Find a bridge` | add | the field above a list of more than ten bridges | done |
+| `2000+` | add | the unread count past the bound of the backend | done |
 | `Manager` row and `Your conversation` | remove | Manager is a place of the app bar | done |
 | `Places`, `Fleet`, `Pages` rows | remove | places of the app bar | done |
 
@@ -216,7 +228,13 @@ Capacity shows where seating happens:
 | `This bridge is closed. Open it again to send.` | change | `Closed. Reopen it to send.` | A |
 | `Messages of <title>` (log label) | keep | | A |
 | new | add | the tabs `Posts`, `Wiki`, `Decisions` with the count of decisions | A |
-| new | add | the system line `Runs in waves: N seats share M workers.` once per bridge | A |
+| new | add | the system line `Runs in waves: N seats share M workers.` once per bridge | done |
+| `Bridge` (the name of the screen for a screen reader, and the title of a bridge that is not here) | add | | done |
+| `N updates`, `N failed` (a fold of system lines, with a red light for the failures) | add | | done |
+| `<a> and <b>: N messages` (a fold of the chatter of agents) | add | | done |
+| `More` (the menu of the header) | add | it holds `What the manager can do`, `Reopen`, and, below 1200 pixels, `Close bridge` | done |
+| the empty tab Decisions | add | `Nothing needs you.`, the words of Activity | done |
+| the tab Wiki | add | `Loading the pages.` and `New page`, the words of the wiki | done |
 
 ### src/ui/Message.tsx
 
@@ -233,6 +251,7 @@ Capacity shows where seating happens:
 | `An earlier message` | keep | | A |
 | `The channel holds the first 4 KB. The run holds the whole text.` | change | `Cut at 4 KB.` with the link `Whole text` to the run | A |
 | `to @a, @b` (address line) | change | `to a and b` | A |
+| new | add | `pinned`, a quiet chip after the clock time of a pinned message, which keeps its header after a message of the same sender | done |
 | `Question from <who>`, `Permission for <who>` (labels) | change | `Question from <who>`, `Decision for <who>` | A |
 | system lines: the icon before the line | change | the light of the event: green for started, amber for needs you, red for failed, grey for the rest | A |
 
@@ -263,6 +282,7 @@ Capacity shows where seating happens:
 | `Ctrl+Enter`, `⌘+Enter` | keep | | A |
 | `Send` | keep | | done |
 | `Members` (list label) | keep | and `Commands` for the slash menu | done |
+| the argument hint of a command, such as `<module>` | add | in a slot of its own: beside the name in the slash menu, and as `/<name> <hint>` in the address line while the person types the arguments | done |
 | `Message <who>` (placeholder of a reply) | keep | | done |
 
 ### src/ui/Roster.tsx
@@ -298,7 +318,19 @@ Capacity shows where seating happens:
 | `Fire <handle>?`, `Fire <handle>` | keep | | A |
 | `The open runs of <handle> in this bridge stop, and its seat gets no more messages. Its Task stays in its pool, so other bridges can still use it.` | change | `Its open runs stop, and it gets no more messages.` | A |
 | `Drop here to fire` | change | `Fire` | done |
-| new | add | the footer `This bridge` with turns, cost, and pages, from `usage`, for a bridge whose runs report usage | A |
+| new | add | the footer `This bridge` with turns, cost, and pages, from `usage`, for a bridge whose runs report usage | done |
+| `N turns`, `$N so far`, `N pages` (the figures of the foot, at `--t-control`) | add | `1 turn` and `1 page` for one | done |
+| `Add` (the screen-reader name of the picker) | add | the picker carries the name of the key that opens it | done |
+
+### src/ui/Picker.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `Who` with the placeholder `Who?` | add | the field of the picker | done |
+| `On this bridge`, `Everyone else` | add | the two groups. On the new-bridge screen, On this bridge holds the agents of the seats of the form. | done |
+| `N free`, `waiting for a worker` | add | the capacity of an agent, with a green or a grey light | done |
+| `Advanced`, `New agent` | add | `Advanced` shows only in the members pane, where the picker seats on a bridge that exists | done |
+| `Handle`, `Agent`, `Task`, `Seat`, `Cancel` (the full form of Advanced) | add | | done |
 
 ## 5. Screen B
 
@@ -339,7 +371,17 @@ Capacity shows where seating happens:
 | new | add | the profile: `Workers` with its chip, `Keep`, and the question mark `What is a worker` with `A worker runs the work of one agent, one seat at a time. Keep is how many it keeps ready.` | B |
 | new | add | `What people liked` with its chip and `Open page` | B |
 | new | add | `Today` with runs, cost, and decisions | B |
-| new | add | `N skills`, the one line of the profile that counts them | B |
+| new | add | `N skills`, the one line of the profile that counts them | done |
+| `Find a member` | add | the field above the people list | done |
+| `Not on a bridge` | add | the last group of the people list | done |
+| `N awake` (a chip with a green light), with `N workers awake` for a screen reader | add | | done |
+| `N free`, `Keep N` (a person who is not an owner reads Keep as a number) | add | | done |
+| `asks before <pattern>`, `asks first` (an amber word for a rule of the profile) | add | | done |
+| `Tools and rules` (the list of chips) | add | an accessible name | done |
+| `Edit` (the key of an owner on the profile) | add | | done |
+| `Keep is a whole number, 0 or more.` | add | the error of the Keep field | done |
+| `Remove workers`, with Confirm: `Remove the workers of <agent>?`, `Every worker of <agent> stops. A seat of <agent> waits for a worker.`, and the key `Remove workers` | add | an owner only, at the end of Workers | done |
+| `N runs`, `$N`, `N decisions` (Today) | add | `1 run` and `1 decision` for one, and `$N so far` when a run reports no cost | done |
 
 ### src/ui/RunPane.tsx and src/ui/Conversation.tsx
 
@@ -362,9 +404,11 @@ Capacity shows where seating happens:
 | `Your heart is recorded.`, `Your thumb is recorded.` | change | `Heart recorded.`, `Thumb recorded.` | B |
 | `Took N steps` | keep | | B |
 | `Ran "<command>"`, `Created`, `Edited`, `Removed`, `Used <tool>` | keep | | B |
-| `Asked you a question`, `Asked for permission` | change | `Asked you`, `Asked for a decision` | B |
-| `<who> allowed it`, `<who> denied it` | keep | | B |
-| `The turn failed`, `The turn ended` | keep | | B |
+| `Asked you a question`, `Asked for permission` | change | `Asked you`, `Asked for a decision` | done |
+| `<who> allowed it`, `<who> denied it` | keep | | done |
+| `The turn failed` | keep | | done |
+| `The turn ended` | remove | the answer above it says it. A turn that failed keeps its line. | done |
+| `Took N steps` (a fold of three or more steps) | keep | | done |
 | `Load earlier messages` | change | `Earlier messages` | B |
 | `Loading the conversation.` | keep | | B |
 
@@ -374,8 +418,12 @@ Capacity shows where seating happens:
 |---|---|---|---|
 | `<handle> has no seat on this bridge, or no run yet.` | keep | | B |
 | `Loading the member.` | keep | | B |
-| `Board` | keep | | B |
-| `The board shows one light per member. It comes with the next stage.` | remove | the board | B |
+| `Board` | keep | | done |
+| `The board shows one light per member. It comes with the next stage.` | remove | the board | done |
+| `Statuses of <bridge>` (the strip of a group of the board) | add | an accessible name | done |
+| `Messages with <handle>` (the log of a seat), `Conversation with <handle>` (its tabs) | add | accessible names | done |
+| `Profile of <agent>, <status>` (the mark at the head of a conversation) | add | the name of the link to the profile, which a window narrower than three panes keeps out of sight | done |
+| `stopped` (a seat whose newest run was canceled) | add | the status beside `error`, with a grey light, and the key `Seat again` | done |
 
 ## 6. Screen C
 
@@ -418,6 +466,9 @@ Capacity shows where seating happens:
 | `Manager` | keep | | done |
 | `It reads the fleet, opens bridges, and decides only what you delegate.` | remove | | done |
 | `New conversation` | keep | | done |
+| `Where the manager is set up` (the name of the question mark) and `The setting workbench.bossmode.manager names the agent of the manager.` | add | the definition behind the question mark of `No manager is set up.` | done |
+| `waking` with `Waking the manager` in the tooltip, `working` with the phrase of the step | add | the status of an answer on its way | done |
+| the thread | change | the conversation of a run that the member and the agent screens show, so its words are the words of `src/ui/Conversation.tsx` | done |
 | `This workbench has no manager. An operator sets the profile of the manager in workbench.bossmode.manager.` | change | `No manager is set up.` with a question mark that names `workbench.bossmode.manager` | C |
 | `Ask the manager about the fleet, or ask it to open a bridge. The first answer takes a few seconds, because its Task wakes for it.` | change | `Ask about the fleet, or ask for a bridge.` | C |
 | `Waking the manager. Its Task sleeps between messages, so the first answer takes a few seconds.` | change | the status `waking` with a grey light | C |
@@ -436,7 +487,11 @@ Capacity shows where seating happens:
 | `Placement` with `Queue. Each member runs on a worker of the pool of its agent.` and `Spawn. The manager seats each member in a child Task of its own, and its budget bounds the whole bridge.` | change | a visible choice with two options: `Keep warm workers` (the default) and `Fresh sandbox per seat` | C |
 | `What the manager can do here` and its four rows | change | in Advanced, with the words of screen A | C |
 | `Each member starts a run as you. A bridge spends through the budgets of the pools of its members.` | remove | | C |
-| `Cancel`, `Open the bridge` | change | `Cancel`, `Open bridge` | C |
+| `Cancel`, `Open the bridge` | change | `Cancel`, `Open bridge` | done |
+| `Seats`, `Pick the seats`, `Let the manager split it` | add | the choice of who seats the bridge, when the settings name a manager | done |
+| `Add a seat` (the heading of the seats beside that choice), `Add` (the key that opens the picker of the members pane) | add | | done |
+| `Placement`, `Title`, `Caps`, `Most messages`, `Most messages a minute`, `Most messages between two members` | add | Title and Caps in Advanced | done |
+| `Write a whole number.` | add | the error of a cap | done |
 | `The bridge needs a title.`, `The bridge needs a goal.` | change | `Write the goal of the bridge.` | C |
 | `Member N needs a handle of lower-case letters, digits, dots, dashes, or underscores.` | change | the reason of `handleReason()` | C |
 | `The handle <h> is there twice.` | change | `<h> has a seat on this bridge already. Pick another handle.` | C |
@@ -447,10 +502,14 @@ Capacity shows where seating happens:
 
 | Now | Verdict | New text | Who |
 |---|---|---|---|
-| `New agent` | keep | | C |
-| `A new agent starts with a name and the number of workers it keeps. The form comes with the next stage.` | remove | the form: `Name` first, then `How many can work at once?` with 2 as the default, and Advanced | C |
+| `New agent` | keep | | done |
+| `A new agent starts with a name and the number of workers it keeps. The form comes with the next stage.` | remove | the form: `Name` first, then `How many can work at once?` with 2 as the default, and Advanced | done |
+| `Name`, `What it handles`, `How many can work at once?`, `Template`, `Skills` | add | the fields before Advanced. The skills sit outside Advanced. | done |
+| `Model`, `Effort`, `Default`, `Budget of a run`, `Turns`, `Tokens`, `Cost in dollars`, `Context compaction`, `Compact at, in tokens`, `Compaction model`, `Rules`, `Ask before`, `Never run`, `Time zone` | add | in Advanced | done |
+| `Create agent`, `Preview`, `saved`, `Open <name>`, `Workers`, `N workers start when you create the agent.` | add | | done |
+| `Write the name of the agent.`, `A name holds letters, digits, dots, dashes, or underscores, at most 64.`, `An agent named <name> exists. Pick another name.`, `Pick a number from 1 to 32.`, `Write a whole number.`, `Write an amount in dollars, such as 2.50.`, `Write a whole number of tokens, at least 1024.` | add | the errors, each at the moment the person hits it | done |
 | `Appearance`, `Theme`, `Match the system`, `Light`, `Graphite` | keep | | C |
-| `<name> sets the accent <hex>.`, `The accent is <hex>.` | keep | | C |
+| `<name> sets the accent <hex>.`, `The accent is <hex>.` | remove | Appearance holds the theme of the person only, and the accent belongs to the deployment | done |
 | `Skills` with the count chip, `Imported`, `Local`, `<server>`, `Tools`, `Built in` | keep | | done |
 | `Agents that can load it` with the count chip | keep | | done |
 | `Pick a skill or a tool in the list.` | keep | | done |
@@ -459,4 +518,12 @@ Capacity shows where seating happens:
 | `Copy /<name>`, `Copied /<name>` | keep | | done |
 | `Remove`, `Remove <name>?`, `Remove <name>` | keep | | done |
 | `No agent can load it after this.` | keep | | done |
-| new | add | `Add skill` and its chooser: `From a marketplace`, `From an address`, `Paste a SKILL.md`, `Upload files`, then the preview and `Install` | C |
+| new | add | `Add skill` and its chooser: `From a marketplace`, `From an address`, `Paste a SKILL.md`, `Upload files`, then the preview and `Install` | done |
+| `Find a skill` (with the name `Find a skill or a tool`), `No skill holds those words.`, `Loading the skill.`, `Loading the skills.` | add | | done |
+| `Address`, `Preview`, `Pick files`, `Pick a folder`, `SKILL.md`, `Files`, `Close` | add | the keys and fields of the chooser | done |
+| `Loading the marketplaces.`, `No marketplace is set up.`, `Loading the preview.` | add | | done |
+| `An installed skill is instructions for every agent of a profile that allows it.` | add | the one sentence of the preview, because an install reaches every agent at once | done |
+| `replaces <name>` (a grey light), `blocks` (red), `note` (grey) | add | the status words of a preview and its problems | done |
+| `Replace <name>` | add | the key after a 409 for the name of an imported skill. A 409 for a source that changed shows its reason, and a new preview. | done |
+| `imported`, `local`, `built in`, and the name of a server | add | the origin of a skill or a tool | done |
+| `Write an https address of a SKILL.md, of the folder of a skill, or of a zip file.`, `Pick at most 64 files.` | add | the errors of the address and the upload | done |

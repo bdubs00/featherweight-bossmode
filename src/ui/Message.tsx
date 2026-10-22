@@ -15,7 +15,7 @@ import { decide, react } from '../state/actions';
 import { attempt } from './notice';
 import { InlineMarkdown, Markdown, When } from './common';
 import { DecisionCard } from './Decision';
-import { Avatar, Button, IconButton, LineLed, Mark, ReactionChip, TextArea } from './primitives';
+import { Avatar, Button, Chip, IconButton, LineLed, Mark, ReactionChip, TextArea } from './primitives';
 
 /** plain drops the marks of Markdown from a text, for a label. */
 const plain = (t: string) => t.replace(/```[\s\S]*?```/g, ' code ').replace(/[*_`#>|[\]]/g, '');
@@ -270,6 +270,7 @@ export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, fresh, li
     !!prev &&
     !day &&
     !e.replyTo &&
+    !e.pinned &&
     prev.from.kind === e.from.kind &&
     !prev.decision &&
     prev.from.kind !== 'system' &&
@@ -296,6 +297,7 @@ export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, fresh, li
               <b>{name}</b>
               <When at={e.at} />
               {to.length > 0 && <span class="to">to {list(to)}</span>}
+              {e.pinned && <Chip>pinned</Chip>}
             </header>
           )}
           {e.replyTo ? <ReplyChip bridge={bridge} seq={e.replyTo} /> : null}

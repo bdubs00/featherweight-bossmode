@@ -61,30 +61,43 @@ through the style object of the DOM, which the policy allows.
 
 ## 4. The settings of the page
 
-**New.** `GET /v1/bossmode` answers the settings that the page reads:
+`GET /v1/bossmode` answers the settings that the page reads, with the keys
+in this order:
 
 ```json
 {
   "manager": { "agent": "manager", "member": "default/manager-0", "run": "run-01K..." },
   "placement": "queue",
-  "maxMembers": 16
+  "maxMembers": 16,
+  "theme": { "accent": "#FF4D00", "name": "Example Org", "logo": "/v1/bossmode/logo" },
+  "templates": [{ "name": "general", "default": true }, { "name": "python", "default": false }],
+  "chat": { "agent": "chat", "member": "default/manager-0" }
 }
 ```
 
-- `theme` is optional, and each of its fields is optional:
-  `{"accent": "#FF4D00", "name": "Example Org", "logo": "/v1/bossmode/logo"}`.
-  The page takes an accent of 3 or 6 hex digits and keeps signal orange for
-  any other value. The logo must be a path on this origin under `/v1/`. The
-  page reads it with the bearer token, as an image: SVG, PNG, WebP, JPEG, or
-  GIF. Without a theme, the page keeps its defaults. `src/lib/theme.ts`
-  holds the checks.
 - `manager` is null when `workbench.bossmode.manager` is empty.
 - `manager.member` is the fleet member that runs the manager Task, for
-  `POST /v1/runs?member=`.
-- `manager.run` is the newest manager run that the caller started, or `""`.
-  The page opens that conversation. The front finds it in the fleet view by
-  the agent and the principal.
+  `POST /v1/runs?member=`, or `""` when the caller sees none.
+- `manager.run` is the newest top-level run of the manager that the caller
+  started outside a bridge, or `""`. The page opens that conversation.
 - `placement` and `maxMembers` come from `workbench.bridges`.
+- `theme` carries every key. `accent` is the accent of the deployment, else
+  `#FF4D00`. `name` is the name of the organization, else `""`. `logo` is
+  `/v1/bossmode/logo` when the deployment names a logo, else `""`. The page
+  takes an accent of 3 or 6 hex digits and keeps signal orange for any other
+  value. The logo must be a path on this origin under `/v1/`. The page reads
+  it with the bearer token, as an image: SVG, PNG, WebP, JPEG, or GIF. An
+  empty value keeps the default of the page. `src/lib/theme.ts` holds the
+  checks.
+- `templates` names the worker templates of the front, in the order of the
+  configuration, each with `default`. It is `[]` without templates. The
+  new-agent screen offers the choice only when it holds more than one, and
+  it picks the default.
+- `chat` is null when `workbench.bossmode.chat.agent` is empty. `chat.agent`
+  is the profile of the quick chat, and `chat.member` is the fleet member
+  that runs it, or `""`. A quick chat is a run of that profile on that
+  member, with the metadata `fw.view: quickchat`. The page reads the key and
+  has no screen for it yet (section 14).
 
 A workbench without bossmode answers 404, and the page then shows no manager.
 
@@ -102,17 +115,21 @@ section 6.1 of the plan without `members`, plus five fields:
 | `unread` | The entries after `read` that count for the caller: a message of a person or an agent, and a card that waits for a decision. A message of the caller and a plain system line do not count. |
 | `memberCount` | The number of seats, fired seats included |
 | `needsYou` | The number of members with the presence `needs-you` |
+| `unreadMore` | True when the unread entries reach past the bound of 2000 |
 
 The workbench counts `unread` over at most the last 2000 entries of the
-channel, so a larger count stops there. The page shows 99+ above 99.
+channel, so a larger count stops there, and `unreadMore` says so. The page
+shows 99+ above 99, and 2000+ with `unreadMore`.
 
 `GET /v1/bridges/{id}` answers the same item with `members` and `usage`.
 `usage` sums the usage of the runs of the bridge as the tool `batch` sums a
 job: the fields of the usage of a run (`turns`, `toolCalls`, `costUSD`, and
 the tokens), plus `reported`, `final`, `missing`, and `partial`, which is true
-when a run reports no usage. Only this route carries `usage`. The page shows
-no usage, as `/ui` shows none. Each member is the member of the plan plus two
-fields:
+when a run reports no usage. Only this route carries `usage`. The foot of
+the members pane shows the turns, the cost, and the pages of the bridge. A
+record that arrives without `usage`, such as a list item or the answer of a
+`PATCH`, keeps the last sum on the page. Each member is the member of the
+plan plus two fields:
 
 ```json
 {
@@ -214,9 +231,19 @@ The plan gives the entry. The page reads four more fields:
     "reason": "rule: ask bash: git push*", "effect": "Runs \"git push origin migrate/nginx\".",
     "input": { "command": "git push origin migrate/nginx" },
     "state": "pending", "always": true
-  }
+  },
+  "pinned": false,
+  "page": "",
+  "skill": null
 }
 ```
+
+- `pinned` is true when each delivery of the message is pinned, so it
+  survives every compaction of the runs of the members. The page shows a
+  quiet chip `pinned` on such an entry.
+- `page` is the wiki path that a system line is about, when the text of
+  the line holds no link to it. The page links it.
+- `skill` is the slash command of a message, `{"name", "args"}`, or absent.
 
 - `from.kind` is `person`, `agent`, or `system`. A person has `name`, the
   subject, and `display`, a name to show, when the front knows one. An agent
@@ -250,7 +277,7 @@ The plan gives the entry. The page reads four more fields:
   | Field | Value |
   |---|---|
   | `run` | The run that waits |
-  | `state` | `pending`, `allow`, or `deny` |
+  | `state` | `pending`, `allow`, `deny`, or `unknown`: the front cannot tell whether a decision reached the run, such as when the run stopped first |
   | `decidedBy`, `decidedAt` | The subject and the time of the decision |
   | `note` | The note of the decision |
   | `answer` | The answer to a question, as words |
@@ -267,9 +294,14 @@ The plan gives the entry. The page reads four more fields:
 
 ### 6.3 A message of the caller
 
-`POST /v1/bridges/{id}/messages` takes `{"text", "to", "replyTo"}`. `to` is
-optional, and without it the message goes to every active member. The
-answer is 201 with the entry. The page sends no `files` yet. A handle in
+`POST /v1/bridges/{id}/messages` takes `{"text", "to", "replyTo", "pinned",
+"skill"}`. `to`, `replyTo`, `pinned`, and `skill` are optional, and without
+`to` the message goes to every active member. `skill` is a slash command,
+`{"name", "args"}`, and with it `text` is optional: it is the text of the
+person that follows the skill. A one-on-one conversation with a seat sends
+its slash commands this way, to that seat alone. The answer is 201 with the
+entry. An unknown skill answers 404, a skill that is not for people 400,
+and a message over 64 KB 413. The page sends no `files` yet. A handle in
 `to` that is not on the roster, or that is fired, answers 400. The handle
 `operator` in `to` answers 400 too: an agent can address the operator, and a
 person cannot. A closed bridge answers 409.
@@ -325,11 +357,26 @@ The first message starts a run with
 member. A later message is `POST /v1/runs/{id}/messages` with
 `{"content": "..."}`. A run that failed or was canceled ends the
 conversation, and the next message starts a new run. While the run is
-`queued` or `suspended` and the first answer is missing, the page says
-"Waking the manager".
+`queued` or `suspended` and the first answer is missing, the status says
+`waking`, with "Waking the manager" in its tooltip.
 
 The page follows the run on the stream (`run` events) and reads the new
-transcript items with `from`.
+transcript items with `from`. A run of the front sends no `run` event, so
+the page also reads `GET /v1/runs/{id}` every 3 seconds while the
+conversation is open and the run works or an answer is on its way.
+
+A conversation with an agent that sits on no bridge works the same way:
+the first message starts a run on a member of the fleet whose agents hold
+the agent, a live member first, and a later message follows up.
+
+### 7.5 A slash command in a run
+
+`POST /v1/bossmode/runs/{id}/skill` takes `{"name", "args", "text"}`, with
+`args` and `text` optional, and answers 202 with the run object, as
+`POST /v1/runs/{id}/messages` answers. The front expands the skill of the
+catalog and sends the message pinned. The conversation of the manager and
+of an agent on no bridge send their slash commands here. An unknown skill
+answers 404, and a skill that is not for people answers 400.
 
 ## 8. Pages
 
@@ -469,53 +516,116 @@ bridge that the manager opens therefore shows in the rail.
 
 ## 12. Skills and tools
 
-**New.** The backend serves these routes from its own branch. The page and
-the fake server use the shapes below, and they follow the backend where it
-differs.
+The backend serves the skills from its own branch. The catalog names no
+agent and no tool, so the page reads the skills of each agent and the
+tools of the kernel from routes of their own.
 
 | Route | Answer |
 |---|---|
-| `GET /v1/bossmode/skills` | `{"skills": [<skill>], "tools": [<tool>]}` |
-| `GET /v1/bossmode/skills/{name}` | `<skill>` plus `"text"`, the SKILL.md, and `"files"`, each with `path` and `size` |
-| `DELETE /v1/bossmode/skills/{name}` | 204. Only an imported skill can go. Another skill answers 409. |
-| `GET /v1/bossmode/marketplaces` | `{"marketplaces": [{"name", "url", "skills": [{"name", "description"}]}]}` |
-| `POST /v1/bossmode/skills/preview` | Takes `{"source": <source>}` and answers `{"token", "skill", "text", "files"}`. Nothing is installed yet. |
-| `POST /v1/bossmode/skills/install` | Takes `{"token"}` of a preview and answers 201 with the skill |
+| `GET /v1/bossmode/skills` | `{"skills": [<skill>]}`, every skill that the front knows |
+| `GET /v1/agents/{name}/skills` | `{"agent", "pool", "allowlist", "skills": [<ref>]}`: the skills list of the profile, `null` for every skill, and the skills of the catalog that it allows |
+| `GET /v1/skills/{name}` | The skill of the kernel: `{"name", "description", "origin", "server", "uri", "body", "files"}`, where `body` is the whole SKILL.md and `files` the paths of the other files. The page escapes the name, because a skill of a server is named `<server>/<name>`. |
+| `GET /v1/tools` | `{"tools": [<capability>]}`: each tool of the kernel with `name`, `description`, `source` (`builtin`, or the name of a server), and `text`, its plain phrase |
+| `GET /v1/bossmode/marketplaces` | `{"marketplaces": [{"name", "url", "kind", "skills": [{"name", "description"}], "notes", "error", "fetchedAt"}]}`. `error` says why the index of a marketplace did not load. |
+| `POST /v1/bossmode/skills/preview` | Takes the fields of a source and answers the preview. Nothing is installed. |
+| `POST /v1/bossmode/skills` | Takes the fields of a source, `replace`, and `digest`, and installs the skill |
+| `DELETE /v1/bossmode/skills/{name}` | 204. Only an imported skill can go. A skill of the configuration or of a server answers 409. |
 
-A skill carries the keys of the front matter of its SKILL.md and where it
-comes from:
+A skill of the catalog:
 
 ```json
 {
   "name": "ansible-style", "description": "Write Ansible roles the way this team writes them.",
-  "origin": "imported", "source": "team-skills", "license": "MIT", "allowed-tools": ["bash", "files"],
-  "agents": ["migrator", "reviewer"], "slash": "/ansible-style"
+  "origin": "imported", "uri": "ansible-style/SKILL.md",
+  "userInvocable": true, "modelInvocable": true, "argumentHint": "<role>",
+  "arguments": [], "files": ["checklist.md"]
 }
 ```
 
-`origin` is `imported`, `local`, or `server`, and a skill of a server names
-it in `server`. A tool has `id`, unique over the fleet, `name`,
-`description`, `origin` (`builtin` or `server`), `server`, and `agents`.
+- `origin` is `local` for a skill of a skills directory, `imported` for a
+  skill that an admin imported, or `mcp` for a skill of an MCP server, which
+  `server` names. The name of a skill of a server is `<server>/<name>`.
+- `userInvocable` is false when the front matter says
+  `user-invocable: false`, so no person hands the skill to a run, and the
+  slash menus leave it out. `argumentHint` and `arguments` come from the
+  front matter. The slash menu shows the hint beside the name.
+- "Agents that can load it" on the Skills place comes from
+  `GET /v1/agents/{name}/skills` of each agent that the fleet lists. The
+  page reads them while the Skills place is open and forgets them when it
+  closes. A slash menu reads the skills of its one agent the same way.
 
-A source is one of the four avenues of Add skill:
+A source names exactly one of these, as top-level fields:
 
 ```json
-{"kind": "marketplace", "marketplace": "team-skills", "skill": "molecule-ci"}
-{"kind": "url", "url": "https://skills.example.com/release-notes/SKILL.md"}
-{"kind": "text", "text": "---\nname: ...\ndescription: ...\n---\n..."}
-{"kind": "files", "files": [{"path": "SKILL.md", "text": "..."}]}
+{"url": "https://skills.example.com/release-notes/SKILL.md"}
+{"marketplace": "team-skills", "name": "molecule-ci"}
+{"text": "---\nname: ...\ndescription: ...\n---\n..."}
+{"files": [{"path": "SKILL.md", "text": "..."}]}
 ```
 
-A preview of a SKILL.md without front matter, a name, or a description
-answers 422 with the reason in `detail`. A name that exists answers 409.
+A URL names a SKILL.md, the directory of a skill in a repository, or a zip
+archive. An upload holds at most 64 files and 1 MiB.
 
-Open: the picker of skills on the new-agent screen and on the profile needs
-a route that sets the skills of an agent. The backend names it.
+The preview answers, in this order:
 
-## 13. What the page does not call yet
+```json
+{
+  "name": "molecule-ci", "description": "Run molecule in CI and read its failures.",
+  "frontMatter": { "name": "molecule-ci", "description": "...", "license": "MIT" },
+  "entry": { "name": "molecule-ci", "origin": "imported", "...": "..." },
+  "body": "# molecule-ci\n...",
+  "files": [{ "path": "SKILL.md", "size": 230 }],
+  "digest": "sha256:...",
+  "source": { "kind": "marketplace", "marketplace": "team-skills", "name": "molecule-ci", "digest": "sha256:..." },
+  "exists": null,
+  "problems": [{ "code": "binary", "path": "logo.png", "text": "...", "blocks": false }],
+  "installable": true
+}
+```
+
+- `exists` names the skill that holds the name: `{"origin", "replaceable"}`.
+  Only an imported skill is replaceable.
+- A problem that blocks stops an install, such as a missing name. A note,
+  such as a binary file that the import leaves out, does not.
+- `installable` is false when a problem blocks, except the name of an
+  imported skill, which `replace` takes the place of.
+
+The install answers 201 for a new skill, or 200 when it replaced an
+imported skill, with `{"skill", "replaced", "preview"}`. The page sends the
+digest of the preview that the person read:
+
+- 409 when the name exists and the install does not replace it, or a skill
+  of the configuration holds it, or when the source gives another digest
+  than the preview. The page offers Replace for the first case, and a new
+  preview for the last.
+- 400 for a problem that blocks, and for an install from a URL or a
+  marketplace without `digest`.
+- 413 for a source with too many files or too many bytes.
+
+Only an admin of the process (`access.admins`) previews, installs, and
+removes a skill. Another caller gets 403, and the page shows Add skill and
+Remove to an admin alone.
+
+## 13. Agents and workers
+
+| Route | Answer |
+|---|---|
+| `GET /v1/agents` | `{"agents": [<view>]}`: each agent with its profile, as `name`, `description`, `role`, `tools`, `skills`, and `policy`, among others. The profile shows the tools as chips and the rules that ask first as amber words. |
+| `PUT /v1/agents/{name}` | Takes the profile and `workers`, `{"template", "replicas"}`, and answers 201 for a new agent or 200, with `{"name", "description", "role", "pool"}`. `pool` is the status of the workers that the front made. With `?dryRun=true` it checks the profile, saves nothing, and adds `exists`. An unknown field answers 400. |
+| `GET /v1/pools/{name}` | The status of the workers of a pool: `name`, `source`, `template`, `atespace`, `agent`, `intake`, `wanted`, `actual`, `ready`, `hash`, `tasks`, `gaps`, and `checkedAt`. The page names the pool of an agent from the fleet view, else by the rule of the front for a new agent: the name in lower case, with a hyphen for each character that is not a letter or a digit. |
+| `PATCH /v1/pools/{name}` | `{"replicas": n}` changes Keep, for an owner. The answer is the status. |
+| `DELETE /v1/pools/{name}` | Removes every worker of the agent, for an owner, after Confirm. |
+| `GET /v1/bossmode/agents/{agent}/today` | `{"runs", "costUSD", "decisions", "partial"}` of the day of the agent. `partial` is true when a run reports no cost. A workbench without the route answers 404, and the profile then shows no Today. |
+
+The page never says pool to a person: the profile says Workers and Keep.
+The profile reads the status of the workers every 10 seconds while it is
+open, because no event of the stream carries it.
+
+## 14. What the page does not call yet
 
 - `files` on a message of the channel.
 - The budget of a run. The plan offers a button to raise the budget of a
   member that failed at a limit. The page shows the limit and has no button.
 - `DELETE /v1/pages/{path}`.
-- `usage` of a bridge (section 5.1).
+- The quick chat of `chat` (section 4), and its history of
+  `GET /v1/fleet/runs`.

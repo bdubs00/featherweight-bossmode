@@ -13,6 +13,7 @@ beforeEach(() => {
   const f = fakeFetch([
     ['PATCH', /^\/v1\/pools\/crew$/, (b) => ({ ...POOL, wanted: (b as { replicas: number }).replicas })],
     ['GET', /^\/v1\/pools\/crew$/, () => POOL],
+    ['DELETE', /^\/v1\/pools\/crew$/, () => null],
     ['GET', /^\/v1\/bossmode\/agents\/migrator\/today$/, () => ({ runs: 7, costUSD: 1.9, decisions: 2 })],
     ['GET', /^\/v1\/pages\/agents\/migrator\/learned\.md$/, () => ({ path: 'agents/migrator/learned.md', text: '# Liked\n\n## a\n\nAlice hearted: Kept the names.\n\n## b\n\nBob hearted: Ran the lint.\n' })],
     ['GET', /^\/v1\/runs\/run-migrator-2$/, () => ({ id: 'run-migrator-2', agent: 'migrator', state: 'completed', seq: 1, createdAt: '', updatedAt: '' })],
@@ -90,6 +91,15 @@ describe('the profile', () => {
     expect(el.querySelector('.today')!.textContent).toBe('7 runs$1.902 decisions');
     expect(el.textContent!.toLowerCase()).not.toContain('pool');
     expect(calls.some((c) => c.path === '/v1/pools/crew')).toBe(true);
+  });
+
+  it('removes the workers of an agent for an owner, after Confirm', async () => {
+    const el = mount(<Profile agent="migrator" />);
+    await vi.waitFor(() => expect(el.querySelectorAll('.workers li').length).toBe(2));
+    act(() => ([...el.querySelectorAll('button')].find((b) => b.textContent === 'Remove workers') as HTMLButtonElement).click());
+    expect(document.querySelector('dialog.confirm h2')!.textContent).toBe('Remove the workers of migrator?');
+    act(() => ([...document.querySelectorAll('dialog.confirm button')].find((b) => b.textContent === 'Remove workers') as HTMLButtonElement).click());
+    await vi.waitFor(() => expect(calls.some((c) => c.method === 'DELETE' && c.path === '/v1/pools/crew')).toBe(true));
   });
 
   it('offers Edit and New face to an owner only', () => {

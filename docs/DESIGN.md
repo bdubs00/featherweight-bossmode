@@ -324,6 +324,12 @@ at the top right of the icon.
 | Wiki | The tree and the search | A page, its history, or the editor | none |
 | Manager | none at first | The conversation | none at first |
 
+The address names the focus. `#fleet/<agent>` and `#member/<bridge>/<handle>`
+focus the conversation, and `/profile` after either focuses the profile:
+the mark at the head of a conversation links there. `#activity/<key>` names
+the item of the inbox that the main pane shows, so a narrow window opens it.
+`#skills/add` opens the chooser of Add skill.
+
 A pane with nothing picked keeps its header row and its groove band. Thus
 the bands of the three panes stay in one line. The invitation to act sits in
 the middle of the pane. The account key opens a menu with the name of the person, the
@@ -597,11 +603,15 @@ The work:
   per seat (`spawn`), which needs a manager. The seats come from the picker
   of A once it lands, and until then from the rows of today. Advanced holds
   the title, the handles, and what the manager can do.
-- New agent, at `#new-agent`. One question first: the name. Then How many
-  can work at once?, with 2 as the default, which the profile shows as Keep.
-  Advanced holds the description, the tools, the skills with the
-  `SkillPicker`, and the rules. The route that makes an agent is open in the
-  contract. C serves it in `fake/routes-c.mjs` and names it in its report.
+- New agent, at `#new-agent`. One question first: the name, beside what
+  it handles. Then How many can work at once?, with 2 as the default, which
+  the profile shows as Keep, and the template of its workers when the
+  settings offer more than one. Then the skills, with the `SkillPicker`,
+  outside Advanced, because the skills decide what the agent can do.
+  Advanced holds the model, the effort, the budget of a run, the context
+  compaction, the rules, and the time zone. `PUT /v1/agents/{name}` with
+  `workers` makes the agent and its workers (`docs/CONTRACT.md`, section
+  13).
 - The Skills place, at `#skills`. The list of section 5, the text of a skill
   as Markdown with its front matter keys as chips, the description of a
   tool, and the agents that can load it. The details pane holds one key,
@@ -615,8 +625,10 @@ The work:
   grouped by origin, with a search. The new-agent screen and the profile of
   B use it. Its props: `skills`, `value` (the names that are on), and
   `onChange`.
-- Appearance, at `#appearance`. The theme of the person, as in the account
-  menu, and the theme of the deployment: the accent and the logo.
+- Appearance, at `#appearance`. The theme of the person only, as in the
+  account menu: Match the system, Light, or Graphite. The accent and the
+  logo belong to the deployment, and the page does not show or change
+  them there.
 
 ### 11.5 The shared files of the lead
 
