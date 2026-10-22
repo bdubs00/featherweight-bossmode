@@ -84,8 +84,8 @@
 .mark.s36 { width: 36px; height: 36px; }
 .mark.s40 { width: 40px; height: 40px; }
 .mark.s64 { width: 64px; height: 64px; }
-.mark.s72 { width: 72px; height: 72px; box-shadow: var(--e-selected); }
-.mark.s96 { width: 96px; height: 96px; box-shadow: var(--e-selected); }
+.mark.s72 { width: 72px; height: 72px; box-shadow: var(--e-row); }
+.mark.s96 { width: 96px; height: 96px; box-shadow: var(--e-row); }
 .mark-glyph {
   display: block;
 }
@@ -339,6 +339,7 @@ select.recess {
 /* ---------- GrooveBand: the one ornament ---------- */
 .groove {
   flex: none;
+  box-sizing: content-box;
   height: var(--groove);
   border-bottom: 1px solid var(--line);
   background: repeating-linear-gradient(to bottom, var(--line) 0 1px, var(--paper) 1px 4px);
@@ -370,6 +371,7 @@ select.recess {
 }
 .pane-actions {
   display: flex;
+  align-self: stretch;
   align-items: center;
   gap: var(--s-2);
   margin-left: auto;
@@ -476,6 +478,13 @@ select.recess {
 .tab:focus-visible {
   outline-offset: -2px;
 }
+/* The count of a tab is a small chip, 18 pixels, beside its word. */
+.tab .chip {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  line-height: 16px;
+}
 
 /* ---------- ReactionChip ---------- */
 .rchip {
@@ -483,7 +492,7 @@ select.recess {
   display: inline-flex;
   align-items: center;
   gap: var(--s-1);
-  height: 22px;
+  height: 24px;
   padding: 0 7px;
   border: 1px solid var(--line);
   border-radius: var(--r);

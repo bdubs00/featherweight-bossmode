@@ -20,7 +20,7 @@
 }
 .people-title {
   font-size: var(--t-meta);
-  line-height: var(--t-meta-lh);
+  line-height: var(--t-body-lh);
   font-weight: 700;
   color: var(--ink);
   text-decoration: none;
@@ -34,7 +34,7 @@ a.people-title:hover {
 .people-count {
   flex: none;
   font-size: var(--t-caption);
-  line-height: var(--t-caption-lh);
+  line-height: var(--t-body-lh);
   font-weight: 700;
   color: var(--muted);
 }
@@ -59,7 +59,7 @@ a.people-title:hover {
 .person.sel {
   background: var(--raised);
   border-color: var(--raised-line);
-  box-shadow: var(--e-selected);
+  box-shadow: var(--e-row);
 }
 .person:focus-visible {
   outline-offset: -2px;
@@ -85,7 +85,7 @@ a.people-title:hover {
 }
 .person-task {
   font-size: var(--t-meta);
-  line-height: var(--t-meta-lh);
+  line-height: var(--t-body-lh);
   color: var(--muted);
 }
 .person .status {
@@ -207,7 +207,7 @@ a.people-title:hover {
   align-items: center;
   justify-content: center;
   gap: var(--s-2);
-  padding: var(--s-1) var(--s-5);
+  padding: 6px var(--s-5);
   font-size: var(--t-meta);
   line-height: var(--t-meta-lh);
   color: var(--muted);
@@ -508,7 +508,7 @@ a.people-title:hover {
 }
 .prof-tagline {
   font-size: var(--t-meta);
-  line-height: var(--t-meta-lh);
+  line-height: var(--t-body-lh);
   color: var(--muted);
 }
 .prof-chips {
@@ -518,6 +518,10 @@ a.people-title:hover {
   margin: 0;
   padding: 0;
   list-style: none;
+}
+.prof-chips .chip {
+  height: 26px;
+  line-height: 24px;
 }
 .prof-tool {
   font-weight: 600;
@@ -598,7 +602,7 @@ a.people-title:hover {
   color: var(--muted);
 }
 .keep-label .input {
-  width: 64px;
+  width: 56px;
   min-height: var(--h-small);
   height: var(--h-small);
   padding: 0 var(--s-2);
@@ -675,7 +679,7 @@ a.people-title:hover {
 }
 .inbox-row.sel {
   border-color: var(--raised-line);
-  box-shadow: var(--e-selected);
+  box-shadow: var(--e-row);
 }
 .inbox-row.sel:not(.need) {
   background: var(--raised);

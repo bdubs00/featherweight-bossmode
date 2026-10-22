@@ -34,9 +34,11 @@ export function register({ on, refuse, readJson, publish, S, now, AGENTS, FLEET 
     if (r) r.member = member;
   }
 
-  // A direct exchange with migrator-1 at the end of the first channel: a
-  // question of alice to the seat, its answer, a quiet step of its run, its
-  // report with a heart, and the next task.
+  // A direct exchange with migrator-1 in the first channel: a question of
+  // alice to the seat, its answer, a quiet step of its run, its report with
+  // a heart, and the next task. It comes before the last quarter hour of
+  // the channel, as the artboards draw it, and the channel keeps the order
+  // of the clock.
   const ch = S.channels.get('br-puppet');
   const items = S.transcripts.get('run-migrator-1');
   const run = S.runs.get('run-migrator-1');
@@ -49,14 +51,27 @@ export function register({ on, refuse, readJson, publish, S, now, AGENTS, FLEET 
       ch.push(e);
       return e;
     };
-    const q = add(30, alice, 'How far is cron? The bridge wants it before nginx lands.', { to: ['migrator-1'] });
-    add(29, m1, 'The role is written and lints clean. Two things are left: the handler for the cron service, and the molecule scenario. About twenty minutes.', { replyTo: q.seq });
+    const before = ch.length;
+    const q = add(31, alice, 'How far is cron? The bridge wants it before nginx lands.', { to: ['migrator-1'] });
+    add(30, m1, 'The role is written and lints clean. Two things are left: the handler for the cron service, and the molecule scenario. About twenty minutes.', { replyTo: q.seq });
     const seq = items[items.length - 1].seq + 1;
-    items.push({ seq, time: ago(12), kind: 'tool', tool: 'bash', callId: 'c9', input: { command: 'ansible-lint roles/cron' } });
-    items.push({ seq: seq + 1, time: ago(12), kind: 'result', tool: 'bash', callId: 'c9', text: 'Passed.' });
+    items.push({ seq, time: ago(22), kind: 'tool', tool: 'bash', callId: 'c9', input: { command: 'ansible-lint roles/cron' } });
+    items.push({ seq: seq + 1, time: ago(22), kind: 'result', tool: 'bash', callId: 'c9', text: 'Passed.' });
     run.seq = seq + 1;
-    add(6, m1, 'Cron is done: handler added, molecule converges twice without a change. Notes are on the wiki at [modules/cron.md](modules/cron.md). I move to logrotate unless you want something else first.', { reactions: { up: [], down: [], heart: ['alice@example.com'] } });
-    add(4, alice, 'Go ahead with logrotate. Keep the template names as they are in the manifest.', { to: ['migrator-1'] });
+    add(20, m1, 'Cron is done: handler added, molecule converges twice without a change. Notes are on the wiki at [modules/cron.md](modules/cron.md). I move to logrotate unless you want something else first.', { reactions: { up: [], down: [], heart: ['alice@example.com'] } });
+    add(18, alice, 'Go ahead with logrotate. Keep the template names as they are in the manifest.', { to: ['migrator-1'] });
+    // The order of the clock, with each reply moved with its entry.
+    const old = new Map(ch.map((e) => [e, e.seq]));
+    ch.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : old.get(a) - old.get(b)));
+    const seqOf = new Map();
+    ch.forEach((e, i) => seqOf.set(old.get(e), i + 1));
+    ch.forEach((e, i) => {
+      e.seq = i + 1;
+      if (e.replyTo != null) e.replyTo = seqOf.get(e.replyTo) || null;
+    });
+    // A read mark at the end of the channel stays at its end.
+    const key = 'br-puppet|alice@example.com';
+    if (S.reads.get(key) === before) S.reads.set(key, ch.length);
   }
 
   const poolOf = (name) => FLEET.pools.find((p) => p.name === name) || FLEET.pools.find((p) => poolName(p.agent) === name);

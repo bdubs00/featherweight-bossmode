@@ -24,6 +24,7 @@
   --raised: #dcdcd6;
   --raised-line: #c4c4bc;
   --sheen: #ffffff;
+  --sheen-row: #ecece7;
   --key: #f3f3ef;
   --edge: #000000;
   --drop: #000000;
@@ -101,6 +102,7 @@
   --e-recess: inset 0 1px 2px rgba(0, 0, 0, 0.14);
   --e-overlay: 0 2px 0 var(--drop), 0 12px 24px rgba(0, 0, 0, 0.14);
   --e-selected: inset 0 1px 0 var(--sheen);
+  --e-row: inset 0 1px 0 var(--sheen-row);
   --led-ring: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
 
   /* Motion. Three things move, and reduced motion stops all three. */
@@ -128,6 +130,7 @@
     --raised: #44443f;
     --raised-line: #55554f;
     --sheen: #55554f;
+    --sheen-row: #44443f;
     --key: #44443f;
     --edge: #1a1a18;
     --drop: #000000;
@@ -153,7 +156,8 @@
     --e-chip: 0 1px 0 #000000;
     --e-recess: inset 0 1px 2px rgba(0, 0, 0, 0.4);
     --e-overlay: 0 2px 0 var(--drop), 0 12px 24px rgba(0, 0, 0, 0.4);
-    --e-selected: inset 0 1px 0 var(--sheen);
+    --e-selected: inset 0 1px 0 var(--raised);
+    --e-row: inset 0 1px 0 var(--sheen-row);
   }
 }
 
@@ -172,6 +176,7 @@
   --raised: #44443f;
   --raised-line: #55554f;
   --sheen: #55554f;
+  --sheen-row: #44443f;
   --key: #44443f;
   --edge: #1a1a18;
   --drop: #000000;
@@ -197,5 +202,6 @@
   --e-chip: 0 1px 0 #000000;
   --e-recess: inset 0 1px 2px rgba(0, 0, 0, 0.4);
   --e-overlay: 0 2px 0 var(--drop), 0 12px 24px rgba(0, 0, 0, 0.4);
-  --e-selected: inset 0 1px 0 var(--sheen);
+  --e-selected: inset 0 1px 0 var(--raised);
+  --e-row: inset 0 1px 0 var(--sheen-row);
 }

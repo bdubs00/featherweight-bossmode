@@ -13,7 +13,7 @@ import { loadSkills } from '../state/actions';
 import { previewOf, type Preview } from '../lib/catalog';
 import { go, parseRoute } from '../lib/route';
 import { Markdown } from './common';
-import { Button, Chip, Field, IconButton, Input, Led, PaneHeader, Tabs, TextArea } from './primitives';
+import { Button, Chip, Field, Help, IconButton, Input, Led, PaneHeader, Tabs, TextArea } from './primitives';
 
 /* ---------- open and closed ---------- */
 
@@ -90,11 +90,11 @@ function PreviewView({ p, busy, conflict, onInstall, onCancel }: { p: Preview; b
   const replaces = !!(p.exists && p.exists.replaceable);
   return (
     <section class="preview" aria-labelledby="preview-name">
-      <p class="preview-why">An installed skill is instructions for every agent of a profile that allows it.</p>
       <div class="preview-head">
         <h2 id="preview-name" class="t-heading">
           {p.name || 'SKILL.md'}
         </h2>
+        <Help label="What an install does">An installed skill is instructions for every agent of a profile that allows it.</Help>
         {replaces && <Led tone="grey" word={'replaces ' + p.name} />}
       </div>
       {p.description && <p class="preview-lede">{p.description}</p>}

@@ -89,7 +89,7 @@ button.group-head > .clip {
 .wrow.sel {
   background: var(--raised);
   border-color: var(--raised-line);
-  box-shadow: var(--e-selected);
+  box-shadow: var(--e-row);
 }
 .wrow .meta,
 .vrow .meta {
@@ -531,9 +531,6 @@ code.slash {
   margin-top: var(--s-5);
   padding-top: var(--s-4);
   border-top: 1px solid var(--line);
-}
-.preview-why {
-  color: var(--muted);
 }
 .preview-head {
   display: flex;

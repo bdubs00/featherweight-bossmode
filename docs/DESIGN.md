@@ -103,6 +103,7 @@ Derived values, each with one job:
 | `--raised` | A selected row, a mark well, inline code | `#DCDCD6` | `#44443F` |
 | `--raised-line` | The edge of a selected row and of a mark | `#C4C4BC` | `#55554F` |
 | `--sheen` | The light top line of a raised surface | `#FFFFFF` | `#55554F` |
+| `--sheen-row` | The top line of a selected row and of a large mark well | `#ECECE7` | `#44443F`, which the row hides |
 | `--key` | The ground of a secondary key | `#F3F3EF` | `#44443F` |
 | `--edge` | The hard edge of a key or a card | `#000000` | `#1A1A18` |
 | `--drop` | The hard drop under a key or a card | `#000000` | `#000000` |
@@ -216,7 +217,8 @@ The page has four levels, and three of them use no blur.
 | `--e-chip` | `0 1px 0 var(--line)` | `0 1px 0 #000` | A reaction chip |
 | `--e-recess` | `inset 0 1px 2px rgba(0,0,0,.14)` | `inset 0 1px 2px rgba(0,0,0,.4)` | Inputs, the composer, command blocks |
 | `--e-overlay` | `0 2px 0 var(--drop), 0 12px 24px rgba(0,0,0,.14)` | `... rgba(0,0,0,.4)` | Menus, the picker, dialogs: the only soft shadow |
-| `--e-selected` | `inset 0 1px 0 var(--sheen)` | same | A selected row, the active place of the app bar |
+| `--e-selected` | `inset 0 1px 0 var(--sheen)` | `inset 0 1px 0 var(--raised)` | The active place of the app bar, a picked choice |
+| `--e-row` | `inset 0 1px 0 var(--sheen-row)` | same | A selected row, the well of a mark at 72 and 96 |
 
 A pressed key drops its offset: it moves down by its drop, and the drop goes
 to zero.

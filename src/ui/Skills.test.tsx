@@ -191,7 +191,9 @@ describe('Add skill', () => {
     await settle();
     expect(api.calls.find((c) => c.path === '/v1/bossmode/skills/preview')!.body).toEqual({ text: '---\nname: ansible-style\n---\n' });
     const pv = el.querySelector('.preview')!;
-    expect(pv.querySelector('.preview-why')!.textContent).toBe('An installed skill is instructions for every agent of a profile that allows it.');
+    // The one sentence about what an install does sits behind its question mark.
+    click(pv.querySelector('.help-key'));
+    expect(pv.querySelector('[role="note"]')!.textContent).toBe('An installed skill is instructions for every agent of a profile that allows it.');
     expect([...pv.querySelectorAll('.fm li')].map((x) => x.textContent)).toEqual(['licenseMIT', 'allowed-toolsbash, files']);
     expect(pv.querySelector('.preview-body h1')!.textContent).toBe('Ansible style');
     expect([...pv.querySelectorAll('.file-list li')].map((x) => x.textContent)).toEqual(['SKILL.md230 B', 'scripts/lint.sh2.0 KB']);
