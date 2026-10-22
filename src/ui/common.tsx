@@ -1,59 +1,35 @@
 // The small parts that every screen uses: faces, lights, Markdown, times,
-// menus, and the confirmation dialog of the page.
+// menus, and the confirmation dialog of the page. Face, Avatar, and Light
+// draw the primitives of src/ui/primitives under the names of the screens.
 
 import type { ComponentChildren, JSX } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { useFace } from '../lib/faces';
 import { renderInline, renderMarkdown } from '../lib/markdown';
 import type { Light as LightT } from '../lib/presence';
-import { useSelect } from '../state/store';
-import { clock, dayWords, personName } from '../lib/words';
-import { Icon } from './icons';
+import { clock, dayWords } from '../lib/words';
+import { Glyph } from './icons';
+import { Avatar as PersonAvatar, GrooveBand, Led, Mark, buttonClass, type MarkSize } from './primitives';
 
-export type Size = 16 | 20 | 24 | 32 | 40 | 64 | 96;
+export type Size = 16 | 20 | 24 | 32 | 36 | 40 | 64 | 72 | 96;
 
-/** Face shows the face of an agent: the SVG of the API as a blob URL, else its initial. */
+/**
+ * Face shows the face of an agent: the mark that the page draws from the
+ * name, or the custom picture of the API. It is the Mark primitive under
+ * the name that the screens use.
+ */
 export function Face({ agent, size = 32 }: { agent: string; size?: Size }) {
-  const hash = useSelect((s) => (s.faces[agent] ? s.faces[agent].hash : ''));
-  const url = useFace(agent, hash);
-  return (
-    <span class={'face s' + size} aria-hidden="true">
-      {url ? <img src={url} alt="" draggable={false} /> : <span class="initial">{(agent || '?').slice(0, 1).toUpperCase()}</span>}
-    </span>
-  );
+  return <Mark agent={agent} size={(size === 16 ? 20 : size) as MarkSize} />;
 }
 
-/** hueOf picks one of eight calm hues from a name, for the avatar of a person. */
-function hueOf(name: string): number {
-  let h = 2166136261;
-  for (const ch of name) h = Math.imul(h ^ (ch.codePointAt(0) || 0), 16777619) >>> 0;
-  return h % 8;
-}
-
-/** Avatar shows a person as initials on a calm color. A person has no face in the API. */
+/** Avatar shows a person as initials on an ink square. A person has no face in the API. */
 export function Avatar({ subject, display, size = 32 }: { subject: string; display?: string; size?: Size }) {
-  const name = personName(subject, display);
-  const initials = name
-    .split(/[\s._-]+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0].toUpperCase())
-    .join('');
-  return (
-    <span class={'face person s' + size + ' hue' + hueOf(subject || name)} aria-hidden="true">
-      <span class="initial">{initials || '?'}</span>
-    </span>
-  );
+  const s = size <= 20 ? 20 : size <= 24 ? 24 : size <= 32 ? 32 : 36;
+  return <PersonAvatar subject={subject} display={display} size={s} />;
 }
 
-/** Light shows a status: its icon in its color, and its word. */
+/** Light shows a status: its light and its word. With short, the word stays for a screen reader and a tooltip. */
 export function Light({ light, short }: { light: LightT; short?: boolean }) {
-  return (
-    <span class={'light ' + light.tone + (light.struck ? ' struck' : '')} title={light.label}>
-      <Icon name={light.icon} />
-      <span class={short ? 'w sr' : 'w'}>{light.word}</span>
-    </span>
-  );
+  return <Led tone={light.tone} word={light.word} struck={light.struck} quiet={short} label={light.label} />;
 }
 
 /** Markdown shows a text of an agent or of the wiki, sanitized. */
@@ -127,15 +103,18 @@ export function Confirm(props: {
         }
       }}
     >
-      <h2 id="confirm-title">{props.title}</h2>
-      {props.children}
-      <div class="do">
-        <button type="button" class="btn" data-cancel onClick={props.onCancel}>
-          Cancel
-        </button>
-        <button type="button" class={'btn ' + (props.danger ? 'danger-fill' : 'primary')} disabled={props.busy} onClick={props.onConfirm}>
-          {props.confirm}
-        </button>
+      <GrooveBand on="card" />
+      <div class="confirm-body">
+        <h2 id="confirm-title">{props.title}</h2>
+        {props.children}
+        <div class="do">
+          <button type="button" class={buttonClass('secondary')} data-cancel onClick={props.onCancel}>
+            Cancel
+          </button>
+          <button type="button" class={buttonClass(props.danger ? 'danger' : 'primary')} disabled={props.busy} onClick={props.onConfirm}>
+            {props.confirm}
+          </button>
+        </div>
       </div>
     </dialog>
   );
@@ -192,8 +171,8 @@ export function Menu({ label, items, icon = 'more', class: cls }: { label: strin
   };
   return (
     <span class={'pop' + (cls ? ' ' + cls : '')}>
-      <button ref={btn} type="button" class="icon-btn" aria-label={label} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
-        <Icon name={icon} />
+      <button ref={btn} type="button" class={buttonClass('quiet', 's', 'key-icon')} aria-label={label} title={label} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <Glyph name={icon} size={18} />
       </button>
       {open && (
         <div ref={list} class="menu" role="menu" aria-label={label} onKeyDown={onKey}>
@@ -218,19 +197,23 @@ export function Menu({ label, items, icon = 'more', class: cls }: { label: strin
 }
 
 /**
- * Back is the link to the column before. With narrow set, it shows only in
- * a narrow window, where that column is out of sight.
+ * Back is the link to the column before. With narrow set, it shows only
+ * where that column is out of sight. Without narrow, it always shows. The
+ * screens of the next stage use the back of PaneHeader instead.
  */
 export function Back({ label, href, narrow }: { label: string; href: string; narrow?: boolean }) {
   return (
-    <a class={'back' + (narrow ? ' narrow-only' : '')} href={href}>
-      <Icon name="back" />
-      <span>{label}</span>
+    <a class={'back ' + (narrow ? 'to-list' : 'always')} href={href} aria-label={'Back to ' + label} title={'Back to ' + label}>
+      <Glyph name="back" size={20} />
     </a>
   );
 }
 
-/** Empty is the quiet text of a place with nothing in it. */
+/** Empty is the text of a place with nothing in it, with the key that fills it when there is one. */
 export function Empty({ children }: { children: ComponentChildren }) {
-  return <p class="empty">{children}</p>;
+  return (
+    <div class="empty">
+      <p>{children}</p>
+    </div>
+  );
 }

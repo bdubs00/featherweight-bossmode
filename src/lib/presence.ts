@@ -1,43 +1,54 @@
-// The presence of a member: its light, its word, and its icon, from the
-// table of section 6.5 of the plan. Color is never the only signal, so each
-// presence has a word and an icon of its own shape.
+// The presence of a member: its light and its word, from the table of
+// section 6.5 of the plan. Color is never the only signal: each status has
+// a word, and the light only repeats it. Two statuses of one color differ in
+// their word, and a fired seat shows its word struck through.
 
 import type { Presence, Run, RunState } from '../api/types';
 
-/** The tone of a light. Each tone is a color variable of the page. */
-export type Tone = 'ok' | 'need' | 'quiet' | 'bad' | 'tint';
-
-/** The icons of the statuses. ui/icons.tsx draws each one. */
-export type StatusIcon = 'play' | 'hand' | 'ring' | 'moon' | 'cross' | 'slash' | 'hourglass' | 'check' | 'stop' | 'dot';
+/** The color of a status light. tokens.css holds each one as --led-<tone>. */
+export type Tone = 'green' | 'amber' | 'red' | 'grey';
 
 export interface Light {
   /** The word beside the light. */
   word: string;
   tone: Tone;
-  icon: StatusIcon;
-  /** True when the handle shows struck through. */
+  /** True when the word shows struck through. */
   struck?: boolean;
-  /** A sentence for a screen reader and a tooltip. */
+  /** A sentence for a tooltip and a screen reader. */
   label: string;
 }
 
 export const PRESENCE: Record<Presence, Light> = {
-  working: { word: 'working', tone: 'ok', icon: 'play', label: 'Works on its task now.' },
-  'needs-you': { word: 'needs you', tone: 'need', icon: 'hand', label: 'Waits for an approval, an answer, or a connection.' },
-  idle: { word: 'idle', tone: 'quiet', icon: 'ring', label: 'Finished its turn. Its Task is live.' },
-  asleep: { word: 'asleep', tone: 'quiet', icon: 'moon', label: 'Its Task sleeps. A message wakes it.' },
-  error: { word: 'error', tone: 'bad', icon: 'cross', label: 'Its newest run failed, or its Task stopped.' },
-  fired: { word: 'fired', tone: 'quiet', icon: 'slash', struck: true, label: 'Its seat is fired. It gets no message.' },
+  working: { word: 'working', tone: 'green', label: 'Works on its task now.' },
+  'needs-you': { word: 'needs you', tone: 'amber', label: 'Waits for your approval, your answer, or a connection.' },
+  idle: { word: 'idle', tone: 'grey', label: 'Finished its turn. A message starts the next one.' },
+  asleep: { word: 'asleep', tone: 'grey', label: 'Its worker sleeps. A message wakes it.' },
+  error: { word: 'error', tone: 'red', label: 'Its newest run failed, or its worker stopped.' },
+  fired: { word: 'fired', tone: 'grey', struck: true, label: 'Fired. It gets no message.' },
 };
 
-/** presenceOf returns the light of a presence. An unknown word shows as it is. */
+/** The status of a seat whose run waits in the queue for a free worker. */
+export const WAITING: Light = { word: 'waiting for a worker', tone: 'grey', label: 'Every worker of its agent is busy. It starts when one is free.' };
+
+/** presenceOf returns the light of a presence. An unknown word shows as it is, in grey. */
 export function presenceOf(p: string | undefined | null): Light {
   if (p && Object.prototype.hasOwnProperty.call(PRESENCE, p)) return PRESENCE[p as Presence];
   const word = p ? String(p).replace(/-/g, ' ') : 'unknown';
-  return { word, tone: 'quiet', icon: 'dot', label: 'The workbench reports ' + word + '.' };
+  return { word, tone: 'grey', label: 'The workbench reports ' + word + '.' };
 }
 
-/** The phases of an ax Task, as the pools report them. */
+/**
+ * seatLight is the light of a seat on a roster. A seat that the workbench
+ * calls working while its newest run still waits in the queue shows
+ * "waiting for a worker", so the operator sees capacity where seating
+ * happens.
+ */
+export function seatLight(presence: string | undefined | null, runState?: string): Light {
+  if (presence === 'working' && runState === 'queued') return WAITING;
+  return presenceOf(presence);
+}
+
+/** The phases of an ax Task, as the fleet view reports them. */
 export type TaskPhase = 'Pending' | 'Running' | 'Suspended' | 'Failed' | 'Terminating' | string;
 
 /**
@@ -56,40 +67,41 @@ export function derivePresence(m: { fired?: boolean; run?: Pick<Run, 'state'> | 
   return 'idle';
 }
 
-/** phaseOf returns the light of a Task phase, for the Fleet place. */
+/** phaseOf returns the light of a worker from the phase of its Task. */
 export function phaseOf(phase: string): Light {
   switch (phase) {
     case 'Running':
-      return { word: 'running', tone: 'ok', icon: 'play', label: 'The Task is up.' };
+      return { word: 'awake', tone: 'green', label: 'The worker is up.' };
     case 'Suspended':
-      return { word: 'asleep', tone: 'quiet', icon: 'moon', label: 'The Task sleeps. A request wakes it.' };
+      return { word: 'asleep', tone: 'grey', label: 'The worker sleeps. A request wakes it.' };
     case 'Pending':
-      return { word: 'starting', tone: 'tint', icon: 'hourglass', label: 'The Task starts.' };
+      return { word: 'starting', tone: 'grey', label: 'The worker starts.' };
     case 'Failed':
-      return { word: 'failed', tone: 'bad', icon: 'cross', label: 'The Task failed.' };
+      return { word: 'failed', tone: 'red', label: 'The worker failed.' };
     case 'Terminating':
-      return { word: 'stopping', tone: 'quiet', icon: 'stop', label: 'The Task stops.' };
+      return { word: 'stopping', tone: 'grey', label: 'The worker stops.' };
   }
-  return { word: phase ? phase.toLowerCase() : 'unknown', tone: 'quiet', icon: 'dot', label: 'The Task reports ' + (phase || 'nothing') + '.' };
+  return { word: phase ? phase.toLowerCase() : 'unknown', tone: 'grey', label: 'The worker reports ' + (phase || 'nothing') + '.' };
 }
 
-/** The status word of a run, as the shared views of /ui name it. */
+/** The status of a run, in the words of the page. */
 export function runStatus(r: Pick<Run, 'state' | 'output'>): Light {
   switch (r.state) {
     case 'input-required':
-      return { word: 'needs you', tone: 'need', icon: 'hand', label: 'Waits for an approval or an answer.' };
+      return { word: 'needs you', tone: 'amber', label: 'Waits for your approval or your answer.' };
     case 'queued':
+      return { word: 'waiting for a worker', tone: 'grey', label: 'Waits in the queue for a free worker.' };
     case 'running':
     case 'suspended':
-      return { word: 'working', tone: 'tint', icon: 'play', label: 'Is queued, running, or paused.' };
+      return { word: 'working', tone: 'green', label: 'Runs, or pauses between two steps.' };
     case 'completed':
       return r.output
-        ? { word: 'ready', tone: 'ok', icon: 'check', label: 'Completed with an answer to review.' }
-        : { word: 'ended', tone: 'quiet', icon: 'ring', label: 'Completed with no answer.' };
+        ? { word: 'ready', tone: 'grey', label: 'Finished with an answer to review.' }
+        : { word: 'ended', tone: 'grey', label: 'Finished with no answer.' };
     case 'failed':
-      return { word: 'failed', tone: 'bad', icon: 'cross', label: 'Stopped with an error.' };
+      return { word: 'failed', tone: 'red', label: 'Stopped with an error.' };
     case 'canceled':
-      return { word: 'canceled', tone: 'quiet', icon: 'stop', label: 'Stopped by a person.' };
+      return { word: 'stopped', tone: 'grey', label: 'A person stopped it.' };
   }
   return presenceOf(r.state);
 }

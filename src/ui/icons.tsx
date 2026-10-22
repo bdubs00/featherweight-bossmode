@@ -1,5 +1,8 @@
 // The icons of the page. Each one is a small SVG of this code, never of the
 // API. An icon is decoration beside a word, so a screen reader skips it.
+// Icon draws the 16-pixel set of the old screens. Glyph draws the 24-unit
+// set of the shell and the primitives: the places of the app bar, the
+// reactions, and the small controls, with a stroke of 1.8 in currentColor.
 
 import type { JSX } from 'preact';
 
@@ -51,6 +54,41 @@ export function Icon({ name, class: cls }: { name: IconName; class?: string }) {
   return (
     <svg class={'ic' + (cls ? ' ' + cls : '')} viewBox="0 0 16 16" aria-hidden="true" focusable="false">
       {P[name]}
+    </svg>
+  );
+}
+
+export type GlyphName =
+  | 'activity' | 'bridges' | 'fleet' | 'skills' | 'wiki' | 'manager' | 'logo' | 'thumb-up' | 'thumb-down' | 'heart'
+  | 'search' | 'close' | 'more' | 'plus' | 'back' | 'reply' | 'question' | 'check' | 'gear';
+
+const G: Record<GlyphName, JSX.Element> = {
+  activity: <><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10 21h4" /></>,
+  bridges: <><circle cx="7" cy="6" r="3" /><circle cx="17" cy="6" r="3" /><path d="M2 20v-1a5 5 0 0 1 5-5a5 5 0 0 1 5 5v1" /><path d="M12 20v-1a5 5 0 0 1 5-5a5 5 0 0 1 5 5v1" /></>,
+  fleet: <><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></>,
+  skills: <><path d="M12 3l9 5-9 5-9-5z" /><path d="M3 12.5l9 5 9-5" /><path d="M3 17l9 5 9-5" /></>,
+  wiki: <><path d="M4 4h7a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H4z" /><path d="M20 4h-7a3 3 0 0 0-3 3v13a2 2 0 0 1 2-2h8z" /></>,
+  manager: <><circle cx="12" cy="8" r="4" /><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1" /></>,
+  logo: <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 16l5-5 4 4 3-3 6 6" /><circle cx="16" cy="8" r="1.5" /></>,
+  'thumb-up': <><path d="M7 11v9H3v-9z" /><path d="M7 11l4-8a2 2 0 0 1 2 2v4h6a2 2 0 0 1 2 2l-1.5 8a2 2 0 0 1-2 2H7" /></>,
+  'thumb-down': <><path d="M7 13V4H3v9z" /><path d="M7 13l4 8a2 2 0 0 0 2-2v-4h6a2 2 0 0 0 2-2l-1.5-8a2 2 0 0 0-2-2H7" /></>,
+  heart: <path d="M12 21s-7-4.6-9.5-9A5.5 5.5 0 0 1 12 6a5.5 5.5 0 0 1 9.5 6c-2.5 4.4-9.5 9-9.5 9z" />,
+  search: <><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></>,
+  close: <path d="M5 5l14 14M19 5L5 19" />,
+  more: <g fill="currentColor" stroke="none"><circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" /></g>,
+  plus: <path d="M12 5v14M5 12h14" />,
+  back: <path d="M15 5l-7 7 7 7" />,
+  reply: <><path d="M10 6L4 12l6 6" /><path d="M4.5 12H14a6 6 0 0 1 6 6v1" /></>,
+  question: <><path d="M9.2 9a3 3 0 0 1 5.8 1c0 2-3 2.5-3 4.5" /><path d="M12 18.5v.1" /></>,
+  check: <path d="M4.5 12.5l5 5L19.5 7" />,
+  gear: <><circle cx="12" cy="12" r="3" /><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" /></>,
+};
+
+/** Glyph draws one icon of the 24-unit set, as decoration. */
+export function Glyph({ name, size = 22, class: cls }: { name: GlyphName; size?: number; class?: string }) {
+  return (
+    <svg class={'glyph' + (cls ? ' ' + cls : '')} width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      {G[name]}
     </svg>
   );
 }

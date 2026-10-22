@@ -1,27 +1,37 @@
 import { describe, expect, it } from 'vitest';
-import { PRESENCE, derivePresence, phaseOf, presenceOf, runStatus } from './presence';
+import { PRESENCE, WAITING, derivePresence, phaseOf, presenceOf, runStatus, seatLight } from './presence';
 
 describe('presence', () => {
-  it('maps each presence of the plan to a light, a word, and an icon', () => {
-    expect(presenceOf('working')).toMatchObject({ word: 'working', tone: 'ok', icon: 'play' });
-    expect(presenceOf('needs-you')).toMatchObject({ word: 'needs you', tone: 'need', icon: 'hand' });
-    expect(presenceOf('idle')).toMatchObject({ word: 'idle', tone: 'quiet', icon: 'ring' });
-    expect(presenceOf('asleep')).toMatchObject({ word: 'asleep', tone: 'quiet', icon: 'moon' });
-    expect(presenceOf('error')).toMatchObject({ word: 'error', tone: 'bad', icon: 'cross' });
-    expect(presenceOf('fired')).toMatchObject({ word: 'fired', tone: 'quiet', icon: 'slash', struck: true });
+  it('maps each presence of the plan to a light and a word', () => {
+    expect(presenceOf('working')).toMatchObject({ word: 'working', tone: 'green' });
+    expect(presenceOf('needs-you')).toMatchObject({ word: 'needs you', tone: 'amber' });
+    expect(presenceOf('idle')).toMatchObject({ word: 'idle', tone: 'grey' });
+    expect(presenceOf('asleep')).toMatchObject({ word: 'asleep', tone: 'grey' });
+    expect(presenceOf('error')).toMatchObject({ word: 'error', tone: 'red' });
+    expect(presenceOf('fired')).toMatchObject({ word: 'fired', tone: 'grey', struck: true });
   });
 
-  it('never leans on color alone: two presences of one tone differ in word and icon', () => {
+  it('never leans on color alone: each presence has a word of its own', () => {
     const all = Object.values(PRESENCE);
     expect(new Set(all.map((l) => l.word)).size).toBe(all.length);
-    expect(new Set(all.map((l) => l.icon)).size).toBe(all.length);
     for (const l of all) expect(l.label).toMatch(/\.$/);
   });
 
-  it('shows an unknown word as it is, with no color of its own', () => {
-    expect(presenceOf('on-break')).toMatchObject({ word: 'on break', tone: 'quiet', icon: 'dot' });
+  it('never says pool to an operator', () => {
+    const all = [...Object.values(PRESENCE), WAITING, ...['Running', 'Suspended', 'Pending', 'Failed', 'Terminating', 'X'].map(phaseOf)];
+    for (const l of all) expect(l.word + ' ' + l.label).not.toMatch(/pool/i);
+  });
+
+  it('shows an unknown word as it is, in grey', () => {
+    expect(presenceOf('on-break')).toMatchObject({ word: 'on break', tone: 'grey' });
     expect(presenceOf(undefined).word).toBe('unknown');
     expect(presenceOf('constructor').word).toBe('constructor');
+  });
+
+  it('says waiting for a worker for a working seat whose run is queued', () => {
+    expect(seatLight('working', 'queued')).toBe(WAITING);
+    expect(seatLight('working', 'running').word).toBe('working');
+    expect(seatLight('needs-you', 'queued').word).toBe('needs you');
   });
 
   it('derives the presence with the table of section 6.5', () => {
@@ -37,12 +47,14 @@ describe('presence', () => {
     expect(derivePresence({ run: { state: 'completed' }, blocked: true })).toBe('error');
   });
 
-  it('words the phases of a Task and the status of a run', () => {
-    expect(phaseOf('Suspended')).toMatchObject({ word: 'asleep', icon: 'moon' });
-    expect(phaseOf('Failed').tone).toBe('bad');
+  it('words the phases of a worker and the status of a run', () => {
+    expect(phaseOf('Running')).toMatchObject({ word: 'awake', tone: 'green' });
+    expect(phaseOf('Suspended')).toMatchObject({ word: 'asleep', tone: 'grey' });
+    expect(phaseOf('Failed').tone).toBe('red');
     expect(phaseOf('Odd').word).toBe('odd');
     expect(runStatus({ state: 'completed', output: 'done' }).word).toBe('ready');
     expect(runStatus({ state: 'completed', output: '' }).word).toBe('ended');
-    expect(runStatus({ state: 'input-required' }).word).toBe('needs you');
+    expect(runStatus({ state: 'input-required' })).toMatchObject({ word: 'needs you', tone: 'amber' });
+    expect(runStatus({ state: 'queued' }).word).toBe('waiting for a worker');
   });
 });

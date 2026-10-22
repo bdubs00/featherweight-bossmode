@@ -1,0 +1,697 @@
+/* The styles of the primitives in src/ui/primitives. docs/DESIGN.md,
+   section 6, names each one and its states. */
+
+/* ---------- Led: a status light and its word ---------- */
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+  min-width: 0;
+}
+.status-word {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.status.tone-green {
+  color: var(--word-green);
+}
+.status.tone-amber {
+  color: var(--word-amber);
+}
+.status.tone-red {
+  color: var(--word-red);
+}
+.status.struck .status-word {
+  text-decoration: line-through;
+}
+.led {
+  display: inline-block;
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: var(--r-led);
+  box-shadow: var(--led-ring);
+  background: var(--led-grey);
+}
+.led-l {
+  width: 11px;
+  height: 11px;
+}
+.led-green {
+  background: var(--led-green);
+  box-shadow: 0 0 5px var(--led-green), var(--led-ring);
+}
+.led-amber {
+  background: var(--led-amber);
+  box-shadow: 0 0 5px var(--led-amber), var(--led-ring);
+}
+.led-red {
+  background: var(--led-red);
+  box-shadow: 0 0 5px var(--led-red), var(--led-ring);
+}
+.led-grey {
+  background: var(--led-grey);
+}
+
+/* ---------- Mark: the face of an agent ---------- */
+.mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  border-radius: var(--r);
+  background: var(--raised);
+  border: 1px solid var(--raised-line);
+  overflow: hidden;
+}
+.mark.sel {
+  background: var(--paper);
+}
+.mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.mark.s20 { width: 20px; height: 20px; }
+.mark.s24 { width: 24px; height: 24px; }
+.mark.s32 { width: 32px; height: 32px; }
+.mark.s36 { width: 36px; height: 36px; }
+.mark.s40 { width: 40px; height: 40px; }
+.mark.s64 { width: 64px; height: 64px; }
+.mark.s72 { width: 72px; height: 72px; box-shadow: var(--e-selected); }
+.mark.s96 { width: 96px; height: 96px; box-shadow: var(--e-selected); }
+.mark-glyph {
+  display: block;
+}
+.hue-0 { fill: var(--mark-0); }
+.hue-1 { fill: var(--mark-1); }
+.hue-2 { fill: var(--mark-2); }
+.hue-3 { fill: var(--mark-3); }
+.hue-4 { fill: var(--mark-4); }
+.hue-5 { fill: var(--mark-5); }
+.hue-6 { fill: var(--mark-6); }
+.hue-7 { fill: var(--mark-7); }
+.hue-ink { fill: var(--ink); }
+/* The halo of a status, in the header of a member conversation. */
+.mark.halo-green { box-shadow: 0 0 10px 1px color-mix(in srgb, var(--led-green) 22%, transparent); }
+.mark.halo-amber { box-shadow: 0 0 10px 1px color-mix(in srgb, var(--led-amber) 30%, transparent); }
+.mark.halo-red { box-shadow: 0 0 10px 1px color-mix(in srgb, var(--led-red) 22%, transparent); }
+.mark.halo-grey { box-shadow: none; }
+
+/* ---------- Avatar: a person ---------- */
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  border-radius: var(--r);
+  background: var(--ink);
+  color: var(--on-ink);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.avatar.s20 { width: 20px; height: 20px; font-size: 9px; }
+.avatar.s24 { width: 24px; height: 24px; font-size: 10px; }
+.avatar.s32 { width: 32px; height: 32px; font-size: 12px; }
+.avatar.s36 { width: 36px; height: 36px; font-size: 13px; }
+
+/* ---------- Chip: a count on a heading line ---------- */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: none;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: var(--r);
+  font-size: var(--t-caption);
+  line-height: 20px;
+  font-weight: 700;
+  font-stretch: 100%;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+.chip-plain {
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+.chip-ink {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  background: var(--ink);
+  color: var(--on-ink);
+}
+.chip-amber {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 11px;
+  background: var(--led-amber);
+  color: #000000;
+}
+.chip .status {
+  font-size: var(--t-caption);
+  font-weight: 700;
+}
+
+/* ---------- Button: the keys ---------- */
+.key {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: none;
+  border-radius: var(--r);
+  border: 1px solid var(--edge);
+  background: var(--key);
+  color: var(--ink);
+  font-weight: 700;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: var(--e-key);
+  position: relative;
+}
+.key-m {
+  min-height: var(--h-control);
+  padding: 0 14px;
+  font-size: 14px;
+}
+.key-s {
+  min-height: var(--h-small);
+  padding: 0 12px;
+  font-size: 13px;
+}
+.key:hover {
+  background: var(--paper);
+}
+.key:active:not(:disabled) {
+  top: 1px;
+  box-shadow: none;
+}
+.key-primary {
+  border-color: #000000;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 800;
+  box-shadow: var(--e-primary);
+  top: -1px;
+}
+.key-primary.key-m {
+  padding: 0 16px;
+}
+.key-primary:hover {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.key-primary:active:not(:disabled) {
+  top: 1px;
+  box-shadow: none;
+}
+.key-danger {
+  color: var(--word-red);
+}
+.key-quiet {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  font-weight: 600;
+}
+.key-quiet:hover {
+  background: var(--raised);
+}
+.key-quiet:active:not(:disabled) {
+  top: 0;
+}
+.key-quiet[aria-pressed='true'],
+.key-quiet[aria-expanded='true'] {
+  background: var(--raised);
+}
+.key-icon {
+  padding: 0;
+  width: var(--h-small);
+}
+.key-icon.key-m {
+  width: var(--h-control);
+}
+.key:disabled,
+.key[aria-disabled='true'] {
+  cursor: default;
+  opacity: 0.45;
+  top: 0;
+  box-shadow: none;
+}
+.key-primary:disabled {
+  box-shadow: 0 1px 0 var(--drop);
+}
+
+/* ---------- Recess: what you type into ---------- */
+.recess {
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--recess);
+  box-shadow: var(--e-recess);
+  color: var(--ink);
+}
+.input,
+select.recess {
+  width: 100%;
+  min-height: var(--h-control);
+  padding: 0 10px;
+  font-size: 14px;
+}
+.textarea {
+  display: block;
+  width: 100%;
+  min-height: 88px;
+  padding: 8px 10px;
+  font-size: 14px;
+  line-height: 20px;
+  resize: vertical;
+}
+.recess::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+.recess:focus-visible,
+.recess:focus {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+.recess[aria-invalid='true'] {
+  border-color: var(--led-red);
+}
+.recess:disabled {
+  opacity: 0.6;
+}
+.command {
+  margin: 0;
+  padding: 10px 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 14em;
+  overflow: auto;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  min-width: 0;
+}
+.field-label {
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+  font-weight: 600;
+  color: var(--muted);
+}
+.field-error {
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+  font-weight: 600;
+  color: var(--word-red);
+}
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: var(--h-row);
+  padding: 10px 0;
+  cursor: pointer;
+}
+.check input {
+  margin: 2px 0 0;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  accent-color: var(--ink);
+}
+
+/* ---------- GrooveBand: the one ornament ---------- */
+.groove {
+  flex: none;
+  height: var(--groove);
+  border-bottom: 1px solid var(--line);
+  background: repeating-linear-gradient(to bottom, var(--line) 0 1px, var(--paper) 1px 4px);
+}
+.groove-card {
+  border-bottom-color: var(--line);
+  background: repeating-linear-gradient(to bottom, var(--line) 0 1px, var(--card-groove) 1px 4px);
+}
+
+/* ---------- PaneHeader ---------- */
+.pane-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  height: var(--h-header);
+  padding: 0 var(--s-4);
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+  min-width: 0;
+}
+.pane-head-title {
+  gap: var(--s-3);
+  padding: 0 var(--s-5);
+}
+.pane-head > h1,
+.pane-head > h2 {
+  min-width: 0;
+}
+.pane-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin-left: auto;
+  flex: none;
+}
+.pane-head .meta {
+  min-width: 0;
+  font-size: var(--t-meta);
+  color: var(--muted);
+}
+.back {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--h-small);
+  height: var(--h-small);
+  margin-left: -8px;
+  border-radius: var(--r);
+  color: var(--ink);
+}
+.back:hover {
+  background: var(--raised);
+}
+
+/* ---------- Card ---------- */
+.card {
+  max-width: 640px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r);
+  background: var(--card);
+  box-shadow: var(--e-card);
+  overflow: hidden;
+}
+.card.quiet {
+  border-color: var(--line);
+  box-shadow: none;
+}
+.card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding: var(--s-4);
+}
+.card-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.card-title h3 {
+  font-stretch: 106%;
+  overflow-wrap: anywhere;
+}
+.card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--s-2);
+  margin-top: var(--s-2);
+}
+
+/* ---------- Tabs ---------- */
+.tabs {
+  display: flex;
+  align-self: stretch;
+  gap: var(--s-5);
+  flex: none;
+}
+.tab {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0 0;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: none;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tab:hover {
+  color: var(--ink);
+}
+.tab.on {
+  color: var(--ink);
+  font-weight: 700;
+  border-bottom-color: var(--accent);
+}
+.tab:focus-visible {
+  outline-offset: -2px;
+}
+
+/* ---------- ReactionChip ---------- */
+.rchip {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  height: 22px;
+  padding: 0 7px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: var(--t-caption);
+  font-weight: 700;
+  box-shadow: var(--e-chip);
+  cursor: default;
+}
+button.rchip {
+  cursor: pointer;
+}
+button.rchip:hover {
+  border-color: var(--ink);
+}
+.rchip.mine {
+  border-color: var(--ink);
+}
+.glyph.heart {
+  fill: var(--accent);
+  stroke: var(--drop);
+  stroke-width: 1.5;
+}
+
+/* ---------- LogoWell ---------- */
+.logo-well {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--h-header);
+  border-bottom: 1px solid var(--line);
+  background: var(--chrome);
+  text-decoration: none;
+  color: var(--placeholder);
+}
+.logo-well .well {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px dashed var(--placeholder);
+  border-radius: var(--r);
+  background: var(--paper);
+  overflow: hidden;
+}
+.logo-well .well.has-logo {
+  border: 1px solid var(--line);
+}
+.logo-well img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* ---------- Help: a definition behind a question mark ---------- */
+.help {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+.help-key {
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.help-key[aria-expanded='true'],
+.help-key:hover {
+  border-color: var(--ink);
+}
+.help-pop {
+  position: absolute;
+  z-index: var(--z-menu);
+  top: calc(100% + 6px);
+  left: -8px;
+  width: max-content;
+  max-width: 260px;
+  padding: 10px 12px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r);
+  background: var(--card);
+  box-shadow: var(--e-overlay);
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+  font-weight: 400;
+  color: var(--ink);
+}
+
+/* ---------- Menus and dialogs: the floating layers ---------- */
+.pop {
+  position: relative;
+  flex: none;
+}
+.menu {
+  position: absolute;
+  z-index: var(--z-menu);
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 220px;
+  max-width: min(320px, 88vw);
+  padding: var(--s-1);
+  border: 1px solid var(--edge);
+  border-radius: var(--r);
+  background: var(--card);
+  box-shadow: var(--e-overlay);
+}
+.menu > button,
+.menu > a {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--r);
+  background: none;
+  color: var(--ink);
+  font-size: 14px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.menu > button:hover,
+.menu > button:focus-visible,
+.menu > a:hover,
+.menu > a:focus-visible {
+  background: var(--raised);
+  outline: none;
+}
+.menu .t {
+  font-weight: 600;
+}
+.menu .s {
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+  color: var(--muted);
+}
+.menu > .danger .t {
+  color: var(--word-red);
+}
+.menu-sep {
+  height: 1px;
+  margin: var(--s-1) 0;
+  background: var(--line-soft);
+}
+.menu-head {
+  padding: 8px 10px;
+}
+dialog.confirm {
+  width: min(460px, calc(100vw - 32px));
+  padding: 0;
+  border: 1px solid var(--edge);
+  border-radius: var(--r);
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: var(--e-overlay);
+  overflow: hidden;
+}
+dialog.confirm::backdrop {
+  background: rgba(0, 0, 0, 0.35);
+}
+dialog.confirm .confirm-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  padding: var(--s-4);
+}
+dialog.confirm h2 {
+  font-size: var(--t-heading);
+  line-height: var(--t-heading-lh);
+  font-weight: 800;
+  font-stretch: 108%;
+  letter-spacing: -0.02em;
+}
+dialog.confirm p {
+  color: var(--muted);
+}
+dialog.confirm .do {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--s-2);
+  margin-top: var(--s-2);
+}
+
+/* A target on a touch screen is at least 44 pixels. */
+@media (pointer: coarse) {
+  .key-m,
+  .key-s,
+  .menu > button,
+  .menu > a,
+  .tab,
+  .check {
+    min-height: var(--h-row);
+  }
+  .key-icon,
+  .key-icon.key-m,
+  .back {
+    width: var(--h-row);
+    height: var(--h-row);
+  }
+  .help-key {
+    width: var(--h-row);
+    height: var(--h-row);
+  }
+  .rchip {
+    height: var(--h-row);
+    padding: 0 12px;
+  }
+}
