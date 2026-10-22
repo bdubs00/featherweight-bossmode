@@ -711,13 +711,24 @@ Remove to an admin alone.
 
 | Route | Answer |
 |---|---|
-| `GET /v1/agents` | `{"agents": [<view>]}`: each agent with its profile, as `name`, `description`, `role`, `tools`, `skills`, and `policy`, among others. The profile shows the tools as chips and the rules that ask first as amber words. |
-| `GET /v1/agents/{name}` | One agent in the same shape. The picks of a new chat start from its `tools` and `skills`. An agent that the caller cannot view answers 404. |
+| `GET /v1/agents` | `{"agents": [<view>]}`: each profile of the front itself, as `name`, `description`, `role`, `tools`, `skills`, and `policy`, among others. The front lists no profile that the workers of a pool run. |
+| `GET /v1/agents/{name}` | One agent in the same shape. The profile shows its `tools` as chips and the rules that ask first as amber words, and the picks of a new chat start from its `tools` and `skills`. An agent that the caller cannot view answers 404. **New:** for an agent that a pool runs, the front answers the profile that the workers of the pool run, as the tool `agent_get` does, with `pool` and with no `abilities`. Today the front answers 404 for such an agent, and the page then shows the agent of the fleet with no lists. |
 | `PUT /v1/agents/{name}` | Takes the profile and `workers`, `{"template", "replicas"}`, and answers 201 for a new agent or 200, with `{"name", "description", "role", "pool"}`. `pool` is the status of the workers that the front made. With `?dryRun=true` it checks the profile, saves nothing, and adds `exists`. An unknown field answers 400. |
 | `GET /v1/pools/{name}` | The status of the workers of a pool: `name`, `source`, `template`, `atespace`, `agent`, `intake`, `wanted`, `actual`, `ready`, `hash`, `tasks`, `gaps`, and `checkedAt`. The page names the pool of an agent from the fleet view, else by the rule of the front for a new agent: the name in lower case, with a hyphen for each character that is not a letter or a digit. |
 | `PATCH /v1/pools/{name}` | `{"replicas": n}` changes Keep, for an owner. The answer is the status. |
 | `DELETE /v1/pools/{name}` | Removes every worker of the agent, for an owner, after Confirm. |
 | `GET /v1/bossmode/agents/{agent}/today` | `{"runs", "costUSD", "decisions", "partial"}` of the day of the agent. `partial` is true when a run reports no cost. A workbench without the route answers 404, and the profile then shows no Today. |
+
+The agents of the fleet are the agents that a person can seat, list, and
+open. The page reads them from `GET /v1/fleet`: the `agent` of each pool,
+and the `agents` of each member other than the front itself (`self`), each
+with the `role` of the caller. A profile of `GET /v1/agents` adds its
+description and its lists to an agent of the same name. A profile of the
+front that no pool runs and no member holds shows only when the page knows
+a run of it, such as a seat. `src/lib/agents.ts` holds the rule. The
+picker of Add, the people list, the new-bridge screen, the Skills place, and
+the new-agent screen read this one list. The free workers of an agent come
+from its pool.
 
 The page never says pool to a person: the profile says Workers and Keep.
 The profile reads the status of the workers every 10 seconds while it is

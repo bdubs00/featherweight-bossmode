@@ -13,8 +13,9 @@
 
 import type { JSX, RefObject } from 'preact';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { useSelect } from '../state/store';
-import { addMember, loadAgents } from '../state/actions';
+import { store, useSelect } from '../state/store';
+import { addMember, loadAgents, loadFleet } from '../state/actions';
+import { selectAgents } from '../state/agents';
 import { membersOf } from '../state/reducer';
 import { nextHandle } from '../lib/handles';
 import { attempt } from './notice';
@@ -120,7 +121,7 @@ function Advanced({ bridge, agents, taken, onDone }: { bridge: string; agents: P
 }
 
 export function Picker({ bridge, drafts, draftHandles, onPick, onClose, anchor, below = 0, place = 'pane' }: PickerProps) {
-  const agents = useSelect((s) => s.agents);
+  const agents = useSelect(selectAgents);
   const faces = useSelect((s) => s.faces);
   const roster = useSelect((s) => s.rosters[bridge]);
   const fleet = useSelect((s) => s.fleet);
@@ -135,7 +136,10 @@ export function Picker({ bridge, drafts, draftHandles, onPick, onClose, anchor, 
   const all = useMemo(() => pickGroups(agents || [], faces, seats, fleet, '', drafts), [agents, faces, seats, fleet, drafts]);
 
   useEffect(() => {
-    if (!agents) attempt(loadAgents);
+    // The agents come from the fleet and from the profiles of the front.
+    const s = store.get();
+    if (!s.agents) attempt(loadAgents);
+    if (!s.fleet) loadFleet().catch(() => {});
     if (field.current) field.current.focus();
   }, []);
 

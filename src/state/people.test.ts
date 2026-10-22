@@ -22,6 +22,7 @@ import {
 } from './people';
 import { parseSlash } from '../lib/mention';
 import { workersOf } from '../lib/workers';
+import { fleetAgents } from '../lib/agents';
 
 const bridge = (id: string, title: string, state: 'open' | 'closed' = 'open'): Bridge => ({
   id,
@@ -152,11 +153,38 @@ describe('the presence words', () => {
     expect(capacityWords(s)).toBe('1 free');
     const none = workersOf(fleet, 'idler');
     expect(workerLight(none)).toBeNull();
-    expect(capacityWords(none)).toBe('Keep 0');
+    // An agent with no worker gets no words: no row says Keep 0.
+    expect(capacityWords(none)).toBe('');
     const busy = workersOf({ ...fleet, members: fleet.members.map((x) => ({ ...x, active: 1 })) }, 'manager');
     expect(capacityWords(busy)).toBe('waiting for a worker');
     const starting = workersOf({ ...fleet, pools: [{ ...fleet.pools![2], tasks: [{ name: 's', phase: 'Pending', current: true }] }] }, 'scribe');
     expect(workerLight(starting)!.word).toBe('starting');
+  });
+});
+
+describe('Not on a bridge, from the agents of the fleet', () => {
+  // The front names only its own profile, default. The pools run the
+  // migrator and the scribe, and a member holds the writer.
+  const real: Fleet = {
+    ...fleet,
+    members: [...fleet.members, { name: 'default/notes-0', state: 'live', lastSeen: '', canForward: true, accessMode: '', agents: [{ name: 'writer', role: 'operator' }], active: 0, inputRequired: 0 }],
+  };
+  const own: Agent[] = [{ name: 'default', role: 'owner' }];
+  const base = (): PeopleInput => ({ ...input(), agents: fleetAgents(real, own, []), fleet: real });
+
+  it('lists the agents of the pools and of the members, and leaves out a profile of the front with no pool and no run', () => {
+    const last = peopleOf(base()).pop()!;
+    expect(last.title).toBe(NOT_ON_A_BRIDGE);
+    expect(last.rows.map((r) => r.handle)).toEqual(['manager', 'scribe', 'writer']);
+    expect(last.rows.map((r) => r.task)).toEqual(['1 free', '1 free', '']);
+    expect(peopleOf(base()).flatMap((g) => g.rows).some((r) => /Keep/.test(r.task))).toBe(false);
+  });
+
+  it('shows a profile of the front once the page knows a run of it', () => {
+    const s = { ...base(), agents: fleetAgents(real, own, ['default']) };
+    const last = peopleOf(s).pop()!;
+    expect(last.rows.map((r) => r.handle)).toContain('default');
+    expect(last.rows.find((r) => r.handle === 'default')!.light).toBeNull();
   });
 });
 

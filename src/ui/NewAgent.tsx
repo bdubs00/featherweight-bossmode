@@ -15,6 +15,8 @@ import type { AgentSaved, NewProfile, Template, WorkersAsk } from '../api/types'
 import { templatesOf } from '../lib/workers';
 import { useSelect } from '../state/store';
 import { loadAgents, loadFaces, loadFleet } from '../state/actions';
+import { selectAgents } from '../state/agents';
+import { forgetProfiles } from '../state/profiles';
 import { phaseOf } from '../lib/presence';
 import { hrefOf } from '../lib/route';
 import { useCatalog } from './Skills';
@@ -166,6 +168,7 @@ function Workers({ saved, dry }: { saved: AgentSaved; dry: boolean }) {
 export function NewAgent() {
   const config = useSelect((s) => s.config);
   const agents = useSelect((s) => s.agents);
+  const known = useSelect(selectAgents);
   const fleet = useSelect((s) => s.fleet);
   const cat = useCatalog();
   const templates = useMemo(() => templatesOf(config), [config]);
@@ -174,7 +177,8 @@ export function NewAgent() {
   const [busy, setBusy] = useState(false);
   const [out, setOut] = useState<{ saved: AgentSaved; dry: boolean } | null>(null);
   const first = useRef<HTMLInputElement>(null);
-  const taken = (agents || []).map((a) => a.name);
+  // A name of the front or of the fleet is taken.
+  const taken = [...new Set([...(agents || []), ...(known || [])].map((a) => a.name))];
 
   useEffect(() => {
     if (!agents) attempt(loadAgents);
@@ -216,7 +220,10 @@ export function NewAgent() {
         const el = document.querySelector('.new-agent .form-end');
         if (el && 'scrollIntoView' in el) el.scrollIntoView({ block: 'nearest' });
       });
-      if (!dry) await Promise.allSettled([loadAgents(), loadFaces(), loadFleet()]);
+      if (!dry) {
+        forgetProfiles();
+        await Promise.allSettled([loadAgents(), loadFaces(), loadFleet()]);
+      }
     });
     setBusy(false);
   };

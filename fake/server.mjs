@@ -892,13 +892,28 @@ on('PATCH', '/v1/bridges/([^/]+)/members/([^/]+)', async (c, id, handle) => {
 on('GET', '/v1/fleet', () => FLEET);
 // An agent of the view carries the parts of its profile that the page shows: the tools, the skills that it allows, and its rules.
 const agentView = ({ name, description, role }) => ({ name, description, role, tools: TOOLS_OF[name] || [], skills: allowlistOf(name), policy: name === 'migrator' ? { ask: ['bash: git push*'] } : name === 'reviewer' ? { ask: ['destructive'] } : undefined });
-on('GET', '/v1/agents', () => ({ agents: AGENTS.map(agentView) }));
+// The front names only its own profile in GET /v1/agents, as the real
+// front does. The profiles that the workers of the pools run come from
+// GET /v1/agents/{name}, with the pool and with no abilities, and the page
+// reads the agents of the fleet from GET /v1/fleet.
+const FRONT_AGENTS = [{ name: 'default', description: 'The profile of the front itself.', role: 'owner' }];
+on('GET', '/v1/agents', () => ({ agents: FRONT_AGENTS.map(agentView) }));
 on('GET', '/v1/agents/([^/]+)', (c, raw) => {
   const name = decodeURIComponent(raw);
+  const own = FRONT_AGENTS.find((x) => x.name === name);
+  if (own) return agentView(own);
   const a = AGENTS.find((x) => x.name === name);
   if (!a) refuse(404, `no agent ${name}`);
-  return agentView(a);
+  return { ...agentView(a), pool: poolOfAgent(name) };
 });
+/** poolOfAgent names the pool whose workers run an agent: the pool of the agent, else the pool of a worker that holds it. */
+function poolOfAgent(name) {
+  const own = FLEET.pools.find((p) => p.agent === name);
+  if (own) return own.name;
+  const m = FLEET.members.find((x) => x.agents.some((a) => a.name === name));
+  const p = m && FLEET.pools.find((q) => q.tasks.some((t) => q.atespace + '/' + t.name === m.name));
+  return p ? p.name : undefined;
+}
 
 const runOr404 = (id) => {
   const r = S.runs.get(id);

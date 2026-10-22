@@ -119,7 +119,8 @@ describe('the picker of Add', () => {
     const picker = el.querySelector('.picker[role="dialog"]')!;
     expect(picker.querySelector('input')!.getAttribute('placeholder')).toBe('Who?');
     expect([...picker.querySelectorAll('.pick-group')].map((g) => g.textContent)).toEqual(['On this bridge', 'Everyone else']);
-    expect(rows(el)).toEqual(['Migrator 1 free', 'Reviewer waiting for a worker', 'Writer waiting for a worker', 'Scribe waiting for a worker']);
+    // On this bridge holds the agents of the seats, also the tester, which the profiles of the front do not name.
+    expect(rows(el)).toEqual(['Migrator 1 free', 'Reviewer waiting for a worker', 'Tester waiting for a worker', 'Writer waiting for a worker', 'Scribe waiting for a worker']);
     expect(picker.querySelector('.pick-row .led-green')).not.toBeNull();
     expect(picker.querySelector('a[href="#new-agent"]')!.textContent).toBe('New agent');
   });

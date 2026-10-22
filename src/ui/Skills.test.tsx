@@ -84,7 +84,18 @@ describe('the Skills place', () => {
   });
 
   it('reads the skills of each agent of the fleet while the place is open, and forgets them when it closes', async () => {
-    act(() => store.dispatch({ type: 'agents', agents: [{ name: 'migrator', role: 'owner' }, { name: 'scribe', role: 'operator' }] }));
+    // The agents of the fleet: a pool runs the migrator, and a member holds the scribe. The profile of the front itself names no worker.
+    act(() => {
+      store.dispatch({ type: 'agents', agents: [{ name: 'default', role: 'owner' }] });
+      store.dispatch({
+        type: 'fleet',
+        fleet: {
+          name: 'front-0',
+          members: [{ name: 'default/notes-0', state: 'live', lastSeen: '', canForward: true, accessMode: '', agents: [{ name: 'scribe', role: 'operator' }], active: 0, inputRequired: 0 }],
+          pools: [{ name: 'crew', atespace: 'default', agent: 'migrator', intake: 'q', wanted: 1, actual: 1, ready: 1, hash: 'h', checkedAt: '', tasks: [] }],
+        },
+      });
+    });
     api = fakeApi({
       'GET /v1/tools': TOOLS,
       'GET /v1/agents/migrator/skills': { agent: 'migrator', allowlist: ['ansible-*'], skills: [{ name: 'ansible-style', description: '', origin: 'imported' }] },

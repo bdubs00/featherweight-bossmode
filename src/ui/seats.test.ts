@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Agent, FaceMeta, Fleet, Member } from '../api/types';
 import { draftOf, freeWords, pickGroups, seatReason, taskOfGoal, wavesLine } from './seats';
+import { fleetAgents } from '../lib/agents';
 
 const fleet: Fleet = {
   name: 'front-0',
@@ -51,6 +52,26 @@ describe('pickGroups', () => {
     expect(pickGroups(agents, faces, [], fleet, 'manifests').others.map((r) => r.agent)).toEqual(['migrator']);
     expect(pickGroups(agents, faces, [], fleet, 'REVIEW').others.map((r) => r.agent)).toEqual(['reviewer']);
     expect(pickGroups(agents, faces, [], fleet, 'nobody').others).toEqual([]);
+  });
+});
+
+describe('pickGroups over the agents of the fleet', () => {
+  // The front names only its own profile, default, which no pool runs. The
+  // pools run the migrator and the reviewer, and a member holds the tester.
+  const withMember: Fleet = { ...fleet, members: [...fleet.members, { name: 'default/test-0', state: 'live', lastSeen: '', canForward: true, accessMode: '', agents: [{ name: 'tester', role: 'operator' }], active: 0, inputRequired: 0 }] };
+  const list = fleetAgents(withMember, [{ name: 'default', role: 'owner' }]);
+
+  it('offers the agents that the pools run and that the members hold, and never the profile of the front alone', () => {
+    const g = pickGroups(list, faces, [], withMember);
+    expect(g.here).toEqual([]);
+    expect(g.others.map((r) => r.agent)).toEqual(['migrator', 'reviewer', 'tester']);
+    expect(g.others.map((r) => r.free)).toEqual([1, 0, 0]);
+  });
+
+  it('holds the agents of the seats in On this bridge, also an agent that the fleet does not list', () => {
+    const g = pickGroups(list, faces, [seat('reviewer', 'reviewer'), seat('scribe', 'scribe'), seat('migrator-1', 'migrator')], withMember);
+    expect(g.here.map((r) => r.agent)).toEqual(['reviewer', 'scribe', 'migrator']);
+    expect(g.others.map((r) => r.agent)).toEqual(['tester']);
   });
 });
 

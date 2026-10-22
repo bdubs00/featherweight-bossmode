@@ -11,6 +11,7 @@ import { ApiError } from '../api/client';
 import type { Pool, Today } from '../api/types';
 import { store, useSelect } from '../state/store';
 import { loadAgentSkills, loadFaces } from '../state/actions';
+import { useProfile } from '../state/profiles';
 import { ensureRuns } from '../state/fetchers';
 import { likedOf, newestRun, parseKeep, policyRules, rulesOf, seatOnWorker, seatsOfAgent } from '../state/people';
 import { poolNameOf } from '../lib/workers';
@@ -333,7 +334,8 @@ function EditFace({ agent, onDone }: { agent: string; onDone: (said: string) => 
 /** Profile is the profile of an agent. back is the conversation that a narrow window goes back to. */
 export function Profile({ agent, back }: { agent: string; back?: { href: string; label: string } }) {
   const face = useSelect((s) => s.faces[agent]);
-  const info = useSelect((s) => (s.agents || []).find((a) => a.name === agent));
+  // The profile of GET /v1/agents/{name}, else the agent of the fleet.
+  const info = useProfile(agent) || undefined;
   const loadable = useSelect((s) => s.agentSkills[agent]);
   const runs = useSelect((s) => s.runs);
   const channels = useSelect((s) => s.channels);

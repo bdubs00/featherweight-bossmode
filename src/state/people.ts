@@ -41,6 +41,7 @@ export interface PeopleInput {
   bridges: { order: string[]; byId: Record<string, Bridge> };
   rosters: Record<string, Roster>;
   runs: Record<string, Run>;
+  /** The agents of the fleet, from selectAgents of src/state/agents.ts. */
   agents: Agent[] | null;
   fleet: Fleet | null;
 }
@@ -69,9 +70,9 @@ export function workerLight(w: Workers): Light | null {
   return { word: 'asleep', tone: 'grey', label: 'The worker sleeps. A request wakes it.' };
 }
 
-/** capacityWords says how many workers of an agent are free: 1 free, 2 free, waiting for a worker, or Keep 0. */
+/** capacityWords says how many workers of an agent are free: 1 free, 2 free, or waiting for a worker. An agent with no worker gets no words. */
 export function capacityWords(w: Workers): string {
-  if (w.workers.length === 0) return 'Keep ' + w.keep;
+  if (w.workers.length === 0) return '';
   return w.free > 0 ? w.free + ' free' : 'waiting for a worker';
 }
 
@@ -79,8 +80,9 @@ export function capacityWords(w: Workers): string {
  * peopleOf builds the people list. The groups follow the order of the
  * bridges, open bridges only, each with its seats in the order of the
  * roster and a fired seat last. Not on a bridge comes last, with the agents
- * in the order of their names. It shows only when every open bridge has its
- * roster, so an agent never shows there for a moment before its seat loads.
+ * of the fleet in the order of their names. It shows only when every open
+ * bridge has its roster, so an agent never shows there for a moment before
+ * its seat loads.
  */
 export function peopleOf(s: PeopleInput): PeopleGroup[] {
   const groups: PeopleGroup[] = [];

@@ -13,9 +13,9 @@
 
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { api } from '../api/routes';
-import { ApiError } from '../api/client';
 import type { Agent, InlineProfile, QuickChat, Run, Skill, Tool } from '../api/types';
 import { store, useSelect } from '../state/store';
+import { forgetProfiles, useProfile } from '../state/profiles';
 import { loadAgentSkills, loadChats, loadSkills } from '../state/actions';
 import { slashCommands } from '../state/people';
 import { runStatus } from '../lib/presence';
@@ -43,7 +43,6 @@ let firstSent: { run: string; text: string } | null = null;
 
 let toolCache: Tool[] | null = null;
 let toolLoad: Promise<Tool[]> | null = null;
-const agentCache = new Map<string, Agent | null>();
 
 /** forgetChat drops what the place keeps between two visits, for the tests. */
 export function forgetChat(): void {
@@ -51,7 +50,7 @@ export function forgetChat(): void {
   firstSent = null;
   toolCache = null;
   toolLoad = null;
-  agentCache.clear();
+  forgetProfiles();
 }
 
 /** useChat is the quick chat of the settings, or null when none is set up. */
@@ -80,32 +79,7 @@ function useTools(): Tool[] | null {
 }
 
 /** useAgent reads the profile of an agent: its tools and its skills. undefined while it loads, null when the page cannot read it. */
-function useAgent(name: string): Agent | null | undefined {
-  const [agent, setAgent] = useState<Agent | null | undefined>(agentCache.get(name));
-  useEffect(() => {
-    if (!name) return;
-    if (agentCache.has(name)) {
-      setAgent(agentCache.get(name));
-      return;
-    }
-    let live = true;
-    api
-      .agent(name)
-      .catch((e) => {
-        // A workbench without the route still names the agent in the list of the fleet.
-        if (e instanceof ApiError && e.status === 404) return (store.get().agents || []).find((a) => a.name === name) || null;
-        return null;
-      })
-      .then((a) => {
-        agentCache.set(name, a);
-        if (live) setAgent(a);
-      });
-    return () => {
-      live = false;
-    };
-  }, [name]);
-  return agent;
-}
+const useAgent = (name: string): Agent | null | undefined => useProfile(name);
 
 /** useHistory is the history of the person: the runs of the list of the backend, and the quick chats that this tab started. */
 function useHistory(chat: QuickChat | null): { runs: Run[]; loaded: boolean } {

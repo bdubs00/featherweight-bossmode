@@ -4,6 +4,7 @@
 
 import type { Agent, FaceMeta, Fleet, Member } from '../api/types';
 import { handleReason, nextHandle } from '../lib/handles';
+import { canSeat } from '../lib/agents';
 import { cap } from '../lib/words';
 import { workersOf } from '../lib/workers';
 
@@ -23,30 +24,36 @@ export interface PickGroups {
   others: PickRow[];
 }
 
-/** canSeat reports whether the person can start runs of an agent: an owner or an operator can. */
-export const canSeat = (a: Agent): boolean => a.role === 'owner' || a.role === 'operator';
-
 /**
- * pickGroups builds the two groups of the picker. A query keeps the agents
- * whose name, display name, or tagline holds it. drafts names the agents of
- * the new seats that wait, so a click on the last free worker shows the
- * agent as waiting for a worker at once.
+ * pickGroups builds the two groups of the picker from the agents of the
+ * fleet (src/lib/agents.ts). On this bridge holds the agents of the seats,
+ * in the order of their first seat, also an agent that the fleet does not
+ * list. Everyone else holds every other agent that the person can seat. A
+ * query keeps the agents whose name, display name, or tagline holds it.
+ * drafts names the agents of the new seats that wait, so a click on the
+ * last free worker shows the agent as waiting for a worker at once. The
+ * free workers of an agent come from its pool.
  */
 export function pickGroups(agents: Agent[], faces: Record<string, FaceMeta>, seats: Pick<Member, 'agent' | 'fired'>[], fleet: Fleet | null, query = '', drafts: string[] = []): PickGroups {
   const q = query.trim().toLowerCase();
-  const seated = new Set(seats.filter((m) => !m.fired).map((m) => m.agent));
-  const here: PickRow[] = [];
-  const others: PickRow[] = [];
-  for (const a of agents) {
-    if (!canSeat(a)) continue;
+  const byName = new Map(agents.map((a) => [a.name, a]));
+  const seated: string[] = [];
+  for (const m of seats) if (!m.fired && m.agent && !seated.includes(m.agent)) seated.push(m.agent);
+  const row = (a: Agent): PickRow | null => {
+    if (!canSeat(a)) return null;
     const f = faces[a.name];
     const name = (f && f.displayName) || cap(a.name);
     const tagline = (f && f.tagline) || a.description || '';
-    if (q && !(a.name + '\n' + name + '\n' + tagline).toLowerCase().includes(q)) continue;
+    if (q && !(a.name + '\n' + name + '\n' + tagline).toLowerCase().includes(q)) return null;
     const waiting = drafts.filter((d) => d === a.name).length;
     const free = fleet ? Math.max(0, workersOf(fleet, a.name).free - waiting) : -1;
-    (seated.has(a.name) ? here : others).push({ agent: a.name, name, tagline, free });
-  }
+    return { agent: a.name, name, tagline, free };
+  };
+  const here = seated.map((n) => row(byName.get(n) || { name: n, role: '' })).filter((r): r is PickRow => !!r);
+  const others = agents
+    .filter((a) => !seated.includes(a.name))
+    .map(row)
+    .filter((r): r is PickRow => !!r);
   return { here, others };
 }
 

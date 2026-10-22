@@ -9,7 +9,8 @@ import { api } from '../api/routes';
 import { go, hrefOf, parseRoute, type Route } from '../lib/route';
 import { awakeWorkers } from '../lib/workers';
 import { store, useSelect } from '../state/store';
-import { loadAgentSkills, loadAgents } from '../state/actions';
+import { loadAgentSkills, loadAgents, loadFleet } from '../state/actions';
+import { selectAgents } from '../state/agents';
 import { ensureRosters, ensureRuns, refreshAfterReset } from '../state/fetchers';
 import { filterPeople, firstPerson, newestRun, peopleCount, peopleOf, slashCommands, workerLight, type PeopleGroup, type PersonRow } from '../state/people';
 import { workersOf } from '../lib/workers';
@@ -51,17 +52,20 @@ export function useHashRoute(): Route {
 
 /**
  * usePeople builds the people list from the store, and loads what it
- * needs: the agents, the record of each open bridge, and the newest run of
- * each seat that works, so a seat that waits in the queue says so.
+ * needs: the agents of the fleet, the record of each open bridge, and the
+ * newest run of each seat that works, so a seat that waits in the queue
+ * says so.
  */
 export function usePeople(): { groups: PeopleGroup[]; loaded: boolean } {
   const bridges = useSelect((s) => s.bridges);
   const rosters = useSelect((s) => s.rosters);
   const runs = useSelect((s) => s.runs);
-  const agents = useSelect((s) => s.agents);
+  const agents = useSelect(selectAgents);
   const fleet = useSelect((s) => s.fleet);
   useEffect(() => {
-    if (!store.get().agents) attempt(loadAgents);
+    const s = store.get();
+    if (!s.agents) attempt(loadAgents);
+    if (!s.fleet) loadFleet().catch(() => {});
   }, []);
   useEffect(() => {
     if (bridges.loaded) ensureRosters();

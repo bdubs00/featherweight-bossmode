@@ -2,22 +2,30 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { act } from 'preact/test-utils';
 import { store } from '../state/store';
 import { forgetManagerRun } from '../state/actions';
-import type { BossConfig } from '../api/types';
+import type { BossConfig, Fleet } from '../api/types';
 import { NewBridge, bodyOf, bridgeErrors, titleOf, type BridgeForm } from './NewBridge';
 import { click, fakeApi, keyNamed, mount, settle, typeIn, unmountAll } from './testkit-c';
 
 const MANAGER: BossConfig = { manager: { agent: 'manager', member: 'default/manager-0', run: '' }, placement: 'queue', maxMembers: 16 };
-const AGENTS = [
-  { name: 'migrator', role: 'owner', description: 'Moves a module.' },
-  { name: 'reviewer', role: 'operator', description: 'Reviews.' },
-  { name: 'secret', role: 'viewer', description: 'Not for you.' },
-];
+// The profiles of the front name only its own agent. The pools run the
+// migrator and the reviewer, and a member holds an agent that the person
+// can only view.
+const AGENTS = [{ name: 'default', role: 'owner' }];
+const FLEET: Fleet = {
+  name: 'front-0',
+  members: [{ name: 'default/other-0', state: 'live', lastSeen: '', canForward: true, accessMode: '', agents: [{ name: 'secret', role: 'viewer', description: 'Not for you.' }, { name: 'reviewer', role: 'operator', description: 'Reviews.' }], active: 0, inputRequired: 0 }],
+  pools: [
+    { name: 'crew', atespace: 'default', agent: 'migrator', intake: 'q', wanted: 1, actual: 1, ready: 1, hash: 'h', checkedAt: '', tasks: [{ name: 'crew-0', phase: 'Running', current: true }] },
+    { name: 'review', atespace: 'default', agent: 'reviewer', intake: 'q', wanted: 1, actual: 1, ready: 1, hash: 'h', checkedAt: '', tasks: [{ name: 'review-0', phase: 'Running', current: true }] },
+  ],
+};
 
 let api: ReturnType<typeof fakeApi>;
 beforeEach(() => {
   act(() => {
     store.dispatch({ type: 'config', config: MANAGER });
     store.dispatch({ type: 'agents', agents: AGENTS });
+    store.dispatch({ type: 'fleet', fleet: FLEET });
   });
   forgetManagerRun();
   location.hash = '#new';

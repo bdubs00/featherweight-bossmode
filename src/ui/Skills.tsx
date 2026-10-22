@@ -13,7 +13,8 @@ import { useEffect, useMemo, useState } from 'preact/hooks';
 import { api } from '../api/routes';
 import type { Tool } from '../api/types';
 import { store, useSelect } from '../state/store';
-import { forgetAgentSkills, loadAgentSkills, loadAgents, loadSkills } from '../state/actions';
+import { forgetAgentSkills, loadAgentSkills, loadAgents, loadFleet, loadSkills } from '../state/actions';
+import { selectAgents } from '../state/agents';
 import { catalogOf, docOf, skillGroups, toolGroups, type CatalogSkill, type CatalogTool, type Group, type SkillDoc } from '../lib/catalog';
 import { go, hrefOf, type SkillItem } from '../lib/route';
 import { useRoving } from './keys';
@@ -47,7 +48,7 @@ export interface Catalog {
 export function useCatalog(): Catalog | null {
   const raw = useSelect((s) => s.skills);
   const skillsOf = useSelect((s) => s.agentSkills);
-  const agents = useSelect((s) => s.agents);
+  const agents = useSelect(selectAgents);
   const [tools, setTools] = useState<Tool[] | null>(toolsCache);
   useEffect(() => {
     if (!raw) attempt(loadSkills);
@@ -70,12 +71,9 @@ export function useCatalog(): Catalog | null {
   return cat;
 }
 
-/** agentsOfFleet names every agent that the page knows: the agents of GET /v1/agents and the agents of the members of the fleet. */
+/** agentsOfFleet names every agent of the fleet (src/state/agents.ts). */
 function agentsOfFleet(): string[] {
-  const s = store.get();
-  const names = new Set((s.agents || []).map((a) => a.name));
-  for (const m of (s.fleet && s.fleet.members) || []) for (const a of m.agents || []) names.add(a.name);
-  return [...names].sort();
+  return (selectAgents(store.get()) || []).map((a) => a.name);
 }
 
 /**
@@ -84,14 +82,15 @@ function agentsOfFleet(): string[] {
  * a skill. It forgets them when the place closes.
  */
 function useLoaders(): void {
-  const agents = useSelect((s) => s.agents);
-  const fleet = useSelect((s) => s.fleet);
+  const agents = useSelect(selectAgents);
   useEffect(() => {
-    if (!agents) attempt(loadAgents);
+    const s = store.get();
+    if (!s.agents) attempt(loadAgents);
+    if (!s.fleet) loadFleet().catch(() => {});
   }, []);
   useEffect(() => {
     for (const a of agentsOfFleet()) loadAgentSkills(a).catch(() => {});
-  }, [agents, fleet]);
+  }, [agents]);
   useEffect(() => () => forgetAgentSkills(), []);
 }
 
