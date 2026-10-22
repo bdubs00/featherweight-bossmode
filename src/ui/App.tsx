@@ -41,10 +41,8 @@ function useRoute(): Route {
 
 /** Home is the main column with no bridge open: the newest open bridge, or a hint. */
 function Home() {
-  const order = useSelect((s) => s.bridges.order);
-  const byId = useSelect((s) => s.bridges.byId);
   const loaded = useSelect((s) => s.bridges.loaded);
-  const first = order.find((id) => byId[id] && byId[id].state === 'open');
+  const first = useSelect((s) => s.bridges.order.find((id) => s.bridges.byId[id].state === 'open'));
   useEffect(() => {
     // A wide window opens the newest open bridge, so the main column is never empty.
     if (first && window.matchMedia('(min-width: 1024px)').matches) go({ place: 'bridge', id: first, pane: 'none' }, true);

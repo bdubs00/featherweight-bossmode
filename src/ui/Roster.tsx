@@ -139,7 +139,7 @@ function NewTask({ bridge, m, onClose }: { bridge: string; m: Member; onClose: (
 
 export function Roster({ bridge, current }: { bridge: string; current?: string }) {
   const order = useSelect((s) => (s.rosters[bridge] ? s.rosters[bridge].order : undefined));
-  const b = useSelect((s) => s.bridges.byId[bridge]);
+  const isOpen = useSelect((s) => !!s.bridges.byId[bridge] && s.bridges.byId[bridge].state === 'open');
   const [ask, setAsk] = useState<Ask>(null);
   const [busy, setBusy] = useState(false);
   const list = useRoving<HTMLUListElement>();
@@ -181,7 +181,7 @@ export function Roster({ bridge, current }: { bridge: string; current?: string }
           <p class="goal">{order ? order.length + (order.length === 1 ? ' member' : ' members') : 'Loading'}</p>
         </div>
         <div class="end">
-          {b && b.state === 'open' && (
+          {isOpen && (
             <button type="button" class="btn small" onClick={() => setAsk({ kind: 'add' })}>
               <Icon name="plus" /> Add
             </button>

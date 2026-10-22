@@ -3,7 +3,7 @@
 // front and keeps the entry that the person reads in its place.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
-import type { Delegation } from '../api/types';
+import type { Delegation, Entry } from '../api/types';
 import { useSelect } from '../state/store';
 import { loadBridge, loadChannel, loadOlder, markRead, patchBridge, postMessage } from '../state/actions';
 import { membersOf } from '../state/reducer';
@@ -50,13 +50,39 @@ function Delegations({ id, value, onClose }: { id: string; value: Delegation; on
   );
 }
 
+/**
+ * ChannelComposer is the composer of a bridge. It reads the roster for the @
+ * completion, so a change of presence redraws it and not the channel.
+ */
+function ChannelComposer(p: { id: string; title: string; closed: boolean; reply: Entry | null; onClearReply: () => void }) {
+  const roster = useSelect((s) => s.rosters[p.id]);
+  const members = useMemo(() => membersOf(roster).filter((m) => !m.fired), [roster]);
+  const r = p.reply;
+  return (
+    <Composer
+      draft={p.id}
+      label={'Message to the bridge ' + p.title}
+      placeholder="Message every member, or @ one member"
+      members={members}
+      disabled={p.closed ? 'This bridge is closed. Open it again to send.' : ''}
+      reply={r ? { seq: r.seq, who: senderName(r.from), text: r.text, handle: r.from.kind === 'agent' ? r.from.handle : undefined } : null}
+      onClearReply={p.onClearReply}
+      onSend={async (text, to) => {
+        const ok = await attempt(() => postMessage(p.id, text, to, r ? r.seq : undefined));
+        if (ok) p.onClearReply();
+        return ok;
+      }}
+    />
+  );
+}
+
 export function Channel({ id }: { id: string }) {
   const b = useSelect((s) => s.bridges.byId[id]);
   const known = useSelect((s) => s.bridges.loaded);
-  const ch = useSelect((s) => s.channels[id]);
-  const seqs = ch ? ch.seqs : undefined;
-  const prev = ch ? ch.prev : 0;
-  const roster = useSelect((s) => s.rosters[id]);
+  // The channel reads the order of the entries, never the entries: a
+  // changed entry redraws its own row only.
+  const seqs = useSelect((s) => (s.channels[id] ? s.channels[id].seqs : undefined));
+  const prev = useSelect((s) => (s.channels[id] ? s.channels[id].prev : 0));
   const [reply, setReply] = useState<number | null>(null);
   const [confirm, setConfirm] = useState<'close' | 'delegation' | null>(null);
   const [fresh, setFresh] = useState(false);
@@ -64,7 +90,6 @@ export function Channel({ id }: { id: string }) {
   const scroller = useRef<HTMLDivElement>(null);
   // Enter on a message of a person or an agent starts a reply to it.
   const list = useRoving<HTMLDivElement>({ start: 'last', onEnter: (el) => el.dataset.reply && setReply(Number(el.dataset.seq) || null) });
-  const members = useMemo(() => membersOf(roster).filter((m) => !m.fired), [roster]);
 
   // Open the bridge: its record, its roster, and the recent end of its channel.
   useEffect(() => {
@@ -116,7 +141,7 @@ export function Channel({ id }: { id: string }) {
   }, [id]);
 
   const onReply = useCallback((seq: number) => setReply(seq), []);
-  const replyEntry = reply && ch ? ch.bySeq[reply] : undefined;
+  const replyEntry = useSelect((s) => (reply && s.channels[id] ? s.channels[id].bySeq[reply] : undefined));
 
   const earlier = async () => {
     const el = scroller.current;
@@ -150,7 +175,7 @@ export function Channel({ id }: { id: string }) {
         </div>
         <div class="end">
           <a class="btn small roster-link" href={hrefOf({ place: 'bridge', id, pane: 'roster' })}>
-            <Icon name="people" /> {b.memberCount || members.length}
+            <Icon name="people" /> {b.memberCount || 0}
             <span class="sr"> members</span>
           </a>
           <Menu
@@ -171,10 +196,10 @@ export function Channel({ id }: { id: string }) {
             </button>
           </div>
         )}
-        {ch && prev === 0 && <p class="start">The start of the bridge {b.title}.</p>}
+        {seqs && prev === 0 && <p class="start">The start of the bridge {b.title}.</p>}
         <div class="entries" ref={list} role="log" aria-label={'Messages of ' + b.title} aria-live="polite" aria-relevant="additions">
           {seqs && seqs.map((seq, i) => <EntryRow key={seq} bridge={id} seq={seq} prevSeq={i > 0 ? seqs[i - 1] : 0} onReply={onReply} />)}
-          {!ch && <Empty>Loading the channel.</Empty>}
+          {!seqs && <Empty>Loading the channel.</Empty>}
         </div>
       </div>
       {fresh && (
@@ -190,20 +215,7 @@ export function Channel({ id }: { id: string }) {
           New messages below
         </button>
       )}
-      <Composer
-        draft={id}
-        label={'Message to the bridge ' + b.title}
-        placeholder="Message every member, or @ one member"
-        members={members}
-        disabled={closed ? 'This bridge is closed. Open it again to send.' : ''}
-        reply={replyEntry ? { seq: replyEntry.seq, who: senderName(replyEntry.from), text: replyEntry.text, handle: replyEntry.from.kind === 'agent' ? replyEntry.from.handle : undefined } : null}
-        onClearReply={() => setReply(null)}
-        onSend={async (text, to) => {
-          const ok = await attempt(() => postMessage(id, text, to, replyEntry ? replyEntry.seq : undefined));
-          if (ok) setReply(null);
-          return ok;
-        }}
-      />
+      <ChannelComposer id={id} title={b.title} closed={closed} reply={replyEntry || null} onClearReply={() => setReply(null)} />
       {confirm === 'close' && (
         <Confirm
           title={'Close ' + b.title + '?'}

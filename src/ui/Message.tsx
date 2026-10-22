@@ -190,8 +190,13 @@ export interface EntryProps {
 export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, onReply }: EntryProps) {
   const e = useSelect((s) => (s.channels[bridge] ? s.channels[bridge].bySeq[seq] : undefined));
   const prev = useSelect((s) => (prevSeq && s.channels[bridge] ? s.channels[bridge].bySeq[prevSeq] : undefined));
-  const roster = useSelect((s) => (s.rosters[bridge] ? s.rosters[bridge].byHandle : undefined));
+  // A row reads strings of the roster, never the roster itself, so a change
+  // of presence redraws the roster row and no message.
   const handles = useSelect((s) => (s.rosters[bridge] ? s.rosters[bridge].order : undefined));
+  const decisionRun = e && e.decision ? e.decision.run : '';
+  const runHandle = useSelect((s) => (decisionRun ? handleOfRun(s.rosters[bridge] ? s.rosters[bridge].byHandle : undefined, decisionRun) : ''));
+  const handle = e && e.from.kind === 'agent' ? e.from.handle || '' : runHandle;
+  const agent = useSelect((s) => (handle ? agentOf(s.rosters[bridge] ? s.rosters[bridge].byHandle : undefined, handle) : ''));
   if (!e) return null;
   const day = !prev || dayWords(prev.at) !== dayWords(e.at) ? dayWords(e.at) : '';
   const id = 'entry-' + bridge + '-' + seq;
@@ -210,12 +215,12 @@ export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, onReply }
     );
   }
   if (e.from.kind === 'system' && e.decision) {
-    const who = handleOfRun(roster, e.decision.run) || (e.text.split(' ')[0] || 'An agent');
+    const who = runHandle || e.text.split(' ')[0] || 'An agent';
     return (
       <>
         {day && <p class="day" role="separator">{day}</p>}
         <article class={'msg card' + (e.decision.state === 'pending' ? ' waiting' : '')} id={id} data-item data-seq={seq} aria-label={(e.decision.question ? 'Question from ' : 'Permission for ') + who}>
-          <Face agent={agentOf(roster, who)} size={32} />
+          <Face agent={agent || who.replace(/-\d+$/, '')} size={32} />
           <div class="body">
             <header>
               <b>{who}</b>
@@ -236,12 +241,12 @@ export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, onReply }
     <>
       {day && <p class="day" role="separator">{day}</p>}
       <article class={'msg' + (sameAsPrev ? ' compact' : '') + (mine ? ' by-person' : ' by-agent')} id={id} data-item data-seq={seq} data-reply="1" aria-label={name + ', ' + excerpt(plain(e.text), 60)}>
-        {sameAsPrev ? <span class="gutter" /> : e.from.kind === 'agent' ? <Face agent={agentOf(roster, e.from.handle || '')} size={32} /> : <Avatar subject={e.from.name || ''} display={e.from.display} size={32} />}
+        {sameAsPrev ? <span class="gutter" /> : e.from.kind === 'agent' ? <Face agent={agent} size={32} /> : <Avatar subject={e.from.name || ''} display={e.from.display} size={32} />}
         <div class="body">
           {!sameAsPrev && (
             <header>
               <b>{name}</b>
-              {e.from.kind === 'agent' && agentOf(roster, e.from.handle || '') !== e.from.handle && <span class="agent-name">{agentOf(roster, e.from.handle || '')}</span>}
+              {e.from.kind === 'agent' && agent !== e.from.handle && <span class="agent-name">{agent}</span>}
               <When at={e.at} />
             </header>
           )}

@@ -51,16 +51,18 @@ const BridgeRow = memo(function BridgeRow({ id, current }: { id: string; current
 });
 
 export function Rail({ route, onSignOut }: { route: Route; onSignOut: () => void }) {
-  const order = useSelect((s) => s.bridges.order);
+  // The rail reads the ids of the open and the closed bridges as strings,
+  // so a new message redraws one row and not the rail.
+  const openIds = useSelect((s) => s.bridges.order.filter((id) => s.bridges.byId[id].state === 'open').join('\n'));
+  const closedIds = useSelect((s) => s.bridges.order.filter((id) => s.bridges.byId[id].state === 'closed').join('\n'));
   const loaded = useSelect((s) => s.bridges.loaded);
-  const byId = useSelect((s) => s.bridges.byId);
   const me = useSelect((s) => s.me);
   const config = useSelect((s) => s.config);
   const status = useSelect((s) => s.stream.status);
   const [showClosed, setShowClosed] = useState(false);
   const list = useRoving<HTMLDivElement>();
-  const open = order.filter((id) => byId[id] && byId[id].state === 'open');
-  const closed = order.filter((id) => byId[id] && byId[id].state === 'closed');
+  const open = openIds ? openIds.split('\n') : [];
+  const closed = closedIds ? closedIds.split('\n') : [];
   const cur = route.place === 'bridge' ? route.id : '';
   const subject = (me && me.principal && me.principal.subject) || '';
   const name = (me && me.principal && (me.principal.name || personName(subject))) || 'You';
