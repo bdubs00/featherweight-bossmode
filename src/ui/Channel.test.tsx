@@ -30,8 +30,16 @@ const fleet: Fleet = {
 };
 
 let f: ReturnType<typeof fakeFetch>;
+/** The width of the window that the stub of matchMedia reports. */
+let width = 1440;
 
 beforeAll(() => {
+  window.matchMedia = ((q: string) => {
+    const min = /min-width: (\d+)px/.exec(q);
+    const max = /max-width: (\d+)px/.exec(q);
+    const matches = (!min || width >= Number(min[1])) && (!max || width <= Number(max[1]));
+    return { matches, media: q, addEventListener() {}, removeEventListener() {} } as unknown as MediaQueryList;
+  }) as typeof window.matchMedia;
   const members = [memberOf('migrator-1', { presence: 'working', activity: { turn: 1, phrase: 'Read', since: '' } }), memberOf('migrator-2', { presence: 'needs-you' })];
   f = fakeFetch([
     ['GET', /^\/v1\/bridges\/b-chan$/, () => ({ ...bridgeOf(B, { title: 'Migrate the remaining Puppet modules', lastSeq: 9, read: 9 }), members })],
@@ -45,7 +53,10 @@ beforeAll(() => {
     store.dispatch({ type: 'bridges', bridges: [bridgeOf(B, { title: 'Migrate the remaining Puppet modules', lastSeq: 9, read: 9 })] });
   });
 });
-afterEach(unmountAll);
+afterEach(() => {
+  unmountAll();
+  width = 1440;
+});
 afterAll(() => f.restore());
 
 describe('the channel', () => {
@@ -111,6 +122,23 @@ describe('the channel', () => {
     expect(dialog.querySelector('h2')!.textContent).toBe('Close Migrate the remaining Puppet modules?');
     expect(dialog.querySelector('p')!.textContent).toBe('Members finish what they do. The channel takes no new message. The manager writes a report.');
     expect([...dialog.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Cancel', 'Close bridge']);
+  });
+
+  it('moves Close bridge into More where the window is not wide, and the tabs to a strip where it is narrow', async () => {
+    width = 1024;
+    let el = mount(<Channel id={B} />);
+    await settle();
+    expect([...el.querySelectorAll('.pane-actions button')].map((b) => b.textContent || b.getAttribute('aria-label'))).toEqual(['More']);
+    expect(el.querySelector('.pane-actions a.collapsed-only')!.getAttribute('href')).toBe('#bridge/b-chan/roster');
+    act(() => (el.querySelector('button[aria-label="More"]') as HTMLButtonElement).click());
+    expect([...el.querySelectorAll('[role="menuitem"]')].map((x) => x.textContent)).toEqual(['What the manager can do', 'Close bridge']);
+    expect(el.querySelector('.pane-head .tabs')).not.toBeNull();
+    unmountAll();
+    width = 390;
+    el = mount(<Channel id={B} />);
+    await settle();
+    expect(el.querySelector('.pane-head .tabs')).toBeNull();
+    expect(el.querySelector('.tab-strip .tabs')).not.toBeNull();
   });
 
   it('says a bridge is not here, with the key Bridges', () => {

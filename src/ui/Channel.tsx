@@ -122,6 +122,21 @@ function useTab(id: string, tab?: BridgeTab): BridgeTab {
   return tab || t;
 }
 
+/** useMedia reports whether a media query matches, and follows its changes. */
+function useMedia(query: string): boolean {
+  const read = () => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(query).matches;
+  const [on, setOn] = useState(read);
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return;
+    const m = window.matchMedia(query);
+    const f = () => setOn(m.matches);
+    f();
+    m.addEventListener('change', f);
+    return () => m.removeEventListener('change', f);
+  }, [query]);
+  return on;
+}
+
 /* ---------- Posts ---------- */
 
 function FoldLine({ f, open, onToggle }: { f: Extract<Item, { kind: 'fold' }>; open: boolean; onToggle: () => void }) {
@@ -419,6 +434,9 @@ export function Channel({ id, tab: tabProp }: { id: string; tab?: BridgeTab }) {
   const firstLoaded = useSelect((s) => (s.channels[id] ? s.channels[id].prev === 0 : false));
   const tab = useTab(id, tabProp);
   const [confirm, setConfirm] = useState<'close' | 'delegation' | null>(null);
+  // Where the window is not wide, Close bridge moves into More, and in a narrow window the tabs take a strip of their own.
+  const wide = useMedia('(min-width: 1200px)');
+  const narrow = useMedia('(max-width: 799px)');
 
   // Open the bridge: its record, its roster, and the recent end of its channel.
   useEffect(() => {
@@ -471,6 +489,17 @@ export function Channel({ id, tab: tabProp }: { id: string; tab?: BridgeTab }) {
   // The loaded part can miss an older card that waits. The count of members that need you covers it.
   const decisions = firstLoaded ? waiting : Math.max(waiting, b.needsYou || 0);
   const base = { place: 'bridge' as const, id, pane: 'none' as const };
+  const tabs = (
+    <Tabs
+      label="Bridge"
+      current={tab}
+      items={[
+        { id: 'posts', label: 'Posts', href: hrefOf(base) },
+        { id: 'wiki', label: 'Wiki', href: hrefOf({ ...base, tab: 'wiki' }) },
+        { id: 'decisions', label: 'Decisions', href: hrefOf({ ...base, tab: 'decisions' }), count: decisions, countTone: 'amber', countLabel: decisions === 1 ? '1 decision waits' : countText(decisions) + ' decisions wait' },
+      ]}
+    />
+  );
   return (
     <section class="screen channel" aria-labelledby="channel-title">
       <PaneHeader
@@ -484,7 +513,7 @@ export function Channel({ id, tab: tabProp }: { id: string; tab?: BridgeTab }) {
             <Button href={hrefOf({ place: 'bridge', id, pane: 'roster' })} size="s" class="collapsed-only">
               Members <Chip label={(b.memberCount || 0) + ' members'}>{b.memberCount || 0}</Chip>
             </Button>
-            {!closed && (
+            {!closed && wide && (
               <Button size="s" onClick={() => setConfirm('close')}>
                 Close bridge
               </Button>
@@ -493,23 +522,16 @@ export function Channel({ id, tab: tabProp }: { id: string; tab?: BridgeTab }) {
               label="More"
               items={[
                 { label: 'What the manager can do', onSelect: () => setConfirm('delegation') },
-                ...(closed ? [{ label: 'Reopen', onSelect: () => attempt(() => patchBridge(id, { state: 'open' })) }] : []),
+                ...(closed ? [{ label: 'Reopen', onSelect: () => attempt(() => patchBridge(id, { state: 'open' })) }] : wide ? [] : [{ label: 'Close bridge', danger: true, onSelect: () => setConfirm('close') }]),
               ]}
             />
           </>
         }
       >
         {closed && <Led tone="grey" word="closed" />}
-        <Tabs
-          label="Bridge"
-          current={tab}
-          items={[
-            { id: 'posts', label: 'Posts', href: hrefOf(base) },
-            { id: 'wiki', label: 'Wiki', href: hrefOf({ ...base, tab: 'wiki' }) },
-            { id: 'decisions', label: 'Decisions', href: hrefOf({ ...base, tab: 'decisions' }), count: decisions, countTone: 'amber', countLabel: decisions === 1 ? '1 decision waits' : countText(decisions) + ' decisions wait' },
-          ]}
-        />
+        {!narrow && tabs}
       </PaneHeader>
+      {narrow && <div class="tab-strip">{tabs}</div>}
       {tab === 'posts' && <Posts id={id} closed={closed} />}
       {tab === 'wiki' && <WikiTab id={id} />}
       {tab === 'decisions' && loadedChannel && <DecisionsTab id={id} />}

@@ -97,6 +97,17 @@
 .channel .pane-head > .status {
   margin-left: calc(var(--s-3) - var(--s-5));
 }
+.tab-strip {
+  flex: none;
+  display: flex;
+  height: var(--h-row);
+  padding: 0 var(--s-4);
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+}
+.tab-strip .tabs {
+  gap: var(--s-5);
+}
 
 /* ---------- the entries ---------- */
 .msgs {
@@ -107,8 +118,13 @@
 .entries {
   margin-top: auto;
 }
+.start + .entries {
+  margin-top: 0;
+}
+/* The goal opens the channel, right above its first entry. */
 .start {
-  margin: var(--s-4) var(--s-5) var(--s-2);
+  margin: auto var(--s-5) var(--s-2);
+  padding-top: var(--s-4);
   font-size: var(--t-meta);
   line-height: var(--t-meta-lh);
   color: var(--muted);
@@ -205,21 +221,20 @@
   text-align: center;
 }
 .sys > p {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--s-2);
   max-width: 70ch;
+  margin: 0 auto;
   font-size: var(--t-meta);
   line-height: var(--t-meta-lh);
   color: var(--muted);
-}
-.sys .led {
-  align-self: center;
-}
-.sys-text {
-  min-width: 0;
   overflow-wrap: anywhere;
+}
+.sys > p > .led {
+  margin-right: var(--s-2);
+  vertical-align: 0;
+}
+.sys > p > time {
+  margin-left: var(--s-2);
+  white-space: nowrap;
 }
 .sys-text a {
   font-weight: 600;
@@ -451,6 +466,9 @@
 }
 .decided > p {
   min-width: 0;
+}
+.decided time {
+  margin-left: var(--s-1);
 }
 .decided .note {
   grid-column: 2;
@@ -962,6 +980,7 @@
   .details-key {
     min-height: var(--h-row);
   }
+  /* On touch, the chips sit under the text, and the keys show for the entry that the person taps. */
   .msg.has-rx header {
     padding-right: 0;
   }
@@ -969,8 +988,10 @@
   .sys .rx {
     position: static;
     flex-wrap: wrap;
-    margin-top: var(--s-1);
     grid-column: 2;
+  }
+  .rx > .rchip {
+    margin-top: var(--s-1);
   }
   .sys .rx {
     justify-content: center;
@@ -979,10 +1000,26 @@
   .sys .rx-keys {
     position: static;
     transform: none;
-    display: flex;
+    display: none;
+    order: 2;
+    flex-basis: 100%;
+    margin-top: var(--s-1);
+    padding: 0;
     border: 0;
     background: none;
     box-shadow: none;
+  }
+  .msg:hover .rx-keys,
+  .sys:hover .rx-keys {
+    display: none;
+  }
+  .msg:focus-within .rx-keys,
+  .sys:focus-within .rx-keys,
+  .rx-keys.open {
+    display: flex;
+  }
+  .sys .rx-keys {
+    justify-content: center;
   }
   .rx-keys .key-icon {
     width: var(--h-row);
