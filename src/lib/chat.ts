@@ -113,10 +113,17 @@ export function toggle(list: string[], name: string, on: boolean): string[] {
  * startBody is the body of POST /v1/runs that starts a quick chat: the
  * agent of the chat, the first message, the picks as an inline profile,
  * whose lists replace the lists of the agent for this run, and the mark of
- * the page.
+ * the page. A list that the page did not offer stays out, so the list of
+ * the agent holds, because an empty tool list gives the run every tool.
  */
 export function startBody(agent: string, input: string, picks: InlineProfile): NewRun {
-  return { agent, input, profile: { tools: [...(picks.tools || [])], skills: [...(picks.skills || [])] }, metadata: { [CHAT_VIEW.key]: CHAT_VIEW.value } };
+  const profile: InlineProfile = {};
+  if (picks.tools) profile.tools = [...picks.tools];
+  if (picks.skills) profile.skills = [...picks.skills];
+  const body: NewRun = { agent, input };
+  if (profile.tools || profile.skills) body.profile = profile;
+  body.metadata = { [CHAT_VIEW.key]: CHAT_VIEW.value };
+  return body;
 }
 
 /* ---------- the usage ---------- */

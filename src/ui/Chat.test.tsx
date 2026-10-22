@@ -13,6 +13,8 @@ const CHAT = { agent: 'chat', member: 'default/boss-0' };
 const NEW: Run = { id: 'run-chat-9', agent: 'chat', state: 'queued', seq: 1, input: 'How do I rotate the logs?', principal: ME, metadata: { 'fw.view': 'quickchat' }, createdAt: at(30), updatedAt: at(30), member: CHAT.member };
 const OLD: Run = { id: 'run-chat-1', agent: 'chat', title: 'Summarize the notes', state: 'completed', seq: 4, input: 'Summarize the notes.', output: 'Three notes.', principal: ME, metadata: { 'fw.view': 'quickchat' }, createdAt: at(5), updatedAt: at(6), member: CHAT.member, usage: { inputTokens: 1000, outputTokens: 200, turns: 1, costUSD: 0.02 }, extraTools: ['web_fetch'], resolved: { model: 'model-large', tools: ['files', 'web_fetch'], skills: ['notes'] } };
 const TOOLS = ['bash', 'files', 'web_fetch'].map((name) => ({ name, source: 'builtin', text: 'The tool ' + name + '.' }));
+/** The catalog of tools that GET /v1/tools answers in a test. */
+let tools = TOOLS;
 
 const configure = (chat: typeof CHAT | null) =>
   act(() => {
@@ -31,8 +33,9 @@ const configure = (chat: typeof CHAT | null) =>
 
 beforeEach(() => {
   forgetChat();
+  tools = TOOLS;
   const f = fakeFetch([
-    ['GET', /^\/v1\/tools$/, () => ({ tools: TOOLS })],
+    ['GET', /^\/v1\/tools$/, () => ({ tools })],
     ['GET', /^\/v1\/agents\/chat$/, () => ({ name: 'chat', role: 'operator', tools: ['files'], skills: ['notes'] })],
     ['GET', /^\/v1\/agents\/chat\/skills$/, () => ({ agent: 'chat', allowlist: ['notes'], skills: [{ name: 'notes', description: 'Write notes.', origin: 'local' }] })],
     ['GET', /^\/v1\/fleet\/runs\?/, () => ({ runs: [OLD], total: 1 })],
@@ -132,6 +135,17 @@ describe('the Chat place', () => {
     expect(posts()[0].path).toBe('/v1/runs?member=default%2Fboss-0');
     expect((posts()[0].body as { input: string }).input).toBe('/notes the freeze');
     expect(calls.some((c) => c.path.includes('/skill'))).toBe(false);
+  });
+
+  it('leaves the tools out of the inline profile when the workbench names no tool, so the list of the agent holds', async () => {
+    tools = [];
+    configure(CHAT);
+    const el = mount(<ChatMain />);
+    await vi.waitFor(() => expect(el.querySelectorAll('.pick-chip').length).toBe(2));
+    expect([...el.querySelectorAll('.pick-sec h2')].map((h) => h.textContent)).toEqual(['Skills']);
+    send(el.querySelector('#composer') as HTMLTextAreaElement, 'Hello?');
+    await vi.waitFor(() => expect(posts().length).toBe(1));
+    expect((posts()[0].body as { profile: unknown }).profile).toEqual({ skills: ['notes'] });
   });
 
   it('asks for a tool when the person turns every tool off', async () => {

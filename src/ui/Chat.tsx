@@ -16,7 +16,7 @@ import { api } from '../api/routes';
 import { ApiError } from '../api/client';
 import type { Agent, InlineProfile, QuickChat, Run, Skill, Tool } from '../api/types';
 import { store, useSelect } from '../state/store';
-import { loadAgentSkills, loadChats } from '../state/actions';
+import { loadAgentSkills, loadChats, loadSkills } from '../state/actions';
 import { slashCommands } from '../state/people';
 import { runStatus } from '../lib/presence';
 import { go, hrefOf } from '../lib/route';
@@ -277,21 +277,30 @@ function NewChat({ chat }: { chat: QuickChat }) {
   const tools = useTools();
   const skills = useSelect((s) => (s.skills ? s.skills.skills : null));
   const agent = useAgent(chat.agent);
-  const [picks, setPicks] = useState<{ tools: string[]; skills: string[] } | null>(null);
+  const [picks, setPicks] = useState<InlineProfile | null>(null);
   const [error, setError] = useState('');
-  const ready = tools !== null && agent !== undefined && skills !== null;
-  // The picks start from the lists of the agent, once the catalogs and the agent are in.
+  const [noSkills, setNoSkills] = useState(false);
+  // The page reads the skills at boot. A chat that opens before them, or after a failed read, reads them again.
+  useEffect(() => {
+    if (!skills) loadSkills().catch(() => setNoSkills(true));
+  }, []);
+  const ready = tools !== null && agent !== undefined && (skills !== null || noSkills);
+  // The picks start from the lists of the agent, once the catalogs and the agent are in. A catalog
+  // that is empty or did not load offers no picks, and its list stays out of the inline profile.
   useEffect(() => {
     if (!ready || picks) return;
-    setPicks({ tools: tools ? defaultTools(tools, agent ? agent.tools : null) : [], skills: defaultSkills(skills, agent ? agent.skills : null) });
+    setPicks({
+      tools: tools && tools.length ? defaultTools(tools, agent ? agent.tools : null) : undefined,
+      skills: skills && skills.length ? defaultSkills(skills, agent ? agent.skills : null) : undefined,
+    });
   }, [ready]);
   const toolList = useMemo(() => (tools || []).map((t) => ({ id: toolId(t), name: t.name, text: t.text || t.description || '' })), [tools]);
   const skillList = useMemo(() => skillItems(skills), [skills]);
-  const commands = useMemo(() => slashCommands(skills, picks ? picks.skills : []), [skills, picks]);
+  const commands = useMemo(() => slashCommands(skills, picks && picks.skills ? picks.skills : []), [skills, picks]);
 
   const send = async (text: string): Promise<boolean> => {
     if (!picks) return false;
-    if (toolList.length > 0 && picks.tools.length === 0) {
+    if (picks.tools && picks.tools.length === 0) {
       setError('A chat needs at least one tool. Pick one.');
       return false;
     }
@@ -312,7 +321,7 @@ function NewChat({ chat }: { chat: QuickChat }) {
       <div class="scroll chat-picks-scroll">
         <div class="chat-picks">
           {!picks && <p class="people-note">Loading the tools.</p>}
-          {picks && toolList.length > 0 && (
+          {picks && picks.tools && (
             <PickRow
               id="chat-tools"
               title="Tools"
@@ -326,7 +335,7 @@ function NewChat({ chat }: { chat: QuickChat }) {
               }}
             />
           )}
-          {picks && skillList.length > 0 && <PickRow id="chat-skills" title="Skills" find="Find a skill" items={skillList} value={picks.skills} onChange={(next) => setPicks({ ...picks, skills: next })} />}
+          {picks && picks.skills && <PickRow id="chat-skills" title="Skills" find="Find a skill" items={skillList} value={picks.skills} onChange={(next) => setPicks({ ...picks, skills: next })} />}
         </div>
       </div>
       <Composer draft={'chat:new'} label={'Message to ' + chat.agent} placeholder="Ask a question" disabled={picks ? '' : 'Loading the tools.'} commands={commands} onSend={send} />
@@ -388,7 +397,8 @@ function ChatRun({ chat, runId }: { chat: QuickChat; runId: string }) {
     const ok = await attempt(async () => {
       if (stopped) {
         // A chat that stopped takes no message: the next one starts a new chat with the same picks.
-        const p = { tools: picks.tools || [], skills: picks.skills || [] };
+        // A list that the page does not know stays out, so the list of the agent holds.
+        const p: InlineProfile = { tools: picks.tools || undefined, skills: picks.skills || undefined };
         const r = await api.start(chat.member, startBody(chat.agent, text, p));
         picksOf.set(r.id, p);
         firstSent = { run: r.id, text };

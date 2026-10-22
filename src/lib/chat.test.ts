@@ -68,6 +68,9 @@ describe('the picks of a new chat', () => {
       profile: { tools: ['files', 'web_fetch'], skills: [] },
       metadata: { 'fw.view': 'quickchat' },
     });
+    // A list that the page did not offer stays out, so the list of the agent holds.
+    expect(startBody('chat', 'Hi', { skills: ['notes'] })).toEqual({ agent: 'chat', input: 'Hi', profile: { skills: ['notes'] }, metadata: { 'fw.view': 'quickchat' } });
+    expect(startBody('chat', 'Hi', {})).toEqual({ agent: 'chat', input: 'Hi', metadata: { 'fw.view': 'quickchat' } });
   });
 });
 
