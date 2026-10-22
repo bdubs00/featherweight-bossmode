@@ -126,6 +126,11 @@ a.people-title:hover {
 .member-main .pane-actions {
   gap: var(--s-3);
 }
+/* The handle keeps its place, and the bridge clips first. */
+.member-main .pane-head > h1 {
+  flex: 0 0 auto;
+  max-width: 50%;
+}
 .member-where {
   flex: 0 1 auto;
 }
@@ -561,10 +566,15 @@ a.people-title:hover {
   border-bottom: 0;
 }
 .prof-sec-head {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--s-2);
   min-height: var(--h-small);
+}
+/* The definition opens under the heading line, so it stays inside the narrow details pane. */
+.prof-sec-head .help {
+  position: static;
 }
 .liked {
   display: flex;
@@ -889,8 +899,13 @@ a.people-title:hover {
 
 /* ---------- touch and narrow ---------- */
 @media (pointer: coarse) {
-  .treact-add {
-    display: inline-flex;
+  /* On a touch screen the reactions sit under the text. A tap on a message shows the keys that add one. */
+  .treact {
+    position: static;
+    grid-column: 2;
+  }
+  .tmsg-head {
+    padding-right: 0;
   }
   .tfold-key,
   .person,
@@ -916,6 +931,20 @@ a.people-title:hover {
   }
 }
 @media (max-width: 799px) {
+  /* One pane: the handle, the tabs, and the menu share the header, so the bridge and the mark leave it. */
+  .member-where,
+  .member-main .pane-head > .mark {
+    display: none;
+  }
+  .member-main .pane-head > h1 {
+    flex: 0 1 auto;
+    max-width: none;
+    font-size: var(--t-heading);
+    line-height: var(--t-heading-lh);
+  }
+  .member-main .tabs {
+    gap: var(--s-3);
+  }
   .tmsg,
   .tline {
     padding-left: var(--s-4);
