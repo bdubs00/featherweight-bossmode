@@ -441,6 +441,8 @@ export function Channel({ id, tab: tabProp }: { id: string; tab?: BridgeTab }) {
   // Open the bridge: its record, its roster, and the recent end of its channel.
   useEffect(() => {
     let live = true;
+    // Until the channel loads, no card settles, also a card that arrived while the person read another bridge.
+    markLoaded(id, Number.MAX_SAFE_INTEGER);
     attempt(() =>
       Promise.all([
         loadBridge(id),

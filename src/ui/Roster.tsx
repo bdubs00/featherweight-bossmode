@@ -302,7 +302,7 @@ export function Roster({ bridge, current }: { bridge: string; current?: string }
       />
       {picker && <Picker bridge={bridge} drafts={drafts.map((d) => d.agent)} draftHandles={drafts.map((d) => d.handle)} onPick={pick} onClose={closePicker} anchor={addKey} below={below} />}
       {drafts.length > 0 && (
-        <ul class="members drafts" ref={draftBox} aria-label="New seats">
+        <ul class="members drafts" ref={draftBox}>
           {drafts.map((d) => (
             <SeatRow
               key={'draft-' + d.id}
