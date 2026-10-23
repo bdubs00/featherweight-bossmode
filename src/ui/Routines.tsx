@@ -37,7 +37,7 @@ import {
   units,
 } from '../lib/routines';
 import { useSelect } from '../state/store';
-import { loadRoutine, loadRoutines, loadWeek, move, useRoutines } from '../state/routines';
+import { loadRoutine, loadRoutines, loadWeek, move, useRoutines, useRoutinesView } from '../state/routines';
 import { useRoving } from './keys';
 import { attempt } from './notice';
 import { Confirm, Markdown, Menu, type MenuItem } from './common';
@@ -103,6 +103,7 @@ export function RoutineList({ agent, name }: { agent?: string; name?: string }) 
   const [q, setQ] = useState('');
   const [retiredOpen, setRetiredOpen] = useState(false);
   const list = useRoving<HTMLDivElement>();
+  useRoutinesView();
   useEffect(() => {
     loadRoutines().catch(() => {});
   }, []);
@@ -259,6 +260,7 @@ function RoutineView({ agent, name, tab }: { agent: string; name: string; tab: R
   const agentName = useAgentName(agent);
   const [failed, setFailed] = useState('');
   const [retire, setRetire] = useState(false);
+  useRoutinesView();
   const [busy, setBusy] = useState(false);
   const narrow = useMedia(NARROW);
   const collapsed = useMedia(COLLAPSED);
@@ -638,6 +640,7 @@ export function RoutineAgent({ agent, name }: { agent: string; name: string }) {
   const face = useSelect((s) => s.faces[agent]);
   const week = useRoutines((s) => s.weeks[agent]);
   const [failed, setFailed] = useState('');
+  useRoutinesView();
   useEffect(() => {
     setFailed('');
     loadWeek(agent).catch((e) => setFailed(e instanceof Error ? e.message : 'The action failed. Try it again.'));

@@ -47,6 +47,7 @@ export function forgetRoutines(): void {
   state = initial;
   reading.clear();
   listing = null;
+  views = 0;
   watching = null;
   if (unwatch) unwatch();
   unwatch = null;
@@ -160,10 +161,27 @@ export async function move(agent: string, name: string, standing: Standing, note
 
 /* ---------- the stream ---------- */
 
-/** routineChanged reads again a routine that a routine event names, once the page holds the list. */
+/** The panes of the Routines place that show now. A pane that opens reads what it shows again. */
+let views = 0;
+
+/** useRoutinesView counts a pane of the place while it shows, so the stream reads routines only while the place is open. */
+export function useRoutinesView(): void {
+  useEffect(() => {
+    views++;
+    return () => {
+      views--;
+    };
+  }, []);
+}
+
+/**
+ * routineChanged reads again a routine that a routine event names, while
+ * the place is open and holds the list. A pane that opens later reads
+ * what it shows.
+ */
 export function routineChanged(data: unknown): void {
   const d = data as RoutineEvent | null;
-  if (!d || typeof d.agent !== 'string' || typeof d.name !== 'string' || !state.order) return;
+  if (!d || typeof d.agent !== 'string' || typeof d.name !== 'string' || !state.order || views === 0) return;
   loadRoutine(d.agent, d.name).catch(() => {});
   if (d.agent in state.weeks) loadWeek(d.agent).catch(() => {});
 }

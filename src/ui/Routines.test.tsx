@@ -259,6 +259,25 @@ describe('the other standings', () => {
     expect([...el.querySelectorAll('.menu [role=menuitem]')].map(text)).toEqual(['Pause', 'Retire']);
   });
 
+  it('reaches the week of the agent from More where the window hides the details pane', async () => {
+    const old = window.matchMedia;
+    window.matchMedia = ((q: string) => ({ matches: q === '(max-width: 1199px)', media: q, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
+    try {
+      act(() => store.dispatch({ type: 'faces', faces: [{ agent: 'triage', displayName: 'Triage', tagline: '', hash: 'h', custom: false }] }));
+      api = fakeApi(routes() as never);
+      const el = mount(<RoutineMain agent="triage" name="reset-a-password" tab="steps" />);
+      await settle();
+      click(el.querySelector('.rt-more button'));
+      const items = [...el.querySelectorAll('.menu [role=menuitem]')];
+      expect(items.map(text)).toEqual(['Triage', 'Pause', 'Retire']);
+      click(items[0]);
+      expect(location.hash).toBe('#routines/triage/reset-a-password/agent');
+    } finally {
+      window.matchMedia = old;
+      location.hash = '';
+    }
+  });
+
   it('resumes a paused routine to the standing before the pause', async () => {
     const table = routes() as Record<string, unknown>;
     table['POST /v1/routines/triage/close-a-duplicate/standing'] = { ok: true };

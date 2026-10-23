@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { RoutineRecord } from '../api/routines';
 import { fakeApi } from '../ui/testkit-c';
 import { store } from './store';
-import { forgetRoutines, loadRoutines, routineChanged, routines } from './routines';
+import { forgetRoutines, loadRoutines, routineChanged, routines, useRoutinesView } from './routines';
+import { mount, unmountAll } from '../ui/testkit-c';
 
 const rec = (name: string, standing: RoutineRecord['standing'], updatedAt = '2026-10-22T09:00:00Z'): RoutineRecord => ({
   agent: 'triage',
@@ -22,9 +23,16 @@ const flush = async () => {
 let api: ReturnType<typeof fakeApi>;
 beforeEach(() => forgetRoutines());
 afterEach(() => {
+  unmountAll();
   forgetRoutines();
   if (api) api.restore();
 });
+
+/** View stands for a pane of the place that shows. */
+function View() {
+  useRoutinesView();
+  return null;
+}
 
 describe('the routines of the page', () => {
   it('reads the list once, then each routine that is not retired with its evidence', async () => {
@@ -40,23 +48,23 @@ describe('the routines of the page', () => {
     expect(s.byKey['triage/b'].evidence).toBeUndefined();
   });
 
-  it('reads a routine again on a routine event of the stream, once for a burst', async () => {
+  it('reads a routine again on a routine event of the stream while the place is open, once for a burst', async () => {
     let n = 0;
     api = fakeApi({
       'GET /v1/routines': { routines: [rec('a', 'rehearsing')] },
       'GET /v1/routines/triage/a': () => ({ body: withEvidence(rec('a', ++n > 1 ? 'live' : 'rehearsing')) }),
     });
     await loadRoutines();
+    // While no pane of the place shows, an event reads nothing.
+    routineChanged({ kind: 'routine', agent: 'triage', name: 'a' });
+    await flush();
+    expect(api.calls.filter((c) => c.path === '/v1/routines/triage/a')).toHaveLength(1);
+    mount(<View />);
     routineChanged({ kind: 'routine', agent: 'triage', name: 'a' });
     routineChanged({ kind: 'routine', agent: 'triage', name: 'a' });
     await flush();
     expect(api.calls.filter((c) => c.path === '/v1/routines/triage/a')).toHaveLength(2);
     expect(routines.get().byKey['triage/a'].standing).toBe('live');
-    // An event before the place read the list reads nothing.
-    forgetRoutines();
-    routineChanged({ kind: 'routine', agent: 'triage', name: 'a' });
-    await flush();
-    expect(api.calls.filter((c) => c.path === '/v1/routines/triage/a')).toHaveLength(2);
   });
 
   it('keeps the evidence of a routine whose record did not change when the list loads again', async () => {
