@@ -675,7 +675,7 @@ column Now names the string of the approved boards where one changed.
 | `Where it disagreed` with its count chip, and `Ticket`, `The routine said`, `The agent chose`, `Afterward` | keep | `91% sure` beside what it said, and `none` where the agent chose nothing | done |
 | `requester accepted`, `a person relabeled it identity` | change | the verification of the receipt of the run: `accepted`, `checked`, `sent back`, or `no answer yet` | done |
 | `Open all 35` | change | `Show all`, then `Show fewer`, after the five newest | done |
-| `None of the 1,397 tickets where both agreed came back from a requester.` | change | `Sent back` with its count chip. A count above zero adds `N where it acted` and `N where it agreed with the agent`. | done |
+| `None of the 1,397 tickets where both agreed came back from a requester.` | change | `Sent back` with its count chip. A count above zero adds `N where it acted` and `N where it agreed with the agent`. A routine that never ran beside the agent shows no Sent back. | done |
 | `Tickets that triage handled between 14 Sep and 21 Oct, each accepted by its requester.` with `Open the tickets` | change | `Made from` with `212 tickets of triage, Sep 14 to Oct 10` and `Proposed by fw routine propose`. Past tickets holds the key. | done |
 | new | add | `Loading the evidence.` | done |
 
