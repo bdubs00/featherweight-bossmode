@@ -477,6 +477,7 @@ Capacity shows where seating happens:
 | `New` | keep | | done |
 | `Search the wiki` | keep | | C |
 | `<name> · <time>` (row meta) | change | `<name>` and `14 min`, with a gap and no dot | C |
+| the path of a folder as the head of its group, such as `bridges/01m5h96ejx8yh5fqkg` | change | the title of the bridge for `bridges/<id>`, such as `Harden the lab hosts`, and the name of the agent for `agents/<agent>`, such as `docs-scribe`, with the path in the tooltip. A bridge that the page does not know keeps the path. | done |
 | `No page holds those words.` | change | `No page holds those words. Try fewer words.` | C |
 | `The search read part of the wiki. Use more words to find the rest.` | change | `Partial: more words find the rest.` | C |
 | `The wiki has no page.` | change | `The wiki is empty.` with the key `New page` | C |
@@ -489,7 +490,7 @@ Capacity shows where seating happens:
 | `History` (heading) | change | `History of <page>` | done |
 | `Version N, the current one: <title>` | change | `Version N`, with the chip `current` | C |
 | `Removed` | keep | | C |
-| `New page`, `Edit` (heading) | change | `New page`, `Edit <page>` | done |
+| `New page`, `Edit` (heading) | change | `New page`, `Edit <page>`, where the page is its title, such as `Edit Upgrade k3s on jucs-k3s`, and its name only without a title. The back link takes the same name. | done |
 | `<by> saved this page while you edited it, <time>. Your text is still here, and nothing is lost.` | change | `<by> saved this page while you edited it. Your text is still here.` | C |
 | `See their version` | keep | | C |
 | `Drop my text and take theirs`, `Save mine over theirs` | change | `Take theirs`, `Keep mine` | C |

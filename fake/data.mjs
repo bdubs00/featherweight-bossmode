@@ -402,6 +402,9 @@ function seedPages() {
     { m: 60, by: 'agent:migrator', summary: 'Notes of the nginx role', text: '---\ntitle: The nginx module\n---\n# The nginx module\n\nThe site templates keep their names: `site.conf.erb` becomes `site.conf.j2`.\n\n## Notes from the old wiki\n\nThe old wiki held raw HTML. The page shows it as text and runs nothing:\n\n<img src=x onerror="alert(1)"> <script>alert(2)</script>\n\n![a chart from another site](https://example.com/chart.png)\n\n[a link that runs code](javascript:alert(3)) and [a safe link](https://nginx.org/en/docs/).\n' },
   ]));
   add(page('bridges/br-puppet/plan.md', [{ m: 124, by: 'token', summary: 'The plan of the bridge', text: '---\ntitle: The plan of the Puppet bridge\n---\n# Migrate the remaining Puppet modules\n\n- [x] cron, by migrator-1\n- [ ] nginx, by migrator-2\n- [ ] logrotate, next\n\nThe reviewer reads each role against [the house style](../../runbooks/ansible-style.md). The tester runs molecule. The writer keeps the notes.\n' }]));
+  // A runbook that an agent wrote in a folder of its own, long enough that the editor scrolls.
+  const steps = Array.from({ length: 40 }, (_, i) => `${i + 1}. Drain node ${i % 3 === 0 ? 'jucs-k3s' : 'jucs-k3s-' + (i % 3)} and check the pods with \`kubectl get pods -A -o wide\`.`).join('\n');
+  add(page('k3s/runbooks/upgrade.md', [{ m: 35, by: 'agent:docs-scribe', summary: 'The upgrade of k3s', text: '---\ntitle: Upgrade k3s on jucs-k3s\n---\n# Upgrade k3s on jucs-k3s\n\nThe node also runs the jucs app, so never reinstall k3s.\n\n' + steps + '\n' }]));
   // The front writes an entry per heart, the newest first, as a list of its parts.
   const learned = (agent, entries) =>
     `# What people liked from ${agent}\n\nThe front adds an entry for each heart that a person puts on a result of ${agent} in a bridge. The newest entry comes first.\n\n` +

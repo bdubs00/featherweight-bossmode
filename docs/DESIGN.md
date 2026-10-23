@@ -623,7 +623,14 @@ The work:
 
 - The wiki. The tree with its folders as groups, each row with its name and
   `since()`, the search, the page with its meta as parts, the history, and
-  the editor with the conflict of a 412.
+  the editor with the conflict of a 412. The groups come in the order that
+  a person looks for them: the pages at the root, then the folders that
+  people and agents keep for the place, such as `runbooks` or
+  `k3s/monitoring`, by path, then the work folders of the bridges, each
+  named by the title of its bridge, then the folders of the agents, each
+  named by the agent. The path of a folder sits in its tooltip. The editor
+  names the page by its title, and opens its text at the top with the
+  caret at the start.
 - The manager conversation. The look of the channel, the status waking with
   a grey light while the Task of the manager wakes, and New conversation. A
   manager that runs on the front gets no `run` event, so the screen polls
