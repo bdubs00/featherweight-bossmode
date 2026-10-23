@@ -313,7 +313,7 @@ Capacity shows where seating happens:
 | `Reply to <who>: <excerpt>` | change | the chip `Replying to <who>` with `Stop replying` | done |
 | `Cancel the reply` | change | `Stop replying` | done |
 | `To every active member`, `To @a and @b` | change | `To everyone`, `To a and b` | A |
-| `Ctrl+Enter`, `⌘+Enter` | keep | | A |
+| `Ctrl+Enter`, `⌘+Enter` | keep | `⌘+Enter` on a Mac, from the platform hint of the browser. A touch screen (a coarse pointer) has no such key, so the composer names none there | done |
 | `Send` | keep | | done |
 | `Members` (list label) | keep | and `Commands` for the slash menu | done |
 | the argument hint of a command, such as `<module>` | add | in a slot of its own: beside the name in the slash menu, and as `/<name> <hint>` in the address line while the person types the arguments | done |

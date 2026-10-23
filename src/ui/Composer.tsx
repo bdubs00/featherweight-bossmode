@@ -1,6 +1,7 @@
 // The composer: a text box with @ completion over the roster, a slash menu
 // of commands in a one-on-one conversation, a reply chip that slides in,
-// the address line, and Cmd or Ctrl+Enter to send. The argument hint of a
+// the address line, and Cmd or Ctrl+Enter to send, with the name of that
+// key beside Send, except on a touch screen. The argument hint of a
 // command has a slot of its own: in the menu beside the name, and in the
 // address line while the person types the arguments. A draft stays in
 // sessionStorage, so a move to another screen, a reload, or a sign-in keeps
@@ -77,9 +78,38 @@ export function addressWords(to: string[]): string {
   return to.length ? 'To ' + list(to) : 'To everyone';
 }
 
-/** keyWords names the key that sends: Cmd+Enter on a Mac, Ctrl+Enter elsewhere. */
-export function keyWords(platform = typeof navigator !== 'undefined' ? navigator.platform : ''): string {
-  return (/Mac/.test(platform || '') ? '⌘' : 'Ctrl') + '+Enter';
+/** platformName is the platform of the browser: the hint of its user agent where it gives one, such as macOS, else navigator.platform. */
+function platformName(): string {
+  if (typeof navigator === 'undefined') return '';
+  const hint = (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData;
+  return (hint && hint.platform) || navigator.platform || '';
+}
+
+/** keyWords names the key that sends: ⌘+Enter on a Mac, Ctrl+Enter elsewhere. */
+export function keyWords(platform = platformName()): string {
+  return (/Mac|iPhone|iPad|iPod/i.test(platform || '') ? '⌘' : 'Ctrl') + '+Enter';
+}
+
+const COARSE = '(pointer: coarse)';
+
+/** coarseNow reports whether the main pointer of the device is coarse, as a finger on a touch screen is. */
+function coarseNow(): boolean {
+  return typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(COARSE).matches;
+}
+
+/** useCoarse follows whether the main pointer is coarse. A touch screen has no Ctrl or Cmd key, so the composer names no key there. */
+export function useCoarse(): boolean {
+  const [coarse, setCoarse] = useState(coarseNow);
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const q = window.matchMedia(COARSE);
+    const on = () => setCoarse(q.matches);
+    on();
+    if (typeof q.addEventListener !== 'function') return;
+    q.addEventListener('change', on);
+    return () => q.removeEventListener('change', on);
+  }, []);
+  return coarse;
 }
 
 export function Composer(p: ComposerProps) {
@@ -88,6 +118,7 @@ export function Composer(p: ComposerProps) {
   const [pick, setPick] = useState(0);
   const [busy, setBusy] = useState(false);
   const box = useRef<HTMLTextAreaElement>(null);
+  const coarse = useCoarse();
   const handles = useMemo(() => (p.members || []).map((m) => m.handle), [p.members]);
   const byHandle = useMemo(() => new Map((p.members || []).map((m) => [m.handle, m])), [p.members]);
   const commands = useMemo(() => (p.commands || []).map((c) => c.name), [p.commands]);
@@ -261,9 +292,11 @@ export function Composer(p: ComposerProps) {
         />
         <div class="tools">
           <span class="address">{typing ? <code class="arg-hint">{'/' + typing.name + ' ' + typing.hint}</code> : hint}</span>
-          <span class="keys" aria-hidden="true">
-            {keyWords()}
-          </span>
+          {!coarse && (
+            <span class="keys" aria-hidden="true">
+              {keyWords()}
+            </span>
+          )}
           <Button type="submit" kind="primary" class="send" disabled={busy || !text.trim() || !!p.disabled}>
             Send
           </Button>
