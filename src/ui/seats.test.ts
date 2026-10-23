@@ -8,7 +8,7 @@ const fleet: Fleet = {
   name: 'front-0',
   members: [
     { name: 'default/crew-0', state: 'live', lastSeen: '', canForward: true, accessMode: '', agents: [], active: 2, inputRequired: 0 },
-    { name: 'default/crew-1', state: 'live', lastSeen: '', canForward: true, accessMode: '', agents: [], active: 1, inputRequired: 0 },
+    { name: 'default/crew-1', state: 'live', lastSeen: '', canForward: true, accessMode: '', agents: [{ name: 'scribe', role: 'operator' }], active: 1, inputRequired: 0 },
     { name: 'default/crew-2', state: 'suspended', lastSeen: '', canForward: true, accessMode: '', agents: [], active: 0, inputRequired: 0 },
     { name: 'default/review-0', state: 'live', lastSeen: '', canForward: true, accessMode: '', agents: [], active: 1, inputRequired: 0 },
   ],
@@ -58,21 +58,32 @@ describe('pickGroups', () => {
 
 describe('pickGroups over the agents of the fleet', () => {
   // The front names only its own profile, default, which no pool runs. The
-  // pools run the migrator and the reviewer, and a member holds the tester.
-  const withMember: Fleet = { ...fleet, members: [...fleet.members, { name: 'default/test-0', state: 'live', lastSeen: '', canForward: true, accessMode: '', agents: [{ name: 'tester', role: 'operator' }], active: 0, inputRequired: 0 }] };
+  // pools run the migrator and the reviewer, a worker of the crew holds the
+  // scribe, and a member outside the pools holds the profiles of an old
+  // test. The worker of the manager also holds the agent of the quick chat.
+  const withMember: Fleet = {
+    ...fleet,
+    members: [
+      ...fleet.members,
+      { name: 'default/lab-0', state: 'live', lastSeen: '', canForward: true, accessMode: '', agents: [{ name: 'paybot', role: 'operator' }, { name: 'bootstrap', role: 'operator' }], active: 0, inputRequired: 0 },
+      { name: 'default/manager-0', state: 'live', lastSeen: '', canForward: true, accessMode: '', agents: [{ name: 'manager', role: 'operator' }, { name: 'chat', role: 'operator' }], active: 0, inputRequired: 0 },
+    ],
+    pools: [...fleet.pools!, { name: 'manager', atespace: 'default', agent: 'manager', intake: 'q', wanted: 1, actual: 1, ready: 1, hash: 'h', checkedAt: '', tasks: [{ name: 'manager-0', phase: 'Running', current: true }] }],
+  };
   const list = fleetAgents(withMember, [{ name: 'default', role: 'owner' }]);
 
-  it('offers the agents that the pools run and that the members hold, and never the profile of the front alone', () => {
-    const g = pickGroups(list, faces, [], factsOf(withMember));
+  it('offers the agents that a pool runs or a worker of a pool holds, and never a profile with no worker, the manager, or the quick chat', () => {
+    expect(list.map((a) => a.name)).toEqual(['bootstrap', 'chat', 'manager', 'migrator', 'paybot', 'reviewer', 'scribe']);
+    const g = pickGroups(list, faces, [], factsOf(withMember), '', [], ['manager', 'chat']);
     expect(g.here).toEqual([]);
-    expect(g.others.map((r) => r.agent)).toEqual(['migrator', 'reviewer', 'tester']);
+    expect(g.others.map((r) => r.agent)).toEqual(['migrator', 'reviewer', 'scribe']);
     expect(g.others.map((r) => r.free)).toEqual([1, 0, 0]);
   });
 
   it('holds the agents of the seats in On this bridge, also an agent that the fleet does not list', () => {
-    const g = pickGroups(list, faces, [seat('reviewer', 'reviewer'), seat('scribe', 'scribe'), seat('migrator-1', 'migrator')], factsOf(withMember));
-    expect(g.here.map((r) => r.agent)).toEqual(['reviewer', 'scribe', 'migrator']);
-    expect(g.others.map((r) => r.agent)).toEqual(['tester']);
+    const g = pickGroups(list, faces, [seat('reviewer', 'reviewer'), seat('tester', 'tester'), seat('migrator-1', 'migrator')], factsOf(withMember), '', [], ['manager', 'chat']);
+    expect(g.here.map((r) => r.agent)).toEqual(['reviewer', 'tester', 'migrator']);
+    expect(g.others.map((r) => r.agent)).toEqual(['scribe']);
   });
 });
 

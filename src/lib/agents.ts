@@ -53,3 +53,21 @@ export function fleetAgents(fleet: Fleet | null | undefined, own: Agent[] | null
 
 /** canSeat reports whether the person can start runs of an agent: an owner or an operator can, and so can a person whose role the page cannot tell, because the backend checks it. */
 export const canSeat = (a: Pick<Agent, 'role'>): boolean => !a.role || a.role === 'owner' || a.role === 'operator';
+
+/** holdsTask reports whether the fleet view lists a Task of a member: a worker of a pool. */
+export function holdsTask(fleet: Fleet, member: string): boolean {
+  return (fleet.pools || []).some((p) => (p.tasks || []).some((t) => member === p.atespace + '/' + t.name || member === t.name));
+}
+
+/**
+ * worksSeats reports whether an agent can work a seat of a bridge: a pool
+ * runs it, or a worker of a pool holds it. A profile that only a member
+ * outside the pools holds, such as the profile of an old test, has no
+ * worker for a seat. Without the fleet, the page cannot tell, so every
+ * agent counts.
+ */
+export function worksSeats(fleet: Fleet | null | undefined, agent: string): boolean {
+  if (!fleet) return true;
+  if ((fleet.pools || []).some((p) => p.agent === agent)) return true;
+  return (fleet.members || []).some((m) => !m.self && (m.agents || []).some((a) => a && a.name === agent) && holdsTask(fleet, m.name));
+}

@@ -579,8 +579,12 @@ The work:
   and pages from `usage`, for runs that report it.
 - The picker of Add. One field, Who, with the placeholder `Who?`. A list of
   agents with their marks, their taglines, and their workers: `N free` with
-  a green light, or `waiting for a worker` with a grey one. Two groups: On
-  this bridge, then Everyone else. A click puts a new seat row at the top of the
+  a green light, or `waiting for a worker` with a grey one. The name of an
+  agent stays on one line, and where it and the word do not fit side by
+  side, the status keeps only its light, with the word in its tooltip. Two groups: On
+  this bridge, then Everyone else. Everyone else holds the agents that can
+  work a seat, those that a pool runs or a worker of a pool holds, and never
+  the manager or the agent of the quick chat. A click puts a new seat row at the top of the
   members. The row holds the handle of `nextHandle` and the task, filled
   from the goal of the bridge, with the keys Seat and Cancel. Advanced opens the full form: handle, agent, and task, with the
   reason of `handleReason`. New agent opens `#new-agent`.

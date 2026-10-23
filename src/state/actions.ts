@@ -3,10 +3,11 @@
 
 import { api, type NewBridge, type NewMember, type NewMessage } from '../api/routes';
 import { openStream, type StreamHandle } from '../api/stream';
-import type { Entry, Fleet, FleetChange, MessageEventData, ReactionKind, RunState, StreamEvent } from '../api/types';
+import type { Entry, FleetChange, MessageEventData, ReactionKind, RunState, StreamEvent } from '../api/types';
 import { managerRunOf, type State } from './reducer';
 import { store } from './store';
 import { ApiError, type SigninNeeded } from '../api/client';
+import { holdsTask } from '../lib/agents';
 
 const loading = new Map<string, Promise<unknown>>();
 
@@ -217,10 +218,6 @@ export async function loadOpenRuns(): Promise<void> {
   }
 }
 
-/** holdsTask reports whether the fleet view lists a Task of that member. */
-function holdsTask(fleet: Fleet, member: string): boolean {
-  return (fleet.pools || []).some((p) => (p.tasks || []).some((t) => member === p.atespace + '/' + t.name || member === t.name));
-}
 
 let fleetTimer: ReturnType<typeof setTimeout> | null = null;
 

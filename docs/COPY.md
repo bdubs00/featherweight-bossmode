@@ -394,7 +394,8 @@ Capacity shows where seating happens:
 |---|---|---|---|
 | `Who` with the placeholder `Who?` | add | the field of the picker | done |
 | `On this bridge`, `Everyone else` | add | the two groups. On the new-bridge screen, On this bridge holds the agents of the seats of the form. | done |
-| `N free`, `waiting for a worker` | add | the capacity of an agent, with a green or a grey light | done |
+| `N free`, `waiting for a worker` | add | the capacity of an agent, with a green or a grey light. Where the name of the agent and the word do not fit side by side, the status shrinks to its light, and the word goes to the tooltip and the accessible name. The name stays on one line | done |
+| the manager, the agent of the quick chat, and the profiles of old tests in Everyone else | remove | Everyone else holds the agents that can work a seat: a pool runs it, or a worker of a pool holds it. The manager and the agent of `chat` in the settings are no workers for a bridge | done |
 | `Advanced`, `New agent` | add | `Advanced` shows only in the members pane, where the picker seats on a bridge that exists | done |
 | `Handle`, `Agent`, `Task`, `Seat`, `Cancel` (the full form of Advanced) | add | | done |
 

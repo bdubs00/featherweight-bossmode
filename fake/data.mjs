@@ -21,6 +21,7 @@ export const AGENTS = [
   { name: 'tester', description: 'Runs molecule and the lint checks of a role.', role: 'operator', displayName: 'Tester', tagline: 'Green or it did not happen.' },
   { name: 'writer', description: 'Writes the notes of a migration in the wiki.', role: 'operator', displayName: 'Writer', tagline: 'Plain words for the next person.' },
   { name: 'scribe', description: 'Drafts release notes from the merged changes.', role: 'operator', displayName: 'Scribe', tagline: 'What changed, for whom, and why.' },
+  { name: 'backup', description: 'Keeps the backups of the cluster and checks that each one restores.', role: 'operator', displayName: 'Backup Keeper', tagline: 'A backup counts once it restores.' },
   { name: 'manager', description: 'Helps the operator run the fleet.', role: 'operator', displayName: 'Manager', tagline: 'Reads before it acts. Asks before it spends.' },
   { name: 'chat', description: 'Answers the questions of one person, with the tools that the person picks.', role: 'operator', displayName: 'Chat', tagline: 'Asks back when a question is not clear.' },
 ];
@@ -252,6 +253,12 @@ export function seed(ask = '') {
     keep(x);
     return { handle: s.handle, agent: s.agent, pool: s.pool, task: s.task, runs: [id], fired: false, muted: false, presence: s.presence, activity: x.run.activity || null };
   });
+
+  // The backup keeper works on a run outside any bridge, so its one worker is busy.
+  const nightly = 'run-backup-nightly';
+  runs.set(nightly, { id: nightly, agent: 'backup', title: 'Check the nightly backup of jucs-k3s', state: 'running', input: 'Check the nightly backup of jucs-k3s', seq: 4, origin: 'http', principal: ALICE, metadata: {}, createdAt: minutesAgo(9), updatedAt: minutesAgo(1), member: 'default/backup-0', usage: { turns: 3, toolCalls: 2, costUSD: 0.03 }, reactions: { up: 0, down: 0, heart: 0 } });
+  transcripts.set(nightly, [item(1, 9, 'user', { text: 'Check the nightly backup of jucs-k3s', who: ALICE })]);
+  results.set(nightly, { runId: nightly, title: 'Check the nightly backup of jucs-k3s', agent: 'backup', status: 'working', started: minutesAgo(9), changed: minutesAgo(1), next: [] });
 
   // Bridge two: release notes, with a question that waits.
   const b2 = 'br-notes';
@@ -525,6 +532,7 @@ export const FLEET = {
     { name: 'default/test-0', self: false, state: 'suspended', lastSeen: minutesAgo(30), canForward: true, accessMode: 'static', agents: [{ name: 'tester', role: 'operator' }], active: 0, inputRequired: 0 },
     { name: 'default/test-1', self: false, state: 'suspended', lastSeen: minutesAgo(30), canForward: true, accessMode: 'static', agents: [{ name: 'tester', role: 'operator' }], active: 0, inputRequired: 0 },
     { name: 'default/notes-0', self: false, state: 'live', lastSeen: minutesAgo(0), canForward: true, accessMode: 'static', agents: [{ name: 'writer', role: 'operator' }], active: 0, inputRequired: 0 },
+    { name: 'default/backup-0', self: false, state: 'live', lastSeen: minutesAgo(0), canForward: true, accessMode: 'static', agents: [{ name: 'backup', role: 'operator' }], active: 1, inputRequired: 0 },
   ],
   pools: [
     { name: 'crew', atespace: 'default', agent: 'migrator', intake: 'fw.jobs.migrator', wanted: 3, actual: 3, ready: 2, hash: 'a1b2c3', generation: 4, tasks: [{ name: 'crew-0', phase: 'Running', current: true }, { name: 'crew-1', phase: 'Running', current: true }, { name: 'crew-2', phase: 'Suspended', current: true, note: '' }], gaps: [], checkedAt: minutesAgo(0) },
@@ -534,5 +542,7 @@ export const FLEET = {
     // Two workers for the tester and the writer, asleep and free.
     { name: 'test', atespace: 'default', agent: 'tester', intake: 'fw.jobs.tester', wanted: 2, actual: 2, ready: 2, hash: 't1', generation: 1, tasks: [{ name: 'test-0', phase: 'Suspended', current: true }, { name: 'test-1', phase: 'Suspended', current: true }], gaps: [], checkedAt: minutesAgo(0) },
     { name: 'notes', atespace: 'default', agent: 'writer', intake: 'fw.jobs.writer', wanted: 1, actual: 1, ready: 1, hash: 'w1', generation: 1, tasks: [{ name: 'notes-0', phase: 'Running', current: true }], gaps: [], checkedAt: minutesAgo(0) },
+    // One worker for the backup keeper, busy with a nightly check, so the picker shows it waiting for a worker beside its long name.
+    { name: 'backup', atespace: 'default', agent: 'backup', intake: 'fw.jobs.backup', wanted: 1, actual: 1, ready: 1, hash: 'b1', generation: 1, tasks: [{ name: 'backup-0', phase: 'Running', current: true }], gaps: [], checkedAt: minutesAgo(0) },
   ],
 };

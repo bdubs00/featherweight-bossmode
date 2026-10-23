@@ -4,7 +4,7 @@
 
 import type { Agent, FaceMeta, Fleet, Member } from '../api/types';
 import { handleReason, nextHandle } from '../lib/handles';
-import { canSeat } from '../lib/agents';
+import { canSeat, worksSeats } from '../lib/agents';
 import { cap } from '../lib/words';
 import { workersOf } from '../lib/workers';
 import { factsOf, type Facts } from '../lib/status';
@@ -29,14 +29,17 @@ export interface PickGroups {
  * pickGroups builds the two groups of the picker from the agents of the
  * fleet (src/lib/agents.ts). On this bridge holds the agents of the seats,
  * in the order of their first seat, also an agent that the fleet does not
- * list. Everyone else holds every other agent that the person can seat. A
- * query keeps the agents whose name, display name, or tagline holds it.
+ * list. Everyone else holds every other agent that the person can seat and
+ * that can work a seat: a pool runs it, or a worker of a pool holds it.
+ * skip names the agents that are no workers for a bridge, the manager and
+ * the agent of the quick chat. A query keeps the agents whose name,
+ * display name, or tagline holds it.
  * drafts names the agents of the new seats that wait, so a click on the
  * last free worker shows the agent as waiting for a worker at once. The
  * free workers of an agent come from the state of its workers, and facts
  * is null while the page does not know the fleet.
  */
-export function pickGroups(agents: Agent[], faces: Record<string, FaceMeta>, seats: Pick<Member, 'agent' | 'fired'>[], facts: Facts | null, query = '', drafts: string[] = []): PickGroups {
+export function pickGroups(agents: Agent[], faces: Record<string, FaceMeta>, seats: Pick<Member, 'agent' | 'fired'>[], facts: Facts | null, query = '', drafts: string[] = [], skip: string[] = []): PickGroups {
   const q = query.trim().toLowerCase();
   const byName = new Map(agents.map((a) => [a.name, a]));
   const seated: string[] = [];
@@ -52,8 +55,9 @@ export function pickGroups(agents: Agent[], faces: Record<string, FaceMeta>, sea
     return { agent: a.name, name, tagline, free };
   };
   const here = seated.map((n) => row(byName.get(n) || { name: n, role: '' })).filter((r): r is PickRow => !!r);
+  const fleet = facts ? facts.fleet : null;
   const others = agents
-    .filter((a) => !seated.includes(a.name))
+    .filter((a) => !seated.includes(a.name) && !skip.includes(a.name) && worksSeats(fleet, a.name))
     .map(row)
     .filter((r): r is PickRow => !!r);
   return { here, others };

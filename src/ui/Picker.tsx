@@ -39,15 +39,33 @@ export interface PickerProps {
   place?: 'pane' | 'key';
 }
 
+/**
+ * Row is one agent of the picker. The name stays on one line. Where the
+ * name and the word of the workers do not fit side by side, the status
+ * shrinks to its light, and the word goes to the tooltip and the
+ * accessible name.
+ */
 function Row({ r, onPick }: { r: PickRow; onPick: (agent: string) => void }) {
+  const word = r.free >= 0 ? freeWords(r.free) : '';
+  const name = useRef<HTMLSpanElement>(null);
+  // The word for which the row has no room. A new word measures again.
+  const [tightFor, setTightFor] = useState('');
+  const tight = !!word && tightFor === word;
+  useLayoutEffect(() => {
+    const el = name.current;
+    if (!el || !word || tight) return;
+    if (el.scrollWidth > el.clientWidth + 1) setTightFor(word);
+  }, [word, r.name, tight]);
   return (
     <button type="button" class="pick-row" data-pick onClick={() => onPick(r.agent)}>
       <Mark agent={r.agent} size={32} />
       <span class="pick-text">
-        <span class="pick-name">{r.name}</span>
+        <span class="pick-name" ref={name}>
+          {r.name}
+        </span>
         <span class="pick-tag">{r.tagline}</span>
       </span>
-      {r.free >= 0 && <Led tone={r.free > 0 ? 'green' : 'grey'} word={freeWords(r.free)} />}
+      {word && <Led tone={r.free > 0 ? 'green' : 'grey'} word={word} quiet={tight} />}
     </button>
   );
 }
@@ -131,9 +149,12 @@ export function Picker({ bridge, drafts, draftHandles, onPick, onClose, anchor, 
   const field = useRef<HTMLInputElement>(null);
   // A bridge that does not exist yet has the seats of the form.
   const seats = useMemo(() => (bridge ? membersOf(roster) : drafts.map((agent) => ({ agent, fired: false }))), [bridge, roster, drafts]);
-  const groups = useMemo(() => pickGroups(agents || [], faces, seats, facts, query, drafts), [agents, faces, seats, facts, query, drafts]);
+  // The manager and the agent of the quick chat are no workers for a bridge.
+  const skipKey = useSelect((s) => [s.config && s.config.manager ? s.config.manager.agent : '', s.config && s.config.chat ? s.config.chat.agent : ''].filter(Boolean).join('\n'));
+  const skip = useMemo(() => (skipKey ? skipKey.split('\n') : []), [skipKey]);
+  const groups = useMemo(() => pickGroups(agents || [], faces, seats, facts, query, drafts, skip), [agents, faces, seats, facts, query, drafts, skip]);
   const taken = useMemo(() => [...membersOf(roster).map((m) => m.handle), ...draftHandles], [roster, draftHandles]);
-  const all = useMemo(() => pickGroups(agents || [], faces, seats, facts, '', drafts), [agents, faces, seats, facts, drafts]);
+  const all = useMemo(() => pickGroups(agents || [], faces, seats, facts, '', drafts, skip), [agents, faces, seats, facts, drafts, skip]);
 
   useEffect(() => {
     // The agents come from the fleet and from the profiles of the front.

@@ -16,7 +16,8 @@ const fleet: Fleet = {
   name: 'front-0',
   members: [
     { name: 'default/crew-0', state: 'live', lastSeen: '', canForward: true, accessMode: '', agents: [], active: 1, inputRequired: 0 },
-    { name: 'default/crew-1', state: 'suspended', lastSeen: '', canForward: true, accessMode: '', agents: [], active: 0, inputRequired: 0 },
+    { name: 'default/crew-1', state: 'suspended', lastSeen: '', canForward: true, accessMode: '', agents: [{ name: 'scribe', role: 'operator' }], active: 0, inputRequired: 0 },
+    { name: 'default/lab-0', state: 'live', lastSeen: '', canForward: true, accessMode: '', agents: [{ name: 'paybot', role: 'operator' }], active: 0, inputRequired: 0 },
     { name: 'default/review-0', state: 'live', lastSeen: '', canForward: true, accessMode: '', agents: [], active: 1, inputRequired: 0 },
   ],
   pools: [
@@ -141,6 +142,7 @@ describe('the picker of Add', () => {
     expect(picker.querySelector('input')!.getAttribute('placeholder')).toBe('Who?');
     expect([...picker.querySelectorAll('.pick-group')].map((g) => g.textContent)).toEqual(['On this bridge', 'Everyone else']);
     // On this bridge holds the agents of the seats, also the tester, which the profiles of the front do not name.
+    // Everyone else holds the scribe, which a worker of the crew holds, and leaves out the profile of an old test with no worker.
     expect(rows(el)).toEqual(['Migrator 1 free', 'Reviewer waiting for a worker', 'Tester waiting for a worker', 'Writer waiting for a worker', 'Scribe waiting for a worker']);
     expect(picker.querySelector('.pick-row .led-green')).not.toBeNull();
     expect(picker.querySelector('a[href="#new-agent"]')!.textContent).toBe('New agent');
