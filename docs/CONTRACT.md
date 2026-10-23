@@ -485,9 +485,12 @@ conversation, and the next message starts a new run. While the run is
 `waking`, with "Waking the manager" in its tooltip.
 
 The page follows the run on the stream (`run` events) and reads the new
-transcript items with `from`. A run of the front sends no `run` event, so
-the page also reads `GET /v1/runs/{id}` every 3 seconds while the
-conversation is open and the run works or an answer is on its way.
+transcript items with `from`, at most once every 3 seconds, because a run
+that works sends an event per step. A run of the front sends no `run`
+event, so the page also reads `GET /v1/runs/{id}` every 3 seconds while the
+conversation is open and the run works or an answer is on its way. A run
+that a worker of the fleet holds, as its `member` names it, comes on the
+stream, so the page never polls it.
 
 A conversation with an agent that sits on no bridge works the same way:
 the first message starts a run on a member of the fleet whose agents hold
@@ -903,10 +906,14 @@ the new-agent screen read this one list. The free workers of an agent come
 from its pool.
 
 The page never says pool to a person: the profile says Workers and Keep.
-While the profile is open, it reads `GET /v1/pools/{name}` every 10
-seconds. That read gives Keep (`wanted`) and the `gaps`, which no event of
-the stream carries. The page reads a pool only once the fleet view names
-it, and it stops a read of the pool or of Today that answered 404. The
+The profile reads `GET /v1/pools/{name}` and Today once when it opens.
+The pool gives Keep (`wanted`) and the `gaps`, which no event of the stream
+carries. The profile reads the pool again only when the phases of its
+workers change on the stream, and Today only when a run of the agent
+changes its state, at most once every 5 seconds each, and it keeps both
+answers for the next view of the agent. The page reads a pool only once
+the fleet view names it, and it stops a read of the pool or of Today that
+answered 404. The
 profile reads `agents/<agent>/learned.md` only while the list of the wiki,
 once loaded, holds it. The workers and their phases come from the stream (section 10.1),
 never from that read.

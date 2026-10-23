@@ -68,11 +68,12 @@ describe('the conversation with an agent on no bridge', () => {
     expect(posts()[2]).toEqual({ method: 'POST', path: '/v1/bossmode/runs/run-boss-1/skill', body: { name: 'plan', args: 'cron' } });
   });
 
-  it('reads a run of the front again every 3 seconds while it works', async () => {
+  it('reads a run of the front again every 3 seconds while it works, and never a run that a worker holds, which comes on the stream', async () => {
     vi.useFakeTimers();
     try {
       sessionStorage.setItem('fw.bossmode.agentrun.manager', 'run-boss-1');
-      act(() => store.dispatch({ type: 'run', run: RUN as never }));
+      // A run of the front names no member of the fleet.
+      act(() => store.dispatch({ type: 'run', run: { ...RUN, member: '', seq: 2 } as never }));
       mount(<AgentChat agent="manager" />);
       const reads = () => calls.filter((c) => c.method === 'GET' && c.path === '/v1/runs/run-boss-1').length;
       const before = reads();
@@ -82,6 +83,12 @@ describe('the conversation with an agent on no bridge', () => {
       expect(reads()).toBe(before + 1);
       await act(async () => {
         vi.advanceTimersByTime(3000);
+      });
+      expect(reads()).toBe(before + 2);
+      // The same run on a worker of the fleet sends its events, so the poll stops.
+      act(() => store.dispatch({ type: 'run', run: { ...RUN, seq: 3 } as never }));
+      await act(async () => {
+        vi.advanceTimersByTime(9000);
       });
       expect(reads()).toBe(before + 2);
     } finally {

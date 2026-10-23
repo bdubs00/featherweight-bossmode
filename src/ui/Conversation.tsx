@@ -11,7 +11,7 @@ import type { ComponentChildren } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { ApiError } from '../api/client';
 import { api } from '../api/routes';
-import type { Item, Result, Run } from '../api/types';
+import type { Fleet, Item, Result, Run } from '../api/types';
 import { store, useSelect } from '../state/store';
 import { placedSteps, type Step } from '../state/thread';
 import { decisionOf } from '../lib/decision';
@@ -67,10 +67,35 @@ export function useTranscript(runId: string, load = true): TranscriptState {
     if (runId && owner.current === runId && (items.length || prev)) read.set(runId, { items, prev });
   }, [runId, items, prev]);
 
+  // The reads of the newer items follow the changes of the run, at most one every READ_GAP_MS: a run that works sends an event per step.
+  const readAt = useRef(0);
+  const planned = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const again = useRef(false);
+  const plan = (id: string) => {
+    if (planned.current) return;
+    if (busy.current) {
+      again.current = true;
+      return;
+    }
+    const wait = Math.max(0, readAt.current + READ_GAP_MS - Date.now());
+    planned.current = setTimeout(() => {
+      planned.current = null;
+      newer(id);
+    }, wait);
+  };
+  useEffect(
+    () => () => {
+      if (planned.current) clearTimeout(planned.current);
+      planned.current = null;
+    },
+    [runId],
+  );
+
   /** newer reads the items after the last one, for the run that the state still holds. */
   const newer = (id: string) => {
     if (busy.current) return;
     busy.current = true;
+    readAt.current = Date.now();
     api
       .transcript(id, { from: last.current + 1, limit: 500 })
       .then((t) => {
@@ -86,6 +111,11 @@ export function useTranscript(runId: string, load = true): TranscriptState {
       })
       .finally(() => {
         busy.current = false;
+        // A change of the run that came during the read reads once more, after the gap.
+        if (again.current && owner.current === id) {
+          again.current = false;
+          plan(id);
+        }
       });
   };
 
@@ -133,7 +163,7 @@ export function useTranscript(runId: string, load = true): TranscriptState {
   const seq = run ? run.seq : 0;
   useEffect(() => {
     if (!runId || !load || loading || seq <= last.current) return;
-    newer(runId);
+    plan(runId);
   }, [runId, seq, loading, load]);
 
   const earlier = async () => {
@@ -152,11 +182,26 @@ export function useTranscript(runId: string, load = true): TranscriptState {
 /** The time between two reads of a run that works. */
 export const POLL_MS = 3000;
 
+/** The least time between two reads of the newer items of a transcript. */
+export const READ_GAP_MS = 3000;
+
+/**
+ * onStream reports whether the stream sends the run events of a run: a run
+ * that a worker of the fleet holds, as its member names it. A run of the
+ * front itself, and a run whose member the page does not know, send none.
+ */
+export function onStream(fleet: Fleet | null, run: Run | undefined): boolean {
+  if (!fleet || !run || !run.member) return false;
+  const m = run.member;
+  return (fleet.members || []).some((x) => !x.self && (x.name === m || x.name.endsWith('/' + m)));
+}
+
 /**
  * usePoll reads a run again every POLL_MS while it works, and while also
  * is true, such as while an answer to a message is on its way. A run of the
  * front itself, such as a manager on the front, sends no run event on the
- * stream, so its conversation polls it while it is open. A run that does
+ * stream, so its conversation polls it while it is open. A run that a
+ * worker of the fleet holds sends its events, so it gets no poll. A run that does
  * not work gets no poll, because a read of it can wake its worker. A run
  * that the fleet lost gets no poll either: its last state can still say
  * running, and a read of it answers 404, which marks it lost. A hidden tab
@@ -165,7 +210,9 @@ export const POLL_MS = 3000;
 export function usePoll(runId: string, also = false): void {
   const state = useSelect((s) => (runId && s.runs[runId] ? s.runs[runId].state : ''));
   const lost = useSelect((s) => !!runId && !!s.lost[runId]);
-  const active = !!runId && !lost && (also || state === 'queued' || state === 'running');
+  // A run that a worker of the fleet holds comes on the stream with each change, so a poll would only read it twice.
+  const streamed = useSelect((s) => onStream(s.fleet, runId ? s.runs[runId] : undefined));
+  const active = !!runId && !lost && !streamed && (also || state === 'queued' || state === 'running');
   useEffect(() => {
     if (!active) return;
     const t = setInterval(() => {

@@ -638,7 +638,8 @@ The work:
   worker, and Keep as a number field in place. Each worker: its name, its
   status, and the seat it serves or the time it slept, as `since()` gives
   it. The workers and their statuses come from the stream (section 11.8).
-  The read of the pool every 10 seconds gives only Keep and the gaps. The one line `N skills`, and the picker of skills of C. Today: runs,
+  The read of the pool gives only Keep and the gaps, once on open and
+  again when the phases of its workers change, at most every 5 seconds. The one line `N skills`, and the picker of skills of C. Today: runs,
   cost, and decisions.
 - Activity. The inbox in the order of attention: the decisions that wait
   and the messages that ask you, then the errors, then the messages to you,
@@ -866,7 +867,10 @@ reads them only while the worker is awake, or on an action of the person.
 - The run pane of a bridge does the same, because a person opens it.
 - A conversation polls `GET /v1/runs/{id}` only while its run works, or
   while an answer to a message of the person is on its way, and never a
-  run that the fleet lost. A poll that answers 404 marks the run lost.
+  run that the fleet lost. A poll that answers 404 marks the run lost. A
+  run that a worker of the fleet holds comes on the stream, so only a run
+  of the front gets a poll. The newer items of a transcript follow the
+  changes of the run, at most one read every 3 seconds.
 - The inbox never reads the result of a run whose worker sleeps.
 
 The wakes that the person causes still show as lines in the channel. A

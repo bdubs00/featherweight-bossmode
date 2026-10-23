@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'preact/test-utils';
 import type { Run } from '../api/types';
 import { store } from '../state/store';
-import { POLL_MS, forgetTranscripts, usePoll, useTranscript } from './Conversation';
+import { POLL_MS, READ_GAP_MS, forgetTranscripts, usePoll, useTranscript } from './Conversation';
 import { at, fakeFetch, mount, unmountAll, type Call } from './testkit-b';
 
 let calls: Call[] = [];
@@ -81,5 +81,24 @@ describe('useTranscript', () => {
     const again = mount(<Reader id="r-read" load={false} />);
     expect(again.textContent).toBe('The role lints clean.');
     expect(calls.filter((c) => c.path.includes('/transcript')).length).toBe(1);
+  });
+
+  it('reads the newer items of a run that works at most once every few seconds, also through a burst of events', async () => {
+    const on = mount(<Reader id="r-read" load />);
+    await vi.waitFor(() => expect(on.textContent).toBe('The role lints clean.'));
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    const reads = () => calls.filter((c) => c.path.includes('/transcript')).length;
+    // A burst of ten steps, one every 200 milliseconds.
+    for (let seq = 2; seq < 12; seq++) {
+      act(() => store.dispatch({ type: 'run', run: { ...run('r-read', 'running'), seq } }));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+    }
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(READ_GAP_MS);
+    });
+    // The first read, the first step at once, and one more read after the gap for the rest.
+    expect(reads()).toBe(3);
   });
 });

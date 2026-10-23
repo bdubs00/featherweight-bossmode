@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'preact/test-utils';
-import { KeepField, Profile } from './Profile';
+import { KeepField, Profile, forgetProfileReads } from './Profile';
 import { FLEET, fakeFetch, mount, seedFleet, unmountAll, type Call } from './testkit-b';
 import { forgetProfiles } from '../state/profiles';
 import { store } from '../state/store';
@@ -38,6 +38,7 @@ const STREAM_FLEET = { ...FLEET, pools: FLEET.pools!.map((p) => (p.name === 'cre
 
 beforeEach(() => {
   forgetProfiles();
+  forgetProfileReads();
   forgetQueued();
   const f = fakeFetch([
     ['PATCH', /^\/v1\/pools\/crew$/, (b) => ({ ...POOL, wanted: (b as { replicas: number }).replicas })],
@@ -165,6 +166,46 @@ describe('the profile', () => {
     expect(words()).toEqual(['awake', 'awake']);
     act(() => store.dispatch({ type: 'stream', event: { id: '', kind: 'task', data: { kind: 'task', member: 'default/crew-0', phase: 'Suspended', time: '' } } }));
     expect(words()).toEqual(['asleep', 'awake']);
+  });
+
+  it('reads the pool and today once on open, again only on an event of the agent, and at most every few seconds', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    try {
+      const reads = (path: string) => calls.filter((c) => c.method === 'GET' && c.path === path).length;
+      mount(<Profile agent="migrator" />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10);
+      });
+      expect([reads('/v1/pools/crew'), reads('/v1/bossmode/agents/migrator/today')]).toEqual([1, 1]);
+      // A minute with no event of the agent reads nothing.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(60_000);
+      });
+      expect([reads('/v1/pools/crew'), reads('/v1/bossmode/agents/migrator/today')]).toEqual([1, 1]);
+      // An event of another agent reads nothing, and a burst of events of the agent reads once.
+      act(() => store.dispatch({ type: 'run', run: { id: 'run-other', agent: 'reviewer', state: 'running', seq: 1, createdAt: '', updatedAt: '' } }));
+      for (let i = 0; i < 4; i++) {
+        act(() => store.dispatch({ type: 'run', run: { id: 'run-burst-' + i, agent: 'migrator', state: 'running', seq: 1, createdAt: '', updatedAt: '' } }));
+        act(() => store.dispatch({ type: 'stream', event: { id: '', kind: 'task', data: { kind: 'task', member: i % 2 ? 'default/crew-9' : 'default/crew-0', phase: i % 2 ? 'Suspended' : 'Running', time: '' } } }));
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(500);
+        });
+      }
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(6000);
+      });
+      // The pool: one change of a phase, one read. Today: the first run of the burst reads at once, and the rest once, after the gap.
+      expect([reads('/v1/pools/crew'), reads('/v1/bossmode/agents/migrator/today')]).toEqual([2, 3]);
+      // A profile that opens again reads nothing new: the page keeps the answers.
+      unmountAll();
+      mount(<Profile agent="migrator" />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10);
+      });
+      expect([reads('/v1/pools/crew'), reads('/v1/bossmode/agents/migrator/today')]).toEqual([2, 3]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('keeps Remove workers in the More menu of the workers, for an owner, and removes them after Confirm', async () => {

@@ -3,9 +3,9 @@
 // skills, New face, What people liked, the workers with Keep, and the
 // counts of today. The workers and their phases come from the state of
 // each worker that the stream keeps, as on every screen. GET
-// /v1/pools/{name}, read again every 10 seconds while the profile is open,
-// gives only Keep and the gaps, which no event of the stream carries. The
-// page never says pool: it says Workers and Keep.
+// /v1/pools/{name} gives only Keep and the gaps. The profile reads it when
+// it opens, and again when the phases of the workers change on the stream.
+// The page never says pool: it says Workers and Keep.
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
@@ -30,60 +30,47 @@ import { Abilities } from './Abilities';
 import { abilitiesOf, rulesWords } from '../lib/tools';
 import { costParts } from '../lib/cost';
 import { useToolCatalog } from '../state/tools';
+import { forgetReads, readCache, useEventRead } from '../state/eventread';
 
 const WORKER_HELP = 'A worker runs the work of one agent, one seat at a time. Keep is how many it keeps ready.';
-const POLL_MS = 10_000;
+/** The answers of the pools and of today, kept for the next view of a profile. */
+const pools = readCache<Pool>();
+const todays = readCache<Today>();
+
+/** forgetProfileReads drops the answers that the profile read, for the tests. */
+export function forgetProfileReads(): void {
+  forgetReads(pools);
+  forgetReads(todays);
+}
 
 /**
- * usePool reads Keep and the gaps of the workers of an agent now and every
- * 10 seconds while the profile is open, and the counts of today. The page
- * asks only what exists: it reads a pool only once the fleet names it, so a
- * profile of the front costs no read, and it stops a read that answered
- * 404, so a workbench without the route of today costs no request every 10
- * seconds.
+ * usePool reads Keep and the gaps of the workers of an agent, and the
+ * counts of today, once when the profile opens. It reads them again only
+ * on an event that concerns them, at most every few seconds: the pool when
+ * the phases of its workers change, and today when a run of the agent
+ * changes its state. The page asks only what exists: it reads a pool only
+ * once the fleet names it, so a profile of the front costs no read, and a
+ * route that answered 404 is not asked again.
  */
 function usePool(agent: string): [Pool | null | undefined, (p: Pool | null) => void, Today | null | undefined] {
-  const [pool, setPool] = useState<Pool | null | undefined>(undefined);
-  const [today, setToday] = useState<Today | null | undefined>(undefined);
   const name = useSelect((s) => poolNameOf(s.fleet, agent));
   // The fleet names the pools, so the page waits for it before it reads one, and the read of the fleet after a new agent names its pool.
   const pooled = useSelect((s) => (s.fleet ? (s.fleet.pools || []).some((p) => p.agent === agent) : undefined));
-  useEffect(() => {
-    let live = true;
-    let askPool = pooled === true;
-    let askToday = true;
-    setPool(pooled === false ? null : undefined);
-    setToday(undefined);
-    const read = () => {
-      if (askPool) {
-        api
-          .pool(name)
-          .then((p) => {
-            if (!live) return;
-            if (!p) askPool = false;
-            setPool(p);
-          })
-          .catch(() => live && setPool((old) => (old === undefined ? null : old)));
-      }
-      if (askToday) {
-        api
-          .today(agent)
-          .then((t) => {
-            if (!live) return;
-            if (!t) askToday = false;
-            setToday(t);
-          })
-          .catch(() => live && setToday((old) => (old === undefined ? null : old)));
-      }
-    };
-    read();
-    const t = setInterval(read, POLL_MS);
-    return () => {
-      live = false;
-      clearInterval(t);
-    };
-  }, [agent, name, pooled]);
-  return [pool, setPool, today];
+  const poolSig = useSelect((s) => {
+    const p = s.fleet ? (s.fleet.pools || []).find((x) => x.agent === agent) : undefined;
+    return p ? [p.wanted, p.actual, p.ready, ...(p.tasks || []).map((t) => t.name + ':' + t.phase)].join(',') : '';
+  });
+  const runSig = useSelect((s) =>
+    Object.values(s.runs)
+      .filter((r) => r.agent === agent)
+      .map((r) => r.id + ':' + r.state)
+      .sort()
+      .join(','),
+  );
+  const [pool, setPool] = useEventRead(pools, pooled ? name : '', poolSig, () => api.pool(name));
+  const [today] = useEventRead(todays, agent, runSig, () => api.today(agent));
+  // While the page does not know the fleet, the pool is unknown, not absent.
+  return [pooled === undefined && pool === null ? undefined : pool, setPool, today];
 }
 
 /**
