@@ -285,7 +285,7 @@ function applyEntry(state: State, bridgeId: string, e: Entry): State {
   if (b) {
     let nb = b;
     if (e.seq > b.lastSeq) {
-      nb = { ...nb, lastSeq: e.seq };
+      nb = { ...nb, lastSeq: e.seq, lastAt: e.at || nb.lastAt };
       if (isNew && e.seq > b.read && counts(state, e)) {
         if (state.open === bridgeId) nb.read = e.seq;
         else nb.unread = (nb.unread || 0) + 1;
@@ -526,7 +526,7 @@ export function reduce(state: State, a: Action): State {
       let next: State = markLost({ ...state, channels: { ...state.channels, [a.bridge]: ch } }, a.page.messages);
       const b = next.bridges.byId[a.bridge];
       const last = ch.seqs.length ? ch.seqs[ch.seqs.length - 1] : 0;
-      if (b && last > b.lastSeq) next = { ...next, bridges: { ...next.bridges, byId: { ...next.bridges.byId, [a.bridge]: { ...b, lastSeq: last } } } };
+      if (b && last > b.lastSeq) next = { ...next, bridges: { ...next.bridges, byId: { ...next.bridges.byId, [a.bridge]: { ...b, lastSeq: last, lastAt: ch.bySeq[last].at || b.lastAt } } } };
       return next;
     }
     case 'entry':

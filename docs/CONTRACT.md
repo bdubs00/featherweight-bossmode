@@ -113,6 +113,7 @@ section 6.1 of the plan without `members`, plus five fields:
 | Field | Value |
 |---|---|
 | `lastSeq` | The seq of the newest entry of the channel |
+| `lastAt` | **New.** The time of the newest entry of the channel, absent before the first entry. The row of the bridge shows its freshness, such as `14 min`, and an entry on the stream moves it. |
 | `read` | The seq that the caller read last (section 5.2) |
 | `unread` | The entries after `read` that count for the caller: a message of a person or an agent, and a card that waits for a decision. A message of the caller and a plain system line do not count. |
 | `memberCount` | The number of seats, fired seats included |
@@ -165,7 +166,11 @@ plan plus two fields:
 the person, or 0 (section 5.1).
 
 `presence` is one word of the table of section 6.5 of the plan: `working`,
-`needs-you`, `waiting`, `not-started`, `idle`, `asleep`, `error`, or `fired`.
+`needs-you`, `waiting`, `not-started`, `idle`, `asleep`, `limit`, `error`,
+or `fired`. **New.** `limit` is a seat whose newest run stopped at a limit
+of its budget, `budget exceeded` in the error of the run: no fault, and
+Continue goes on with the run (section 5.4). The page derives it from a
+run in the state `failed` with that error.
 A seat with no run is `waiting` while its job waits on the queue of its agent
 or the manager of its spawn bridge still runs, and `not-started` when that
 manager stopped before it seated the member. A message to a `not-started`
@@ -180,6 +185,12 @@ takes this field only where it lacks them.
 the caller for the bridge and answers 204. A smaller seq than the mark leaves
 the mark. The page sends it a moment after the person reads the channel.
 
+Done on a message in Activity sends the seq of that message, so the message
+leaves Activity for this person, and so does every earlier entry of the
+bridge, as when the person reads the channel. A decision and a message that
+asks the person have no Done: a decision leaves when it is decided, and a
+message that asks when the person answers it.
+
 ### 5.3 Open, change, and close
 
 `POST /v1/bridges`:
@@ -191,12 +202,16 @@ the mark. The page sends it a moment after the person reads the channel.
   "placement": "queue",
   "members": [{ "handle": "migrator-3", "agent": "migrator", "task": "Migrate the logrotate module" }],
   "delegation": { "approve": false, "budget": false, "members": false, "report": true },
-  "caps": { "maxMessages": 2000 }
+  "caps": { "maxMessages": 2000, "maxTurns": 1000 }
 }
 ```
 
 `delegation` and `caps` are optional and partial: a missing key takes the
-default. The answer is 201 with the record and its members. A handle is
+default. **New.** `caps.maxTurns` bounds the turns of every run of the
+bridge together, 1000 by default, because each message gives a seat its
+allowance again (section 5.4). Past it, nothing fans out until a person
+raises the cap, and the channel says `The bridge reached its cap of <n>
+turns`. A record of an older workbench answers the default. The answer is 201 with the record and its members. A handle is
 lower-case letters, digits, dots, dashes, and underscores, at most 32.
 
 `PATCH /v1/bridges/{id}` takes any of `title`, `delegation` (partial),
@@ -210,17 +225,32 @@ record with its members. A close or an open posts a system line (section
 |---|---|---|
 | `POST /v1/bridges/{id}/members` | `{"handle", "agent", "task"}` | 201 with the member |
 | `DELETE /v1/bridges/{id}/members/{handle}` | none | 200 with the fired member |
-| `PATCH /v1/bridges/{id}/members/{handle}` | `{"muted": true}` or `{"task": "..."}` or both | 200 with the member |
+| `PATCH /v1/bridges/{id}/members/{handle}` | `{"muted": true}` or `{"task": "..."}` or both, or `{"continue": true}` | 200 with the member |
 
 A fire of a fired member answers 200 with the member and changes nothing.
 
-A seat whose newest run was canceled, failed, or stopped at a limit gets no
-delivery from the channel. A `PATCH` with `task` seats it again: a new run
-starts with the task. The page offers Seat again on the row of such a
-member and in its menu, beside Change task. Seat again sends the task of
+The budget of a seat is its allowance for each message that it handles:
+each follow-up of the channel first raises the limits of the run by that
+allowance over what the run used, so a seat that takes many messages does
+not stop at the arithmetic of a budget that counts the whole run.
+
+A seat whose newest run was canceled or failed gets no delivery from the
+channel. A `PATCH` with `task` seats it again: a new run starts with the
+task. **New.** A seat whose newest run stopped at a limit of its budget, the
+presence `limit`, gets no message of an agent, and a message of a person
+continues its run with the allowance. A `PATCH` with `{"continue": true}`
+goes on with the same run, so the run keeps what it knows: the run gets the
+allowance of its seat over what it used and a short message to go on, and
+the channel says `<name> continued <handle>` with the event `task`. A seat
+whose newest run did not stop at a limit answers 409, and `continue` with
+`task` answers 400. The page offers Continue in place of Seat again on the
+row of such a seat, over the composer of its conversation, in Activity, and
+in its menu, where Seat again stays. For a seat whose newest run was
+canceled or failed, the page offers Seat again on its row and in its menu,
+beside Change task. Seat again sends the task of
 the member unchanged as `task`, in one click. Change task opens the task,
 which the person can change first. The page needs the workbench to seat
-the member again also when the text of the task is the same. The page knows that a newest run stopped from the presence `error`, or
+the member again also when the text of the task is the same. The page knows that a newest run stopped from the presence `error` or `limit`, or
 from the state `failed` or `canceled` of the run on the stream.
 
 ## 6. The channel

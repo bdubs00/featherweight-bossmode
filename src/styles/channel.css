@@ -51,6 +51,11 @@
   line-height: var(--t-meta-lh);
   color: var(--muted);
 }
+/* The freshness of the newest entry closes the meta line. */
+.brow-when {
+  flex: none;
+  margin-left: auto;
+}
 .group-toggle {
   appearance: none;
   display: flex;

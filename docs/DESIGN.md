@@ -124,7 +124,7 @@ word color.
 | Working, live, awake | `--led-green` `#1E9E45` | `--word-green` `#177A36` | `#4CCB70` | none |
 | Needs you | `--led-amber` `#F0A400` | `--word-amber` `#8A5500` | `#F0A400` | breathes, 2.4 s |
 | Error | `--led-red` `#D1281F` | `--word-red` `#A8201A` | `#FF7B72` | none |
-| Idle, asleep, closed, waiting for a worker | `--led-grey` `#9A9A92`, graphite `#6E6E68` | `--muted` | `--muted` | none |
+| Idle, asleep, closed, waiting for a worker, at its limit | `--led-grey` `#9A9A92`, graphite `#6E6E68` | `--muted` | `--muted` | none |
 | Fired | `--led-grey`, no glow | `--muted`, struck through | same | none |
 
 A lit light (green, amber, red) glows in its own color: `0 0 5px` of the
@@ -329,7 +329,7 @@ at the top right of the icon.
 
 | Place | List pane | Main pane | Details pane |
 |---|---|---|---|
-| Activity | The inbox: what needs you first, then what is new | The item you picked, else the item that needs you and waits longest | none |
+| Activity | The inbox: what needs you first, then what is new | The item you picked, else the item that needs you and waits longest. After a decision, the next item that needs you, else the decided card, settled | none |
 | Chat | The history of the quick chat, newest first, grouped by day | The conversation of a chat, or the picks of a new chat | This chat: the tools and the skills in use, the model, and the usage |
 | Bridges | Bridges, open first, each with its count and its light | The channel, with the tabs Posts, Wiki, and Decisions | The members, with Add |
 | Fleet | People: the seats grouped by bridge, then Not on a bridge | A direct conversation with a member, with the tabs Chat, Run, and Files, or the board | The profile of the agent |
@@ -518,9 +518,12 @@ Files: `src/ui/BridgeList.tsx`, `src/ui/Channel.tsx`, `src/ui/Message.tsx`,
 The work:
 
 - The list of bridges. Rows as the mockup draws them: the title, the unread
-  count as an ink chip, the members, and the light of what needs you. Open
-  bridges first, the Closed group behind its toggle, and a filter field
-  above the list once it holds more than ten bridges.
+  count as an ink chip, the members, and the light of what needs you, else
+  of a failed seat, else `working` while a seat works. The meta line ends
+  with the freshness of the newest entry, such as `14 min`, from `since()`,
+  so a bridge that went quiet shows it. Open bridges first, the Closed
+  group behind its toggle, and a filter field above the list once it holds
+  more than ten bridges.
 - The header of the channel. The title, the tabs Posts, Wiki, and Decisions
   with the amber count of the decisions that wait, the key Close bridge, and
   the More menu with What the manager can do and Reopen. The title takes
@@ -597,6 +600,10 @@ The work:
   a worker for a queued run. A row that needs you takes `--wash-need`. A
   row whose newest run failed or stopped holds the small secondary key
   Seat again under its text, which sends the task unchanged in one click.
+  A row whose newest run stopped at a limit of its budget says `at its
+  limit` with a grey light, because nothing failed, and its key is
+  Continue, which goes on with the same run with more room. Its plain line
+  names the limit.
   The More menu holds Open conversation (to `#member/<bridge>/<handle>`),
   Mute, Seat again, Change task, and Fire. The foot shows This bridge with turns, cost,
   and pages from `usage`, for runs that report it.

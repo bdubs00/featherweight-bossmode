@@ -37,7 +37,7 @@ import { Confirm, Menu, type MenuItem } from './common';
 import { Composer } from './Composer';
 import { useTranscript } from './Conversation';
 import { FilesView, RunView, failureOf, filesCount, useResult } from './RunPane';
-import { SeatAgainKey, seatAgain } from './SeatAgain';
+import { SeatAgainKey, continueSeat, seatAgain } from './SeatAgain';
 import { FollowBox, ThreadView } from './Thread';
 import { LiveLines, useLiveAnswer } from './Live';
 import { works } from '../lib/chat';
@@ -59,14 +59,15 @@ function useSeat(bridge: string, handle: string) {
 
 /**
  * useStopped reports how the newest run of a seat stopped: failed,
- * stopped, not-started for a seat that the manager never seated, or ""
- * when it takes messages.
+ * stopped, limit for a run at a limit of its budget, not-started for a
+ * seat that the manager never seated, or "" when it takes messages.
  */
-function useStopped(m: MemberT | undefined): '' | 'failed' | 'stopped' | 'not-started' {
+function useStopped(m: MemberT | undefined): '' | 'failed' | 'stopped' | 'limit' | 'not-started' {
   const state = useSelect((s) => (m && s.runs[newestRun(m)] ? s.runs[newestRun(m)].state : ''));
   const presence = useSelect((s) => (m ? seatPresence(selectFacts(s), m) : ''));
   if (!m || m.fired) return '';
   if (presence === 'not-started') return 'not-started';
+  if (presence === 'limit') return 'limit';
   if (state === 'canceled') return 'stopped';
   if (state === 'failed' || presence === 'error') return 'failed';
   return '';
@@ -105,12 +106,13 @@ export function TaskDialog({ bridge, m, onClose }: { bridge: string; m: MemberT;
  * reaches only here, Mute, Seat again, Change task, and Fire. Seat again
  * acts at once, as its key does.
  */
-function SeatMenu({ bridge, m, stopped }: { bridge: string; m: MemberT; stopped: boolean }) {
+function SeatMenu({ bridge, m, stopped }: { bridge: string; m: MemberT; stopped: '' | 'failed' | 'stopped' | 'limit' | 'not-started' }) {
   const [dialog, setDialog] = useState<'' | 'task' | 'fire'>('');
   if (m.fired) return null;
   const items: MenuItem[] = [
     { label: 'Profile', onSelect: () => go({ place: 'member', bridge, handle: m.handle, tab: 'chat', profile: true }) },
     { label: m.muted ? 'Unmute' : 'Mute', onSelect: () => attempt(() => patchMember(bridge, m.handle, { muted: !m.muted })) },
+    ...(stopped === 'limit' ? [{ label: 'Continue', onSelect: () => continueSeat(bridge, m) }] : []),
     ...(stopped ? [{ label: 'Seat again', onSelect: () => seatAgain(bridge, m) }] : []),
     { label: 'Change task', onSelect: () => setDialog('task') },
     { label: 'Fire', danger: true, onSelect: () => setDialog('fire') },
@@ -140,15 +142,17 @@ function SeatMenu({ bridge, m, stopped }: { bridge: string; m: MemberT; stopped:
 /**
  * SeatBar sits over the composer of a seat whose newest run stopped, or
  * that never started: the status, the plain line of the failure with the
- * message of the provider in its tooltip, and Seat again.
+ * message of the provider in its tooltip, and Seat again, or Continue for
+ * a seat at its limit.
  */
-function SeatBar({ bridge, m, how, reason, said }: { bridge: string; m: MemberT; how: 'failed' | 'stopped' | 'not-started'; reason: string; said: string }) {
+function SeatBar({ bridge, m, how, reason, said }: { bridge: string; m: MemberT; how: 'failed' | 'stopped' | 'limit' | 'not-started'; reason: string; said: string }) {
+  const why = how === 'failed' || how === 'limit';
   return (
     <div class="seat-bar">
-      {how === 'failed' ? <Led tone="red" word="error" /> : <Led tone="grey" word={how === 'not-started' ? 'not started' : 'stopped'} />}
-      {/* A stopped seat says it in its status, so only a failure has a line. */}
-      <span class="seat-bar-why" title={how === 'failed' ? said || reason || undefined : undefined}>
-        {how === 'failed' ? reason : ''}
+      {how === 'failed' ? <Led tone="red" word="error" /> : <Led tone="grey" word={how === 'not-started' ? 'not started' : how === 'limit' ? 'at its limit' : 'stopped'} />}
+      {/* A stopped seat says it in its status, so only a failure and a limit, which names its limit, have a line. */}
+      <span class="seat-bar-why" title={why ? said || reason || undefined : undefined}>
+        {why ? reason : ''}
       </span>
       <SeatAgainKey bridge={bridge} m={m} />
     </div>
@@ -156,7 +160,7 @@ function SeatBar({ bridge, m, how, reason, said }: { bridge: string; m: MemberT;
 }
 
 /** Chat is the direct thread of a seat and its composer. */
-function Chat({ bridge, m, items, closed, stopped, reason, said }: { bridge: string; m: MemberT; items: ReturnType<typeof useTranscript>['items']; closed: boolean; stopped: '' | 'failed' | 'stopped' | 'not-started'; reason: string; said: string }) {
+function Chat({ bridge, m, items, closed, stopped, reason, said }: { bridge: string; m: MemberT; items: ReturnType<typeof useTranscript>['items']; closed: boolean; stopped: '' | 'failed' | 'stopped' | 'limit' | 'not-started'; reason: string; said: string }) {
   const ch = useSelect((s) => s.channels[bridge]);
   const roster = useSelect((s) => s.rosters[bridge]);
   const skills = useSelect((s) => (s.skills ? s.skills.skills : null));
@@ -292,7 +296,7 @@ export function MemberMain({ bridge, handle, tab }: { bridge: string; handle: st
                 { id: 'files', label: 'Files', href: hrefOf({ ...base, tab: 'files' }), count: files, countLabel: files === 1 ? '1 file' : files + ' files' },
               ]}
             />
-            <SeatMenu bridge={bridge} m={m} stopped={!!stopped} />
+            <SeatMenu bridge={bridge} m={m} stopped={stopped} />
           </>
         }
       >

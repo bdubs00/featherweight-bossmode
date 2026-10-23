@@ -7,6 +7,7 @@ import type { Entry, FleetChange, MemberEventData, MessageEventData, ReactionKin
 import { managerRunOf, seatOfRun, type State } from './reducer';
 import { store } from './store';
 import { ApiError, type SigninNeeded } from '../api/client';
+import { noteDecided } from './done';
 import { holdsTask } from '../lib/agents';
 
 const loading = new Map<string, Promise<unknown>>();
@@ -226,11 +227,13 @@ export async function react(id: string, seq: number, reaction: ReactionKind, not
 
 export async function decide(run: string, approval: string, decision: 'allow' | 'deny', note?: string, content?: unknown): Promise<void> {
   await api.decide(run, approval, decision, note, content);
+  noteDecided(run, approval, decision, note, content);
 }
 
 export async function alwaysAllow(run: string, approval: string, note?: string): Promise<void> {
   try {
     await api.alwaysAllow(run, approval, note);
+    noteDecided(run, approval, 'allow', note);
   } catch (e) {
     // The rule lands on the profile of the agent, which only its owner or
     // an admin changes. The backend says so with the subject of the caller
@@ -245,7 +248,7 @@ export async function fire(id: string, handle: string): Promise<void> {
   store.dispatch({ type: 'member', bridge: id, member: m });
 }
 
-export async function patchMember(id: string, handle: string, patch: { muted?: boolean; task?: string }): Promise<void> {
+export async function patchMember(id: string, handle: string, patch: { muted?: boolean; task?: string; continue?: boolean }): Promise<void> {
   const m = await api.patchMember(id, handle, patch);
   store.dispatch({ type: 'member', bridge: id, member: m });
 }

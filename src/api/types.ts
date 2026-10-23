@@ -76,7 +76,7 @@ export type Placement = 'queue' | 'spawn';
  * run is waiting while a job or the manager will seat it, and not-started
  * when nothing will: the manager of its spawn bridge stopped first.
  */
-export type Presence = 'working' | 'needs-you' | 'waiting' | 'not-started' | 'idle' | 'asleep' | 'error' | 'fired';
+export type Presence = 'working' | 'needs-you' | 'waiting' | 'not-started' | 'idle' | 'asleep' | 'limit' | 'error' | 'fired';
 
 /** The activity of a run that works (K4). */
 export interface Activity {
@@ -126,6 +126,8 @@ export interface Caps {
   maxMessages: number;
   maxFanoutPerMinute: number;
   maxPairMessages: number;
+  /** The turns of every run of the bridge together. An older workbench has none. */
+  maxTurns?: number;
 }
 
 /** A bridge record. GET /v1/bridges leaves out members and adds counts. */
@@ -144,6 +146,8 @@ export interface Bridge {
   members?: Member[];
   /** The seq of the newest entry of the channel. */
   lastSeq: number;
+  /** The time of the newest entry of the channel, for the freshness of a row of the list. Absent before the first entry, and from an older workbench. */
+  lastAt?: string;
   /** The seq that the caller read last. */
   read: number;
   /** The entries after read that count as unread for the caller. */

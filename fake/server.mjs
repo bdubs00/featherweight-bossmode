@@ -205,6 +205,7 @@ function listItem(b, subject) {
   return {
     ...rest,
     lastSeq: ch.length ? ch[ch.length - 1].seq : 0,
+    ...(ch.length ? { lastAt: ch[ch.length - 1].at } : {}),
     read,
     unread: ch.slice(-2000).filter((e) => e.seq > read && counts(e, subject)).length,
     memberCount: members.length,
@@ -977,6 +978,16 @@ on('PATCH', '/v1/bridges/([^/]+)/members/([^/]+)', async (c, id, handle) => {
   if (typeof body.task === 'string') {
     if (!body.task.trim()) refuse(400, 'a task needs words');
     patch.task = body.task.trim();
+  }
+  if (body.continue === true) {
+    // Continue goes on with the run that stopped at a limit of its budget, with more room.
+    if ('task' in patch) refuse(400, 'continue goes on with the run that stopped; a task alone seats the member again on a new run');
+    const last = S.runs.get(m.runs[m.runs.length - 1]);
+    if (m.fired || !last || last.state !== 'failed' || !/^budget exceeded/.test(last.error || '')) refuse(409, `the newest run of ${m.handle} did not stop at a limit, so there is nothing to continue`);
+    S.runs.set(last.id, { ...last, state: 'running', error: undefined });
+    setMember(id, m, { presence: 'working' });
+    system(id, 'task', `${c.person.name.toLowerCase()} continued ${m.handle}`);
+    return m;
   }
   if ('task' in patch) {
     // A new task seats the member again: a new run starts with the task.

@@ -1,6 +1,7 @@
 // The list pane of the Bridges place: the open bridges, newest first, each
-// with its unread count and one light in the order of attention: needs
-// you, then a seat that failed, then working. Then the closed bridges
+// with its unread count, one light in the order of attention: needs you,
+// then a seat that failed, then working, and the freshness of its newest
+// entry, such as 14 min, so a bridge that went quiet shows it. Then the closed bridges
 // behind a toggle, with no unread count, because their work is done. A
 // filter field shows above the list once it holds more than ten bridges.
 // The foot holds the readout of the fleet.
@@ -15,7 +16,7 @@ import { hrefOf } from '../lib/route';
 import { useRoving } from './keys';
 import { FleetFoot } from './Shell';
 import { Glyph } from './icons';
-import { unreadText } from '../lib/words';
+import { ago, since, unreadText } from '../lib/words';
 import { Button, Chip, Find, Led, PaneHeader } from './primitives';
 
 /** The number of bridges above which the list shows its filter field. */
@@ -31,7 +32,17 @@ export function matches(title: string, filter: string): boolean {
     .every((w) => t.includes(w));
 }
 
-const BridgeRow = memo(function BridgeRow({ id, current }: { id: string; current: boolean }) {
+/** useMinute is the time now, once a minute, so the freshness of the rows stays true while the list shows. */
+function useMinute(): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(t);
+  }, []);
+  return now;
+}
+
+const BridgeRow = memo(function BridgeRow({ id, current, now }: { id: string; current: boolean; now: number }) {
   const b = useSelect((s) => s.bridges.byId[id]);
   // The roster of the bridge shows whether a seat failed or works, in the status of every screen. The list reads the rosters of the open bridges.
   const failed = useSelect((s) => {
@@ -61,11 +72,14 @@ const BridgeRow = memo(function BridgeRow({ id, current }: { id: string; current
   ) : working ? (
     <Led tone="green" word="working" />
   ) : null;
+  const at = b.lastAt || '';
+  const fresh = at ? since(at, now) : '';
   const label = [
     b.title,
     closed ? 'closed' : '',
     unread ? unreadText(b) + ' unread' : '',
-    needs ? needs + (needs === 1 ? ' member needs' : ' members need') + ' you' : failed ? failed + (failed === 1 ? ' member failed' : ' members failed') : '',
+    needs ? needs + (needs === 1 ? ' member needs' : ' members need') + ' you' : failed ? failed + (failed === 1 ? ' member failed' : ' members failed') : !closed && working ? 'working' : '',
+    fresh ? 'last entry ' + ago(at, now) : '',
   ]
     .filter(Boolean)
     .join(', ');
@@ -88,6 +102,11 @@ const BridgeRow = memo(function BridgeRow({ id, current }: { id: string; current
       <span class="brow-meta">
         <span>{members === 1 ? '1 member' : members + ' members'}</span>
         {status}
+        {fresh && (
+          <time class="brow-when" dateTime={at} title={new Date(at).toLocaleString()}>
+            {fresh}
+          </time>
+        )}
       </span>
     </a>
   );
@@ -106,6 +125,7 @@ export function BridgeList({ current }: { current: string }) {
   const [showClosed, setShowClosed] = useState(false);
   const [filter, setFilter] = useState('');
   const list = useRoving<HTMLDivElement>();
+  const now = useMinute();
   const allOpen = openIds ? openIds.split('\n') : [];
   const allClosed = closedIds ? closedIds.split('\n') : [];
   const many = allOpen.length + allClosed.length > FILTER_FROM;
@@ -135,7 +155,7 @@ export function BridgeList({ current }: { current: string }) {
         <div role="list" aria-labelledby="bridges-title" class="rows">
           {open.map((id) => (
             <div role="listitem">
-              <BridgeRow id={id} current={id === current} />
+              <BridgeRow id={id} current={id === current} now={now} />
             </div>
           ))}
         </div>
@@ -159,7 +179,7 @@ export function BridgeList({ current }: { current: string }) {
               <div role="list" class="rows">
                 {closed.map((id) => (
                   <div role="listitem">
-                    <BridgeRow id={id} current={id === current} />
+                    <BridgeRow id={id} current={id === current} now={now} />
                   </div>
                 ))}
               </div>

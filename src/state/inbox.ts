@@ -1,6 +1,6 @@
 // The inbox of the Activity place: one row per decision, question, failed
-// seat, stopped seat, message that asks you, and new message, across every
-// open bridge, in the order of attention. The functions here are pure, so the tests read them
+// seat, stopped seat, seat at its limit, message that asks you, and new
+// message, across every open bridge, in the order of attention. The functions here are pure, so the tests read them
 // without a page.
 
 import type { Bridge, Decision, Entry, Member, Result, Run } from '../api/types';
@@ -15,10 +15,10 @@ import { seatPresence, type Facts } from '../lib/status';
  * the channel: it needs you, and it is no card, so you answer it in the
  * bridge.
  */
-export type InboxKind = 'decision' | 'question' | 'asked' | 'failed' | 'stopped' | 'message';
+export type InboxKind = 'decision' | 'question' | 'asked' | 'failed' | 'stopped' | 'limit' | 'message';
 
-/** The statuses of the inbox, in the order of attention. */
-export const INBOX_ORDER = ['needs-you', 'error', 'working', 'idle', 'asleep'] as const;
+/** The statuses of the inbox, in the order of attention. A seat at its limit did nothing wrong, and it waits for you to continue it. */
+export const INBOX_ORDER = ['needs-you', 'error', 'limit', 'working', 'idle', 'asleep'] as const;
 export type InboxStatus = (typeof INBOX_ORDER)[number];
 
 export interface InboxRow {
@@ -62,7 +62,7 @@ export interface InboxInput {
 }
 
 /** cardOf finds the card of a decision in a loaded channel. */
-function cardOf(ch: Channel | undefined, run: string, id: string): Entry | undefined {
+export function cardOf(ch: Channel | undefined, run: string, id: string): Entry | undefined {
   if (!ch) return undefined;
   for (let i = ch.seqs.length - 1; i >= 0; i--) {
     const e = ch.bySeq[ch.seqs[i]];
@@ -223,6 +223,10 @@ export function inboxRows(s: InboxInput): InboxRow[] {
           continue;
         }
       }
+      if (p === 'limit') {
+        rows.push({ ...base, key: 's:' + b.id + '/' + m.handle, kind: 'limit', status: 'limit', reason: reasonOf(run, s.results[id]), at: run ? run.updatedAt : '' });
+        continue;
+      }
       if (p === 'error' || (run && (run.state === 'failed' || run.state === 'canceled'))) {
         const kind: InboxKind = run && run.state === 'canceled' ? 'stopped' : 'failed';
         rows.push({ ...base, key: 's:' + b.id + '/' + m.handle, kind, status: 'error', reason: reasonOf(run, s.results[id]), said: saidOf(run, s.results[id]), at: run ? run.updatedAt : '' });
@@ -279,12 +283,13 @@ export function sortInbox(rows: InboxRow[]): InboxRow[] {
     .map((x) => x.r);
 }
 
-export type InboxAction = 'allow' | 'deny' | 'always' | 'answer' | 'reply' | 'open' | 'seat';
+export type InboxAction = 'allow' | 'deny' | 'always' | 'answer' | 'reply' | 'open' | 'seat' | 'continue' | 'done';
 
 /**
  * keyAction maps a key on a row of the inbox to an action: a allows, d
  * denies, r replies, and Enter opens. On a question, a opens the answer and
  * d declines. On a message that asks you, r opens the answer in place. A failed or a stopped seat takes s to seat it again.
+ * A seat at its limit takes c to continue it. A message takes e for Done, which clears it for you.
  */
 export function keyAction(key: string, row: InboxRow): InboxAction | null {
   if (key === 'Enter') return 'open';
@@ -292,5 +297,7 @@ export function keyAction(key: string, row: InboxRow): InboxAction | null {
   if (row.kind === 'decision') return key === 'a' ? 'allow' : key === 'd' ? 'deny' : null;
   if (row.kind === 'question') return key === 'a' ? 'answer' : key === 'd' ? 'deny' : null;
   if (row.kind === 'failed' || row.kind === 'stopped') return key === 's' ? 'seat' : null;
+  if (row.kind === 'limit') return key === 'c' ? 'continue' : null;
+  if (row.kind === 'message') return key === 'e' ? 'done' : null;
   return null;
 }

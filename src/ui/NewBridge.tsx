@@ -48,6 +48,7 @@ export const DELEGATION: [keyof Delegation, string][] = [
 
 export const CAPS: [keyof Caps, string][] = [
   ['maxMessages', 'Most messages'],
+  ['maxTurns', 'Most turns'],
   ['maxFanoutPerMinute', 'Most messages a minute'],
   ['maxPairMessages', 'Most messages between two members'],
 ];

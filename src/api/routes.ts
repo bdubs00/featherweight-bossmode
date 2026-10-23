@@ -128,7 +128,7 @@ export const api = {
     call<Entry>(bridge(id) + '/messages/' + enc(seq) + '/reactions', { method: 'POST', body: note ? { reaction, note } : { reaction } }),
   addMember: (id: string, m: NewMember) => call<Member>(bridge(id) + '/members', { method: 'POST', body: m }),
   fire: (id: string, handle: string) => call<Member>(bridge(id) + '/members/' + enc(handle), { method: 'DELETE' }),
-  patchMember: (id: string, handle: string, patch: { muted?: boolean; task?: string }) =>
+  patchMember: (id: string, handle: string, patch: { muted?: boolean; task?: string; continue?: boolean }) =>
     call<Member>(bridge(id) + '/members/' + enc(handle), { method: 'PATCH', body: patch }),
 
   fleet: () => call<Fleet>('/v1/fleet'),
