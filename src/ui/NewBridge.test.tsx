@@ -126,9 +126,8 @@ describe('NewBridge', () => {
     await settle();
     const start = api.calls.find((c) => c.method === 'POST')!;
     expect(start.path).toBe('/v1/runs?member=default%2Fmanager-0');
-    expect((start.body as { input: string }).input).toContain('Job: Write the release notes of 2.4.');
-    // The default placement goes without a word, because the person reads the message in the conversation.
-    expect((start.body as { input: string }).input).not.toContain('Placement');
+    // The message reads as the person writes: the job first, then the ask, and the default placement goes without a word.
+    expect((start.body as { input: string }).input).toBe('Write the release notes of 2.4.\n\nPlease open a bridge for this and pick the seats.');
     expect(keyNamed(el, 'Ask the manager')).toBeTruthy();
     expect(location.hash).toBe('#manager');
   });
@@ -143,10 +142,11 @@ describe('the record of a bridge', () => {
     expect(long.startsWith(titleOf(long))).toBe(true);
   });
 
-  it('names the placement in the message to the manager only when it is not the default', () => {
-    expect(askOf(form())).not.toContain('Placement');
-    expect(askOf(form({ placement: 'spawn' }))).toContain('Placement: a fresh sandbox per seat (spawn)');
-    expect(askOf(form(), 'spawn')).toContain('Placement: keep warm workers (queue)');
+  it('names the placement in the message to the manager only when it is not the default, and the title only when the person gave one', () => {
+    expect(askOf(form())).not.toContain('sandbox');
+    expect(askOf(form({ placement: 'spawn' }))).toMatch(/pick the seats\. Give each seat a fresh sandbox \(spawn\)\.$/);
+    expect(askOf(form(), 'spawn')).toMatch(/Use the warm workers \(queue\)\.$/);
+    expect(askOf(form({ title: 'Notes 2.4' }))).toMatch(/pick the seats\. Call it "Notes 2\.4"\.$/);
   });
 
   it('sends only the caps that the person set', () => {

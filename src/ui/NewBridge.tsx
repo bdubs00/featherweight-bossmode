@@ -111,15 +111,17 @@ export function bodyOf(f: BridgeForm): NewBridgeBody {
 
 /**
  * askOf is the message that hands the job to the manager, to split into
- * seats. The person reads it in the conversation of the manager, so it
- * names the placement only when the person picked another one than the
- * default of the deployment.
+ * seats. It shows in the conversation of the manager as the words of the
+ * person, so it reads as a person writes: the job first, then one short
+ * ask. It names the placement only when the person picked another one
+ * than the default of the deployment, and the title only when the person
+ * gave one, because the manager needs both to open the bridge as asked.
  */
 export function askOf(f: BridgeForm, defaultPlacement: Placement = 'queue'): string {
-  const lines = ['Open a bridge for this job. Split it into seats, pick an agent for each seat, and seat them.', '', 'Job: ' + f.goal.trim()];
-  if (f.placement !== defaultPlacement) lines.push('Placement: ' + (f.placement === 'spawn' ? 'a fresh sandbox per seat (spawn)' : 'keep warm workers (queue)'));
-  if (f.title.trim()) lines.push('Title: ' + f.title.trim());
-  return lines.join('\n');
+  const ask = ['Please open a bridge for this and pick the seats.'];
+  if (f.placement !== defaultPlacement) ask.push(f.placement === 'spawn' ? 'Give each seat a fresh sandbox (spawn).' : 'Use the warm workers (queue).');
+  if (f.title.trim()) ask.push('Call it "' + f.title.trim() + '".');
+  return f.goal.trim() + '\n\n' + ask.join(' ');
 }
 
 let seatKey = 0;
