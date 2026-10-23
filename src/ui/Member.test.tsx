@@ -136,6 +136,19 @@ describe('the member conversation', () => {
     expect(currentNotice()).toBe('');
   });
 
+  it('reads nothing of a run that the front calls gone, and says so at once', async () => {
+    act(() => {
+      store.dispatch({ type: 'member', bridge: 'b1', member: { handle: 'ghost', agent: 'reviewer', task: 'Review', runs: ['run-ghost'], fired: false, muted: false, presence: 'idle', gone: true } });
+    });
+    const run = mount(<MemberMain bridge="b1" handle="ghost" tab="run" />);
+    expect(run.textContent).toContain('This run is gone.');
+    const files = mount(<MemberMain bridge="b1" handle="ghost" tab="files" />);
+    expect(files.textContent).toContain('This run is gone.');
+    await new Promise((r) => setTimeout(r, 50));
+    expect(calls.filter((c) => c.path.includes('run-ghost'))).toEqual([]);
+    expect(currentNotice()).toBe('');
+  });
+
   it('has the halo of the status, the bridge, and the tabs Chat, Run, and Files with the count of files', async () => {
     const el = mount(<MemberMain bridge="b1" handle="migrator-1" tab="chat" />);
     const mark = el.querySelector('header .mark')!;

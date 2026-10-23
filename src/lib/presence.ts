@@ -98,8 +98,13 @@ export function phaseOf(phase: string): Light {
   return { word: phase ? phase.toLowerCase() : 'unknown', tone: 'grey', label: 'The worker reports ' + (phase || 'nothing') + '.' };
 }
 
-/** The status of a run, in the words of the page. */
-export function runStatus(r: Pick<Run, 'state' | 'output'>): Light {
+/**
+ * The status of a run, in the words of the page. A finished run whose
+ * input is empty and that has no title is a run that the front knows
+ * without its texts, such as from its index after a restart, so the page
+ * cannot tell whether it answered.
+ */
+export function runStatus(r: Pick<Run, 'state' | 'output'> & Partial<Pick<Run, 'input' | 'title'>>): Light {
   switch (r.state) {
     case 'input-required':
       return { word: 'needs you', tone: 'amber', label: 'Waits for your approval or your answer.' };
@@ -109,9 +114,9 @@ export function runStatus(r: Pick<Run, 'state' | 'output'>): Light {
     case 'suspended':
       return { word: 'working', tone: 'green', label: 'Runs, or pauses between two steps.' };
     case 'completed':
-      return r.output
-        ? { word: 'ready', tone: 'grey', label: 'Finished with an answer to review.' }
-        : { word: 'ended', tone: 'grey', label: 'Finished with no answer.' };
+      if (r.output) return { word: 'ready', tone: 'grey', label: 'Finished with an answer to review.' };
+      if (r.input === '' && !r.title) return { word: 'finished', tone: 'grey', label: 'Finished. Its texts show once the front reads its worker.' };
+      return { word: 'ended', tone: 'grey', label: 'Finished with no answer.' };
     case 'failed':
       return { word: 'failed', tone: 'red', label: 'Stopped with an error.' };
     case 'canceled':

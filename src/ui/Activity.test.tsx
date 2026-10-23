@@ -141,6 +141,16 @@ describe('the inbox', () => {
     }
   });
 
+  it('reads the newest run of a seat that rests, and not a run that the front calls gone', async () => {
+    act(() => {
+      store.dispatch({ type: 'bridges', bridges: [bridge('b1', 'Migrate Puppet', undefined, { needsYou: 2 }), bridge('b2', 'Docs')] });
+      store.dispatch({ type: 'bridge', bridge: bridge('b2', 'Docs', [seat('kept', 'writer', 'idle'), seat('lost', 'writer', 'idle', { gone: true })]) });
+    });
+    mount(<ActivityList />);
+    await vi.waitFor(() => expect(calls.some((c) => c.path === '/v1/runs/run-kept')).toBe(true));
+    expect(calls.some((c) => c.path.includes('run-lost'))).toBe(false);
+  });
+
   it('says that nothing needs you when nothing does', () => {
     act(() => {
       store.dispatch({ type: 'bridge', bridge: bridge('b1', 'Migrate Puppet', [seat('fine', 'migrator', 'working')], { needsYou: 0 }) });

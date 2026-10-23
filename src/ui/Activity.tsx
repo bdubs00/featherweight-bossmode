@@ -180,7 +180,8 @@ export function useInbox(): { rows: InboxRow[]; loaded: boolean } {
         ? r.order
             .map((h) => r.byHandle[h])
             .filter((m: Member) => {
-              if (!m || m.fired || !m.runs.length) return false;
+              // A run that no worker holds answers 404, so the page does not ask for it.
+              if (!m || m.fired || m.gone || !m.runs.length) return false;
               const p = seatPresence(facts, m);
               return p !== 'working' && p !== 'asleep';
             })

@@ -109,6 +109,16 @@ button.group-head > .clip {
 .wrow .meta > span + span {
   flex: none;
 }
+/* A version keeps its author and its age whole, and its note goes under
+   them when the line has no room for it. */
+.vrow .meta {
+  flex-wrap: wrap;
+  row-gap: 0;
+}
+.vrow .meta > :not(:last-child) {
+  flex: none;
+  white-space: nowrap;
+}
 
 /* A section of a main pane or a details pane: a heading with its count. */
 .sec-head {
