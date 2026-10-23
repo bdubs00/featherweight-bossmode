@@ -127,7 +127,8 @@ a.people-title:hover {
 /* The column of a conversation keeps the reading measure: the text, the
    cards, and the quiet lines. Its width adds the face, its gap, and the
    padding of the pane to the measure, and the composer takes the same
-   width, so the eye never travels across a wide pane. */
+   width, so the eye never travels across a wide pane. A pane wider than
+   the column holds it in its middle, and a narrower one fills with it. */
 .thread {
   display: flex;
   flex-direction: column;
@@ -135,6 +136,7 @@ a.people-title:hover {
   flex: 1 0 auto;
   width: 100%;
   max-width: calc(var(--measure) + 92px);
+  margin-inline: auto;
   padding: var(--s-2) 0;
 }
 .tmsg {
@@ -304,8 +306,9 @@ a.people-title:hover {
   display: flex;
   align-items: center;
   gap: var(--s-3);
+  width: calc(100% - 2 * var(--s-5));
   max-width: calc(var(--measure) + 44px);
-  margin: 0 var(--s-5) var(--s-2);
+  margin: 0 auto var(--s-2);
   padding: var(--s-2) var(--s-2) var(--s-2) var(--s-3);
   border: 1px solid var(--line);
   border-radius: var(--r);
@@ -820,8 +823,10 @@ a.file {
   gap: var(--s-2);
   margin-top: var(--s-2);
 }
+/* The main pane of Activity holds its card in the column of a conversation, in the middle of a wide pane. */
 .inbox-main-pane .card {
-  max-width: 640px;
+  max-width: calc(var(--measure) + 44px);
+  margin-inline: auto;
 }
 .inbox-stop,
 .inbox-msg {
@@ -829,7 +834,8 @@ a.file {
   flex-direction: column;
   align-items: flex-start;
   gap: var(--s-3);
-  max-width: 640px;
+  max-width: calc(var(--measure) + 44px);
+  margin-inline: auto;
 }
 .inbox-stop-line {
   display: flex;
