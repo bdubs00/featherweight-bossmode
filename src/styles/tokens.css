@@ -32,7 +32,6 @@
   --card: #f3f3ef;
   --card-groove: #dcdcd6;
   --on-ink: #f3f3ef;
-  --placeholder: #8a8a82;
   --wash-need: #fff7e8;
 
   /* Status lights and their words. */
@@ -138,7 +137,6 @@
     --card: #3b3b38;
     --card-groove: #2e2e2b;
     --on-ink: #000000;
-    --placeholder: #8a8a82;
     --wash-need: #3f3828;
     --led-grey: #6e6e68;
     --word-green: #4ccb70;
@@ -184,7 +182,6 @@
   --card: #3b3b38;
   --card-groove: #2e2e2b;
   --on-ink: #000000;
-  --placeholder: #8a8a82;
   --wash-need: #3f3828;
   --led-grey: #6e6e68;
   --word-green: #4ccb70;

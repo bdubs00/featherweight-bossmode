@@ -243,7 +243,8 @@ export function NewAgent() {
       >
         <div class="make">
           <div class="who-row">
-            {name ? <Mark agent={name} size={72} label={name} /> : <span class="mark-empty" aria-hidden="true" />}
+            {/* The face that the agent will have, drawn from the name as the person types it, and an empty well before. */}
+            {name ? <Mark agent={name} size={72} label={name} /> : <span class="mark s72 mark-empty" aria-hidden="true" />}
             <div class="who-fields">
               <Field label="Name" error={errors.name}>
                 <Input ref={first} value={f.name} maxLength={64} invalid={!!errors.name} placeholder="linter" autoComplete="off" spellcheck={false} onInput={text('name')} />

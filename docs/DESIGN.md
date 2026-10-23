@@ -111,7 +111,6 @@ Derived values, each with one job:
 | `--card` | The ground of a card | `#F3F3EF` | `#3B3B38` |
 | `--card-groove` | The ground of the groove band of a card | `#DCDCD6` | `#2E2E2B` |
 | `--on-ink` | Text on an ink ground: a count, a person's initials | `#F3F3EF` | `#000000` |
-| `--placeholder` | The dashed edge and the mark of an empty logo well | `#8A8A82` | `#8A8A82` |
 | `--wash-need` | The ground of a row that needs you | `#FFF7E8` | `#3F3828` |
 
 Status lights. A light never stands alone: a word stands beside it, in the
@@ -358,7 +357,7 @@ color, radius, shadow, or type size of its own.
 | `Led` | A 9-pixel square light and its word | Green, amber (breathes), red, and grey. Struck for fired. Quiet: no word on screen, the word in a tooltip and the accessible name. Still: the amber light holds, for a status that waits for nothing. |
 | `LineLed` | The bare light of a line whose text is its word: a system line, a decided line | The four tones. It never breathes. |
 | `FleetFoot` | The readout of the fleet at the foot of the Bridges list, in `Shell.tsx`: the caption `N workers`, a rack of 9-pixel square lamps in a recessed slot, one per worker in the order of attention, and the figures below. The whole foot is the key to the Fleet place. | A lit green lamp works, a green ring is awake and free, a grey ring starts, a dark lamp sleeps or stops, and a lit red lamp failed. Past 14 workers, each status takes its share of the rack. Once the stream has been down for 6 seconds, every lamp turns to an empty ring and `Connecting` takes the place of the figures, because the reads of the page are fresh before then. `Offline` shows at once. Nothing moves. |
-| `Mark` | The face of an agent: a 5 by 5 symmetric glyph from the hash of the name on a raised square, or the custom picture of the backend | Sizes 20, 32, 36, and 72. A halo of a status color in the header of a member conversation. Selected: the well turns paper. |
+| `Mark` | The face of an agent: a 5 by 5 symmetric glyph from the hash of the name on a raised square, or the custom picture of the backend. The lit rows sit in the middle of the well, one row off at most, so a glyph never sits at the foot of its well as a stray shape. | Sizes 20, 32, 36, and 72. Empty: the well with no glyph, where New agent waits for a name; once the person types one, the well draws the mark of that name. A halo of a status color in the header of a member conversation. Selected: the well turns paper. |
 | `Avatar` | A person: initials in on-ink on an ink square | sizes 20, 32, 36 |
 | `Chip` | A count or a short state on a heading line | plain (line edge, muted), ink (unread), amber (decisions), with an optional `Led` inside |
 | `Button` | A key | Primary: accent, 2px edge, raised 1px. Secondary: key ground, 1px edge, 1px drop. Quiet: no edge, no ground. Danger: a secondary key with the red word, for Fire and Remove. Sizes 36 and 32, and 44 on touch. Disabled, pressed, and a link with `href`. Its ref reaches the element, so a layer can give the focus back to it. `IconButton` is a key with one glyph and a name. |

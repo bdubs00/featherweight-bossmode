@@ -48,6 +48,20 @@ describe('NewAgent', () => {
     expect(document.activeElement).toBe(fieldOf(el, 'Name'));
   });
 
+  it('shows an empty well before a name, and the mark of the name as the person types it', () => {
+    config();
+    api = fakeApi({});
+    const el = mount(<NewAgent />);
+    const well = el.querySelector('.who-row > .mark')!;
+    expect(well.classList.contains('mark-empty')).toBe(true);
+    expect(well.querySelector('svg, img')).toBeNull();
+    typeIn(fieldOf(el, 'Name')!, 'linter');
+    const mark = el.querySelector('.who-row > .mark')!;
+    expect(mark.classList.contains('mark-empty')).toBe(false);
+    expect(mark.getAttribute('aria-label')).toBe('linter');
+    expect(mark.querySelector('svg.mark-glyph path')!.getAttribute('d')).not.toBe('');
+  });
+
   it('shows no template with one template, and preselects the default of several', () => {
     config([{ name: 'standard', default: true }]);
     api = fakeApi({});

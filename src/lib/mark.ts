@@ -62,7 +62,31 @@ export function markOf(name: string): MarkGlyph {
   // The middle column fills or empties last, from the top, until the count fits.
   for (let y = 0; y < 5 && lit(cells) < MIN_CELLS; y++) cells[y * 5 + 2] = true;
   for (let y = 0; y < 5 && lit(cells) > MAX_CELLS; y++) cells[y * 5 + 2] = false;
-  return { cells, hue: b % MARK_HUES };
+  return { cells: centered(cells), hue: b % MARK_HUES };
+}
+
+/**
+ * centered moves the lit rows of a glyph up or down by whole rows, so the
+ * empty rows above and below them differ by one at most. A glyph whose
+ * cells sit in its lower rows then reads as a face in the middle of its
+ * well, and not as a stray shape at its foot.
+ */
+export function centered(cells: boolean[]): boolean[] {
+  const rowLit = (y: number) => cells.slice(y * 5, y * 5 + 5).some(Boolean);
+  let top = 0;
+  while (top < 5 && !rowLit(top)) top++;
+  if (top === 5) return cells;
+  let bottom = 0;
+  while (!rowLit(4 - bottom)) bottom++;
+  const shift = Math.trunc((top - bottom) / 2);
+  if (shift === 0) return cells;
+  const out = new Array<boolean>(25).fill(false);
+  for (let y = 0; y < 5; y++) {
+    const to = y - shift;
+    if (to < 0 || to > 4) continue;
+    for (let x = 0; x < 5; x++) out[to * 5 + x] = cells[y * 5 + x];
+  }
+  return out;
 }
 
 /**
