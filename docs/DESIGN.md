@@ -636,11 +636,15 @@ The work:
   manager that runs on the front gets no `run` event, so the screen polls
   `GET /v1/runs/{id}` while the run works. Without a manager, the screen
   says `No manager is set up.` with a question mark that names the setting.
-- New bridge. One question first: the goal. The placement is a visible
-  choice of two: Keep warm workers, the default (`queue`), and Fresh sandbox
-  per seat (`spawn`), which needs a manager. The seats come from the picker
-  of A once it lands, and until then from the rows of today. Advanced holds
-  the title, the handles, and what the manager can do.
+- New bridge. The first view holds one question, the goal, and the seats:
+  the choice of who seats the bridge where a manager is set up, the seat
+  rows, and the key Add a seat, which opens the picker of A. Advanced holds
+  the title, the handles, the placement, the caps, and what the manager
+  can do. The placement is a choice of two: Keep warm workers, the default
+  (`queue`), and Fresh sandbox per seat (`spawn`), which needs a manager.
+  The primary key names what it does: Open bridge for seats that the
+  person picks, and Ask the manager for a job that the manager splits,
+  which lands the person in the conversation of the manager.
 - New agent, at `#new-agent`. One question first: the name, beside what
   it handles. Then How many can work at once?, with 2 as the default. The
   profile shows that number as Keep. If the settings offer more than one

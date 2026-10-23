@@ -3,7 +3,7 @@ import { act } from 'preact/test-utils';
 import { store } from '../state/store';
 import { forgetManagerRun } from '../state/actions';
 import type { BossConfig, Fleet } from '../api/types';
-import { NewBridge, bodyOf, bridgeErrors, titleOf, type BridgeForm } from './NewBridge';
+import { NewBridge, askOf, bodyOf, bridgeErrors, titleOf, type BridgeForm } from './NewBridge';
 import { click, fakeApi, keyNamed, mount, settle, typeIn, unmountAll } from './testkit-c';
 
 const MANAGER: BossConfig = { manager: { agent: 'manager', member: 'default/manager-0', run: '' }, placement: 'queue', maxMembers: 16 };
@@ -38,18 +38,23 @@ afterEach(() => {
 const form = (p: Partial<BridgeForm> = {}): BridgeForm => ({ goal: 'Migrate logrotate.', mode: 'pick', seats: [], placement: 'queue', title: '', caps: {}, delegation: { approve: false, budget: false, members: false, report: true }, ...p });
 
 describe('NewBridge', () => {
-  it('asks the job first and offers the two placements, keep warm workers by default', () => {
+  it('asks the job and the seats first, and keeps the placement under Advanced, keep warm workers by default', () => {
     api = fakeApi({});
     const el = mount(<NewBridge />);
-    const labels = [...el.querySelectorAll('.field-label, legend')].map((x) => x.textContent);
-    expect(labels[0]).toBe('What is the job?');
+    // The first view: the job, who seats it, and the key that adds a seat. The rest waits under Advanced.
+    const outside = [...el.querySelectorAll('.field-label, legend')].filter((x) => !x.closest('details.advanced')).map((x) => x.textContent);
+    expect(outside).toEqual(['What is the job?', 'Seats']);
+    expect(keyNamed(el, 'Add a seat')).toBeTruthy();
+    const adv = el.querySelector('details.advanced') as HTMLDetailsElement;
+    expect(adv.open).toBe(false);
+    expect(adv.querySelectorAll('input[name="placement"]').length).toBe(2);
     const choices = [...el.querySelectorAll<HTMLInputElement>('input[name="placement"]')].map((i) => ({ word: i.closest('label')!.textContent, on: i.checked, value: i.value }));
     expect(choices).toEqual([
       { word: 'Keep warm workers', on: true, value: 'queue' },
       { word: 'Fresh sandbox per seat', on: false, value: 'spawn' },
     ]);
-    // The key Add opens the picker of the members pane, and an agent that the person cannot run offers no seat.
-    click(keyNamed(el, 'Add'));
+    // The key Add a seat opens the picker of the members pane, and an agent that the person cannot run offers no seat.
+    click(keyNamed(el, 'Add a seat'));
     expect([...el.querySelectorAll('.picker .pick-name')].map((x) => x.textContent)).toEqual(['Migrator', 'Reviewer']);
   });
 
@@ -64,7 +69,7 @@ describe('NewBridge', () => {
     api = fakeApi({ 'POST /v1/bridges': () => ({ status: 201, body: { id: 'br-new', title: 'Migrate logrotate', goal: 'g', operator: '', state: 'open', placement: 'spawn', createdAt: '', closedAt: null, delegation: { approve: false, budget: false, members: false, report: true }, caps: { maxMessages: 1, maxFanoutPerMinute: 1, maxPairMessages: 1 }, lastSeq: 0, read: 0, unread: 0, members: [] } }) });
     const el = mount(<NewBridge />);
     typeIn(el.querySelector('textarea'), 'Migrate logrotate. Then review it.');
-    click(keyNamed(el, 'Add'));
+    click(keyNamed(el, 'Add a seat'));
     const migrator = () => [...el.querySelectorAll('.picker .pick-row')].find((r) => r.querySelector('.pick-name')!.textContent === 'Migrator');
     click(migrator());
     click(migrator());
@@ -85,6 +90,20 @@ describe('NewBridge', () => {
     expect(location.hash).toBe('#bridge/br-new');
   });
 
+  it('opens Advanced to show why a fresh sandbox per seat cannot open without a manager', () => {
+    act(() => store.dispatch({ type: 'config', config: { ...MANAGER, manager: null } }));
+    api = fakeApi({});
+    const el = mount(<NewBridge />);
+    // Without a manager, the seats have a heading of their own, and the placement keeps warm workers.
+    expect(el.querySelector('#seats-head')!.textContent).toBe('Seats');
+    expect((el.querySelector('input[value="queue"]') as HTMLInputElement).checked).toBe(true);
+    typeIn(el.querySelector('textarea'), 'Migrate logrotate.');
+    click(el.querySelector('input[value="spawn"]'));
+    click(keyNamed(el, 'Open bridge'));
+    expect((el.querySelector('details.advanced') as HTMLDetailsElement).open).toBe(true);
+    expect([...el.querySelectorAll('[role="alert"]')].map((x) => x.textContent)).toContain('A fresh sandbox per seat needs a manager. Pick keep warm workers, or set up a manager.');
+  });
+
   it('says what is missing in the words of the copy', () => {
     api = fakeApi({});
     const el = mount(<NewBridge />);
@@ -101,12 +120,16 @@ describe('NewBridge', () => {
     typeIn(el.querySelector('textarea'), 'Write the release notes of 2.4.');
     click([...el.querySelectorAll('input[name="mode"]')][1]);
     expect(el.querySelector('.pick-anchor')).toBeNull();
-    click(keyNamed(el, 'Open bridge'));
+    // The key says what it does on this path: the manager plans the seats, and no bridge opens yet.
+    expect(keyNamed(el, 'Open bridge')).toBeUndefined();
+    click(keyNamed(el, 'Ask the manager'));
     await settle();
     const start = api.calls.find((c) => c.method === 'POST')!;
     expect(start.path).toBe('/v1/runs?member=default%2Fmanager-0');
     expect((start.body as { input: string }).input).toContain('Job: Write the release notes of 2.4.');
-    expect((start.body as { input: string }).input).toContain('Placement: keep warm workers (queue)');
+    // The default placement goes without a word, because the person reads the message in the conversation.
+    expect((start.body as { input: string }).input).not.toContain('Placement');
+    expect(keyNamed(el, 'Ask the manager')).toBeTruthy();
     expect(location.hash).toBe('#manager');
   });
 });
@@ -118,6 +141,12 @@ describe('the record of a bridge', () => {
     const long = 'Migrate every remaining module of the Puppet tree to an Ansible role with its molecule scenario and its notes';
     expect(titleOf(long).length).toBeLessThanOrEqual(80);
     expect(long.startsWith(titleOf(long))).toBe(true);
+  });
+
+  it('names the placement in the message to the manager only when it is not the default', () => {
+    expect(askOf(form())).not.toContain('Placement');
+    expect(askOf(form({ placement: 'spawn' }))).toContain('Placement: a fresh sandbox per seat (spawn)');
+    expect(askOf(form(), 'spawn')).toContain('Placement: keep warm workers (queue)');
   });
 
   it('sends only the caps that the person set', () => {

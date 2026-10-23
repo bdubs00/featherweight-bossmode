@@ -527,13 +527,14 @@ Capacity shows where seating happens:
 | `Open a bridge` and its line `One job, split into tasks, with one agent on each.` | change | `Open a bridge`, and the one question first: `What is the job?` | C |
 | `Title`, `Goal` | change | `Goal` first, and `Title` in Advanced, filled from the goal | C |
 | `Members`, `Handle`, `Agent`, `Task`, `Add a member`, `Remove member N` | change | the picker of screen A, then `Seat` | C |
-| `Placement` with `Queue. Each member runs on a worker of the pool of its agent.` and `Spawn. The manager seats each member in a child Task of its own, and its budget bounds the whole bridge.` | change | a visible choice with two options: `Keep warm workers` (the default) and `Fresh sandbox per seat` | C |
+| `Placement` with `Queue. Each member runs on a worker of the pool of its agent.` and `Spawn. The manager seats each member in a child Task of its own, and its budget bounds the whole bridge.` | change | a choice with two options under Advanced: `Keep warm workers` (the default) and `Fresh sandbox per seat`. It is a choice of the deployer more than of a person, so the first view holds only the job and the seats. A placement that cannot open, a fresh sandbox without a manager, opens Advanced with its reason. | done |
 | `What the manager can do here` and its four rows | change | in Advanced, with the words of screen A | C |
 | `Each member starts a run as you. A bridge spends through the budgets of the pools of its members.` | remove | | C |
 | `Cancel`, `Open the bridge` | change | `Cancel`, `Open bridge` | done |
+| `Open bridge` while the manager splits the job | change | `Ask the manager`: the key sends the job to the conversation of the manager, which plans the seats there, and the person lands in that conversation with the job in view. The message names the placement only when it is not the default of the deployment. `Open bridge` stays for the path where the person picks the seats. | done |
 | `Seats`, `Pick the seats`, `Let the manager split it` | add | if the settings name a manager, the choice of who seats the bridge | done |
-| `Add a seat` (the heading of the seats beside that choice), `Add` (the key that opens the picker of the members pane) | add | | done |
-| `Placement`, `Title`, `Caps`, `Most messages`, `Most messages a minute`, `Most messages between two members` | add | Title and Caps in Advanced | done |
+| `Add a seat` (the heading of the seats beside that choice), `Add` (the key that opens the picker of the members pane) | change | `Add a seat`, the key that opens the picker, under the choice `Seats`, with no heading of its own. Without a manager, the heading `Seats` stands above the rows and the key. | done |
+| `Placement`, `Title`, `Caps`, `Most messages`, `Most messages a minute`, `Most messages between two members` | add | Title, Placement, and Caps in Advanced | done |
 | `Write a whole number.` | add | the error of a cap | done |
 | `The bridge needs a title.`, `The bridge needs a goal.` | change | `Write the goal of the bridge.` | C |
 | `Member N needs a handle of lower-case letters, digits, dots, dashes, or underscores.` | change | the reason of `handleReason()` | C |
