@@ -7,6 +7,7 @@
 
 import { Marked } from 'marked';
 import DOMPurify from 'dompurify';
+import { linkRefs, type Refs } from './refs';
 
 const esc = (s: string): string =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
@@ -48,6 +49,8 @@ export interface RenderOptions {
   base?: string;
   /** The handles to mark as mentions. */
   handles?: string[];
+  /** The bridges and the pages that the page knows, so the text links their ids and paths. */
+  refs?: Refs;
 }
 
 export interface SafeLink {
@@ -158,6 +161,7 @@ export function sanitize(html: string, opts: RenderOptions = {}): string {
       RETURN_DOM_FRAGMENT: true,
     }) as DocumentFragment;
     if (opts.handles && opts.handles.length) markMentions(frag, opts.handles);
+    if (opts.refs) linkRefs(frag, opts.refs);
     const box = document.createElement('div');
     box.appendChild(frag);
     return box.innerHTML;

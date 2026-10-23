@@ -338,7 +338,7 @@ export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, fresh, li
             </header>
           )}
           {e.replyTo ? <ReplyChip bridge={bridge} seq={e.replyTo} /> : null}
-          <Markdown text={e.text} handles={handles} />
+          <Markdown text={e.text} handles={handles} refs />
           {e.cut && (
             <p class="cut">
               Cut at 4 KB.{' '}

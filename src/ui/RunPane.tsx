@@ -220,7 +220,7 @@ export function RunView({ runId, result, member, who, endSeq, gone, wakes }: { r
         {phrase && <span class="clip">{phrase}</span>}
       </p>
       {res && res.error && <p class="run-error">{res.error}</p>}
-      {res && res.summary && <Markdown text={res.summary} class="run-summary" />}
+      {res && res.summary && <Markdown text={res.summary} class="run-summary" refs />}
       {res && res.steps && res.steps.length > 0 && (
         <section class="run-sec" aria-labelledby={'did-' + runId}>
           <div class="run-sec-head">

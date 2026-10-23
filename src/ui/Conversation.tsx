@@ -275,7 +275,7 @@ export function Conversation(props: ConversationProps) {
           case 'assistant':
             return (
               <Msg face={face} name={props.agentLabel} at={it.time} compact={compact}>
-                <Markdown text={it.text || ''} />
+                <Markdown text={it.text || ''} refs />
               </Msg>
             );
           case 'ask':
@@ -321,7 +321,7 @@ export function Conversation(props: ConversationProps) {
       {props.tail}
       {live && live.text && (
         <Msg face={face} name={props.agentLabel} pending>
-          <Markdown text={live.text} />
+          <Markdown text={live.text} refs />
         </Msg>
       )}
       {live && <LiveLines live={live} />}

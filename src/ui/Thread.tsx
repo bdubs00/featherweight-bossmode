@@ -239,7 +239,7 @@ function EntryMsg({ bridge, e, prev, agentOf, handles, runHref }: { bridge: stri
   const face = agent ? <Mark agent={agentOf(e.from.handle || '')} size={32} /> : <Avatar subject={e.from.name || ''} display={e.from.display} size={32} />;
   return (
     <Msg face={face} name={name} at={e.at} compact={sameSender(prev, e) && !e.pinned && !reacted(e)} id={'t-' + e.seq} tag={e.pinned ? <Chip>pinned</Chip> : undefined} corner={<Reactions bridge={bridge} e={e} onHeart={() => setHeart(true)} />}>
-      <Markdown text={e.text} handles={handles} />
+      <Markdown text={e.text} handles={handles} refs />
       {e.cut && (
         <p class="tmsg-cut">
           Cut at 4 KB. {runHref && <a href={runHref}>Whole text</a>}
@@ -299,7 +299,7 @@ export function ThreadView({ rows, bridge, agentOf, handles, runHref }: ThreadVi
           else
             node = (
               <Msg face={<Mark agent={agentOf(r.handle)} size={32} />} name={r.handle} pending>
-                <Markdown text={r.text} handles={handles} />
+                <Markdown text={r.text} handles={handles} refs />
               </Msg>
             );
         }
