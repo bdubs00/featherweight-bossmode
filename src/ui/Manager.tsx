@@ -22,7 +22,7 @@ import { managerRunOf } from '../state/reducer';
 import { slashCommands } from '../state/people';
 import { parseSlash } from '../lib/mention';
 import { attempt, showError } from './notice';
-import { describeFiles, refusalOf } from '../lib/attachments';
+import { NO_FILES_WITH_COMMAND, describeFiles, refusalOf } from '../lib/attachments';
 import { AttachedFiles } from './AttachedFiles';
 import { Avatar } from './common';
 import { Button, Help, Led, Mark, PaneHeader } from './primitives';
@@ -104,7 +104,7 @@ export function Manager() {
   const send = async (text: string, files: Attachment[]): Promise<boolean> => {
     const slash = runId && !stopped ? parseSlash(text, commands.map((c) => c.name)) : null;
     if (slash && files.length) {
-      showError(new Error('A command takes no files. Send the files in a message of their own.'));
+      showError(new Error(NO_FILES_WITH_COMMAND));
       return false;
     }
     setSent({ text, run: runId, users: userCount, files: describeFiles(files) });

@@ -3,6 +3,7 @@ import { act } from 'preact/test-utils';
 import { store } from '../state/store';
 import { AgentChat } from './Fleet';
 import { at, fakeFetch, mount, seedFleet, unmountAll, type Call } from './testkit-b';
+import { clearNotice, currentNotice } from './notice';
 
 let calls: Call[] = [];
 let restore = () => {};
@@ -66,6 +67,32 @@ describe('the conversation with an agent on no bridge', () => {
     send(box, '/plan cron');
     await vi.waitFor(() => expect(posts().length).toBe(3));
     expect(posts()[2]).toEqual({ method: 'POST', path: '/v1/bossmode/runs/run-boss-1/skill', body: { name: 'plan', args: 'cron' } });
+  });
+
+  it('sends files with the first message and with a follow-up, and refuses them with a slash command', async () => {
+    const attach = (el: HTMLElement, files: File[]) => {
+      const input = el.querySelector('.composer input[type=file]') as HTMLInputElement;
+      Object.defineProperty(input, 'files', { value: files, configurable: true });
+      act(() => {
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    };
+    const el = mount(<AgentChat agent="manager" />);
+    const box = el.querySelector('#composer') as HTMLTextAreaElement;
+    attach(el, [new File(['hello'], 'note.txt')]);
+    send(box, 'Read this');
+    await vi.waitFor(() => expect(posts().length).toBe(1));
+    expect(posts()[0]).toEqual({ method: 'POST', path: '/v1/runs?member=default%2Fboss-0', body: { agent: 'manager', input: 'Read this', files: [{ name: 'note.txt', data: 'aGVsbG8=' }] } });
+    await vi.waitFor(() => expect(box.value).toBe(''));
+    attach(el, [new File(['name,role'], 'team.csv')]);
+    send(box, '');
+    await vi.waitFor(() => expect(posts().length).toBe(2));
+    expect(posts()[1]).toEqual({ method: 'POST', path: '/v1/runs/run-boss-1/messages', body: { content: '', files: [{ name: 'team.csv', data: 'bmFtZSxyb2xl' }] } });
+    attach(el, [new File(['a'], 'a.txt')]);
+    send(box, '/plan nginx');
+    await vi.waitFor(() => expect(currentNotice()).toBe('A command takes no files. Send the files in a message of their own.'));
+    expect(posts().length).toBe(2);
+    clearNotice();
   });
 
   it('reads a run of the front again every 3 seconds while it works, and never a run that a worker holds, which comes on the stream', async () => {

@@ -32,7 +32,8 @@ import { newestRun, slashCommands } from '../state/people';
 import { selectFacts } from '../state/reducer';
 import { awakeFor, seatPresence, statusOf } from '../lib/status';
 import { directEntries, foldNaps, stepsOf, threadOf, withLive } from '../state/thread';
-import { attempt } from './notice';
+import { attempt, showError } from './notice';
+import { NO_FILES_WITH_COMMAND, refusalOf } from '../lib/attachments';
 import { Confirm, Menu, type MenuItem } from './common';
 import { Composer } from './Composer';
 import { useTranscript } from './Conversation';
@@ -226,10 +227,19 @@ function Chat({ bridge, m, items, closed, stopped, reason, said }: { bridge: str
         placeholder={'Message ' + m.handle}
         disabled={closed ? 'Closed. Reopen it to send.' : m.fired ? 'Fired. It gets no message.' : ''}
         commands={commands}
-        onSend={async (text) => {
+        attach
+        onSend={async (text, _to, files) => {
           const skill = parseSlash(text, names);
-          // A slash command goes as skill, and its arguments leave the text.
-          return attempt(() => sendMessage(bridge, skill ? { text: '', to: [m.handle], skill } : { text, to: [m.handle] }));
+          if (skill && files.length) {
+            showError(new Error(NO_FILES_WITH_COMMAND));
+            return false;
+          }
+          // A slash command goes as skill, and its arguments leave the text. The files go to this member alone, through the bridge.
+          return attempt(() =>
+            sendMessage(bridge, skill ? { text: '', to: [m.handle], skill } : files.length ? { text, to: [m.handle], files } : { text, to: [m.handle] }).catch((e) => {
+              throw refusalOf(e, files.length);
+            }),
+          );
         }}
       />
     </>

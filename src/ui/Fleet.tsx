@@ -7,7 +7,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
-import type { OrphanList } from '../api/types';
+import type { Attachment, OrphanList } from '../api/types';
+import { NO_FILES_WITH_COMMAND, refusalOf } from '../lib/attachments';
 import { spanWords } from '../lib/words';
 import { go, hrefOf, parseRoute, type Route } from '../lib/route';
 import { awakeCount, statusOf } from '../lib/status';
@@ -19,7 +20,7 @@ import { ensureRosters, ensureRuns, refreshAfterReset } from '../state/fetchers'
 import { filterPeople, firstPerson, newestRun, peopleCount, peopleOf, slashCommands, type PeopleGroup, type PersonRow } from '../state/people';
 import { parseSlash } from '../lib/mention';
 import { useRoving } from './keys';
-import { attempt } from './notice';
+import { attempt, showError } from './notice';
 import { Composer } from './Composer';
 import { Conversation, useTranscript, usePoll } from './Conversation';
 import { useResult } from './RunPane';
@@ -309,25 +310,35 @@ export function AgentChat({ agent }: { agent: string }) {
   // The end of the conversation: its newest item, the live answer, and a card that waits.
   const end = [t.items.length ? t.items[t.items.length - 1].seq : 0, live.text.length, live.tool, run && run.pending ? run.pending.id : ''].join(':');
   const stopped = !!run && ['failed', 'canceled'].includes(run.state);
-  const send = async (text: string): Promise<boolean> =>
-    attempt(async () => {
-      if (!runId || stopped) {
-        const r = await api.start(member, { agent, input: text });
+  const send = async (text: string, files: Attachment[]): Promise<boolean> => {
+    const fresh = !runId || stopped;
+    const skill = fresh ? null : parseSlash(text, names);
+    if (skill && files.length) {
+      showError(new Error(NO_FILES_WITH_COMMAND));
+      return false;
+    }
+    return attempt(async () => {
+      if (fresh) {
+        const r = await api.start(member, files.length ? { agent, input: text, files } : { agent, input: text }).catch((e) => {
+          throw refusalOf(e, files.length);
+        });
         store.dispatch({ type: 'run', run: r });
         setRunId(r.id);
         keepRun(agent, r.id);
         return;
       }
-      const skill = parseSlash(text, names);
       if (skill) {
         const r = await api.runSkill(runId, skill);
         if (r && r.id) store.dispatch({ type: 'run', run: r });
         return;
       }
-      await api.sendRun(runId, text);
+      await api.sendRun(runId, text, files).catch((e) => {
+        throw refusalOf(e, files.length);
+      });
       const r = await api.run(runId);
       store.dispatch({ type: 'run', run: r });
     });
+  };
   const name = (face && face.displayName) || agent;
   return (
     <section class="screen member-main agent-chat" aria-labelledby="agent-chat-title">
@@ -342,7 +353,7 @@ export function AgentChat({ agent }: { agent: string }) {
       <FollowBox end={end}>
         {runId ? <Conversation run={run} result={res} t={t} agentLabel={agent} live={live} /> : <div class="thread" />}
       </FollowBox>
-      <Composer draft={'agent:' + agent} label={'Message to ' + agent} placeholder={'Message ' + agent} disabled={member ? '' : 'Keep 0'} commands={commands} onSend={send} />
+      <Composer draft={'agent:' + agent} label={'Message to ' + agent} placeholder={'Message ' + agent} disabled={member ? '' : 'Keep 0'} commands={commands} attach onSend={(text, _to, files) => send(text, files)} />
     </section>
   );
 }

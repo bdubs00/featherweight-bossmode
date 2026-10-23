@@ -13,7 +13,7 @@
 
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { api } from '../api/routes';
-import type { Agent, InlineProfile, QueuedData, QuickChat, Run, Skill } from '../api/types';
+import type { Agent, AttachedFile, Attachment, InlineProfile, QueuedData, QuickChat, Run, Skill } from '../api/types';
 import { store, useSelect } from '../state/store';
 import { forgetProfiles, useProfile } from '../state/profiles';
 import { forgetQueued, useQueued } from '../state/queued';
@@ -30,7 +30,9 @@ import { Abilities } from './Abilities';
 import { Glyph } from './icons';
 import { isOn, skillOf } from '../lib/catalog';
 import { useRoving } from './keys';
-import { attempt } from './notice';
+import { attempt, showError } from './notice';
+import { AttachedFiles } from './AttachedFiles';
+import { NO_FILES_WITH_COMMAND, describeFiles, refusalOf } from '../lib/attachments';
 import { Composer } from './Composer';
 import { Conversation, usePoll, useTranscript } from './Conversation';
 import { useResult } from './RunPane';
@@ -44,7 +46,7 @@ export const FIND_FROM = 12;
 /** The picks of the chats that this tab started, so the details pane names them before the run object does. */
 const picksOf = new Map<string, InlineProfile>();
 /** The first message of a chat on its way, so the new conversation shows it before its transcript does. */
-let firstSent: { run: string; text: string } | null = null;
+let firstSent: { run: string; text: string; files: AttachedFile[] } | null = null;
 
 /** forgetChat drops what the place keeps between two visits, for the tests. */
 export function forgetChat(): void {
@@ -297,7 +299,7 @@ function NewChat({ chat }: { chat: QuickChat }) {
   const commands = useMemo(() => slashCommands(skills, picks && picks.skills ? picks.skills : []), [skills, picks]);
   const summary = !picks ? 'Loading the tools.' : picks.tools || (agent && agent.tools) ? summaryOf(abilitiesOf(picks.tools || (agent && agent.tools) || [], tools), picks.skills ? picks.skills.length : 0) : 'Tools and skills';
 
-  const send = async (text: string): Promise<boolean> => {
+  const send = async (text: string, files: Attachment[]): Promise<boolean> => {
     if (!picks) return false;
     if (picks.tools && picks.tools.length === 0) {
       setError('A chat needs at least one tool. Pick one.');
@@ -305,11 +307,13 @@ function NewChat({ chat }: { chat: QuickChat }) {
       return false;
     }
     setError('');
-    // A slash command on a new chat starts the run with its text, as any first message does.
+    // A slash command on a new chat starts the run with its text, as any first message does, and its files go with it.
     return attempt(async () => {
-      const r = await api.start(chat.member, startBody(chat.agent, text, picks));
+      const r = await api.start(chat.member, startBody(chat.agent, text, picks, files)).catch((e) => {
+        throw refusalOf(e, files.length);
+      });
       picksOf.set(r.id, picks);
-      firstSent = { run: r.id, text };
+      firstSent = { run: r.id, text, files: describeFiles(files) };
       store.dispatch({ type: 'run', run: r });
       go({ place: 'chat', run: r.id }, true);
     });
@@ -350,7 +354,7 @@ function NewChat({ chat }: { chat: QuickChat }) {
           )}
         </div>
       </div>
-      <Composer draft={'chat:new'} label={'Message to ' + chat.agent} placeholder="Ask a question" disabled={picks ? '' : 'Loading the tools.'} commands={commands} onSend={send} />
+      <Composer draft={'chat:new'} label={'Message to ' + chat.agent} placeholder="Ask a question" disabled={picks ? '' : 'Loading the tools.'} commands={commands} attach onSend={(text, _to, files) => send(text, files)} />
     </section>
   );
 }
@@ -392,12 +396,12 @@ function ChatRun({ chat, runId }: { chat: QuickChat; runId: string }) {
   const agent = useAgent(chat.agent);
   const res = useResult(runId);
   const t = useTranscript(runId);
-  const [sent, setSent] = useState<{ text: string; users: number } | null>(() => (firstSent && firstSent.run === runId ? { text: firstSent.text, users: 0 } : null));
+  const [sent, setSent] = useState<{ text: string; users: number; files: AttachedFile[] } | null>(() => (firstSent && firstSent.run === runId ? { text: firstSent.text, users: 0, files: firstSent.files } : null));
   useEffect(() => {
     loadAgentSkills(chat.agent).catch(() => {});
   }, [chat.agent]);
   useEffect(() => {
-    setSent(firstSent && firstSent.run === runId ? { text: firstSent.text, users: 0 } : null);
+    setSent(firstSent && firstSent.run === runId ? { text: firstSent.text, users: 0, files: firstSent.files } : null);
   }, [runId]);
   // A run of the front sends no run event, so the chat reads it while it works and while an answer is on its way.
   usePoll(runId, !!sent || !run);
@@ -421,27 +425,35 @@ function ChatRun({ chat, runId }: { chat: QuickChat; runId: string }) {
   const commands = useMemo(() => slashCommands(skills, picks.skills || loadable || (skills || []).map((s) => s.name)), [skills, picks.skills, loadable]);
   const names = useMemo(() => commands.map((c) => c.name), [commands]);
 
-  const send = async (text: string): Promise<boolean> => {
-    setSent({ text, users: userCount });
+  const send = async (text: string, files: Attachment[]): Promise<boolean> => {
+    const skill = stopped ? null : parseSlash(text, names);
+    if (skill && files.length) {
+      showError(new Error(NO_FILES_WITH_COMMAND));
+      return false;
+    }
+    setSent({ text, users: userCount, files: describeFiles(files) });
     const ok = await attempt(async () => {
       if (stopped) {
         // A chat that stopped takes no message: the next one starts a new chat with the same picks.
         // A list that the page does not know stays out, so the list of the agent holds.
         const p: InlineProfile = { tools: picks.tools || undefined, skills: picks.skills || undefined };
-        const r = await api.start(chat.member, startBody(chat.agent, text, p));
+        const r = await api.start(chat.member, startBody(chat.agent, text, p, files)).catch((e) => {
+          throw refusalOf(e, files.length);
+        });
         picksOf.set(r.id, p);
-        firstSent = { run: r.id, text };
+        firstSent = { run: r.id, text, files: describeFiles(files) };
         store.dispatch({ type: 'run', run: r });
         go({ place: 'chat', run: r.id }, true);
         return;
       }
-      const skill = parseSlash(text, names);
       if (skill) {
         const r = await api.runSkill(runId, skill);
         if (r && r.id) store.dispatch({ type: 'run', run: r });
         return;
       }
-      await api.sendRun(runId, text);
+      await api.sendRun(runId, text, files).catch((e) => {
+        throw refusalOf(e, files.length);
+      });
       store.dispatch({ type: 'run', run: await api.run(runId) });
     });
     if (!ok) setSent(null);
@@ -453,7 +465,8 @@ function ChatRun({ chat, runId }: { chat: QuickChat; runId: string }) {
     <>
       {sent && (
         <Msg face={<Avatar subject={me} display={meName} size={32} />} name="You">
-          <p class="tmsg-plain sending">{sent.text}</p>
+          {sent.text && <p class="tmsg-plain sending">{sent.text}</p>}
+          <AttachedFiles files={sent.files} />
         </Msg>
       )}
       {waiting && !live.text && !live.tool && (
@@ -469,7 +482,7 @@ function ChatRun({ chat, runId }: { chat: QuickChat; runId: string }) {
       {stopped && <Quiet tone="grey">Stopped. Your next message starts a new chat.</Quiet>}
     </>
   );
-  const title = run ? chatTitle(run) : sent ? chatTitle({ input: sent.text }) : 'Chat';
+  const title = run ? chatTitle(run) : sent ? chatTitle({ input: sent.text || sent.files.map((f) => f.name).join(', ') }) : 'Chat';
   return (
     <section class="screen chat-main" aria-labelledby="chat-title">
       <PaneHeader
@@ -487,7 +500,7 @@ function ChatRun({ chat, runId }: { chat: QuickChat; runId: string }) {
       <FollowBox end={end}>
         <Conversation run={run} result={res} t={t} agentLabel={chat.agent} tail={tail} live={live} />
       </FollowBox>
-      <Composer draft={'chat:' + runId} label={'Message to ' + chat.agent} placeholder="Ask a question" commands={commands} onSend={send} />
+      <Composer draft={'chat:' + runId} label={'Message to ' + chat.agent} placeholder="Ask a question" commands={commands} attach onSend={(text, _to, files) => send(text, files)} />
     </section>
   );
 }

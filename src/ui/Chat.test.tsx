@@ -4,6 +4,7 @@ import type { Run } from '../api/types';
 import { store } from '../state/store';
 import { ChatDetails, ChatList, ChatMain, forgetChat } from './Chat';
 import { at, fakeFetch, mount, unmountAll, type Call } from './testkit-b';
+import { clearNotice, currentNotice } from './notice';
 
 let calls: Call[] = [];
 let restore = () => {};
@@ -232,6 +233,40 @@ describe('the Chat place', () => {
     send(box, '/notes the freeze');
     await vi.waitFor(() => expect(posts().length).toBe(2));
     expect(posts()[1]).toEqual({ method: 'POST', path: '/v1/bossmode/runs/run-chat-1/skill', body: { name: 'notes', args: 'the freeze' } });
+  });
+
+  it('sends files with the first message of a new chat and with a follow-up, and refuses them with a slash command', async () => {
+    const attach = (el: HTMLElement, files: File[]) => {
+      const input = el.querySelector('.composer input[type=file]') as HTMLInputElement;
+      Object.defineProperty(input, 'files', { value: files, configurable: true });
+      act(() => {
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    };
+    configure(CHAT);
+    const fresh = mount(<ChatMain />);
+    await vi.waitFor(() => expect(fresh.querySelectorAll('.kit-row').length).toBe(5));
+    attach(fresh, [new File(['hello'], 'note.txt')]);
+    send(fresh.querySelector('#composer') as HTMLTextAreaElement, 'Read this');
+    await vi.waitFor(() => expect(posts().length).toBe(1));
+    expect(posts()[0].body).toEqual({ agent: 'chat', input: 'Read this', profile: { tools: ['files'], skills: ['notes'] }, metadata: { 'fw.view': 'quickchat' }, files: [{ name: 'note.txt', data: 'aGVsbG8=' }] });
+    unmountAll();
+    act(() => store.dispatch({ type: 'run', run: OLD }));
+    const el = mount(<ChatMain run="run-chat-1" />);
+    await vi.waitFor(() => expect(el.querySelector('.thread')!.textContent).toContain('Three notes.'));
+    const box = el.querySelector('#composer') as HTMLTextAreaElement;
+    attach(el, [new File(['name,role'], 'team.csv')]);
+    send(box, 'And this');
+    await vi.waitFor(() => expect(posts().length).toBe(2));
+    expect(posts()[1]).toEqual({ method: 'POST', path: '/v1/runs/run-chat-1/messages', body: { content: 'And this', files: [{ name: 'team.csv', data: 'bmFtZSxyb2xl' }] } });
+    // The files that went out show while the transcript does not hold the message yet.
+    expect([...el.querySelectorAll('.tmsg .attached li')].map((li) => li.textContent)).toEqual(['team.csv9 B']);
+    await vi.waitFor(() => expect(box.value).toBe(''));
+    attach(el, [new File(['a'], 'a.txt')]);
+    send(box, '/notes the freeze');
+    await vi.waitFor(() => expect(currentNotice()).toBe('A command takes no files. Send the files in a message of their own.'));
+    expect(posts().length).toBe(2);
+    clearNotice();
   });
 
   it('says what the chat can do in plain words, an extra tool for this chat, its skills in one line, the model, and the usage', async () => {

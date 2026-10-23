@@ -435,10 +435,18 @@ the files of earlier messages, 64 MiB on one replica. The page keeps the
 text and the files of a refused post, shows the sentence of the detail,
 and words a 413 itself, because a proxy that refuses a large body sends no
 sentence: `The files are too large to send. Remove some, and send again.`
+A 413 of the front that names a file keeps its sentence, such as a file
+over `tools.files.maxFileBytes` of the workers of a member.
 
-The composer of a bridge and of the manager takes files from the key Attach
+Every composer that sends to an agent takes files from the key Attach
 files, a drop, and a paste, and checks the count and the size before it
-takes them. The files of a draft stay in the memory of the tab, so a move
+takes them: the composer of a bridge, of the manager, of the quick chat,
+of an agent in Fleet, and of a member. The quick chat and an agent in
+Fleet send the files in `files` of `POST /v1/runs` for the first message
+and of `POST /v1/runs/{id}/messages` for a follow-up (section 7.1). A
+member sends them through its bridge, to that member alone. A slash
+command takes no files, and the page says so:
+`A command takes no files. Send the files in a message of their own.` The files of a draft stay in the memory of the tab, so a move
 to another screen keeps them and a reload drops them.
 
 When the person replies to a message of an agent and names no handle, the
