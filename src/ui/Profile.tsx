@@ -1,7 +1,7 @@
 // The profile of an agent, in the details pane of the Fleet place: the mark
 // at 72, the tagline, the tools and the rules as chips, the count of its
-// skills, New face, What people liked, the workers with Keep, and the
-// counts of today. The workers and their phases come from the state of
+// skills, its duties, New face, What people liked, the workers with Keep,
+// and the counts of today. The workers and their phases come from the state of
 // each worker that the stream keeps, as on every screen. GET
 // /v1/pools/{name} gives only Keep and the gaps. The profile reads it when
 // it opens, and again when the phases of the workers change on the stream.
@@ -27,6 +27,7 @@ import { Confirm, InlineMarkdown, Menu } from './common';
 import { Glyph } from './icons';
 import { Button, Chip, Field, Help, Input, Led, Mark, PaneHeader } from './primitives';
 import { Abilities } from './Abilities';
+import { AgentDuties } from './Duties';
 import { abilitiesOf, rulesWords } from '../lib/tools';
 import { costParts } from '../lib/cost';
 import { useToolCatalog } from '../state/tools';
@@ -525,6 +526,7 @@ export function Profile({ agent, back }: { agent: string; back?: { href: string;
             <Abilities abilities={abilities} rules={rules} label="Tools and rules" />
           </section>
         )}
+        <AgentDuties agent={agent} />
         <Liked agent={agent} />
         <Workers agent={agent} owner={owner} pool={pool} setPool={setPool} />
         <TodaySec agent={agent} today={today} />

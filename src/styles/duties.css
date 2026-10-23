@@ -206,6 +206,22 @@
   color: var(--ink);
   font-weight: 600;
 }
+/* The duties of an agent on its profile. */
+.prof-duties {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  margin: var(--s-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.prof-duties li {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 /* ---------- the editor ---------- */
 .duty-form {
   gap: var(--s-5);

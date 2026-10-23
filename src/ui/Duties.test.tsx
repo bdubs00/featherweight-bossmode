@@ -5,6 +5,7 @@ import { store } from '../state/store';
 import { forgetDuties } from '../state/duties';
 import { nextShort, nextWords } from '../lib/duties';
 import { DUTY_IS, DutyList, DutyMain } from './Duties';
+import { Profile } from './Profile';
 import { clearNotice } from './notice';
 import { click, fakeApi, keyNamed, mount, settle, typeIn, unmountAll } from './testkit-c';
 
@@ -323,5 +324,27 @@ describe('the page of a duty', () => {
     const el = mount(<DutyMain name="gone-duty" />);
     await settle();
     expect(text(el)).toContain('This duty is not here. It was removed, or you cannot see it.');
+  });
+});
+
+describe('the profile of an agent', () => {
+  it('counts the duties of the agent and links each one', async () => {
+    api = fakeApi(listOf([REPORT, WATCH, MONTHLY]));
+    const el = mount(<Profile agent="scribe" />);
+    await settle();
+    const sec = el.querySelector('section[aria-labelledby="duties-scribe"]')!;
+    expect(sec.querySelector('h3')!.textContent).toBe('Duties');
+    expect(sec.querySelector('.chip .sr')!.textContent).toBe('2 duties');
+    expect([...sec.querySelectorAll('a')].map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
+      ["Write the report of [Today's date].", '#duties/daily-report'],
+      ['Sum up the month.', '#duties/monthly-summary'],
+    ]);
+  });
+
+  it('shows no section for an agent without a duty', async () => {
+    api = fakeApi(listOf([WATCH]));
+    const el = mount(<Profile agent="scribe" />);
+    await settle();
+    expect(el.querySelector('section[aria-labelledby="duties-scribe"]')).toBeNull();
   });
 });

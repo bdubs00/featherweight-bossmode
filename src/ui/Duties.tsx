@@ -508,3 +508,40 @@ function History({ runs }: { runs: DutyRun[] }) {
     </ol>
   );
 }
+
+/* ---------- the profile of an agent ---------- */
+
+/**
+ * AgentDuties is the section of the duties of an agent on its profile: the
+ * count and a link to each. An agent without a duty has no section, and
+ * neither has a front that keeps no duties.
+ */
+export function AgentDuties({ agent }: { agent: string }) {
+  const list = useDuties((s) => s.list);
+  const off = useDuties((s) => s.off);
+  useEffect(() => {
+    if (!list) loadDuties().catch(() => {});
+  }, []);
+  const mine = useMemo(() => sortDuties((list || []).filter((d) => d.agent === agent)), [list, agent]);
+  if (off || mine.length === 0) return null;
+  return (
+    <section class="prof-sec" aria-labelledby={'duties-' + agent}>
+      <div class="prof-sec-head">
+        <h3 class="t-sub" id={'duties-' + agent}>
+          Duties
+        </h3>
+        <Chip label={mine.length === 1 ? '1 duty' : mine.length + ' duties'}>{mine.length}</Chip>
+      </div>
+      <ul class="prof-duties">
+        {mine.map((d) => (
+          <li>
+            <a class="prof-link" href={dutyHref(d.name)}>
+              {dutyTitle(d)}
+            </a>
+            {d.readback && <span class="t-meta">{d.readback}</span>}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
