@@ -234,10 +234,14 @@ describe('the channel', () => {
     expect(el.querySelector('.tab-strip .tabs')).not.toBeNull();
   });
 
-  it('says a bridge is not here, with the key Bridges', () => {
+  it('says a bridge is not here, with the key Bridges, and raises no notice for the 404', async () => {
+    clearNotice();
     const el = mount(<Channel id="b-gone" />);
     expect(el.querySelector('.empty p')!.textContent).toBe('This bridge is not here. It was removed, or you cannot see it.');
     expect(el.querySelector('.empty a')!.textContent).toBe('Bridges');
+    await settle();
+    expect(f.seen.some((x) => x.path.startsWith('/v1/bridges/b-gone'))).toBe(true);
+    expect(currentNotice()).toBe('');
   });
 });
 
