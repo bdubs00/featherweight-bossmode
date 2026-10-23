@@ -19,6 +19,7 @@ import { attempt } from './notice';
 import { smooth } from './keys';
 import { useWhole } from '../state/whole';
 import { CutEnd } from './Whole';
+import { AttachedFiles } from './AttachedFiles';
 import { InlineMarkdown, Markdown, When } from './common';
 import { DecisionCard } from './Decision';
 import { Avatar, Button, Chip, IconButton, LineLed, Mark, ReactionChip, TextArea } from './primitives';
@@ -246,6 +247,7 @@ function EntryMsg({ bridge, e, prev, agentOf, handles, runHref }: { bridge: stri
     <Msg face={face} name={name} at={e.at} compact={sameSender(prev, e) && !e.pinned && !reacted(e)} id={'t-' + e.seq} tag={e.pinned ? <Chip>pinned</Chip> : undefined} corner={<Reactions bridge={bridge} e={e} onHeart={() => setHeart(true)} />}>
       <Markdown text={whole && !whole.cut ? whole.text : e.text} handles={handles} refs />
       {e.cut && <CutEnd bridge={bridge} seq={e.seq} whole={whole} runHref={runHref} class="tmsg-cut" />}
+      <AttachedFiles files={e.files} />
       {heart && (
         <HeartNote
           onCancel={() => setHeart(false)}

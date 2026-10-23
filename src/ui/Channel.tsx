@@ -17,6 +17,7 @@ import { decidedRuns, hiddenLine } from '../lib/lines';
 import { hrefOf, type BridgeTab } from '../lib/route';
 import { useRoving, smooth } from './keys';
 import { attempt } from './notice';
+import { refusalOf } from '../lib/attachments';
 import { Confirm, Empty, Menu } from './common';
 import { EntryRow, NapRow, markLoaded } from './Message';
 import { NewBelow, nearEnd } from './Thread';
@@ -79,8 +80,13 @@ function ChannelComposer(p: { id: string; closed: boolean; reply: Entry | null; 
       disabled={p.closed ? 'Closed. Reopen it to send.' : ''}
       reply={r ? { seq: r.seq, who: senderName(r.from), text: r.text, handle: r.from.kind === 'agent' ? r.from.handle : undefined } : null}
       onClearReply={p.onClearReply}
-      onSend={async (text, to) => {
-        const ok = await attempt(() => postMessage(p.id, text, to, r ? r.seq : undefined));
+      attach
+      onSend={async (text, to, files) => {
+        const ok = await attempt(() =>
+          postMessage(p.id, text, to, r ? r.seq : undefined, files).catch((e) => {
+            throw refusalOf(e, files.length);
+          }),
+        );
         if (ok) p.onClearReply();
         return ok;
       }}

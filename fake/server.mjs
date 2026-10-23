@@ -111,8 +111,8 @@ async function readBody(req, max = 512 * 1024) {
   return Buffer.concat(chunks).toString('utf8');
 }
 
-async function readJson(req) {
-  const raw = await readBody(req);
+async function readJson(req, max) {
+  const raw = await readBody(req, max);
   if (!raw) return {};
   try {
     const v = JSON.parse(raw);
@@ -123,6 +123,35 @@ async function readJson(req) {
     refuse(400, 'the body is not JSON');
   }
 }
+
+/* ---------- the files of a message ---------- */
+
+// A body with files holds 32 MiB of bytes in base64 and 1 MB more, as
+// native.MaxFilesBodyBytes of the kernel.
+const FILE_BODY_BYTES = Math.floor((32 * 1024 * 1024) / 3) * 4 + 1024 * 1024;
+
+/** uploadedFiles checks the files of a body as the front does, and decodes them. */
+function uploadedFiles(body) {
+  const files = body.files === undefined || body.files === null ? [] : body.files;
+  if (!Array.isArray(files)) refuse(400, 'json: cannot unmarshal files');
+  if (files.length > 20) refuse(400, 'a message holds at most 20 files');
+  let total = 0;
+  return files.map((f) => {
+    const name = f && typeof f.name === 'string' ? f.name : '';
+    if (!name.trim() || name === '.' || name === '..' || Buffer.byteLength(name) > 255 || /[\/\\\u0000-\u001f\u007f]/.test(name)) refuse(400, 'a file needs a name of at most 255 bytes, without a path or a control character');
+    if (typeof f.data !== 'string' || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(f.data)) refuse(400, 'illegal base64 data');
+    const data = Buffer.from(f.data, 'base64');
+    if (!data.length) refuse(400, `the file "${name}" is empty`);
+    total += data.length;
+    if (total > 32 * 1024 * 1024) refuse(413, 'the files of a message hold at most 32 MiB together');
+    const text = data.toString('utf8');
+    const mediaType = !text.includes('\0') && Buffer.from(text).equals(data) ? 'text/plain' : 'application/octet-stream';
+    return { name, size: data.length, mediaType };
+  });
+}
+
+/** attachedOf is the file blocks of a user item of a transcript, as the kernel keeps them under attachments/. */
+const attachedOf = (files) => files.map((f) => ({ ...f, path: 'attachments/' + f.name }));
 
 /* ---------- the stream ---------- */
 
@@ -381,6 +410,33 @@ const REPLIES = [
   'Noted in the wiki under `index.md`.',
 ];
 let replyN = 0;
+
+/**
+ * filesReach refuses files that cannot reach every member that a message
+ * reaches, in the words of the front: the channel keeps no bytes for a
+ * later run.
+ */
+function filesReach(b, to) {
+  const targets = b.members.filter((m) => !m.fired && (to.length ? to.includes(m.handle) : !m.muted));
+  if (!targets.length) refuse(409, 'the message reaches no member, so its files have nowhere to go: address a member');
+  const waiting = targets.filter((m) => !m.runs.length).map((m) => m.handle);
+  const failed = targets.filter((m) => m.runs.length && stoppedRun(m) === 'failed').map((m) => m.handle);
+  const and = (hs) => (hs.length < 3 ? hs.join(' and ') : hs.slice(0, -1).join(', ') + ', and ' + hs[hs.length - 1]);
+  if (waiting.length === 1) refuse(409, `files go only to a member with a run, and ${waiting[0]} has none yet: send them once it works, or address another member`);
+  if (waiting.length > 1) refuse(409, `files go only to a member with a run, and ${and(waiting)} have none yet: send them once they work, or address other members`);
+  if (failed.length === 1) refuse(409, `files go only to a run that takes messages, and the run of ${failed[0]} failed: give it a new task, or address another member`);
+  if (failed.length > 1) refuse(409, `files go only to a run that takes messages, and the runs of ${and(failed)} failed: give them new tasks, or address other members`);
+}
+
+/** seatFiles puts the message with its files into the transcript of the run of each member that gets it. */
+function seatFiles(b, e, files) {
+  for (const m of b.members.filter((x) => !x.fired && (e.to.length ? e.to.includes(x.handle) : !x.muted))) {
+    const items = S.transcripts.get(m.runs[m.runs.length - 1]);
+    if (!items) continue;
+    const seq = items.length ? items[items.length - 1].seq + 1 : 1;
+    items.push({ seq, time: now(), kind: 'user', text: e.text, who: e.from.name, files: attachedOf(files) });
+  }
+}
 
 /** fanOut answers a message of a person in the place of the members. */
 function fanOut(bridgeId, e) {
@@ -877,13 +933,15 @@ on('GET', '/v1/bridges/([^/]+)/messages', (c, id) => {
 on('POST', '/v1/bridges/([^/]+)/messages', async (c, id) => {
   const b = bridgeOr404(id);
   if (b.state !== 'open') refuse(409, 'the bridge is closed, so it takes no message');
-  const body = await readJson(c.req);
-  for (const k of Object.keys(body)) if (!['text', 'to', 'replyTo', 'pinned', 'skill'].includes(k)) refuse(400, `json: unknown field "${k}"`);
+  const body = await readJson(c.req, FILE_BODY_BYTES);
+  for (const k of Object.keys(body)) if (!['text', 'to', 'replyTo', 'pinned', 'skill', 'files'].includes(k)) refuse(400, `json: unknown field "${k}"`);
+  const files = uploadedFiles(body);
+  if (files.length && (body.pinned || body.skill)) refuse(400, 'a pinned message and a slash command take no files');
   const skill = body.skill && typeof body.skill === 'object' ? { name: String(body.skill.name || ''), ...(body.skill.args ? { args: String(body.skill.args) } : {}) } : null;
   if (body.skill !== undefined && (!skill || !skill.name)) refuse(400, 'a slash command names a skill');
   // A slash command can come without a text: the skill and its arguments say it.
   const text = String(body.text || '').trim() || (skill ? '/' + skill.name + (skill.args ? ' ' + skill.args : '') : '');
-  if (!text) refuse(400, 'a message needs a text');
+  if (!text && !files.length) refuse(400, 'a message needs a text, a skill, or files');
   const to = Array.isArray(body.to) ? body.to.map(String) : [];
   if (to.includes('operator')) refuse(400, 'a person does not address the operator; the operator reads the channel');
   for (const h of to) {
@@ -893,7 +951,9 @@ on('POST', '/v1/bridges/([^/]+)/messages', async (c, id) => {
   }
   const ch = S.channels.get(id);
   if (body.replyTo != null && !ch.some((e) => e.seq === Number(body.replyTo))) refuse(400, `no entry ${body.replyTo} to reply to`);
-  const e = post(id, { kind: 'person', name: c.person.subject, display: c.person.name }, text, { to, replyTo: body.replyTo != null ? Number(body.replyTo) : null, pinned: !!body.pinned || !!skill, ...(skill ? { skill } : {}) });
+  if (files.length) filesReach(b, to);
+  const e = post(id, { kind: 'person', name: c.person.subject, display: c.person.name }, text, { to, replyTo: body.replyTo != null ? Number(body.replyTo) : null, pinned: !!body.pinned || !!skill, ...(skill ? { skill } : {}), ...(files.length ? { files } : {}) });
+  if (files.length) seatFiles(b, e, files);
   S.reads.set(id + '|' + c.person.subject, e.seq);
   fanOut(id, e);
   c.status = 201;
@@ -1086,14 +1146,15 @@ on('GET', '/v1/runs/([^/]+)/live', (c, raw) => {
 // A run starts on any member of the fleet whose agents hold the agent of the body.
 on('POST', '/v1/runs', async (c) => {
   const member = c.url.searchParams.get('member') || '';
-  const body = await readJson(c.req);
+  const body = await readJson(c.req, FILE_BODY_BYTES);
   const agent = String(body.agent || '');
   const fm = FLEET.members.find((m) => m.name === member);
   if (!fm) refuse(400, `no fleet member ${member}`);
   if (!agent || !fm.agents.some((a) => a.name === agent)) refuse(400, `the fleet member ${member} runs no agent ${agent || '""'}`);
   const input = String(body.input || '').trim();
-  if (!input) refuse(400, 'a run needs an input');
-  for (const k of Object.keys(body)) if (!['agent', 'input', 'title', 'profile', 'metadata', 'instructions', 'budget'].includes(k)) refuse(400, `json: unknown field "${k}"`);
+  for (const k of Object.keys(body)) if (!['agent', 'input', 'title', 'profile', 'metadata', 'instructions', 'budget', 'files'].includes(k)) refuse(400, `json: unknown field "${k}"`);
+  const files = uploadedFiles(body);
+  if (!input && !files.length) refuse(400, 'the field input is required and must not be empty');
   const id = 'run-' + agent + '-' + Date.now().toString(36);
   // The kernel titles a run from the first sentence of its input.
   const title = String(body.title || '').trim() || (input.split('\n')[0].split(/(?<=[.?!])\s/)[0] || '').slice(0, 64);
@@ -1109,7 +1170,7 @@ on('POST', '/v1/runs', async (c) => {
     if (extra.length) run.extraTools = extra;
   }
   S.runs.set(id, run);
-  S.transcripts.set(id, [{ seq: 1, time: now(), kind: 'user', text: input, who: c.person.subject }]);
+  S.transcripts.set(id, [{ seq: 1, time: now(), kind: 'user', text: input, who: c.person.subject, ...(files.length ? { files: attachedOf(files) } : {}) }]);
   S.results.set(id, { runId: id, title: run.title, agent: run.agent, status: 'working', started: run.createdAt, changed: run.updatedAt, next: [] });
   publish('run', run);
   managerTurn(run, true);
@@ -1163,13 +1224,14 @@ on('GET', '/v1/runs/([^/]+)/files/(.+)', (c, id, p) => {
 });
 on('POST', '/v1/runs/([^/]+)/messages', async (c, id) => {
   const run = runOr404(id);
-  const body = await readJson(c.req);
+  const body = await readJson(c.req, FILE_BODY_BYTES);
+  const files = uploadedFiles(body);
   const content = String(body.content || '').trim();
-  if (!content) refuse(400, 'a message needs content');
+  if (!content && !files.length) refuse(400, 'a message needs content');
   if (run.state === 'failed' || run.state === 'canceled') refuse(409, `the run ${id} ${run.state === 'failed' ? 'failed' : 'was canceled'}, so it takes no message`);
   const items = S.transcripts.get(id);
   const seq = items[items.length - 1].seq + 1;
-  items.push({ seq, time: now(), kind: 'user', text: content, who: c.person.subject });
+  items.push({ seq, time: now(), kind: 'user', text: content, who: c.person.subject, ...(files.length ? { files: attachedOf(files) } : {}) });
   Object.assign(run, { state: 'running', seq, updatedAt: now() });
   publish('run', run);
   if (!run.metadata || !run.metadata['fw.bridge.member']) managerTurn(run, false);

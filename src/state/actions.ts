@@ -3,7 +3,7 @@
 
 import { api, type NewBridge, type NewMember, type NewMessage } from '../api/routes';
 import { openStream, type StreamHandle } from '../api/stream';
-import type { Entry, FleetChange, MemberEventData, MessageEventData, ReactionKind, Run, RunState, StreamEvent } from '../api/types';
+import type { Attachment, Entry, FleetChange, MemberEventData, MessageEventData, ReactionKind, Run, RunState, StreamEvent } from '../api/types';
 import { managerRunOf, seatOfRun, type State } from './reducer';
 import { store } from './store';
 import { ApiError, type SigninNeeded } from '../api/client';
@@ -201,8 +201,8 @@ export function markRead(id: string): void {
   );
 }
 
-export async function postMessage(id: string, text: string, to: string[], replyTo?: number): Promise<Entry> {
-  return sendMessage(id, { text, to, replyTo });
+export async function postMessage(id: string, text: string, to: string[], replyTo?: number, files?: Attachment[]): Promise<Entry> {
+  return sendMessage(id, { text, to, replyTo, files });
 }
 
 /** sendMessage posts a message with any field of the route, such as the skill of a slash command, and puts the entry into the channel. */
@@ -476,9 +476,10 @@ export function forgetManagerRun(): void {
 /**
  * askManager sends a message to the manager: a follow-up of the
  * conversation, or the first message of a new run when there is none or
- * the last one ended. It returns the run.
+ * the last one ended. The files go with the message in either case, and
+ * the workspace of the manager run keeps them. It returns the run.
  */
-export async function askManager(text: string): Promise<string> {
+export async function askManager(text: string, files?: Attachment[]): Promise<string> {
   const s = store.get();
   const m = s.config && s.config.manager;
   if (!m) throw new Error('No manager is set up.');
@@ -486,7 +487,7 @@ export async function askManager(text: string): Promise<string> {
   const run = id ? s.runs[id] : undefined;
   if (id && !ended(run && run.state)) {
     try {
-      await api.sendRun(id, text);
+      await api.sendRun(id, text, files);
       return id;
     } catch (e) {
       // A run that ended since the page read it refuses the message, and
@@ -494,7 +495,7 @@ export async function askManager(text: string): Promise<string> {
       if (!(e instanceof ApiError) || e.status !== 409) throw e;
     }
   }
-  const r = await api.start(m.member, { agent: m.agent, input: text });
+  const r = await api.start(m.member, files && files.length ? { agent: m.agent, input: text, files } : { agent: m.agent, input: text });
   store.dispatch({ type: 'run', run: r });
   setManagerRun(r.id);
   return r.id;
