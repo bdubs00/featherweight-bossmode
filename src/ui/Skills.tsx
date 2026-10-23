@@ -322,7 +322,7 @@ export function SkillMain({ item, add }: { item?: SkillItem; add?: boolean }) {
         back={{ href: '#skills', label: 'Skills', to: 'list' }}
         actions={skill ? <ItemMenu s={skill} admin={admin} onRemove={() => setAsk(true)} /> : undefined}
       >
-        <Chip>{skill ? (skill.kind === 'server' ? skill.server : skill.kind) : tool!.builtin ? 'built in' : tool!.server}</Chip>
+        <Chip class="head-kind">{skill ? (skill.kind === 'server' ? skill.server : skill.kind) : tool!.builtin ? 'built in' : tool!.server}</Chip>
       </PaneHeader>
       <div class="scroll pad">
         {skill ? (
@@ -353,6 +353,7 @@ function CopyKey({ slash }: { slash: string }) {
   return (
     <Button
       size="s"
+      aria-label={(copied ? 'Copied ' : 'Copy ') + slash}
       onClick={async () => {
         try {
           await navigator.clipboard.writeText(slash);
@@ -362,7 +363,10 @@ function CopyKey({ slash }: { slash: string }) {
         }
       }}
     >
-      <span aria-live="polite">{(copied ? 'Copied ' : 'Copy ') + slash}</span>
+      <span aria-live="polite">
+        {copied ? 'Copied' : 'Copy'}
+        <span class="copy-slash">{' ' + slash}</span>
+      </span>
     </Button>
   );
 }

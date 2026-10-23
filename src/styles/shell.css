@@ -433,6 +433,14 @@
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
+    /* The keys never squeeze the title out of the header. */
+    min-width: 5em;
+  }
+  /* The header of a skill keeps its name: the kind goes, and the key Copy
+     leaves out the slash command, which the text of the skill shows. */
+  .skill .pane-head .head-kind,
+  .skill .pane-head .copy-slash {
+    display: none;
   }
 }
 
