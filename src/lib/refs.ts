@@ -15,6 +15,19 @@ export interface Refs {
   bridges: Record<string, string>;
   /** Whether a path names a page of the wiki. */
   page: (path: string) => boolean;
+  /** The ids of the bridges that the page knows, by their exact titles, for a title that a text quotes. */
+  titles?: Record<string, string>;
+}
+
+/** A text in double quotes, straight or curly, on one line, as an agent quotes the title of a bridge. */
+const QUOTED = String.raw`(["“])([^"“”
+]{1,200})(["”])`;
+
+/** quotedTexts lists the texts that a text holds in double quotes, which can be the titles of bridges. */
+export function quotedTexts(text: string): string[] {
+  const out = new Set<string>();
+  for (const m of String(text || '').matchAll(new RegExp(QUOTED, 'g'))) out.add(m[2]);
+  return [...out];
 }
 
 /** A path that ends with .md, at the edge of a word, as an agent writes it. A dot ends a sentence, so a path can end before one. */
@@ -46,13 +59,41 @@ export function refCandidates(text: string): { paths: string[]; words: string[] 
   return { paths: [...paths], words: [...words] };
 }
 
-const bridgeLink = (doc: Document, id: string, title: string): HTMLAnchorElement => {
+const bridgeLink = (doc: Document, id: string, title: string, quoted = false): HTMLAnchorElement => {
   const a = doc.createElement('a');
   a.setAttribute('href', hrefOf({ place: 'bridge', id, pane: 'none' }));
-  a.className = 'ref-bridge';
+  a.className = quoted ? 'ref-bridge ref-title' : 'ref-bridge';
   a.textContent = title || id;
   return a;
 };
+
+/**
+ * dropRepeats removes the link of an id that only repeats the quoted title
+ * right before it, as in "Proxmox blanks table" (01m5...): the quoted title
+ * is the link, and the parenthesis goes. A parenthesis that repeats the
+ * title as words goes too.
+ */
+function dropRepeats(root: DocumentFragment | Element): void {
+  for (const q of [...root.querySelectorAll('a.ref-title')]) {
+    const t1 = q.nextSibling;
+    if (!t1 || t1.nodeType !== 3) continue;
+    const text = t1 as Text;
+    const href = q.getAttribute('href');
+    const words = new RegExp('^(["\u201d])\\s*\\(\\s*' + (q.textContent || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*\\)');
+    const plain = words.exec(text.data);
+    if (plain) {
+      text.data = plain[1] + text.data.slice(plain[0].length);
+      continue;
+    }
+    const open = /^(["\u201d])\s*\($/.exec(text.data);
+    const link = t1.nextSibling;
+    const t2 = link ? link.nextSibling : null;
+    if (!open || !link || link.nodeName !== 'A' || (link as Element).getAttribute('href') !== href || !t2 || t2.nodeType !== 3 || !(t2 as Text).data.startsWith(')')) continue;
+    text.data = open[1];
+    link.remove();
+    (t2 as Text).data = (t2 as Text).data.slice(1);
+  }
+}
 
 const pageLink = (doc: Document, path: string): HTMLAnchorElement => {
   const a = doc.createElement('a');
@@ -89,20 +130,35 @@ export function linkRefs(root: DocumentFragment | Element, refs: Refs): void {
   const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   const texts: Text[] = [];
   for (let n = walker.nextNode(); n; n = walker.nextNode()) if (!inside(n, ['A', 'PRE', 'CODE'])) texts.push(n as Text);
-  const re = new RegExp(EDGE_BEFORE + '(?:(' + PATH + ')|(' + WORD + '))' + EDGE_AFTER, 'g');
+  // A quoted title of a known bridge, a path, or an id. A quoted text that names no bridge stays text, and the names inside it still link.
+  const titles = refs.titles || {};
+  const re = new RegExp(QUOTED + '|' + EDGE_BEFORE + '(?:(' + PATH + ')|(' + WORD + '))' + EDGE_AFTER, 'g');
   for (const t of texts) {
     const s = t.data;
     const parts: (string | Node)[] = [];
     let last = 0;
-    for (const m of s.matchAll(re)) {
+    re.lastIndex = 0;
+    for (let m = re.exec(s); m; m = re.exec(s)) {
+      if (m[2] !== undefined) {
+        const id = titles[m[2]];
+        if (id === undefined) {
+          re.lastIndex = m.index + 1;
+          continue;
+        }
+        // The quotes stay as text around the link.
+        parts.push(s.slice(last, m.index) + m[1], bridgeLink(doc, id, m[2], true));
+        last = m.index + m[1].length + m[2].length;
+        re.lastIndex = last;
+        continue;
+      }
       let link: Node | null = null;
-      if (m[1] && pageReason(m[1]) === '' && refs.page(m[1])) {
-        link = pageLink(doc, m[1]);
-        link.textContent = m[1];
-      } else if (m[2] && refs.bridges[m[2]] !== undefined) link = bridgeLink(doc, m[2], refs.bridges[m[2]]);
+      if (m[4] && pageReason(m[4]) === '' && refs.page(m[4])) {
+        link = pageLink(doc, m[4]);
+        link.textContent = m[4];
+      } else if (m[5] && refs.bridges[m[5]] !== undefined) link = bridgeLink(doc, m[5], refs.bridges[m[5]]);
       if (!link) continue;
       parts.push(s.slice(last, m.index), link);
-      last = m.index! + m[0].length;
+      last = m.index + m[0].length;
     }
     if (!parts.length) continue;
     parts.push(s.slice(last));
@@ -110,4 +166,5 @@ export function linkRefs(root: DocumentFragment | Element, refs: Refs): void {
     for (const x of parts) frag.append(x);
     t.replaceWith(frag);
   }
+  dropRepeats(root);
 }

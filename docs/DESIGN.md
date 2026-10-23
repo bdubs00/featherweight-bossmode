@@ -553,7 +553,9 @@ The work:
   command in `Command`; the title, the goal, and the seats of a bridge, one
   line per seat; the path and the first lines of a page; the task of a
   hand-off; or the top-level fields of any other call, each cut to one
-  line. Details holds the tool and the raw input, and never a rule id. Its
+  line. A goal and a task read from their start and end in an ellipsis
+  past 280 characters, and they link the bridges and the pages that they
+  name, as a message does. Details holds the tool and the raw input, and never a rule id. Its
   keys are Deny, Always allow, and the verb of `verbOf`: Open bridge, Write
   page, Hand off, the label of the backend, such as Run command, and Allow
   only as the fallback. A card that arrives on the stream after the channel
@@ -562,7 +564,10 @@ The work:
   closed, shows as a link with the title of the bridge, and the path of a
   page of the wiki shows as a link to the page, in a code span or in plain
   text (`src/lib/refs.ts`). A path in a code span keeps its code look. The
-  channel, a thread, a conversation, and Activity link them. A page of the
+  exact title of a bridge that the page knows, in double quotes, links the
+  bridge, and the quotes stay text. An id or a title in parentheses right
+  after that title only repeats it, so it goes. The channel, a thread, a
+  conversation, Activity, and the plan of a card link them. A page of the
   wiki does not.
 - The step lines of a run. A tool of the front says what happened, such as
   `Opened the bridge` with the bridge as a link. A call that waits for a

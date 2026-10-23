@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { briefOf, planOf, valueLine, verbOf } from './decision';
+import { PLAN_TEXT, briefOf, planOf, valueLine, verbOf } from './decision';
 
 const open = {
   tool: 'front.bridge_open',
@@ -28,6 +28,15 @@ describe('planOf', () => {
       ],
     });
     expect(planOf({ tool: 'mcp__front__bridge_open', input: JSON.stringify({ title: 'T', members: [], placement: 'spawn' }) })).toMatchObject({ kind: 'bridge', title: 'T', spawn: true, seats: [] });
+  });
+
+  it('reads a long goal from its start, on one line, and cuts it at its end', () => {
+    const goal = 'Collect every fact that the Proxmox runbooks need.\n\n' + 'Builds on the open bridge "Proxmox automation" (01m5j6032f6c8ct57drs6agkqq), which wrote the pages. '.repeat(5);
+    const plan = planOf({ tool: 'front.bridge_open', input: { title: 'T', goal, members: [] } });
+    const shown = plan.kind === 'bridge' ? plan.goal : '';
+    expect(shown.startsWith('Collect every fact that the Proxmox runbooks need. Builds on')).toBe(true);
+    expect(shown.length).toBe(PLAN_TEXT);
+    expect(shown.endsWith('…')).toBe(true);
   });
 
   it('says where pages_write writes, with the first lines of the text after its front matter', () => {

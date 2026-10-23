@@ -6,7 +6,7 @@ import type { ComponentChildren, JSX } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { renderInline, renderMarkdown } from '../lib/markdown';
 import { pageReason } from '../lib/pagepath';
-import { refCandidates, type Refs } from '../lib/refs';
+import { quotedTexts, refCandidates, type Refs } from '../lib/refs';
 import { loadPages } from '../state/actions';
 import { useSelect } from '../state/store';
 import type { Light as LightT } from '../lib/presence';
@@ -54,6 +54,17 @@ const readPages = (): Promise<boolean> =>
  */
 function useRefs(text: string): { refs?: Refs; key: string } {
   const cands = useMemo(() => (text ? refCandidates(text) : null), [text]);
+  // A text in double quotes that is the exact title of a bridge that the page knows links that bridge; the newest bridge of a title wins.
+  const quoted = useMemo(() => (text ? quotedTexts(text) : []), [text]);
+  const titleKey = useSelect((s) => {
+    if (!quoted.length) return '';
+    const out: string[] = [];
+    for (const q of quoted) {
+      const id = s.bridges.order.find((x) => s.bridges.byId[x] && s.bridges.byId[x].title === q);
+      if (id) out.push(q + '\u0001' + id);
+    }
+    return out.join('\u0002');
+  });
   const bridgeKey = useSelect((s) =>
     cands && cands.words.length
       ? cands.words
@@ -76,10 +87,15 @@ function useRefs(text: string): { refs?: Refs; key: string } {
       const [id, title] = line.split('\u0001');
       bridges[id] = title;
     }
+    const titles: Record<string, string> = {};
+    for (const line of titleKey ? titleKey.split('\u0002') : []) {
+      const [title, id] = line.split('\u0001');
+      titles[title] = id;
+    }
     const held = new Set(pageKey ? pageKey.split('\n') : []);
     const page = loaded ? (p: string) => held.has(p) : failed ? (p: string) => pageReason(p) === '' : () => false;
-    return { refs: { bridges, page }, key: bridgeKey + '\u0003' + pageKey + (loaded ? 'L' : failed ? 'F' : '') };
-  }, [cands, bridgeKey, pageKey, loaded, failed]);
+    return { refs: { bridges, page, titles }, key: bridgeKey + '\u0003' + titleKey + '\u0003' + pageKey + (loaded ? 'L' : failed ? 'F' : '') };
+  }, [cands, bridgeKey, titleKey, pageKey, loaded, failed]);
 }
 
 /**

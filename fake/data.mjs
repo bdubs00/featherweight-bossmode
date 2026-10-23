@@ -187,7 +187,8 @@ export const MANAGER_ASKS = {
     reason: 'rule: ask destructive',
     input: {
       title: 'Runbooks for the new roles',
-      goal: 'Write a runbook in the wiki for each Ansible role of the migration: cron, nginx, and logrotate. Each runbook says how to deploy the role, how to check it, and how to roll it back.',
+      // A long goal, as the manager writes one: the card shows its start, and it names a bridge by its title and its id, and pages by their paths.
+      goal: 'Write a runbook in the wiki for each Ansible role of the migration: cron, nginx, and logrotate. Each runbook says how to deploy the role, how to check it, and how to roll it back. Builds on the open bridge "Migrate the remaining Puppet modules" (br-puppet), which wrote modules/cron.md and modules/nginx.md. The reviewer reads each runbook against its role before the bridge closes, and the writers keep the house style of runbooks/ansible-style.md.',
       placement: 'queue',
       members: [
         { handle: 'writer-3', agent: 'writer', task: 'Write runbooks/cron.md and runbooks/nginx.md from the roles and the notes of the migration' },

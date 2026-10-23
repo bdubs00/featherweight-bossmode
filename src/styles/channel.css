@@ -455,16 +455,12 @@
   font-weight: 700;
   overflow-wrap: anywhere;
 }
-/* A goal, a summary, or the task of a hand-off: three lines at most, and Details holds the rest. */
+/* A goal, a summary, or the task of a hand-off, read from its start. The plan cuts a long text at its end, and Details holds the rest. A box that clips its lines can scroll out of place, so none does. */
 .plan-goal {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  overflow: hidden;
   overflow-wrap: anywhere;
 }
-.plan-handoff {
-  -webkit-line-clamp: 4;
+.plan-goal > :last-child {
+  margin-bottom: 0;
 }
 .plan-meta {
   font-size: var(--t-meta);

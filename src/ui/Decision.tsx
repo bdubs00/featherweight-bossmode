@@ -19,7 +19,7 @@ import { whoName } from '../lib/lines';
 import { useSelect } from '../state/store';
 import { alwaysAllow, decide } from '../state/actions';
 import { attempt } from './notice';
-import { When } from './common';
+import { Markdown, When } from './common';
 import { Button, Card, Command, Field, Input, LineLed, TextArea } from './primitives';
 
 
@@ -82,7 +82,7 @@ export function What({ d }: { d: Pick<Decision, 'tool' | 'input'> }) {
       return (
         <div class="plan">
           {plan.title && <p class="plan-title">{plan.title}</p>}
-          {plan.goal && <p class="plan-goal">{plan.goal}</p>}
+          {plan.goal && <Markdown text={plan.goal} class="plan-goal" refs />}
           {plan.spawn && <p class="plan-meta">Fresh sandbox per seat</p>}
           {plan.seats.length > 0 && (
             <ul class="plan-seats" aria-label="Seats">
@@ -112,7 +112,7 @@ export function What({ d }: { d: Pick<Decision, 'tool' | 'input'> }) {
         </div>
       );
     case 'handoff':
-      return plan.task ? <p class="plan-goal plan-handoff">{plan.task}</p> : null;
+      return plan.task ? <Markdown text={plan.task} class="plan-goal plan-handoff" refs /> : null;
     case 'fields':
       return (
         <div class="plan">

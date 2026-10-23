@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { linkRefs, refCandidates, type Refs } from './refs';
+import { linkRefs, quotedTexts, refCandidates, type Refs } from './refs';
 import { renderMarkdown } from './markdown';
 
 const REFS: Refs = {
@@ -49,6 +49,27 @@ describe('linkRefs', () => {
     const box = html('`br-other` and docs/migration.md and `index.md is here` and [index.md](https://x.test/index.md)\n\n```\nbr-notes index.md\n```');
     expect([...box.querySelectorAll('a')].map((a) => a.getAttribute('href'))).toEqual(['https://x.test/index.md']);
     expect(box.querySelector('pre')!.textContent).toBe('br-notes index.md\n');
+  });
+
+  it('links the quoted title of a known bridge and keeps the quotes as text, and drops an id that only repeats it', () => {
+    const refs: Refs = { ...REFS, titles: { 'Release notes for 2.4': '01m5kpw79kyq9j8nbpnhvtwm95', 'Proxmox blanks table': 'br-px' }, bridges: { ...REFS.bridges, 'br-px': 'Proxmox blanks table' } };
+    expect(quotedTexts('Builds on "Proxmox blanks table" and \u201cRelease notes for 2.4\u201d.')).toEqual(['Proxmox blanks table', 'Release notes for 2.4']);
+    // A title alone, in straight and in curly quotes.
+    let box = html('Builds on the open bridge "Proxmox blanks table", and \u201cRelease notes for 2.4\u201d waits.', refs);
+    expect([...box.querySelectorAll('a')].map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
+      ['Proxmox blanks table', '#bridge/br-px'],
+      ['Release notes for 2.4', '#bridge/01m5kpw79kyq9j8nbpnhvtwm95'],
+    ]);
+    expect(box.textContent!.trim()).toBe('Builds on the open bridge "Proxmox blanks table", and \u201cRelease notes for 2.4\u201d waits.');
+    // The id after the title only repeats it, as plain text or in a code span, and so does the title in a parenthesis.
+    for (const text of ['Builds on "Proxmox blanks table" (br-px), which wrote it.', 'Builds on "Proxmox blanks table" (`br-px`), which wrote it.', 'Builds on "Proxmox blanks table" (Proxmox blanks table), which wrote it.']) {
+      box = html(text, refs);
+      expect(box.textContent!.trim()).toBe('Builds on "Proxmox blanks table", which wrote it.');
+      expect(box.querySelectorAll('a').length).toBe(1);
+    }
+    // An id of another bridge stays, and a quote that names no bridge stays text, with its path linked.
+    box = html('Builds on "Proxmox blanks table" (br-notes) and "see index.md".', refs);
+    expect([...box.querySelectorAll('a')].map((a) => a.textContent)).toEqual(['Proxmox blanks table', 'Notes', 'index.md']);
   });
 
   it('keeps an underscore, a mention, and a word that holds an id', () => {

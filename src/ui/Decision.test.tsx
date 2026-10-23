@@ -3,7 +3,7 @@ import { act } from 'preact/test-utils';
 import type { Decision, Run } from '../api/types';
 import { store } from '../state/store';
 import { DecisionCard, canAlways, mayDecide } from './Decision';
-import { fakeFetch, mount, settle, unmountAll } from './testkit-a';
+import { bridgeOf, fakeFetch, mount, settle, unmountAll } from './testkit-a';
 import { clearNotice, currentNotice } from './notice';
 
 afterEach(unmountAll);
@@ -101,12 +101,24 @@ describe('the plan of a call that is not a shell command', () => {
     state: 'pending',
   };
 
+  it('reads the goal of Open bridge from its start, and links the bridges and the pages that it names', () => {
+    act(() => {
+      store.dispatch({ type: 'bridges', bridges: [bridgeOf('br-px', { title: 'Proxmox automation' })] });
+      store.dispatch({ type: 'pages', pages: [{ path: 'k3s/proxmox/facts.md', title: 'Facts', hash: 'h', size: 1, by: 'token', at: '' }] });
+    });
+    const goal = 'Collect every fact that the runbooks need, in k3s/proxmox/facts.md. Builds on the open bridge "Proxmox automation" (br-px), which wrote the pages.';
+    const el = mount(<DecisionCard d={{ ...open, input: { ...(open.input as object), goal } }} who="manager" />);
+    const g = el.querySelector('.plan-goal')!;
+    expect(g.textContent!.trim()).toBe('Collect every fact that the runbooks need, in k3s/proxmox/facts.md. Builds on the open bridge "Proxmox automation", which wrote the pages.');
+    expect([...g.querySelectorAll('a')].map((a) => a.getAttribute('href'))).toEqual(['#pages/k3s/proxmox/facts.md', '#bridge/br-px']);
+  });
+
   it('says what Open bridge opens before Details: the title, the goal, and each seat, and never the rule id', () => {
     const el = mount(<DecisionCard d={open} who="manager" />);
     const card = el.querySelector('section.card')!;
     expect(card.textContent).toContain('manager wants to open a bridge.');
     expect(card.querySelector('.plan-title')!.textContent).toBe('Runbooks for the new roles');
-    expect(card.querySelector('.plan-goal')!.textContent).toBe('Write a runbook for each role.');
+    expect(card.querySelector('.plan-goal')!.textContent!.trim()).toBe('Write a runbook for each role.');
     const seats = [...card.querySelectorAll('.plan-seats li')].map((li) => [li.querySelector('.plan-handle')!.textContent, li.querySelector('.plan-agent')?.textContent || '', li.querySelector('.plan-task')!.textContent]);
     expect(seats).toEqual([
       ['writer-3', '', 'Write runbooks/cron.md and runbooks/nginx.md'],
@@ -134,7 +146,7 @@ describe('the plan of a call that is not a shell command', () => {
   it('says to whom Hand off hands the task, and the task', () => {
     const el = mount(<DecisionCard d={{ ...open, tool: 'spawn_task', input: { agent: 'tester', input: 'Time the molecule run.' } }} who="manager" />);
     expect(el.textContent).toContain('manager wants to hand off a task to tester.');
-    expect(el.querySelector('.plan-handoff')!.textContent).toBe('Time the molecule run.');
+    expect(el.querySelector('.plan-handoff')!.textContent!.trim()).toBe('Time the molecule run.');
     expect(keys(el)).toEqual(['Deny', 'Hand off']);
   });
 

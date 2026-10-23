@@ -58,6 +58,8 @@ export type Plan =
 /** The most fields and lines that a card shows. Details holds the rest. */
 export const PLAN_FIELDS = 6;
 export const PLAN_LINES = 4;
+/** The most characters of a goal and of the task of a hand-off that a card shows, from the start. Details holds the rest. */
+export const PLAN_TEXT = 280;
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 
@@ -110,13 +112,14 @@ export function planOf(d: Pick<Decision, 'tool' | 'input'>): Plan {
         const handle = str(m.handle) || str(m.agent);
         return { handle, agent: sameAgent(handle, str(m.agent)) ? '' : str(m.agent), task: excerpt(str(m.task), 200) };
       });
-    return { kind: 'bridge', title: str(v.title).trim(), goal: str(v.goal).trim(), spawn: v.placement === 'spawn', seats };
+    // The goal reads from its start and ends in an ellipsis where it is long.
+    return { kind: 'bridge', title: str(v.title).trim(), goal: excerpt(str(v.goal), PLAN_TEXT), spawn: v.placement === 'spawn', seats };
   }
   if (base === 'pages_write' && v && str(v.path)) {
     const lines = textLines(str(v.text));
     return { kind: 'page', path: str(v.path), summary: excerpt(str(v.summary), 160), lines: lines.slice(0, PLAN_LINES), more: lines.length > PLAN_LINES };
   }
-  if (base === 'spawn_task' && v) return { kind: 'handoff', agent: str(v.agent), task: str(v.input).trim() };
+  if (base === 'spawn_task' && v) return { kind: 'handoff', agent: str(v.agent), task: excerpt(str(v.input), PLAN_TEXT) };
   if ((!d.tool || base === 'files') && editOf(d.input)) return { kind: 'none' };
   if (v) {
     const keys = Object.keys(v);
