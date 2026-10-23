@@ -1217,3 +1217,121 @@ The stream sends `routine` events (section 10), coalesced within 2
 seconds. While a pane of the place shows, an event reads that routine
 again. It also reads the week of the agent that the details pane shows. A
 `reset` reads the list again.
+
+## 16. Duties
+
+A duty is what an agent does on its own: who, when, what, and its limits.
+The Duties place reads the routes of the duties of the workbench, after the
+contract of the build, `reports/Duties contract 2026-10-23.md`. Section 2 of
+that file names the routes, and section 1 names the record.
+`src/api/routes.ts` holds the calls, and `src/api/types.ts` holds the
+shapes. `fake/routes-e.mjs` serves the same shapes.
+
+Each call of a duty sends the header `X-Time-Zone`, with the IANA time zone
+of the browser, such as `America/New_York`. The front reads the words of a
+person in that zone. A schedule without `timeZone` also takes that zone.
+
+| Route | What the page does with it |
+|---|---|
+| `GET /v1/duties` | `{"duties": [<duty>], "paused": false}`. The list pane and the profile of an agent call it. With `paused` true, the list says `Every duty is paused.` A 404 means that the front keeps no duties. The place then says `This workbench keeps no duties.` |
+| `GET /v1/duties/{name}` | The duty with `history`, the last 50 runs, newest first. The page of a duty and the editor call it. A 404 says in place that the duty is gone. |
+| `PUT /v1/duties/{name}?dryRun=true` | The editor sends the whole form. It calls the route after each change of When, for the words of a person, and on Save duty. The page shows `readback`, the first five times of `next`, and `problems`. |
+| `PUT /v1/duties/{name}?dryRun=true&test=true` | The key Try the check. The page shows the count of `check`, whether the items wake the agent, and each item of `found`. |
+| `PUT /v1/duties/{name}` | Save duty, in the dialog that shows the readback and the next five times. The answer is 201 for a new duty and 200 for a change. The page then opens the duty. |
+| `PATCH /v1/duties/{name}` | `{"paused": true}` or `{"paused": false}`, from the keys Pause and Resume. |
+| `DELETE /v1/duties/{name}` | Delete, in the menu More, after a dialog that asks first. The page then opens the list. |
+| `POST /v1/duties/{name}/run` | Run now, with the body `{}`. For 202 `{"run": "<id>"}`, the page says `A run started.` and links the run. For 200 `{"skipped": "<reason>"}`, the page shows the reason. |
+| `POST /v1/duties/{name}/write-check` | `{"words": "..."}`, from the key Write the check. The answer `{"checkFirst", "readback", "check"}` fills the fields of the check. A 422 shows its detail under the words. For a 404 or a 501, the key goes, and the fields by hand show. |
+| `PATCH /v1/duties` | `{"paused": true, "reason": "..."}` or `{"paused": false}`. This is the switch that pauses every duty. If `whoami` says `admin`, the page shows it. Before a pause, a dialog asks first. |
+
+A duty, as a read answers it. The page writes the same record without
+`owner`, `source`, `readback`, `next`, `state`, and `history`:
+
+```json
+{
+  "name": "daily-report", "agent": "scribe", "owner": "alice@example.com",
+  "when": { "schedule": { "repeat": "weekdays", "times": ["09:00"], "timeZone": "America/New_York" } },
+  "checkFirst": { "look": { "http": { "url": "https://example.com/api/queue" } }, "items": "result.records", "key": "number", "wake": { "when": "new" } },
+  "do": { "ask": { "message": "Write the report of {date}. The last report is {last.title}." } },
+  "limits": { "budget": { "maxCostUSD": 0.5, "maxTurns": 40 }, "perDayUSD": 2, "overlap": "skip", "catchUp": "1h" },
+  "whileAway": { "decider": "manager", "timeout": "2h", "then": "deny" },
+  "notify": { "failure": ["owner"], "needsYou": ["owner"] },
+  "runAs": "duty", "paused": false, "source": "store", "revision": 7,
+  "readback": "Every weekday at 9:00 AM, New York time.",
+  "next": ["2026-10-26T13:00:00Z"],
+  "state": { "lastRun": { "at": "2026-10-23T13:00:00Z", "run": "01K...", "state": "completed", "costUSD": 0.12 }, "todayUSD": 0.12, "failuresInRow": 0, "pausedReason": "" }
+}
+```
+
+The rules of the page:
+
+- A person never sees cron or the syntax of a template. When is a sentence
+  with choices, five presets, and a box for words. Each schedule shows as
+  the readback of the front and the next five times, in the zone of the
+  browser.
+- The page sends the words of a person as `{"when": {"say": "..."}}` with
+  the rest of the form. The schedule of the answer, `duty.when.schedule`,
+  fills the sentence. If the answer has a readback but no schedule, the
+  page keeps the words and saves them as `say`.
+- A new duty sends no budget. Before any call, Save duty refuses a form
+  without the most that a run can cost. The front never fills a budget for
+  the page.
+- **New:** a change sends the `revision` of the duty that the person read.
+  For a 409, the page says `This duty changed since you opened it. Open it
+  again, then make your change.`
+- The page never sends `owner`. It keeps each field that the form does not
+  show. These fields are `pool`, a start by an event or by a call, and an
+  action other than `ask`. They are also `maxTokens`, `maxToolCalls`,
+  `retries`, `runAs`, `paused`, and other people in `notify`.
+- Until the message or the field Name gives a name, a dry run of a new duty
+  goes to `/v1/duties/new-duty`. A dry run saves nothing.
+- **New:** the page reads a problem of a dry run as a sentence, or as
+  `{"field", "message"}`. When shows the problems whose field starts with
+  `when`. When shows a problem without a field only if the front read back
+  no schedule.
+- The page shows a duty with `source` `file` with the key Run now alone,
+  because the routes never change it.
+- The page offers Pause, Edit, and Delete to an admin, to an owner of the
+  agent, and to the owner of the duty. The front decides with 403.
+- A run links to the page at `/ui`, as `/ui#run/<id>`, as a heart does.
+- The stream carries no event of a duty. When the place opens, the page
+  reads the list. It reads the list again after each action and after a
+  reset of the stream. If a run of its history changes its state in the
+  store, the page of a duty reads the duty again.
+
+The placeholders of a message show as words in brackets. A chip inserts
+the words, and the page stores the placeholder. Nobody types a brace.
+
+| Words on the page | Placeholder |
+|---|---|
+| `[Today's date]` | `{date}` |
+| `[The time]` | `{time}` |
+| `[What the check found]` | `{found}`, offered once the duty has a check |
+| `[The last run's title]` | `{last.title}` |
+| `[The last run]` | `{last.run}` |
+| `[How the last run ended]` | `{last.state}` |
+| `[This duty's name]` | `{duty}` |
+| `[What happened]` | `{event}`, with no chip until an event starts a duty |
+
+The light of a run of a duty:
+
+| `state` of the run | Word | Light |
+|---|---|---|
+| `completed` | finished | grey |
+| `completed` with `woke` false | slept | grey |
+| `running`, `suspended` | working | green |
+| `queued` | waiting for a worker | grey |
+| `input-required` | needs you | amber |
+| `failed` | failed | red |
+| `skipped` | skipped | grey |
+| `canceled` | stopped | grey |
+
+A duty with `paused` true, or every duty under the switch, shows `paused`.
+The list puts the duties in this order: a duty that needs you, a failed
+duty, a duty that works, and then the rest by their next time. A paused duty
+comes last.
+
+**Open:** Write the check names a duty, and a new duty does not exist
+before its first save. So for a new duty, the front can answer 404. The
+page then shows the fields by hand. A body that also takes `agent` closes
+this gap.

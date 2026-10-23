@@ -45,7 +45,7 @@ The code of the look:
 | `src/styles/fonts.css`, `base.css` | The typeface and the base styles |
 | `src/ui/primitives/` | The primitives, with `primitives.css` and their tests |
 | `src/ui/Shell.tsx`, `src/styles/shell.css` | The app bar and the three panes |
-| `src/styles/channel.css`, `fleet.css`, `wiki.css`, `chat.css`, `routines.css` | The styles of the screens: the bridges, the fleet and the people, what you make, the quick chat, and the routines |
+| `src/styles/channel.css`, `fleet.css`, `wiki.css`, `chat.css`, `routines.css`, `duties.css` | The styles of the screens: the bridges, the fleet and the people, what you make, the quick chat, the routines, and the duties |
 
 ## Build
 
@@ -68,7 +68,8 @@ agents of the fleet. They test the statuses of the workers and the seats,
 and the reads of a worker that sleeps. They test the words and the folds of
 a system line, and the links of every screen of the page. They test the
 Routines place: the groups, the sign-off card and its moves, the evidence,
-the runbook, and the week of an agent.
+the runbook, and the week of an agent. They test the Duties place: the list,
+the page of a duty, the editor with its readback, and the switch of an admin.
 
 ## Run against the fake server
 
@@ -80,7 +81,11 @@ approval card, and a question card. It also holds a manager conversation
 and a quick chat with a history of six chats. Last come a fleet with two
 pools, a wiki of eight pages, and a face for every agent. The Routines place
 has nine routines of three agents: one needs your sign-off, four are live,
-one rehearses, one is proposed, and two are retired. Timers move members between
+one rehearses, one is proposed, and two are retired. The Duties place has
+five duties. One reports each weekday, and one restores a backup each night
+and needs you. One watches a queue with a check that mostly sleeps. One
+paused itself after three failed runs, and another app starts the last one.
+Timers move members between
 presences, with their runs and their workers, and post messages every few
 seconds. It takes the files of a message with the limits of the front,
 refuses them with 409 when a member that the message reaches has no run or a
@@ -116,7 +121,7 @@ Variables of the fake server:
 | `FAKE_ORG` | The name of the organization of the theme, Example Org by default |
 | `FAKE_LOGO=1` | The theme names a logo, served at `/v1/bossmode/logo` |
 | `FAKE_PARTIAL=1` | A card goes out on the stream without its input and its schema, as the backend can send it, so the page reads it again |
-| `FAKE_ADMIN=1` | `whoami` says that the person is an admin, who adds and removes skills |
+| `FAKE_ADMIN=1` | `whoami` says that the person is an admin, who adds and removes skills and pauses every duty |
 | `FAKE_A=1` | The sample data shows each state of the bridges screen: a seat that waits for a worker, a fired seat, folds, a card in the state unknown, a second open bridge, and a closed one. The second open bridge also holds a message that asks the operator, and a seat that failed with the raw error of a model provider. |
 | `FAKE_LIVE=1` | `GET /v1/runs/{id}/live` streams each answer outside a bridge in pieces, as the model writes it. The quick chat calls one tool first. Without it, the route sends no piece. It sends `idle` once the run stops working. |
 | `FAKE_LIVE_MS` | The time between two pieces of a live answer in milliseconds, 120 by default |

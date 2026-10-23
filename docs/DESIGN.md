@@ -333,11 +333,13 @@ centered, because they are not anyone's voice. Numbers in chips are centered
 in the chip. Nothing is justified.
 
 The places of the app bar, top to bottom: the logo well, Activity, Chat,
-Bridges, Fleet, Skills, Routines, Wiki, Manager, and the account at the foot. Each place has a 22-pixel
+Bridges, Fleet, Duties, Skills, Routines, Wiki, Manager, and the account at the foot. Each place has a 22-pixel
 icon over a 12-pixel label. A narrow window puts the places in a bar at the
 bottom. There each place takes the width of its label, and the account key
-is 44 pixels wide. Under 380 pixels the labels take the condensed width of
-the typeface (`font-stretch: 75%`), so the eight places stay in sight. The active place sits on paper with a line edge
+is 44 pixels wide. Under 440 pixels the labels take the condensed width of
+the typeface (`font-stretch: 75%`), and the places touch. Thus the nine
+places stay in sight. The bar never pushes the account out of sight. If a
+label still lacks the room, the bar cuts its end. The active place sits on paper with a line edge
 and a sheen, as a key that is pressed in. A count on Activity is a black chip
 at the top right of the icon.
 
@@ -347,6 +349,7 @@ at the top right of the icon.
 | Chat | The history of the quick chat, newest first, grouped by day | The conversation of a chat, or the picks of a new chat | This chat: the tools and the skills in use, the model, and the usage |
 | Bridges | Bridges, open first, each with its count and its light | The channel, with the tabs Posts, Wiki, and Decisions | The members, with Add |
 | Fleet | People: the seats grouped by bridge, then Not on a bridge | A direct conversation with a member, with the tabs Chat, Run, and Files, or the board | The profile of the agent |
+| Duties | The duties, what needs you first, with New duty and, for an admin, the switch that pauses every duty | A duty with its history, or the editor of New duty and Edit | none |
 | Skills | The skills by origin (Imported, Local, one group per server), then the tools (Built in, one group per server) | The text of a skill or the description of a tool, and the agents that can load it | Add skill, and the actions on the item |
 | Routines | The routines in the order of attention: Needs you, Live, Rehearsing, Proposed, Paused, then Retired behind a toggle | A routine with the tabs Steps, Evidence, and Runbook | The agent of the routine and its week |
 | Wiki | The tree and the search | A page, its history, or the editor | none |
@@ -360,7 +363,8 @@ the mark at the head of a chat links there. `#activity/<key>` names
 the item of the inbox that the main pane shows, so a narrow window opens it.
 `#skills/add` opens the chooser of Add skill. `#routines/<agent>/<name>`
 focuses a routine, `/evidence` and `/runbook` after it focus a tab, and
-`/agent` focuses the week of its agent.
+`/agent` focuses the week of its agent. `#duties/<name>` focuses a duty,
+`/edit` after it focuses its editor, and `#duties/new` focuses New duty.
 
 A pane with nothing picked keeps its header row and its groove band. Thus
 the bands of the three panes stay in one line. The invitation to act sits in
