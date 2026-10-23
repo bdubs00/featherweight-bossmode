@@ -46,6 +46,7 @@ export const routines = {
 export function forgetRoutines(): void {
   state = initial;
   reading.clear();
+  latest.clear();
   listing = null;
   views = 0;
   watching = null;
@@ -79,6 +80,8 @@ export function useRoutines<T>(select: (s: RoutinesState) => T): T {
 
 /** One read per routine at a time, so a burst of events reads it once. */
 const reading = new Map<string, Promise<void>>();
+/** The newest read of each routine. An older read that answers late changes nothing. */
+const latest = new Map<string, number>();
 
 /** putRecord keeps a record. A record of the list keeps the evidence that the page read before. */
 function putRecord(r: RoutineRecord, full: boolean): void {
@@ -96,14 +99,21 @@ export function loadRoutine(agent: string, name: string): Promise<void> {
   const key = keyOf(agent, name);
   const busy = reading.get(key);
   if (busy) return busy;
+  const n = (latest.get(key) || 0) + 1;
+  latest.set(key, n);
   const p = routinesApi
     .get(agent, name)
-    .then((r) => putRecord(r, true))
+    .then((r) => {
+      if (latest.get(key) === n) putRecord(r, true);
+    })
     .catch((e: { status?: number }) => {
+      if (latest.get(key) !== n) return;
       if (e && e.status === 404) set({ ...state, gone: { ...state.gone, [key]: true } });
       else throw e;
     })
-    .finally(() => reading.delete(key));
+    .finally(() => {
+      if (reading.get(key) === p) reading.delete(key);
+    });
   reading.set(key, p);
   return p;
 }

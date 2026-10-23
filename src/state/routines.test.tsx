@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { RoutineRecord } from '../api/routines';
 import { fakeApi } from '../ui/testkit-c';
 import { store } from './store';
-import { forgetRoutines, loadRoutines, routineChanged, routines, useRoutinesView } from './routines';
+import { forgetRoutines, loadRoutine, loadRoutines, move, routineChanged, routines, useRoutinesView } from './routines';
 import { mount, unmountAll } from '../ui/testkit-c';
 
 const rec = (name: string, standing: RoutineRecord['standing'], updatedAt = '2026-10-22T09:00:00Z'): RoutineRecord => ({
@@ -64,6 +64,29 @@ describe('the routines of the page', () => {
     routineChanged({ kind: 'routine', agent: 'triage', name: 'a' });
     await flush();
     expect(api.calls.filter((c) => c.path === '/v1/routines/triage/a')).toHaveLength(2);
+    expect(routines.get().byKey['triage/a'].standing).toBe('live');
+  });
+
+  it('keeps the record of a move when an older read answers after it', async () => {
+    let release: () => void = () => {};
+    const slow = new Promise<void>((r) => (release = r));
+    let n = 0;
+    api = fakeApi({
+      'GET /v1/routines/triage/a': async () => {
+        n++;
+        if (n === 1) {
+          await slow;
+          return { body: withEvidence(rec('a', 'rehearsing')) };
+        }
+        return { body: withEvidence(rec('a', 'live')) };
+      },
+      'POST /v1/routines/triage/a/standing': { ok: true },
+    });
+    const first = loadRoutine('triage', 'a');
+    await move('triage', 'a', 'live');
+    expect(routines.get().byKey['triage/a'].standing).toBe('live');
+    release();
+    await first;
     expect(routines.get().byKey['triage/a'].standing).toBe('live');
   });
 

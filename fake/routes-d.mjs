@@ -277,7 +277,13 @@ function seedRoutines() {
       ],
       source: { runs: extra.runs || 40, from: dayOf(Date.now() - (signedAgo + 40) * DAY), to: dayOf(Date.now() - (signedAgo + 13) * DAY), proposedBy: PROPOSE },
       days,
-      questions: Object.fromEntries(Object.keys(routine.questions || {}).map((k) => [k, { bands: [{ from: 0.95, to: 1, runs: 180, agreed: 179 }, { from: routine.questions[k].act, to: 0.95, runs: 19, agreed: 17 }, { from: 0, to: routine.questions[k].act, runs: 6, agreed: 4 }] }])),
+      questions: Object.fromEntries(
+        Object.keys(routine.questions || {}).map((k) => {
+          const act = routine.questions[k].act;
+          const hi = act >= 0.95 ? 0.99 : 0.95;
+          return [k, { bands: [{ from: hi, to: 1, runs: 180, agreed: 179 }, { from: act, to: hi, runs: 19, agreed: 17 }, { from: 0, to: act, runs: 6, agreed: 4 }] }];
+        }),
+      ),
       sentBack: { applied: extra.sentBack || 0, agreed: 0 },
       replay: { matched: extra.runs || 40, total: extra.runs || 40, at: ago(signedAgo + 12) },
       updatedAt: minsAgo(extra.changed || 120),

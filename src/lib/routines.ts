@@ -220,7 +220,8 @@ export interface BandRow {
 }
 
 export function bandRows(bands: Band[] | undefined, act?: number): BandRow[] {
-  return [...(bands || [])]
+  return (bands || [])
+    .filter((b) => b.to > b.from)
     .sort((a, b) => b.from - a.from)
     .map((b) => {
       const handed = act !== undefined && b.to <= act + 1e-9 && b.to < 1;
