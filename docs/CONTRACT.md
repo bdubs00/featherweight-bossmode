@@ -123,6 +123,14 @@ The workbench counts `unread` over at most the last 2000 entries of the
 channel, so a larger count stops there, and `unreadMore` says so. The page
 shows 99+ above 99, and 2000+ with `unreadMore`.
 
+A message of an agent whose `to` holds `operator`, or whose text starts
+with `@operator`, asks the person. The page finds such a message after
+`read` in the channel, from `to` and the text, and shows it in Activity
+among what needs you, until the person sends a message to that handle or
+in reply to it. The list carries no count of these messages, so the count
+of Activity takes them once the page reads the channel: Activity reads the
+channel of each bridge with `unread` above 0.
+
 `GET /v1/bridges/{id}` answers the same item with `members` and `usage`.
 `usage` sums the usage of the runs of the bridge as the tool `batch` sums a
 job: the fields of the usage of a run (`turns`, `toolCalls`, `costUSD`, and
@@ -839,6 +847,10 @@ the stream carries. The workers and their phases come from the stream (section 1
 never from that read.
 
 ## 14. What the page does not call yet
+
+- A count of the messages that ask the person in `GET /v1/bridges`, such
+  as `asksYou` beside `needsYou`. Without it, the count of Activity on the
+  app bar takes such a message only after the page reads its channel.
 
 - `files` on a message of the channel.
 - The budget of a run. The plan offers a button to raise the budget of a
