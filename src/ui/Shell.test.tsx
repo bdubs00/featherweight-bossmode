@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { render, type ComponentChildren } from 'preact';
 import { act } from 'preact/test-utils';
+import type { Fleet } from '../api/types';
 import { store } from '../state/store';
-import { Shell, shownOf } from './Shell';
+import { FleetFoot, RACK_LAMPS, Shell, captionOf, shownOf } from './Shell';
 
 let box: HTMLElement | null = null;
 
@@ -64,5 +65,68 @@ describe('Shell', () => {
     const items = [...el.querySelectorAll('[role^="menuitem"]')].map((x) => x.textContent);
     expect(items).toEqual(['Match the system', 'Light', 'Graphite', 'Connections', 'Sign out']);
     expect(el.querySelector('[role="menuitemradio"][aria-checked="true"]')!.textContent).toBe('Match the system');
+  });
+});
+
+/** fleetOf is a fleet of one agent with workers in the phases given. */
+function fleetOf(phases: string[]): Fleet {
+  return {
+    name: 'front-0',
+    members: [],
+    pools: [{ name: 'crew', atespace: 'default', agent: 'migrator', intake: 'q', wanted: phases.length, actual: phases.length, ready: phases.length, hash: 'h', checkedAt: '', tasks: phases.map((phase, i) => ({ name: 'crew-' + i, phase, current: true })) }],
+  };
+}
+
+describe('FleetFoot', () => {
+  it('reads out the workers: a caption with the size of the fleet, one lamp per worker, and the count of each status', () => {
+    act(() => {
+      store.dispatch({ type: 'stream-status', status: 'live' });
+      store.dispatch({ type: 'fleet', fleet: fleetOf(['Suspended', 'Running', 'Failed', 'Suspended']) });
+      store.dispatch({ type: 'open-runs', runs: [] });
+    });
+    const el = mount(<FleetFoot />);
+    const a = el.querySelector('a.readout') as HTMLAnchorElement;
+    expect(a.getAttribute('href')).toBe('#fleet');
+    expect(a.getAttribute('aria-label')).toBe('Fleet: 4 workers, 1 failed, 1 awake, 2 asleep');
+    expect(el.querySelector('.readout-head .t-meta')!.textContent).toBe('4 workers');
+    expect([...el.querySelectorAll('.rack .lamp')].map((x) => x.className)).toEqual(['lamp lamp-failed', 'lamp lamp-awake', 'lamp lamp-asleep', 'lamp lamp-asleep']);
+    expect(el.querySelector('.rack .lamp')!.getAttribute('title')).toBe('migrator, crew-2: failed');
+    expect([...el.querySelectorAll('.figure')].map((x) => x.textContent)).toEqual(['1 failed', '1 awake', '2 asleep']);
+    expect(el.querySelector('.figure-failed')).not.toBeNull();
+    expect(el.querySelector('.readout.stale')).toBeNull();
+    expect(el.querySelector('[role="status"]')!.textContent).toBe('');
+  });
+
+  it('shows each status as its share of the rack for a fleet past the lamps of the rack', () => {
+    act(() => store.dispatch({ type: 'fleet', fleet: fleetOf([...Array(RACK_LAMPS).fill('Suspended'), 'Running']) }));
+    const el = mount(<FleetFoot />);
+    expect(el.querySelector('.rack-share')).not.toBeNull();
+    const shares = [...el.querySelectorAll('.rack-share .lamp')] as HTMLElement[];
+    expect(shares.map((x) => x.className)).toEqual(['lamp lamp-awake', 'lamp lamp-asleep']);
+    expect(shares.map((x) => x.style.flexGrow)).toEqual(['1', String(RACK_LAMPS)]);
+    expect(el.querySelector('.readout-head .t-meta')!.textContent).toBe(RACK_LAMPS + 1 + ' workers');
+  });
+
+  it('darkens the lamps and says the state of the stream while it is down', () => {
+    act(() => {
+      store.dispatch({ type: 'fleet', fleet: fleetOf(['Running']) });
+      store.dispatch({ type: 'stream-status', status: 'lost' });
+    });
+    const el = mount(<FleetFoot />);
+    expect(el.querySelector('.readout.stale')).not.toBeNull();
+    expect(el.querySelector('.readout-figures')!.textContent).toBe('Connecting');
+    expect(el.querySelector('[role="status"]')!.textContent).toBe('Connecting');
+    expect(el.querySelector('.readout-head .t-meta')!.textContent).toBe('1 worker');
+    act(() => store.dispatch({ type: 'stream-status', status: 'closed' }));
+    expect(el.querySelector('.readout-figures .tone-red')!.textContent).toBe('Offline');
+    act(() => store.dispatch({ type: 'stream-status', status: 'live' }));
+    expect(el.querySelector('.readout.stale')).toBeNull();
+    expect(el.querySelector('.readout-figures')!.textContent).toBe('1 awake');
+  });
+
+  it('names the size of a fleet in words', () => {
+    expect(captionOf(0)).toBe('No workers');
+    expect(captionOf(1)).toBe('1 worker');
+    expect(captionOf(12)).toBe('12 workers');
   });
 });

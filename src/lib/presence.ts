@@ -21,6 +21,8 @@ export interface Light {
 export const PRESENCE: Record<Presence, Light> = {
   working: { word: 'working', tone: 'green', label: 'Works on its task now.' },
   'needs-you': { word: 'needs you', tone: 'amber', label: 'Waits for your approval, your answer, or a connection.' },
+  waiting: { word: 'waiting for a worker', tone: 'grey', label: 'It has no run yet. It starts when a worker takes it.' },
+  'not-started': { word: 'not started', tone: 'grey', label: 'The manager stopped before it seated this member. A message starts it.' },
   idle: { word: 'idle', tone: 'grey', label: 'Finished its turn. A message starts the next one.' },
   asleep: { word: 'asleep', tone: 'grey', label: 'Its worker sleeps. A message wakes it.' },
   error: { word: 'error', tone: 'red', label: 'Its newest run failed, or its worker stopped.' },

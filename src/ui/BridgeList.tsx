@@ -1,7 +1,7 @@
 // The list pane of the Bridges place: the open bridges, newest first, each
 // with its unread count and the light of what needs you, then the closed
 // bridges behind a toggle. A filter field shows above the list once it
-// holds more than ten bridges. The foot holds the state of the stream.
+// holds more than ten bridges. The foot holds the readout of the fleet.
 
 import { memo } from 'preact/compat';
 import { useState } from 'preact/hooks';
@@ -10,7 +10,7 @@ import { selectFacts } from '../state/reducer';
 import { seatPresence } from '../lib/status';
 import { hrefOf } from '../lib/route';
 import { useRoving } from './keys';
-import { LiveStatus } from './Shell';
+import { FleetFoot } from './Shell';
 import { Glyph } from './icons';
 import { unreadText } from '../lib/words';
 import { Button, Chip, Find, Led, PaneHeader } from './primitives';
@@ -137,9 +137,7 @@ export function BridgeList({ current }: { current: string }) {
           </>
         )}
       </div>
-      <footer class="pane-foot">
-        <LiveStatus />
-      </footer>
+      <FleetFoot />
     </section>
   );
 }

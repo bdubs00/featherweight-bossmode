@@ -234,3 +234,46 @@ export function awakeFor(f: Facts, run: Pick<Run, 'state' | 'member'> | undefine
   if (!w || !w.phase) return null;
   return w.phase === 'Running';
 }
+
+/** The lamps of the readout of the fleet, in the order of attention. */
+export const LAMP_ORDER = ['failed', 'working', 'awake', 'starting', 'asleep', 'stopping'] as const;
+export type LampKind = (typeof LAMP_ORDER)[number];
+
+/** One lamp of the readout: a worker and its kind. */
+export interface Lamp {
+  kind: LampKind;
+  /** The name of the worker, such as crew-0. */
+  worker: string;
+  /** The agent whose workers hold it. */
+  agent: string;
+}
+
+/** The readout of the fleet: one lamp per worker, and the count of each kind. */
+export interface Readout {
+  lamps: Lamp[];
+  counts: Record<LampKind, number>;
+}
+
+/**
+ * lampOf is the kind of the lamp of a worker: failed, working while it is
+ * awake and holds an open run, awake while it holds none, starting,
+ * asleep, or stopping. A worker that sleeps with an open run, such as a run
+ * that waits for a decision, is asleep.
+ */
+export function lampOf(w: Pick<WorkerState, 'phase' | 'busy' | 'blocked'>): LampKind {
+  if (w.blocked || w.phase === 'Failed') return 'failed';
+  if (w.phase === 'Running') return w.busy ? 'working' : 'awake';
+  if (w.phase === 'Pending') return 'starting';
+  if (w.phase === 'Terminating') return 'stopping';
+  return 'asleep';
+}
+
+/** readoutOf builds the readout of the fleet from the state of each worker, with its lamps in the order of attention. */
+export function readoutOf(f: Facts): Readout {
+  const counts = Object.fromEntries(LAMP_ORDER.map((k) => [k, 0])) as Record<LampKind, number>;
+  const lamps = workerStates(f).map((w) => ({ kind: lampOf(w), worker: w.name, agent: w.agent }));
+  for (const l of lamps) counts[l.kind]++;
+  const rank = (k: LampKind) => LAMP_ORDER.indexOf(k);
+  lamps.sort((a, b) => rank(a.kind) - rank(b.kind));
+  return { lamps, counts };
+}

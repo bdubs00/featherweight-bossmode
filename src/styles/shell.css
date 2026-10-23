@@ -140,15 +140,97 @@
   padding: var(--s-4);
   border-top: 1px solid var(--line);
 }
-.live-status {
+/* The readout of the fleet at the foot of the Bridges list. It has the
+   height of the foot This bridge of the members, so the two feet share one
+   top line. The whole foot is the key that opens the Fleet place. */
+.fleet-foot {
+  padding: 0;
+}
+.readout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  padding: var(--s-4);
+  color: var(--ink);
+  text-decoration: none;
+}
+.readout:focus-visible {
+  outline-offset: -2px;
+}
+.readout-head {
   display: flex;
   align-items: center;
-  gap: var(--s-2);
-  min-width: 0;
-  min-height: var(--t-body-lh);
+  justify-content: space-between;
+  gap: var(--s-3);
+  min-height: var(--t-meta-lh);
 }
-.live-status .status {
-  color: var(--ink);
+.readout-head .t-meta {
+  color: var(--muted);
+}
+.readout-figures {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-1) var(--s-4);
+  min-height: var(--t-body-lh);
+  font-size: var(--t-control);
+}
+.readout-figures strong {
+  font-weight: 700;
+}
+.readout:hover .figure {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+}
+.figure-failed {
+  color: var(--word-red);
+}
+/* The rack: a recessed slot of square lamps, one per worker. A lit lamp
+   works, a ring is awake and free, a dark lamp sleeps. */
+.rack {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px;
+  border-radius: var(--r);
+  background: var(--recess);
+  box-shadow: var(--e-recess);
+}
+.rack-share {
+  width: calc(14 * 9px + 13 * 3px);
+}
+.lamp {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: var(--r-led);
+  background: var(--led-grey);
+  box-shadow: var(--led-ring);
+}
+.rack-share .lamp {
+  flex: 1 1 0;
+  min-width: 3px;
+}
+.lamp-working {
+  background: var(--led-green);
+  box-shadow: 0 0 5px var(--led-green), var(--led-ring);
+}
+.lamp-failed {
+  background: var(--led-red);
+  box-shadow: 0 0 5px var(--led-red), var(--led-ring);
+}
+.lamp-awake {
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--led-green);
+}
+.lamp-starting {
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--led-grey);
+}
+/* A stream that is down: the lamps no longer follow the workers. */
+.readout.stale .lamp {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--led-grey);
 }
 /* A key that opens the details pane, for the widths that hide it. */
 .collapsed-only {

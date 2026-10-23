@@ -6,13 +6,13 @@
 // bottom of a list. docs/DESIGN.md, section 5, draws the layouts.
 
 import type { ComponentChildren, JSX } from 'preact';
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
 import { useSelect } from '../state/store';
 import { columnOf, placeOf, type Column, type Place, type Route } from '../lib/route';
 import { themeOf, setChoice, useChoice, type ThemeChoice } from '../lib/theme';
 import { personName } from '../lib/words';
-import { awakeCount } from '../lib/status';
+import { LAMP_ORDER, readoutOf, type Lamp, type LampKind, type Readout } from '../lib/status';
 import { selectFacts } from '../state/reducer';
 import { Glyph, type GlyphName } from './icons';
 import { Avatar, Chip, LogoWell, Led, countText } from './primitives';
@@ -205,19 +205,93 @@ export function AppBar({ route, onSignOut }: { route: Route; onSignOut: () => vo
   );
 }
 
-/* ---------- the live status ---------- */
+/* ---------- the readout of the fleet ---------- */
 
-/** LiveStatus is the state of the stream and the number of awake workers, for the foot of a list. */
-export function LiveStatus() {
-  const status = useSelect((s) => s.stream.status);
-  const awake = useSelect((s) => awakeCount(selectFacts(s)));
-  const known = useSelect((s) => !!s.fleet);
-  const word = status === 'live' ? 'Live' : status === 'closed' ? 'Offline' : 'Connecting';
+/** RACK_LAMPS is the most lamps that the rack shows one by one. A larger fleet shows each status as its share of the rack. */
+export const RACK_LAMPS = 14;
+
+/** The word of each lamp, as the figures and the tooltips say it. */
+const LAMP_WORDS: Record<LampKind, string> = { failed: 'failed', working: 'working', awake: 'awake', starting: 'starting', asleep: 'asleep', stopping: 'stopping' };
+
+export interface Figure {
+  kind: LampKind;
+  n: number;
+  word: string;
+}
+
+/** figuresOf gives the count of each status of a readout that holds one, in the order of attention, such as 2 working and 7 asleep. */
+export function figuresOf(r: Readout): Figure[] {
+  return LAMP_ORDER.filter((k) => r.counts[k] > 0).map((k) => ({ kind: k, n: r.counts[k], word: LAMP_WORDS[k] }));
+}
+
+/** captionOf names the size of the fleet: 1 worker, 9 workers, or No workers. */
+export function captionOf(total: number): string {
+  if (total === 0) return 'No workers';
+  return total === 1 ? '1 worker' : total + ' workers';
+}
+
+/** Rack is the recessed strip of lamps: one per worker for a small fleet, else one share per status. */
+function Rack({ lamps, counts }: Readout) {
+  if (lamps.length <= RACK_LAMPS) {
+    return (
+      <span class="rack" aria-hidden="true">
+        {lamps.map((l: Lamp) => (
+          <i class={'lamp lamp-' + l.kind} title={(l.agent ? l.agent + ', ' : '') + l.worker + ': ' + LAMP_WORDS[l.kind]} />
+        ))}
+      </span>
+    );
+  }
   return (
-    <div class="live-status" role="status">
-      <Led tone={status === 'live' ? 'green' : status === 'closed' ? 'red' : 'grey'} word={word} label={status === 'live' ? 'Updates arrive as they happen.' : 'The page connects to the workbench again.'} />
-      {known && <span class="t-meta">{awake === 1 ? '1 worker awake' : awake + ' workers awake'}</span>}
-    </div>
+    <span class="rack rack-share" aria-hidden="true">
+      {LAMP_ORDER.filter((k) => counts[k] > 0).map((k) => (
+        <i class={'lamp lamp-' + k} style={{ flexGrow: counts[k] }} title={counts[k] + ' ' + LAMP_WORDS[k]} />
+      ))}
+    </span>
+  );
+}
+
+/**
+ * FleetFoot is the foot of the Bridges list: the readout of the workers of
+ * the fleet. A rack holds one lamp per worker, in the order of attention,
+ * and the figures below it count each status. The readout opens the Fleet
+ * place. While the stream is down, the lamps go dark and the state of the
+ * connection takes the place of the figures, because the page no longer
+ * gets the changes. A deployment without a fleet shows the foot only while
+ * the stream is down.
+ */
+export function FleetFoot() {
+  const status = useSelect((s) => s.stream.status);
+  const facts = useSelect(selectFacts);
+  const r = useMemo(() => readoutOf(facts), [facts]);
+  const known = !!facts.fleet;
+  const down = status === 'live' ? '' : status === 'closed' ? 'Offline' : 'Connecting';
+  if (!known && !down) return null;
+  const caption = known ? captionOf(r.lamps.length) : 'Workers';
+  const figures = known ? figuresOf(r) : [];
+  const said = down || figures.map((f) => f.n + ' ' + f.word).join(', ');
+  return (
+    <footer class="pane-foot fleet-foot">
+      <a class={'readout' + (down ? ' stale' : '')} href="#fleet" aria-label={'Fleet: ' + caption + (said ? ', ' + said : '')}>
+        <span class="readout-head">
+          <span class="t-meta">{caption}</span>
+          {known && r.lamps.length > 0 && <Rack lamps={r.lamps} counts={r.counts} />}
+        </span>
+        <span class="readout-figures" aria-hidden="true">
+          {down ? (
+            <Led tone={status === 'closed' ? 'red' : 'grey'} word={down} label={status === 'closed' ? 'The page gets no updates.' : 'The page connects to the workbench again.'} />
+          ) : (
+            figures.map((f) => (
+              <span class={'figure figure-' + f.kind}>
+                <strong>{f.n}</strong> {f.word}
+              </span>
+            ))
+          )}
+        </span>
+      </a>
+      <span class="sr" role="status">
+        {down}
+      </span>
+    </footer>
   );
 }
 

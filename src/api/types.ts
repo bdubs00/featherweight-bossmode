@@ -71,8 +71,12 @@ export interface ManagerConfig {
 
 export type Placement = 'queue' | 'spawn';
 
-/** The presence of a member, from section 6.5 of the plan. */
-export type Presence = 'working' | 'needs-you' | 'idle' | 'asleep' | 'error' | 'fired';
+/**
+ * The presence of a member, from section 6.5 of the plan. A seat with no
+ * run is waiting while a job or the manager will seat it, and not-started
+ * when nothing will: the manager of its spawn bridge stopped first.
+ */
+export type Presence = 'working' | 'needs-you' | 'waiting' | 'not-started' | 'idle' | 'asleep' | 'error' | 'fired';
 
 /** The activity of a run that works (K4). */
 export interface Activity {

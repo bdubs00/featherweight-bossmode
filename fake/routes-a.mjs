@@ -11,7 +11,8 @@
 //     fired seat, a fold of four system lines with a failure and a line
 //     about a wiki page, a card in the state unknown, and the end of the
 //     artboard: reactions, a message of alice to the reviewer, and its answer.
-//   - br-logrotate is a second open bridge with two unread messages.
+//   - br-logrotate is a second open bridge with two unread messages and a
+//     seat with no run, whose job waits on the queue.
 //   - br-notes-23 is a closed bridge.
 // The routes of the server serve all of it. This file adds no route.
 
@@ -142,6 +143,8 @@ function logrotate(S) {
     const run = addRun(S, { id: 'run-lr-' + s.handle, agentName: s.agent, handle: s.handle, bridge: id, task: s.task, state: s.state, minutes: 40, activity: s.activity });
     return { handle: s.handle, agent: s.agent, pool: 'crew', task: s.task, runs: [run.id], fired: false, muted: false, presence: s.presence, activity: s.activity };
   });
+  // A seat with no run yet: its job waits on the queue of its agent.
+  members.push({ handle: 'reviewer', agent: 'reviewer', pool: 'review', task: 'Review the logrotate role against its manifest', runs: [], fired: false, muted: false, presence: 'waiting', activity: null });
   S.bridges.set(id, {
     id, title: 'Migrate logrotate', goal: 'Migrate the logrotate module to an Ansible role and test it with molecule.', operator: ALICE, state: 'open', placement: 'queue',
     createdAt: ago(52), closedAt: null, manager: null,
@@ -152,7 +155,7 @@ function logrotate(S) {
   S.channels.set(
     id,
     renumber([
-      entry(ago(41), system, 'alice opened the bridge with 2 members.', { event: 'opened' }),
+      entry(ago(41), system, 'alice opened the bridge with 3 members.', { event: 'opened' }),
       entry(ago(41), system, 'migrator started: Migrate the logrotate module to an Ansible role.', { event: 'started', mirrors: { run: 'run-lr-migrator', seq: 1, type: 'fw.run.queued' } }),
       entry(ago(41), system, 'tester started: Run molecule for the logrotate role.', { event: 'started', mirrors: { run: 'run-lr-tester', seq: 1, type: 'fw.run.queued' } }),
       entry(ago(30), agent('migrator', 'run-lr-migrator'), 'logrotate has one class and one template. I keep the handler style of nginx.'),

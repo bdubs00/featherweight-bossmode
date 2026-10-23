@@ -62,7 +62,7 @@ the plan does instead, and why.
 | Decorative entrance motion on each section | Three motions: the amber light breathes, an arriving decision card settles once, and the reply chip slides in | Motion that answers a change shows what changed. Motion on load says nothing. |
 | A sentence of help under every field and in every footer | A label, a limit in the error at the moment the person hits it, and a definition behind a question mark | The operator learns the page once and reads it a thousand times. |
 | Glyphs of the mockup that are not symmetric, such as the marks of writer and scribe | Every mark mirrors around its middle column | A symmetric mark reads as a face at 20 pixels. |
-| `4 Tasks awake` at the foot of the list (the mockup) | `4 workers awake` | The page never says Task or pool to an operator. |
+| `■ Live  4 Tasks awake` at the foot of the list (the mockup) | The readout of the fleet (section 6): the caption `9 workers`, a recessed rack of square lamps, one per worker, and the figures `2 working  7 asleep`. The word Live goes, and `Connecting` or `Offline` shows only while the stream is down. | Live said nothing in the normal state. A green light beside `0 workers awake` looked like good news about an empty fleet. The page never says Task or pool to an operator, and the foot has the height of This bridge, so the two feet share one top line. |
 | A soft wash under a selected member and a needs-you row of `#FFF7E8` without a token (the mockup) | `--wash-need`, light and graphite, only for a row that needs you | A color without a token drifts. |
 | A decided card with the same hard edge as a waiting one | A decided card turns quiet: a line edge, no drop, no light | Only what waits keeps the hard edge. |
 | The usage of a bridge at the foot of the members (the mockup), against the contract, which showed none | The foot shows turns, cost, and pages from `usage`, for runs that report it | The owner approved the mockup, and `GET /v1/bridges/{id}` carries `usage`. |
@@ -273,7 +273,7 @@ details gives the space to the main pane.
 |      |                  |  |       Deny  Always allow [Run cmd]||                |
 |      |                  |  +=====================================+|                |
 |      |                  | [Replying to reviewer x]               |                |
-| (AL) | ■ Live  4 awake  | [ Message reviewer          [Send] ]   | This bridge    |
+| (AL) | 9 workers ▪▪▫··· | [ Message reviewer          [Send] ]   | This bridge    |
 +------+------------------+---------------------------------------+----------------+
   76px       300px                   the rest, at least 480px            340px
 ```
@@ -357,6 +357,7 @@ color, radius, shadow, or type size of its own.
 | `Menu` | A key with the glyph More that opens a list of actions, in `common.tsx` | quiet in a row, secondary on the header of a pane, and a danger item for Fire and Remove |
 | `Led` | A 9-pixel square light and its word | Green, amber (breathes), red, and grey. Struck for fired. Quiet: no word on screen, the word in a tooltip and the accessible name. Still: the amber light holds, for a status that waits for nothing. |
 | `LineLed` | The bare light of a line whose text is its word: a system line, a decided line | The four tones. It never breathes. |
+| `FleetFoot` | The readout of the fleet at the foot of the Bridges list, in `Shell.tsx`: the caption `N workers`, a rack of 9-pixel square lamps in a recessed slot, one per worker in the order of attention, and the figures below. The whole foot is the key to the Fleet place. | A lit green lamp works, a green ring is awake and free, a grey ring starts, a dark lamp sleeps or stops, and a lit red lamp failed. Past 14 workers, each status takes its share of the rack. While the stream is down, every lamp turns to an empty ring and `Connecting` or `Offline` takes the place of the figures. Nothing moves. |
 | `Mark` | The face of an agent: a 5 by 5 symmetric glyph from the hash of the name on a raised square, or the custom picture of the backend | Sizes 20, 32, 36, and 72. A halo of a status color in the header of a member conversation. Selected: the well turns paper. |
 | `Avatar` | A person: initials in on-ink on an ink square | sizes 20, 32, 36 |
 | `Chip` | A count or a short state on a heading line | plain (line edge, muted), ink (unread), amber (decisions), with an optional `Led` inside |

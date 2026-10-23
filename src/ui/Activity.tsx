@@ -78,7 +78,7 @@ export function useInbox(): { rows: InboxRow[]; loaded: boolean } {
         ? r.order
             .map((h) => r.byHandle[h])
             .filter((m: Member) => {
-              if (!m || m.fired) return false;
+              if (!m || m.fired || !m.runs.length) return false;
               const p = seatPresence(facts, m);
               return p !== 'working' && p !== 'asleep';
             })

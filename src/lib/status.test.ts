@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Fleet, Member, Run } from '../api/types';
 import { initialState, reduce, selectFacts, type State } from '../state/reducer';
 import { PRESENCE, WAITING } from './presence';
-import { awakeCount, awakeFor, factsOf, seatPresence, statusOf, workerOf, workerStates } from './status';
+import { awakeCount, awakeFor, factsOf, lampOf, readoutOf, seatPresence, statusOf, workerOf, workerStates } from './status';
 
 const fleet: Fleet = {
   name: 'front-0',
@@ -179,5 +179,39 @@ describe('awakeFor', () => {
     expect(awakeFor(f, undefined)).toBeNull();
     expect(awakeFor(f, run('r', 'completed'))).toBeNull();
     expect(awakeFor(f, run('r', 'completed', 'default/gone-0'))).toBeNull();
+  });
+});
+
+describe('the readout of the fleet', () => {
+  it('gives each worker one lamp: failed, working while awake with an open run, awake, starting, asleep, or stopping', () => {
+    expect(lampOf({ phase: 'Running', busy: true, blocked: false })).toBe('working');
+    expect(lampOf({ phase: 'Running', busy: false, blocked: false })).toBe('awake');
+    expect(lampOf({ phase: 'Running', busy: true, blocked: true })).toBe('failed');
+    expect(lampOf({ phase: 'Failed', busy: false, blocked: false })).toBe('failed');
+    expect(lampOf({ phase: 'Pending', busy: false, blocked: false })).toBe('starting');
+    expect(lampOf({ phase: 'Terminating', busy: false, blocked: false })).toBe('stopping');
+    // A worker that sleeps with a run that waits for a decision sleeps.
+    expect(lampOf({ phase: 'Suspended', busy: true, blocked: false })).toBe('asleep');
+    expect(lampOf({ phase: '', busy: false, blocked: false })).toBe('asleep');
+  });
+
+  it('counts the lamps and puts them in the order of attention, each kind in the order of the fleet', () => {
+    const r = readoutOf(factsOf(fleet, { a: run('a', 'running', 'default/crew-0') }, true));
+    expect(r.lamps.map((l) => l.kind + ' ' + l.worker)).toEqual(['failed crew-2', 'failed dead-0', 'working crew-0', 'starting new-0', 'asleep crew-1']);
+    expect(r.counts).toEqual({ failed: 2, working: 1, awake: 0, starting: 1, asleep: 1, stopping: 0 });
+    // A run that finished frees its worker.
+    expect(readoutOf(factsOf(fleet, { a: run('a', 'completed', 'default/crew-0') }, true)).counts.awake).toBe(1);
+    expect(readoutOf(factsOf(null)).lamps).toEqual([]);
+  });
+});
+
+describe('a seat with no run', () => {
+  it('takes the presence of the bridge: waiting for a worker, or not started', () => {
+    const f = factsOf(fleet, {}, true);
+    expect(seatPresence(f, seat('waiting', []))).toBe('waiting');
+    expect(statusOf(f, { seat: seat('waiting', []) })).toBe(PRESENCE.waiting);
+    expect(statusOf(f, { seat: seat('waiting', []) })!.word).toBe('waiting for a worker');
+    expect(statusOf(f, { seat: seat('not-started', []) })!.word).toBe('not started');
+    expect(statusOf(f, { seat: seat('not-started', []) })!.tone).toBe('grey');
   });
 });

@@ -133,7 +133,7 @@ export function filterPeople(groups: PeopleGroup[], q: string): PeopleGroup[] {
 }
 
 /** The statuses in the order of attention, for the board and its status strips. */
-export const STATUS_ORDER = ['needs you', 'error', 'failed', 'working', 'awake', 'starting', 'waiting for a worker', 'idle', 'asleep', 'stopping', 'fired'];
+export const STATUS_ORDER = ['needs you', 'error', 'failed', 'working', 'awake', 'starting', 'waiting for a worker', 'not started', 'idle', 'asleep', 'stopping', 'fired'];
 
 /** rowWord is the word of the status of a row, or "" for an agent with no worker. */
 export const rowWord = (r: PersonRow): string => (r.light ? r.light.word : '');

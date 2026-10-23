@@ -54,10 +54,11 @@ marked done is in the code already.
 | A message that each delivery pins, so it survives every compaction of the runs | pinned, a quiet chip on the entry | sticky, starred, saved |
 
 The statuses of a seat: `working`, `needs you`, `waiting for a worker`,
-`idle`, `asleep`, `error`, and `fired`. The statuses of a worker: `awake`,
-`asleep`, `starting`, `failed`, and `stopping`. The statuses of a run:
-`waiting for a worker`, `working`, `needs you`, `ready`, `ended`, `failed`,
-and `stopped`.
+`not started`, `idle`, `asleep`, `error`, and `fired`. The statuses of a
+worker: `awake`, `asleep`, `starting`, `failed`, and `stopping`. The readout
+of the fleet also counts `working`, a worker that is awake and holds an open
+run. The statuses of a run: `waiting for a worker`, `working`, `needs you`,
+`ready`, `ended`, `failed`, and `stopped`.
 
 Capacity shows where seating happens:
 
@@ -103,9 +104,12 @@ Capacity shows where seating happens:
 | `<name>, account` (account key) | keep | | done |
 | `Match the system`, `Light`, `Graphite` | keep | | done |
 | `Connections`, `Sign out` | keep | | done |
-| `Live`, `Connecting`, `Offline` | keep | | done |
-| `Live updates arrive.` (tooltip) | change | `Updates arrive as they happen.` | done |
-| `N workers awake` | keep | replaces `4 Tasks awake` of the mockup | done |
+| `Live` | remove | The stream is live in the normal state, so the word said nothing. The readout of the fleet takes the foot of the Bridges list. | done |
+| `Connecting`, `Offline` | keep | the words of the readout while the stream is down, with `The page connects to the workbench again.` and `The page gets no updates.` in the tooltip | done |
+| `Updates arrive as they happen.` (tooltip) | remove | | done |
+| `N workers awake` | change | the readout of the fleet: the caption `N workers`, `1 worker`, or `No workers`, and the figures `N failed`, `N working`, `N awake`, `N starting`, `N asleep`, `N stopping`, in that order, each only when its count is not 0 | done |
+| new | add | `<agent>, <worker>: <status>`, the tooltip of a lamp, such as `migrator, crew-0: working`, and `N <status>` for a share of a large fleet | done |
+| new | add | `Fleet: <caption>, <figures>`, the name of the readout for a screen reader, such as `Fleet: 9 workers, 2 working, 7 asleep` | done |
 | `<name>, home` (logo well) | keep | | done |
 
 ### src/ui/Signin.tsx
@@ -162,6 +166,8 @@ Capacity shows where seating happens:
 | `canceled` (run) | change | `stopped`, the word of the Stop key | done |
 | `Is queued, running, or paused.` | change | `waiting for a worker` for queued, and `Runs, or pauses between two steps.` for running | done |
 | new | add | `waiting for a worker`, with `Every worker of its agent is busy. It starts when one is free.` | done |
+| new | add | `waiting for a worker` for a seat with no run whose job or manager will seat it (presence `waiting`), with `It has no run yet. It starts when a worker takes it.` | done |
+| new | add | `not started` for a seat with no run that nothing will seat, because the manager of its spawn bridge stopped first (presence `not-started`), with `The manager stopped before it seated this member. A message starts it.` | done |
 | the word of a status from three sources: the presence of the bridge, the phases of the stream, and the read of the pool | change | one word for one status on every screen, from `statusOf` of `src/lib/status.ts`. The counts `N awake` and `N workers awake` take it, and so do the people list and the board. The halo of a conversation, a row of the members, the run pane, and the Workers of a profile take it too. The words stay the words of this section. | done |
 
 ### src/lib/words.ts

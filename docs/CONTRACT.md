@@ -144,7 +144,11 @@ plan plus two fields:
 ```
 
 `presence` is one word of the table of section 6.5 of the plan: `working`,
-`needs-you`, `idle`, `asleep`, `error`, or `fired`. `activity` is the K4
+`needs-you`, `waiting`, `not-started`, `idle`, `asleep`, `error`, or `fired`.
+A seat with no run is `waiting` while its job waits on the queue of its agent
+or the manager of its spawn bridge still runs, and `not-started` when that
+manager stopped before it seated the member. A message to a `not-started`
+seat starts it, and so does Seat again. `activity` is the K4
 activity of the newest run of the member, or null. The page derives the
 presence of a seat itself where it holds the facts (section 10.1), and
 takes this field only where it lacks them.

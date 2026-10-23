@@ -53,11 +53,16 @@ function useSeat(bridge: string, handle: string) {
   return { m, loaded };
 }
 
-/** useStopped reports how the newest run of a seat stopped: failed, stopped, or "" when it takes messages. */
-function useStopped(m: MemberT | undefined): '' | 'failed' | 'stopped' {
+/**
+ * useStopped reports how the newest run of a seat stopped: failed,
+ * stopped, not-started for a seat that the manager never seated, or ""
+ * when it takes messages.
+ */
+function useStopped(m: MemberT | undefined): '' | 'failed' | 'stopped' | 'not-started' {
   const state = useSelect((s) => (m && s.runs[newestRun(m)] ? s.runs[newestRun(m)].state : ''));
   const presence = useSelect((s) => (m ? seatPresence(selectFacts(s), m) : ''));
   if (!m || m.fired) return '';
+  if (presence === 'not-started') return 'not-started';
   if (state === 'canceled') return 'stopped';
   if (state === 'failed' || presence === 'error') return 'failed';
   return '';
@@ -123,12 +128,12 @@ function SeatMenu({ bridge, m, stopped }: { bridge: string; m: MemberT; stopped:
   );
 }
 
-/** SeatBar sits over the composer of a seat whose newest run stopped: the status, the reason, and Seat again. */
-function SeatBar({ bridge, m, how, reason }: { bridge: string; m: MemberT; how: 'failed' | 'stopped'; reason: string }) {
+/** SeatBar sits over the composer of a seat whose newest run stopped, or that never started: the status, the reason, and Seat again. */
+function SeatBar({ bridge, m, how, reason }: { bridge: string; m: MemberT; how: 'failed' | 'stopped' | 'not-started'; reason: string }) {
   const [again, setAgain] = useState(false);
   return (
     <div class="seat-bar">
-      {how === 'failed' ? <Led tone="red" word="error" /> : <Led tone="grey" word="stopped" />}
+      {how === 'failed' ? <Led tone="red" word="error" /> : <Led tone="grey" word={how === 'not-started' ? 'not started' : 'stopped'} />}
       {reason && <span class="seat-bar-why clip">{reason}</span>}
       <Button size="s" onClick={() => setAgain(true)}>
         Seat again
@@ -139,7 +144,7 @@ function SeatBar({ bridge, m, how, reason }: { bridge: string; m: MemberT; how: 
 }
 
 /** Chat is the direct thread of a seat and its composer. */
-function Chat({ bridge, m, items, closed, stopped, reason }: { bridge: string; m: MemberT; items: ReturnType<typeof useTranscript>['items']; closed: boolean; stopped: '' | 'failed' | 'stopped'; reason: string }) {
+function Chat({ bridge, m, items, closed, stopped, reason }: { bridge: string; m: MemberT; items: ReturnType<typeof useTranscript>['items']; closed: boolean; stopped: '' | 'failed' | 'stopped' | 'not-started'; reason: string }) {
   const ch = useSelect((s) => s.channels[bridge]);
   const roster = useSelect((s) => s.rosters[bridge]);
   const skills = useSelect((s) => (s.skills ? s.skills.skills : null));
