@@ -3,12 +3,16 @@
 // to another screen, a reload, or a sign-in keeps it.
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import type { Attachment } from '../api/types';
+import { checkFiles, encodeFiles, fileSize } from '../lib/attachments';
 import { applyCompletion, completionAt, mentionsIn, type Completion } from '../lib/mention';
 import { excerpt, list } from '../lib/words';
 import { Face } from './common';
 import { Icon } from './icons';
 
 const draftKey = (k: string) => 'fw.bossmode.draft.' + k;
+// Files stay in this tab until sent or removed. A reload releases them.
+const fileDrafts = new Map<string, File[]>();
 
 function readDraft(k: string): string {
   try {
@@ -43,15 +47,24 @@ export interface ComposerProps {
   reply?: { seq: number; who: string; text: string; handle?: string } | null;
   onClearReply?: () => void;
   disabled?: string;
-  /** onSend sends the text. It resolves true when the text went out. */
-  onSend: (text: string, to: string[]) => Promise<boolean>;
+  /** onSend resolves true when the message and its files went out. */
+  onSend: (text: string, to: string[], files: Attachment[]) => Promise<boolean>;
 }
 
 export function Composer(p: ComposerProps) {
+  return <DraftComposer key={p.draft} {...p} />;
+}
+
+function DraftComposer(p: ComposerProps) {
   const [text, setText] = useState(() => readDraft(p.draft));
+  const [files, setFiles] = useState<File[]>(() => fileDrafts.get(p.draft) || []);
+  const [error, setError] = useState('');
+  const [dragging, setDragging] = useState(false);
   const [comp, setComp] = useState<Completion | null>(null);
   const [pick, setPick] = useState(0);
   const [busy, setBusy] = useState(false);
+  const sending = useRef(false);
+  const picker = useRef<HTMLInputElement>(null);
   const box = useRef<HTMLTextAreaElement>(null);
   const handles = useMemo(() => (p.members || []).map((m) => m.handle), [p.members]);
   const byHandle = useMemo(() => new Map((p.members || []).map((m) => [m.handle, m])), [p.members]);
@@ -100,15 +113,38 @@ export function Composer(p: ComposerProps) {
 
   const send = async () => {
     const t = text.trim();
-    if (!t || busy || p.disabled) return;
+    if ((!t && files.length === 0) || sending.current || p.disabled) return;
+    sending.current = true;
     setBusy(true);
-    const ok = await p.onSend(t, to);
-    setBusy(false);
-    if (ok) {
-      setText('');
-      writeDraft(p.draft, '');
-      setComp(null);
-      if (box.current) box.current.focus();
+    setError('');
+    try {
+      const ok = await p.onSend(t, to, await encodeFiles(files));
+      if (ok) {
+        setText('');
+        writeDraft(p.draft, '');
+        setFiles([]);
+        fileDrafts.delete(p.draft);
+        setComp(null);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'The message did not send. Try again.');
+    } finally {
+      sending.current = false;
+      setBusy(false);
+      requestAnimationFrame(() => box.current?.focus());
+    }
+  };
+
+  const addFiles = (picked: File[]) => {
+    if (sending.current || p.disabled || !picked.length) return;
+    try {
+      const next = [...files, ...picked];
+      checkFiles(next);
+      setFiles(next);
+      fileDrafts.set(p.draft, next);
+      setError('');
+    } catch (e) {
+      setError((e as Error).message);
     }
   };
 
@@ -152,7 +188,29 @@ export function Composer(p: ComposerProps) {
   const hint = p.members ? (to.length ? 'To ' + list(to.map((h) => '@' + h)) : 'To every active member') : '';
   return (
     <form
-      class="composer"
+      class={'composer' + (dragging ? ' dragging' : '')}
+      aria-busy={busy}
+      onDragOver={(e) => {
+        if (!e.dataTransfer?.types.includes('Files')) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = busy || p.disabled ? 'none' : 'copy';
+        setDragging(!busy && !p.disabled);
+      }}
+      onDragLeave={(e) => {
+        if (!(e.relatedTarget instanceof Node) || !e.currentTarget.contains(e.relatedTarget)) setDragging(false);
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDragging(false);
+        addFiles(Array.from(e.dataTransfer?.files || []));
+      }}
+      onPaste={(e) => {
+        const pasted = Array.from(e.clipboardData?.files || []);
+        if (pasted.length) {
+          e.preventDefault();
+          addFiles(pasted);
+        }
+      }}
       onSubmit={(e) => {
         e.preventDefault();
         send();
@@ -164,12 +222,28 @@ export function Composer(p: ComposerProps) {
           <span>
             Reply to <b>{p.reply.who}</b>: {excerpt(p.reply.text, 80)}
           </span>
-          <button type="button" class="icon-btn" aria-label="Cancel the reply" onClick={p.onClearReply}>
+          <button type="button" class="icon-btn" aria-label="Cancel the reply" disabled={busy} onClick={p.onClearReply}>
             <Icon name="close" />
           </button>
         </div>
       )}
       <div class={'box' + (p.disabled ? ' off' : '')}>
+        <input ref={picker} type="file" multiple hidden disabled={busy || !!p.disabled} aria-label="Choose files" onChange={(e) => {
+          addFiles(Array.from(e.currentTarget.files || []));
+          e.currentTarget.value = '';
+        }} />
+        {files.length > 0 && <ul class="attachments" aria-label="Files to send">
+          {files.map((file, i) => <li key={i}>
+            <Icon name="file" /><span class="filename">{file.name}</span><small>{fileSize(file.size)}</small>
+            <button type="button" class="icon-btn" aria-label={'Remove ' + file.name} disabled={busy} onClick={() => {
+              const next = files.filter((_, n) => n !== i);
+              setFiles(next);
+              if (next.length) fileDrafts.set(p.draft, next);
+              else fileDrafts.delete(p.draft);
+              setError('');
+            }}><Icon name="close" /></button>
+          </li>)}
+        </ul>}
         {comp && (
           <ul class="complete" id={listId} role="listbox" aria-label="Members">
             {comp.matches.map((h, i) => {
@@ -199,7 +273,7 @@ export function Composer(p: ComposerProps) {
           rows={1}
           aria-label={p.label}
           placeholder={p.disabled || p.placeholder}
-          disabled={!!p.disabled}
+          disabled={busy || !!p.disabled}
           value={text}
           aria-autocomplete={p.members ? 'list' : undefined}
           aria-controls={comp ? listId : undefined}
@@ -216,15 +290,20 @@ export function Composer(p: ComposerProps) {
           onBlur={() => setTimeout(() => setComp(null), 120)}
         />
         <div class="tools">
+          <button type="button" class="btn small attach" disabled={busy || !!p.disabled} onClick={() => picker.current?.click()}>
+            <Icon name="file" /><span>Attach files</span>
+          </button>
           <span class="hint">{hint}</span>
           <span class="keys" aria-hidden="true">
             {navigator.platform && /Mac/.test(navigator.platform) ? '⌘' : 'Ctrl'}+Enter
           </span>
-          <button type="submit" class="btn primary send" disabled={busy || !text.trim() || !!p.disabled} aria-label="Send">
+          <button type="submit" class="btn primary send" disabled={busy || (!text.trim() && !files.length) || !!p.disabled} aria-label="Send">
             <Icon name="send" />
-            <span>Send</span>
+            <span>{busy ? 'Sending…' : 'Send'}</span>
           </button>
         </div>
+        <p class="attachment-hint">Drop or paste files here · 20 files, 32 MiB total. Agent workspace limits also apply.{files.length > 0 ? ' Files stay in this tab until sent; a reload clears them.' : ''}</p>
+        {error && <p class="err" role="alert">{error}</p>}
       </div>
     </form>
   );

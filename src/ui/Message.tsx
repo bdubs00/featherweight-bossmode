@@ -11,6 +11,7 @@ import { decide, react } from '../state/actions';
 import { attempt } from './notice';
 import { Avatar, Face, Markdown, When } from './common';
 import { DecisionCard } from './Decision';
+import { AttachedFiles } from './AttachedFiles';
 import { Icon, type IconName } from './icons';
 
 /** plain drops the marks of Markdown from a text, for a label. */
@@ -253,6 +254,7 @@ export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, onReply }
           {e.replyTo ? <ReplyChip bridge={bridge} seq={e.replyTo} /> : null}
           {e.to && e.to.length > 0 && <p class="to">to {e.to.map((h) => '@' + h).join(', ')}</p>}
           <Markdown text={e.text} handles={handles} />
+          <AttachedFiles files={e.files} />
           {e.cut && <p class="cut">The channel holds the first 4 KB. The run holds the whole text.</p>}
           <Reactions bridge={bridge} e={e} onReply={onReply} />
         </div>

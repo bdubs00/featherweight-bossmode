@@ -77,8 +77,8 @@ async function readBody(req, max = 512 * 1024) {
   return Buffer.concat(chunks).toString('utf8');
 }
 
-async function readJson(req) {
-  const raw = await readBody(req);
+async function readJson(req, max) {
+  const raw = await readBody(req, max);
   if (!raw) return {};
   try {
     const v = JSON.parse(raw);
@@ -88,6 +88,37 @@ async function readJson(req) {
     if (e instanceof Refusal) throw e;
     refuse(400, 'the body is not JSON');
   }
+}
+
+const FILE_BODY_BYTES = Math.ceil(32 * 1024 * 1024 / 3) * 4 + 1024 * 1024;
+
+function uploadedFiles(body) {
+  const files = body.files ?? [];
+  if (!Array.isArray(files) || files.length > 20) refuse(400, 'a message holds at most 20 files');
+  let total = 0;
+  return files.map((f) => {
+    if (!f || typeof f.name !== 'string' || !f.name.trim() || Buffer.byteLength(f.name) > 255 || /[\/\\\u0000-\u001f\u007f]/.test(f.name)) refuse(400, 'a file needs a name of at most 255 bytes without a path or control characters');
+    if (typeof f.data !== 'string' || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(f.data)) refuse(400, 'file data must be base64');
+    const data = Buffer.from(f.data, 'base64');
+    if (!data.length) refuse(400, 'empty files cannot be sent');
+    total += data.length;
+    if (total > 32 * 1024 * 1024) refuse(400, 'the files of a message must total 32 MiB or less');
+    const text = data.toString('utf8');
+    const mediaType = !text.includes('\0') && Buffer.from(text).equals(data) ? 'text/plain' : 'application/octet-stream';
+    return { name: f.name, size: data.length, mediaType, data };
+  });
+}
+
+const fileMeta = (files) => files.map(({ name, size, mediaType }) => ({ name, size, mediaType }));
+
+function keepFiles(run, files) {
+  return files.map((f) => {
+    let p = 'attachments/' + f.name;
+    for (let n = 2; S.files.has(run + '|' + p); n++) p = 'attachments/' + n + '-' + f.name;
+    const binary = f.mediaType !== 'text/plain';
+    S.files.set(run + '|' + p, { path: p, op: 'created', size: f.size, mediaType: f.mediaType, binary, text: binary ? undefined : f.data.subarray(0, 256 * 1024).toString('utf8'), cut: f.size > 256 * 1024 });
+    return { name: f.name, size: f.size, mediaType: f.mediaType, path: p };
+  });
 }
 
 /* ---------- the stream ---------- */
@@ -244,12 +275,20 @@ const REPLIES = [
 let replyN = 0;
 
 /** fanOut answers a message of a person in the place of the members. */
-function fanOut(bridgeId, e) {
+function fanOut(bridgeId, e, files = []) {
   const b = S.bridges.get(bridgeId);
   if (!b || b.state !== 'open') return;
-  const active = b.members.filter((m) => !m.fired && !m.muted && m.presence !== 'error');
-  const to = e.to && e.to.length ? active.filter((m) => e.to.includes(m.handle)) : active.slice(0, 2);
+  const active = b.members.filter((m) => !m.fired && m.presence !== 'error');
+  const to = e.to && e.to.length ? active.filter((m) => e.to.includes(m.handle)) : active.filter((m) => !m.muted);
   to.forEach((m, i) => {
+    const run = S.runs.get(m.runs[m.runs.length - 1]);
+    if (run) {
+      const items = S.transcripts.get(run.id);
+      const seq = items.length ? items[items.length - 1].seq + 1 : 1;
+      items.push({ seq, time: now(), kind: 'user', text: e.text, who: e.from.name, files: keepFiles(run.id, files) });
+      Object.assign(run, { seq, updatedAt: now() });
+      publish('run', run);
+    }
     const wasAsleep = m.presence === 'asleep';
     setTimeout(() => {
       if (wasAsleep) system(bridgeId, 'started', `${m.handle} woke up.`);
@@ -517,9 +556,10 @@ on('GET', '/v1/bridges/([^/]+)/messages', (c, id) => {
 on('POST', '/v1/bridges/([^/]+)/messages', async (c, id) => {
   const b = bridgeOr404(id);
   if (b.state !== 'open') refuse(409, 'the bridge is closed, so it takes no message');
-  const body = await readJson(c.req);
+  const body = await readJson(c.req, FILE_BODY_BYTES);
+  const files = uploadedFiles(body);
   const text = String(body.text || '').trim();
-  if (!text) refuse(400, 'a message needs a text');
+  if (!text && !files.length) refuse(400, 'a message needs text or files');
   const to = Array.isArray(body.to) ? body.to.map(String) : [];
   for (const h of to) {
     const m = b.members.find((x) => x.handle === h);
@@ -527,10 +567,14 @@ on('POST', '/v1/bridges/([^/]+)/messages', async (c, id) => {
     if (m.fired) refuse(400, `${h} is fired and gets no message`);
   }
   const ch = S.channels.get(id);
+  if (files.length) {
+    const targets = b.members.filter((m) => !m.fired && (to.length ? to.includes(m.handle) : !m.muted));
+    if (!targets.length || targets.some((m) => !m.runs.length || m.presence === 'error')) refuse(409, 'files need a ready run for every recipient; address a ready member');
+  }
   if (body.replyTo != null && !ch.some((e) => e.seq === Number(body.replyTo))) refuse(400, `no entry ${body.replyTo} to reply to`);
-  const e = post(id, { kind: 'person', name: c.person.subject, display: c.person.name }, text, { to, replyTo: body.replyTo != null ? Number(body.replyTo) : null });
+  const e = post(id, { kind: 'person', name: c.person.subject, display: c.person.name }, text, { to, replyTo: body.replyTo != null ? Number(body.replyTo) : null, files: fileMeta(files) });
   S.reads.set(id + '|' + c.person.subject, e.seq);
-  fanOut(id, e);
+  fanOut(id, e, files);
   c.status = 201;
   return e;
 });
@@ -619,14 +663,15 @@ const runOr404 = (id) => {
 };
 on('POST', '/v1/runs', async (c) => {
   const member = c.url.searchParams.get('member') || '';
-  const body = await readJson(c.req);
+  const body = await readJson(c.req, FILE_BODY_BYTES);
+  const files = uploadedFiles(body);
   if (member !== MANAGER_MEMBER) refuse(400, `the fake server starts runs on ${MANAGER_MEMBER} only`);
   const input = String(body.input || '').trim();
-  if (!input) refuse(400, 'a run needs an input');
+  if (!input && !files.length) refuse(400, 'a run needs input or files');
   const id = 'run-manager-' + Date.now().toString(36);
   const run = { id, agent: body.agent || 'manager', title: input.slice(0, 80), state: 'queued', input, seq: 1, origin: 'http', principal: c.person.subject, createdAt: now(), updatedAt: now(), member, usage: { turns: 0 } };
   S.runs.set(id, run);
-  S.transcripts.set(id, [{ seq: 1, time: now(), kind: 'user', text: input, who: c.person.subject }]);
+  S.transcripts.set(id, [{ seq: 1, time: now(), kind: 'user', text: input, who: c.person.subject, files: keepFiles(id, files) }]);
   S.results.set(id, { runId: id, title: run.title, agent: run.agent, status: 'working', started: run.createdAt, changed: run.updatedAt, next: [] });
   publish('run', run);
   managerTurn(run, true);
@@ -666,13 +711,14 @@ on('GET', '/v1/runs/([^/]+)/files/(.+)', (c, id, p) => {
 });
 on('POST', '/v1/runs/([^/]+)/messages', async (c, id) => {
   const run = runOr404(id);
-  const body = await readJson(c.req);
+  const body = await readJson(c.req, FILE_BODY_BYTES);
+  const files = uploadedFiles(body);
   const content = String(body.content || '').trim();
-  if (!content) refuse(400, 'a message needs content');
+  if (!content && !files.length) refuse(400, 'a message needs content or files');
   if (run.state === 'failed' || run.state === 'canceled') refuse(409, `the run ${id} ${run.state === 'failed' ? 'failed' : 'was canceled'}, so it takes no message`);
   const items = S.transcripts.get(id);
   const seq = items[items.length - 1].seq + 1;
-  items.push({ seq, time: now(), kind: 'user', text: content, who: c.person.subject });
+  items.push({ seq, time: now(), kind: 'user', text: content, who: c.person.subject, files: keepFiles(id, files) });
   Object.assign(run, { state: 'running', seq, updatedAt: now() });
   publish('run', run);
   if (run.agent === 'manager') managerTurn(run, false);

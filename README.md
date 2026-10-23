@@ -47,6 +47,19 @@ question forms, and the Markdown sanitizer against hostile input.
 
 ## Run against the fake server
 
+Both the bridge composer and the manager composer accept files through
+Attach files, drag-and-drop, and paste. Each file shows its name and size
+and has a Remove button. Files can travel with text or on their own, to
+every active member or to the addressed members of a bridge. A failed
+send keeps the draft. File selections stay in this tab across navigation;
+a reload clears them. Text drafts stay in sessionStorage.
+
+The limits are 20 nonempty files and 32 MiB in total per message. The agent
+also applies its workspace limits (8 MiB per file by default). The channel
+and manager transcript show the names and sizes of sent files. The fake
+server accepts files and reflects them in simulated run transcripts; its
+agents give canned replies and do not process the uploaded content.
+
 The fake server in `fake/` is for development only. It keeps its data in
 memory, trusts any token that starts with `fake-`, and checks nothing that a
 real workbench checks. It serves every route of `docs/CONTRACT.md` with

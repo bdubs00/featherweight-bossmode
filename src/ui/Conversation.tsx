@@ -10,6 +10,7 @@ import { commandOf, personName } from '../lib/words';
 import { showError } from './notice';
 import { Avatar, Face, Markdown, When } from './common';
 import { DecisionCard } from './Decision';
+import { AttachedFiles } from './AttachedFiles';
 import { Icon } from './icons';
 
 /** phraseOf words one tool call as /ui does, without a tool name where it can. */
@@ -170,13 +171,14 @@ export function Conversation(props: { run: Run | undefined; result?: Result | nu
           case 'user': {
             const mine = !it.who || it.who === me;
             return mine ? (
-              <div class="bubble mine">{it.text}</div>
+              <div class="bubble mine">{it.text}<AttachedFiles files={it.files} /></div>
             ) : (
               <div class="from">
                 <Avatar subject={it.who || ''} size={24} />
                 <div class="bubble">
                   <span class="who">{personName(it.who)}</span>
                   {it.text}
+                  <AttachedFiles files={it.files} />
                 </div>
               </div>
             );

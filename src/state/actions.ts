@@ -3,7 +3,7 @@
 
 import { api, type NewBridge, type NewMember } from '../api/routes';
 import { openStream, type StreamHandle } from '../api/stream';
-import type { Entry, ReactionKind, StreamEvent } from '../api/types';
+import type { Attachment, Entry, ReactionKind, StreamEvent } from '../api/types';
 import { store } from './store';
 import type { SigninNeeded } from '../api/client';
 
@@ -80,8 +80,8 @@ export function markRead(id: string): void {
   );
 }
 
-export async function postMessage(id: string, text: string, to: string[], replyTo?: number): Promise<Entry> {
-  const e = await api.post(id, { text, to: to.length ? to : undefined, replyTo });
+export async function postMessage(id: string, text: string, to: string[], replyTo?: number, files?: Attachment[]): Promise<Entry> {
+  const e = await api.post(id, { text, to: to.length ? to : undefined, replyTo, files });
   store.dispatch({ type: 'entry', bridge: id, entry: e });
   return e;
 }

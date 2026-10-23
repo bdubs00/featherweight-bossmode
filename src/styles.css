@@ -262,6 +262,15 @@ legend { font-weight: 600; margin-bottom: 6px; padding: 0; }
 .composer .hint { flex: 1; font-size: 12px; color: var(--ink2); }
 .composer .keys { font-size: 12px; color: var(--quiet); }
 .composer .send { min-height: 32px; padding: 4px 14px; }
+.composer .tools { flex-wrap: wrap; }
+.composer .attach { min-height: 44px; }
+.composer.dragging .box { outline: 2px dashed var(--tint); }
+.attachment-hint { color: var(--ink2); font-size: 11px; margin: 5px 0 2px; }
+.attachments { list-style: none; padding: 0; margin: 6px 0; display: flex; flex-wrap: wrap; gap: 6px; max-height: 22vh; overflow: auto; }
+.attachments li { display: flex; align-items: center; gap: 6px; max-width: 100%; min-width: 0; padding: 4px 8px; border: 1px solid var(--hair); border-radius: 8px; }
+.attachments .filename { overflow-wrap: anywhere; min-width: 0; }
+.attachments small { color: var(--ink2); white-space: nowrap; }
+.attachments .icon-btn { flex: none; min-width: 44px; min-height: 44px; }
 .replying { display: flex; align-items: center; gap: 8px; margin: 0 2px 6px; font-size: 13px; color: var(--ink2); }
 .replying span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .complete { position: absolute; left: 8px; bottom: calc(100% + 6px); z-index: 10; margin: 0; padding: 6px; list-style: none; min-width: 260px; max-width: min(460px, 90vw); background: var(--surface); border-radius: 12px; box-shadow: 0 0 0 .5px var(--hair), 0 10px 30px rgba(0,0,0,.18); }

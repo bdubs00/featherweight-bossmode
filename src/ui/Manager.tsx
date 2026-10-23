@@ -5,7 +5,7 @@
 
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { api } from '../api/routes';
-import type { Result } from '../api/types';
+import type { Attachment, Result } from '../api/types';
 import { store, useSelect } from '../state/store';
 import { attempt, showError } from './notice';
 import { Back, Empty, Face } from './common';
@@ -62,18 +62,18 @@ export function Manager() {
     );
   }
 
-  const send = async (text: string): Promise<boolean> => {
-    setSent(text);
+  const send = async (text: string, files: Attachment[]): Promise<boolean> => {
+    setSent(text || 'Sending files…');
     const ok = await attempt(async () => {
       if (!runId || stopped) {
-        const r = await api.start(manager.member, { agent: manager.agent, input: text });
+        const r = await api.start(manager.member, { agent: manager.agent, input: text, files });
         store.dispatch({ type: 'run', run: r });
         setRunId(r.id);
       } else {
-        await api.sendRun(runId, text);
+        await api.sendRun(runId, text, files);
       }
     });
-    if (!ok) setSent('');
+    setSent('');
     return ok;
   };
 
@@ -118,7 +118,7 @@ export function Manager() {
         )}
         {stopped && <p class="cap err">This conversation stopped. Your next message starts a new one.</p>}
       </div>
-      <Composer draft="manager" label="Message to the manager" placeholder="Ask the manager" onSend={(text) => send(text)} />
+      <Composer draft="manager" label="Message to the manager" placeholder="Ask the manager" onSend={(text, _to, files) => send(text, files)} />
     </section>
   );
 }

@@ -221,11 +221,33 @@ The plan gives the entry. The page reads four more fields:
 
 ### 6.3 A message of the caller
 
-`POST /v1/bridges/{id}/messages` takes `{"text", "to", "replyTo"}`. `to` is
+`POST /v1/bridges/{id}/messages` takes `{"text", "to", "replyTo", "files"}`. `to` is
 optional, and without it the message goes to every active member. The
-answer is 201 with the entry. The page sends no `files` yet. A handle in
+answer is 201 with the entry. A handle in
 `to` that is not on the roster, or that is fired, answers 400. A closed
 bridge answers 409.
+
+`files` is optional and uses the native run API shape:
+`[{"name": "notes.txt", "data": "aGVsbG8="}]`. Data is base64, without a
+data URL prefix. A message needs text or at least one nonempty file. The
+limits are 20 files and 32 MiB of decoded bytes in total. A name is at most
+255 bytes and holds no path or control characters. The recipient kernel
+also applies its workspace limits, including `tools.files.maxFileBytes`
+(8 MiB per file by default), and sniffs the media type.
+
+The entry and the event stream hold only file metadata:
+`files: [{"name": "notes.txt", "size": 5, "mediaType": "text/plain"}]`.
+The front forwards the bytes to each recipient with the message. The run
+stores them in its workspace under `attachments/`, as any native upload.
+The channel has no file download route.
+
+An attachment post answers 409 before it changes the channel when a
+recipient has no ready run, a run cannot take a follow-up, or the bridge
+caps prevent delivery to every recipient. The page keeps the text and
+files for a retry. A failure after acceptance posts a system line that
+names the member. Pending deliveries live in the front process; a restart
+loses their bytes, as it loses pending text deliveries. The channel keeps
+the file metadata. Send the files again after such a restart.
 
 When the person replies to a message of an agent and names no handle, the
 page sets `to` to that agent, as section 4.2 of the plan says.
@@ -273,9 +295,12 @@ counted as a receipt.
 
 The first message starts a run with
 `POST /v1/runs?member=<manager.member>` and
-`{"agent": "<manager.agent>", "input": "..."}`, as `/ui` starts a run on a
+`{"agent": "<manager.agent>", "input": "...", "files": [...]}`, as `/ui` starts a run on a
 member. A later message is `POST /v1/runs/{id}/messages` with
-`{"content": "..."}`. A run that failed or was canceled ends the
+`{"content": "...", "files": [...]}`. Files are optional and have the
+same upload shape and limits as section 6.3. The native transcript carries
+file references on user items; the page shows their names and sizes.
+A run that failed or was canceled ends the
 conversation, and the next message starts a new run. While the run is
 `queued` or `suspended` and the first answer is missing, the page says
 "Waking the manager".

@@ -4,6 +4,7 @@
 import { call, enc, encPath, query, send, ApiError } from './client';
 import type {
   Agent,
+  Attachment,
   BossConfig,
   Bridge,
   Caps,
@@ -71,7 +72,7 @@ export const api = {
   markRead: (id: string, seq: number) => call<null>(bridge(id) + '/read', { method: 'PUT', body: { seq } }),
   messages: (id: string, q: PageQuery = {}) =>
     call<MessagePage>(bridge(id) + '/messages' + query({ before: q.before, from: q.from, limit: q.limit })),
-  post: (id: string, m: { text: string; to?: string[]; replyTo?: number }) =>
+  post: (id: string, m: { text: string; to?: string[]; replyTo?: number; files?: Attachment[] }) =>
     call<Entry>(bridge(id) + '/messages', { method: 'POST', body: m }),
   react: (id: string, seq: number, reaction: ReactionKind, note?: string) =>
     call<Entry>(bridge(id) + '/messages/' + enc(seq) + '/reactions', { method: 'POST', body: note ? { reaction, note } : { reaction } }),
@@ -88,9 +89,9 @@ export const api = {
   transcript: (id: string, q: PageQuery = {}) =>
     call<Transcript>(run(id) + '/transcript' + query({ before: q.before, from: q.from, limit: q.limit || 200 })),
   file: (id: string, path: string) => call<FileView>(run(id) + '/files/' + encPath(path)),
-  start: (member: string, body: { agent: string; input: string }) =>
+  start: (member: string, body: { agent: string; input: string; files?: Attachment[] }) =>
     call<Run>('/v1/runs' + query({ member }), { method: 'POST', body }),
-  sendRun: (id: string, content: string) => call<unknown>(run(id) + '/messages', { method: 'POST', body: { content } }),
+  sendRun: (id: string, content: string, files?: Attachment[]) => call<unknown>(run(id) + '/messages', { method: 'POST', body: { content, files } }),
   decide: (id: string, approval: string, decision: 'allow' | 'deny', note?: string, content?: unknown) => {
     const body: Record<string, unknown> = { decision };
     if (note) body.note = note;

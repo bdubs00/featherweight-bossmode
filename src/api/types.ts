@@ -159,6 +159,19 @@ export interface Decision {
   always?: boolean;
 }
 
+/** File bytes sent with a message. data is base64, without a data URL prefix. */
+export interface Attachment {
+  name: string;
+  data: string;
+}
+
+/** The channel holds file metadata. The recipient run holds the bytes. */
+export interface AttachedFile {
+  name: string;
+  size: number;
+  mediaType?: string;
+}
+
 /** One channel entry. */
 export interface Entry {
   seq: number;
@@ -168,6 +181,7 @@ export interface Entry {
   replyTo?: number | null;
   text: string;
   cut?: boolean;
+  files?: AttachedFile[];
   /** For a system line: what happened, such as opened, closed, or fired. */
   event?: string;
   mirrors?: Mirror | null;
@@ -267,6 +281,7 @@ export interface Item {
   time: string;
   kind: 'user' | 'assistant' | 'tool' | 'result' | 'file' | 'ask' | 'decided' | 'note' | 'end' | 'tools';
   text?: string;
+  files?: AttachedFile[];
   detail?: string;
   tool?: string;
   callId?: string;

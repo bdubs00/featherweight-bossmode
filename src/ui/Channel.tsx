@@ -67,8 +67,8 @@ function ChannelComposer(p: { id: string; title: string; closed: boolean; reply:
       disabled={p.closed ? 'This bridge is closed. Open it again to send.' : ''}
       reply={r ? { seq: r.seq, who: senderName(r.from), text: r.text, handle: r.from.kind === 'agent' ? r.from.handle : undefined } : null}
       onClearReply={p.onClearReply}
-      onSend={async (text, to) => {
-        const ok = await attempt(() => postMessage(p.id, text, to, r ? r.seq : undefined));
+      onSend={async (text, to, files) => {
+        const ok = await attempt(() => postMessage(p.id, text, to, r ? r.seq : undefined, files));
         if (ok) p.onClearReply();
         return ok;
       }}
