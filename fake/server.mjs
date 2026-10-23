@@ -15,7 +15,7 @@
 //   FAKE_ORG           the name of the organization of the theme, Example Org by default
 //   FAKE_LOGO=1        the theme names a logo, served at /v1/bossmode/logo
 //   FAKE_PARTIAL=1     a stream event of a card carries a partial entry, so the page reads it again
-//   FAKE_ADMIN=1       whoami says that the person is an admin, who can add and remove skills
+//   FAKE_ADMIN=1       whoami says that the person is an admin, who can add and remove skills and pause every duty
 //   FAKE_A=1           the sample data shows each state of the bridges screen (routes-a.mjs)
 //   FAKE_LIVE=1        GET /v1/runs/{id}/live streams each answer outside a bridge in pieces, as the model writes it
 //   FAKE_LIVE_MS=120   the time between two pieces of a live answer, in milliseconds
@@ -1560,8 +1560,8 @@ function tick() {
 // adds its routes in its own file, so two screens never edit one file.
 // skills.mjs serves the Skills place.
 // routes-d.mjs serves the Routines place, and writes the runbook of a
-// routine on a sign-off with writePage.
-for (const name of ['skills.mjs', 'routes-a.mjs', 'routes-b.mjs', 'routes-c.mjs', 'routes-chat.mjs', 'routes-d.mjs']) {
+// routine on a sign-off with writePage. routes-e.mjs serves the Duties place.
+for (const name of ['skills.mjs', 'routes-a.mjs', 'routes-b.mjs', 'routes-c.mjs', 'routes-chat.mjs', 'routes-d.mjs', 'routes-e.mjs']) {
   const mod = await import('./' + name);
   mod.register({ on, refuse, readJson, readBody, publish, S, now, AGENTS, FLEET, admin: () => ADMIN, writePage });
 }
