@@ -170,6 +170,28 @@ describe('openStream', () => {
     expect(statuses[statuses.length - 1]).toBe('closed');
   });
 
+  it('names the build of the page that the front serves at each start of the stream', async () => {
+    const builds: string[] = [];
+    let n = 0;
+    await new Promise<void>((resolve) => {
+      openStream({
+        onEvent: () => {},
+        onBuild: (b) => builds.push(b),
+        backoff: [1],
+        sleep: () => Promise.resolve(),
+        fetch: async () => {
+          n++;
+          if (n === 1) return new Response(new ReadableStream({ start: (c) => c.close() }), { status: 200, headers: { 'Content-Type': 'text/event-stream', 'Fw-Page-Build': 'bf5ebeab9889130a' } });
+          if (n === 2) return stream([]);
+          resolve();
+          return new Promise<Response>(() => {});
+        },
+      });
+    });
+    // A front without the header names no build.
+    expect(builds).toEqual(['bf5ebeab9889130a', '']);
+  });
+
   it('tries again after a failed answer', async () => {
     let calls = 0;
     const statuses: string[] = [];

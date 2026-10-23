@@ -98,6 +98,9 @@ export function toEvent(m: SseMessage): StreamEvent | null {
 
 export type StreamStatus = 'connecting' | 'live' | 'lost' | 'closed';
 
+/** The header of the answer of the stream that names the build of the page that the front serves. */
+export const HEADER_PAGE_BUILD = 'Fw-Page-Build';
+
 export interface StreamOptions {
   url?: string;
   /** The id to resume after, from an earlier stream of this tab. */
@@ -105,6 +108,8 @@ export interface StreamOptions {
   onEvent: (e: StreamEvent) => void;
   onStatus?: (s: StreamStatus) => void;
   onUnauthorized?: (e: SigninNeeded) => void;
+  /** Gets the build of the page that the front serves, or "", at each start of the stream. */
+  onBuild?: (build: string) => void;
   fetch?: FetchLike;
   /** The waits between attempts, in milliseconds. A test sets them short. */
   backoff?: number[];
@@ -170,6 +175,7 @@ export function openStream(opts: StreamOptions): StreamHandle {
       throw new ApiError(res.status, p, res.statusText);
     }
     status('live');
+    if (opts.onBuild) opts.onBuild(res.headers.get(HEADER_PAGE_BUILD) || '');
     const parser = new SseParser();
     parser.lastId = lastId;
     const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();

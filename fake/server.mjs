@@ -158,8 +158,26 @@ function wire(ev) {
   return { bridge: ev.data.bridge, message: { ...ev.data.message, decision }, partial: true };
 }
 
+/**
+ * pageBuild is the build of the page in dist/, from the element that the
+ * build writes into index.html, or "" without a build. It reads the file at
+ * each stream, as the workbench reads a directory, so a new build counts at
+ * the next stream.
+ */
+function pageBuild() {
+  try {
+    const m = /<meta\s+name="bossmode-build"\s+content="([A-Za-z0-9._-]{1,64})"\s*\/?>/.exec(fs.readFileSync(path.join(DIST, 'index.html'), 'utf8'));
+    return m ? m[1] : '';
+  } catch {
+    return '';
+  }
+}
+
 function stream(req, res) {
-  res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
+  const head = { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' };
+  const build = pageBuild();
+  if (build) head['Fw-Page-Build'] = build;
+  res.writeHead(200, head);
   res.write('retry: 2000\n\n');
   const last = req.headers['last-event-id'];
   if (last) {

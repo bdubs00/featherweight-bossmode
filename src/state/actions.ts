@@ -10,6 +10,7 @@ import { ApiError, type SigninNeeded } from '../api/client';
 import { noteDecided } from './done';
 import { holdsTask } from '../lib/agents';
 import { routineChanged } from './routines';
+import { sawBuild } from '../lib/build';
 
 const loading = new Map<string, Promise<unknown>>();
 
@@ -588,6 +589,9 @@ export function startStream(onUnauthorized: (e: SigninNeeded) => void): void {
       chain = chain.then(() => onEvent(e)).catch(() => {});
     },
     onStatus: (status) => store.dispatch({ type: 'stream-status', status }),
+    // Each start of the stream, at boot and after each end, names the build
+    // of the page that the front serves, so a tab learns of a deploy.
+    onBuild: sawBuild,
     onUnauthorized: (e) => {
       stream = null;
       onUnauthorized(e);

@@ -15,6 +15,7 @@ import { api } from '../api/routes';
 import { store, useSelect } from '../state/store';
 import { loadAgents, loadBridges, loadFaces, loadFleet, loadOpenRuns, loadSkills, startStream, stopStream } from '../state/actions';
 import { forgetFaces } from '../lib/faces';
+import { dismissBuild, useNewBuild } from '../lib/build';
 import { applyTheme, themeOf } from '../lib/theme';
 import { canonicalPath, columnOf, go, parentOf, parseRoute, type Route } from '../lib/route';
 import { isTyping } from './keys';
@@ -172,10 +173,30 @@ function Notice({ text }: { text: string }) {
   );
 }
 
+/**
+ * NewBuild offers the page that a deploy put out while this tab ran the old
+ * one. The person reloads when it suits. A draft of a composer or of a page
+ * stays in the tab across the reload. A failed action takes the place first.
+ */
+function NewBuild() {
+  return (
+    <div class="notice" role="status">
+      <p>A new version of bossmode is out.</p>
+      <Button kind="secondary" size="s" onClick={() => location.reload()}>
+        Reload
+      </Button>
+      <Button kind="quiet" size="s" onClick={dismissBuild}>
+        Dismiss
+      </Button>
+    </div>
+  );
+}
+
 export function App() {
   const route = useRoute();
   const [auth, setAuth] = useState<Auth>({ kind: 'loading' });
   const notice = useNotice();
+  const fresh = useNewBuild();
   const open = route.place === 'bridge' ? route.id : '';
   const config = useSelect((s) => s.config);
 
@@ -373,5 +394,5 @@ export function App() {
   }
 
   const panes = panesOf(route);
-  return <Shell route={route} list={panes.list} main={panes.main} details={panes.details} notice={notice ? <Notice text={notice} /> : null} onSignOut={signOut} />;
+  return <Shell route={route} list={panes.list} main={panes.main} details={panes.details} notice={notice ? <Notice text={notice} /> : fresh ? <NewBuild /> : null} onSignOut={signOut} />;
 }

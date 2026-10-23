@@ -249,7 +249,7 @@ cursor, and no fade, so reduced motion changes nothing there.
 | Token | Value | Use |
 |---|---|---|
 | `--z-menu` | 30 | Menus and the picker |
-| `--z-notice` | 40 | The notice of a failed action |
+| `--z-notice` | 40 | The notice of a failed action, and the line of a new build of the page |
 | `--z-dialog` | 50 | The dialog that asks before a destructive action |
 
 ### 4.7 Scrollbars
