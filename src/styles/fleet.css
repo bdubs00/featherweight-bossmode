@@ -305,8 +305,10 @@ a.people-title:hover {
 }
 .seat-bar-why {
   flex: 1;
+  min-width: 0;
   font-size: var(--t-meta);
-  color: var(--muted);
+  line-height: var(--t-meta-lh);
+  color: var(--ink);
 }
 
 /* ---------- the run and its files ---------- */
@@ -333,10 +335,36 @@ a.people-title:hover {
   line-height: var(--t-meta-lh);
   color: var(--muted);
 }
-.run-error {
-  margin: 0 0 var(--s-2);
+/* A failure: the plain line in ink, the words of the provider below it, the way back, and the whole error behind Details. The light and the word of the status carry the red. */
+.run-fail {
+  margin: 0 0 var(--s-3);
+}
+.run-fail-line {
+  margin: 0;
   font-weight: 600;
-  color: var(--word-red);
+}
+.run-fail-said {
+  margin: var(--s-1) 0 0;
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.run-fail-keys {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+  margin-top: var(--s-2);
+}
+.run-fail-more {
+  color: var(--muted);
+}
+.run-fail-more[aria-expanded='true'] {
+  color: var(--ink);
+}
+.run-fail-raw {
+  margin-top: var(--s-2);
 }
 .run-summary {
   margin-top: var(--s-2);
@@ -408,6 +436,14 @@ a.people-title:hover {
 /* The line that says that a read wakes the worker sits above the files, apart from them. */
 .files-view > .wake-note {
   margin-bottom: var(--s-2);
+}
+/* The pages of the wiki follow the files, and lead when the run changed no file. */
+.files-view > .run-pages:first-child,
+.files-view > .wake-note + .run-pages {
+  margin-top: 0;
+}
+a.file {
+  text-decoration: none;
 }
 .files {
   border: 1px solid var(--line);

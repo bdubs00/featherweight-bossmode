@@ -1,23 +1,32 @@
-// The run of a seat: the result first (the title, the status, the answer,
-// what it did, the limits, and the reactions), and the files that it
-// changed with a viewer. The member conversation shows these on its tabs
-// Run and Files. The run pane of a bridge shows the result and the
-// conversation of the run in the details pane. A read of a run goes to its
-// worker and wakes a worker that sleeps, so these views read only when the
-// person opens them, and say so in place when the read wakes the worker.
+// The run of a seat: the result first (the title, the status, the failure,
+// the answer, what it did, the limits, and the reactions), and the files
+// that it changed with a viewer, and the pages of the wiki that it wrote.
+// The member conversation shows these on its tabs Run and Files. The run
+// pane of a bridge shows the result and the conversation of the run in the
+// details pane. A failure shows as one plain line with the message of the
+// provider, the key Seat again, and the whole error behind Details. A read
+// of a run goes to its worker and wakes a worker that sleeps, so these
+// views read only when the person opens them, and say so in place when the
+// read wakes the worker.
 
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useMemo, useState } from 'preact/hooks';
 import { api } from '../api/routes';
-import type { FileView, Member, ReactionKind, Result } from '../api/types';
+import type { FileView, Item, Member, ReactionKind, Result, Run } from '../api/types';
 import { store, useSelect } from '../state/store';
 import { runStatus } from '../lib/presence';
 import { awakeFor, seatPresence, statusOf } from '../lib/status';
 import { selectFacts } from '../state/reducer';
 import { hrefOf } from '../lib/route';
+import { plainError, providerMessage } from '../lib/runerror';
+import { pagesWritten, stepInputs, stepWords } from '../lib/steps';
+import { pageName } from '../lib/pagepath';
 import { noteLost } from '../state/actions';
+import { newestRun } from '../state/people';
 import { attempt, showError } from './notice';
 import { Confirm, Light, Markdown, When } from './common';
-import { Button, Chip, IconButton, Mark, PaneHeader, ReactionChip } from './primitives';
+import { Button, Chip, Command, IconButton, Mark, PaneHeader, ReactionChip } from './primitives';
+import { Phrase } from './Roster';
+import { SeatAgainKey } from './SeatAgain';
 import { Conversation, useTranscript } from './Conversation';
 import { HeartNote } from './Thread';
 import { Icon } from './icons';
@@ -63,6 +72,56 @@ export function WakeNote() {
   return <p class="run-note wake-note">This read wakes the worker.</p>;
 }
 
+/** The failure of a run for a person: the plain line, the message of the provider, and the whole error. */
+export interface Failure {
+  line: string;
+  said: string;
+  raw: string;
+}
+
+/**
+ * failureOf reads why a run stopped. The error of the result, else of the
+ * run, gives the plain line. A limit of the result that says where the run
+ * stopped, such as "Stopped at the limit of 40 turns.", stands for a
+ * limit of the budget, because it holds the number.
+ */
+export function failureOf(run: Pick<Run, 'error'> | undefined, res: Pick<Result, 'error' | 'limits'> | null | undefined): Failure {
+  const raw = ((res && res.error) || (run && run.error) || '').trim();
+  const stop = res && res.limits ? res.limits.find((l) => /^Stopped\b/.test(l)) : undefined;
+  const line = stop ? stop.replace(/\.$/, '') : plainError(raw);
+  return { line, said: providerMessage(raw), raw };
+}
+
+/** FailureView is the failure of a run: the plain line, the message of the provider, the way back, and the whole error behind Details. */
+function FailureView({ id, f, again }: { id: string; f: Failure; again?: { bridge: string; m: Member } }) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => setOpen(false), [id]);
+  const rawId = 'raw-' + id;
+  // Details holds the whole error only where the plain line leaves part of it out.
+  const more = f.raw && f.raw !== f.line && f.raw !== f.said;
+  return (
+    <div class="run-fail">
+      {f.line && <p class="run-fail-line">{f.line}</p>}
+      {f.said && f.said !== f.line && <p class="run-fail-said">{f.said}</p>}
+      {(again || more) && (
+        <div class="run-fail-keys">
+          {again && <SeatAgainKey bridge={again.bridge} m={again.m} />}
+          {more && (
+            <Button kind="quiet" size="s" class="run-fail-more" aria-expanded={open} aria-controls={rawId} onClick={() => setOpen(!open)}>
+              Details
+            </Button>
+          )}
+        </div>
+      )}
+      {more && open && (
+        <div id={rawId}>
+          <Command class="run-fail-raw">{f.raw}</Command>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** FileBox shows one file that a run changed, as numbered lines of text. */
 function FileBox({ run, path, onClose }: { run: string; path: string; onClose: () => void }) {
   const [f, setF] = useState<FileView | null>(null);
@@ -94,11 +153,18 @@ function FileBox({ run, path, onClose }: { run: string; path: string; onClose: (
   );
 }
 
-/** FilesView lists the files that a run changed, and opens one in place. wakes says that the read wakes the worker of the run. */
-export function FilesView({ runId, result, wakes }: { runId: string; result: Result | null; wakes?: boolean }) {
+/**
+ * FilesView lists the files that a run changed, and opens one in place.
+ * The pages of the wiki that the run wrote follow, as links to the Wiki,
+ * because to a person they are files of the work too. items is the
+ * transcript of the run, which holds the writes of the pages. wakes says
+ * that the read wakes the worker of the run.
+ */
+export function FilesView({ runId, result, items, wakes }: { runId: string; result: Result | null; items?: Item[]; wakes?: boolean }) {
   const [file, setFile] = useState('');
   useEffect(() => setFile(''), [runId]);
   const files = (result && result.files) || [];
+  const pages = useMemo(() => pagesWritten(items || []), [items]);
   if (!result)
     return wakes ? (
       <div class="files-view">
@@ -111,23 +177,54 @@ export function FilesView({ runId, result, wakes }: { runId: string; result: Res
   return (
     <div class="files-view">
       {wakes && <WakeNote />}
-      <div class="files" role="list">
-        {files.map((f) => (
-          <div role="listitem">
-            <button type="button" class={'file' + (f.op === 'deleted' ? ' gone' : '') + (file === f.path ? ' on' : '')} aria-expanded={file === f.path} onClick={() => setFile(file === f.path ? '' : f.path)}>
-              <Icon name="file" />
-              <span class="fn">
-                <b>{f.path.split('/').pop()}</b>
-                <small>{f.path}</small>
-              </span>
-              <span class="fo">{f.op}</span>
-            </button>
-          </div>
-        ))}
-      </div>
+      {files.length === 0 && pages.length === 0 && <p class="run-note">No files changed in this run.</p>}
+      {files.length > 0 && (
+        <div class="files" role="list">
+          {files.map((f) => (
+            <div role="listitem">
+              <button type="button" class={'file' + (f.op === 'deleted' ? ' gone' : '') + (file === f.path ? ' on' : '')} aria-expanded={file === f.path} onClick={() => setFile(file === f.path ? '' : f.path)}>
+                <Icon name="file" />
+                <span class="fn">
+                  <b>{f.path.split('/').pop()}</b>
+                  <small>{f.path}</small>
+                </span>
+                <span class="fo">{f.op}</span>
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
       {file && <FileBox run={runId} path={file} onClose={() => setFile('')} />}
+      {pages.length > 0 && (
+        <section class="run-sec run-pages" aria-labelledby={'pages-' + runId}>
+          <div class="run-sec-head">
+            <h4 class="t-sub" id={'pages-' + runId}>
+              Wiki pages
+            </h4>
+            <Chip label={pages.length === 1 ? '1 page' : pages.length + ' pages'}>{pages.length}</Chip>
+          </div>
+          <div class="files" role="list">
+            {pages.map((p) => (
+              <div role="listitem">
+                <a class="file" href={hrefOf({ place: 'pages', path: p, mode: 'read' })}>
+                  <Icon name="page" />
+                  <span class="fn">
+                    <b>{pageName(p)}</b>
+                    <small>{p}</small>
+                  </span>
+                </a>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
+}
+
+/** filesCount is the count of the tab Files: the files that a run changed and the pages of the wiki that it wrote. */
+export function filesCount(result: Result | null, items: Item[] | undefined): number {
+  return ((result && result.files) || []).length + pagesWritten(items || []).length;
 }
 
 /** ResultReactions records a reaction on the result of the run (K2), with the seq of its fw.run.finished. */
@@ -197,15 +294,25 @@ export function StopKey({ runId, who }: { runId: string; who: string }) {
 }
 
 /**
- * RunView is the result of a run: the title, the status, the answer, what
- * it did, the limits, and the reactions. wakes says that the read wakes
- * the worker of the run.
+ * RunView is the result of a run: the title, the status, the failure, the
+ * answer, what it did, the limits, and the reactions. bridge and member
+ * name the seat of the run, so a failure of its newest run offers Seat
+ * again. items is the transcript of the run, which gives the targets of
+ * the steps. wakes says that the read wakes the worker of the run.
  */
-export function RunView({ runId, result, member, who, endSeq, gone, wakes }: { runId: string; result: Result | null; member?: Member; who: string; endSeq?: number; gone?: boolean; wakes?: boolean }) {
+export function RunView({ runId, result, bridge, member, who, items, endSeq, gone, wakes }: { runId: string; result: Result | null; bridge?: string; member?: Member; who: string; items?: Item[]; endSeq?: number; gone?: boolean; wakes?: boolean }) {
   const run = useSelect((s) => s.runs[runId]);
   const presence = useSelect((s) => (member ? seatPresence(selectFacts(s), member) : ''));
   const res = result;
   const phrase = member && presence === 'working' && member.activity ? member.activity.phrase : '';
+  const ended = !!run && (run.state === 'failed' || run.state === 'canceled');
+  const canceled = !!run && run.state === 'canceled';
+  // A stopped run says it in its status, so only a failure has a line.
+  const fail = useMemo(() => (ended || (res && res.error) ? { ...failureOf(run, res), ...(canceled ? { line: '', said: '', raw: '' } : {}) } : null), [ended, canceled, run && run.error, res]);
+  // Seat again starts the seat anew, so it shows only for the newest run of a seat that is not fired.
+  const again = bridge && member && !member.fired && ended && newestRun(member) === runId ? { bridge, m: member } : undefined;
+  const steps = res ? res.steps : undefined;
+  const inputs = useMemo(() => stepInputs(steps || [], items || []), [steps, items]);
   return (
     <div class="run-view">
       <div class="run-head">
@@ -219,7 +326,7 @@ export function RunView({ runId, result, member, who, endSeq, gone, wakes }: { r
         {run && <When at={run.createdAt} />}
         {phrase && <span class="clip">{phrase}</span>}
       </p>
-      {res && res.error && <p class="run-error">{res.error}</p>}
+      {fail && (fail.line || again) && <FailureView id={runId} f={fail} again={again} />}
       {res && res.summary && <Markdown text={res.summary} class="run-summary" />}
       {res && res.steps && res.steps.length > 0 && (
         <section class="run-sec" aria-labelledby={'did-' + runId}>
@@ -230,9 +337,11 @@ export function RunView({ runId, result, member, who, endSeq, gone, wakes }: { r
             <Chip label={res.steps.length === 1 ? '1 step' : res.steps.length + ' steps'}>{res.steps.length}</Chip>
           </div>
           <ol class="run-steps">
-            {res.steps.map((s) => (
+            {res.steps.map((s, i) => (
               <li class={s.isError ? 'err' : ''}>
-                <span>{s.text}</span>
+                <span>
+                  <Phrase text={stepWords(s.tool, inputs[i], s.text)} />
+                </span>
                 <small>{s.isError ? 'Error' : s.done ? 'Done' : 'No result'}</small>
               </li>
             ))}
@@ -254,14 +363,21 @@ export function RunView({ runId, result, member, who, endSeq, gone, wakes }: { r
 /** RunPane is the run of a member in the details pane of a bridge: the result, then the conversation of the run. */
 export function RunPane({ bridge, runId, handle }: { bridge: string; runId: string; handle?: string }) {
   const run = useSelect((s) => s.runs[runId]);
-  const member = useSelect((s) => (handle && s.rosters[bridge] ? s.rosters[bridge].byHandle[handle] : undefined));
+  // The address names the seat, or the roster names the seat that holds the run.
+  const member = useSelect((s) => {
+    const r = s.rosters[bridge];
+    if (!r) return undefined;
+    if (handle) return r.byHandle[handle];
+    const h = r.order.find((x) => r.byHandle[x] && r.byHandle[x].runs.includes(runId));
+    return h ? r.byHandle[h] : undefined;
+  });
   // The person opened the run, so the pane reads it, and says so when the read wakes its worker.
   const res = useResult(runId);
   const t = useTranscript(runId);
   const wakes = useSelect((s) => awakeFor(selectFacts(s), s.runs[runId]) === false);
   const seatLight = useSelect((s) => (member ? statusOf(selectFacts(s), { seat: member }) : null));
   const light = seatLight || (run ? runStatus(run) : null);
-  const who = handle || (run ? run.agent : 'the agent');
+  const who = handle || (member ? member.handle : run ? run.agent : 'the agent');
   const end = [...t.items].reverse().find((x) => x.kind === 'end');
   return (
     <section class="screen runpane" aria-labelledby="run-title">
@@ -273,8 +389,8 @@ export function RunPane({ bridge, runId, handle }: { bridge: string; runId: stri
         lead={run ? <Mark agent={run.agent} size={32} halo={light ? { tone: light.tone, word: light.word } : undefined} label={who} /> : undefined}
       />
       <div class="scroll">
-        <RunView runId={runId} result={res} member={member} who={who} endSeq={end ? end.seq : undefined} wakes={wakes} />
-        {res && res.files && res.files.length > 0 && <FilesView runId={runId} result={res} />}
+        <RunView runId={runId} result={res} bridge={bridge} member={member} who={who} items={t.items} endSeq={end ? end.seq : undefined} wakes={wakes} />
+        {filesCount(res, t.items) > 0 && <FilesView runId={runId} result={res} items={t.items} />}
         <Conversation run={run} result={res} t={t} agentLabel={who} />
       </div>
     </section>

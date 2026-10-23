@@ -399,6 +399,10 @@ color, radius, shadow, or type size of its own.
     fourth is the Chat place: the picks of a new chat, and This chat.
 11. The page loads nothing from another origin: the typeface, the marks, and
     the icons are part of the build.
+12. A failure says what happened in one plain line, and the way back sits
+    beside it as a key. The words of the provider sit in a tooltip and in
+    the run, and the whole error sits behind Details, in monospace. The
+    light and the word of the status carry the red, so the line stays ink.
 
 ## 8. The theme of a deployment
 
@@ -538,12 +542,15 @@ The work:
   agents gets one line in its channel: `Runs in waves: N seats share M
   workers.` The counts come from `workersOf` of `src/lib/workers.ts`.
 - The members pane. Rows of the mockup: the mark at 36, the handle, the
-  status, the task, the phrase of the activity, and the reason of an error,
-  such as `Stopped at 40 turns`. The status comes from `statusOf` (section
-  11.8), which says waiting for a worker for a queued run. A row that needs
-  you takes `--wash-need`. The More
-  menu holds Open conversation (to `#member/<bridge>/<handle>`), Mute, Seat
-  again, Change task, and Fire. The foot shows This bridge with turns, cost,
+  status, the task, the phrase of the activity, and the plain line of an
+  error from `plainError`, such as `The model refused the request` or
+  `Stopped at 40 turns`, with the message of the provider in its tooltip.
+  The status comes from `statusOf` (section 11.8), which says waiting for
+  a worker for a queued run. A row that needs you takes `--wash-need`. A
+  row whose newest run failed or stopped holds the small secondary key
+  Seat again under its text, which sends the task unchanged in one click.
+  The More menu holds Open conversation (to `#member/<bridge>/<handle>`),
+  Mute, Seat again, Change task, and Fire. The foot shows This bridge with turns, cost,
   and pages from `usage`, for runs that report it.
 - The picker of Add. One field, Who, with the placeholder `Who?`. A list of
   agents with their marks, their taglines, and their workers: `N free` with
@@ -580,8 +587,14 @@ The work:
   conversation that the page has from the channel and the stream, in the
   look of the channel, with the composer `Message <handle>`. Its slash
   menu offers the skills of the agent through the `commands` of `Composer`.
-  Run shows the result, what it did, the limits, and the reactions. Files
-  shows the files and the viewer. The `activity` of `GET /v1/runs/{id}` has
+  Run shows the result, the failure, what it did, the limits, and the
+  reactions. A failure is the plain line under the status, the message of
+  the provider, Seat again, and the whole error behind Details. What it did
+  names each step with `stepWords`, such as `Wrote notes/plan.md`. Files
+  shows the files and the viewer, then the pages of the wiki that the run
+  wrote, as links to the Wiki, or `No files changed in this run.` A seat
+  whose newest run failed or stopped shows a bar over the composer of
+  Chat: the status, the plain line, and Seat again. The `activity` of `GET /v1/runs/{id}` has
   no phrase, so the phrase comes from the member of the bridge. For the
   reads of each tab, see section 11.8.
 - The profile of the agent, in the details pane. The mark at 72, the

@@ -24,6 +24,32 @@ const liveStream = () =>
   );
 
 const alice = { kind: 'person' as const, name: 'alice@example.com', display: 'Alice' };
+
+// The error of a seat on the homelab fleet, as the run held it.
+const PREFILL =
+  'model: anthropic: stream claude-haiku-5-5: POST "http://ax-anthropic.fw-fleet.svc.cluster.local:8080/v1/messages?beta=true": 400 Bad Request (Request-ID: req_011CgJhPGRsjUd3vHdi7JLjE) (Workspace-ID: wrkspc_018mMkT171jg5neTmcSP7ha8) {"type":"error","error":{"type":"invalid_request_error","message":"This model does not support assistant message prefill. The conversation must end with a user message."},"request_id":"req_011CgJhPGRsjUd3vHdi7JLjE"}';
+const SAID = 'This model does not support assistant message prefill. The conversation must end with a user message.';
+const PAGE = 'k3s/monitoring/manifests/prometheusrule.md';
+const NOTES_RUN = { id: 'run-notes', agent: 'writer', state: 'failed' as const, error: PREFILL, seq: 9, createdAt: at(0), updatedAt: at(5), member: 'default/crew-0' };
+/** The transcript of run-notes: it read the channel, wrote a page, posted, and failed at the next model call. */
+const NOTES_ITEMS = [
+  { seq: 1, time: at(0), kind: 'user', text: 'Write the runbook of the alerts', who: 'alice@example.com' },
+  { seq: 2, time: at(1), kind: 'tool', tool: 'front.bridge_read', callId: 'c1', input: {} },
+  { seq: 3, time: at(1), kind: 'result', tool: 'front.bridge_read', callId: 'c1', text: '3 messages' },
+  { seq: 4, time: at(2), kind: 'tool', tool: 'front.pages_write', callId: 'c2', input: { path: PAGE, text: '# Rules' } },
+  { seq: 5, time: at(2), kind: 'result', tool: 'front.pages_write', callId: 'c2', text: 'Wrote the page.' },
+  { seq: 6, time: at(3), kind: 'tool', tool: 'front.bridge_post', callId: 'c3', input: { text: 'The runbook is in the wiki.' } },
+  { seq: 7, time: at(3), kind: 'result', tool: 'front.bridge_post', callId: 'c3', text: 'Posted.' },
+  { seq: 9, time: at(5), kind: 'end', text: 'failed', isError: true },
+];
+
+/** seatFailed seats notes, whose newest run failed when the provider refused the request. */
+function seatFailed(): void {
+  act(() => {
+    store.dispatch({ type: 'member', bridge: 'b1', member: { handle: 'notes', agent: 'writer', task: 'Write the runbook of the alerts', runs: ['run-notes'], fired: false, muted: false, presence: 'error' } });
+    store.dispatch({ type: 'run', run: NOTES_RUN });
+  });
+}
 const ENTRIES: Entry[] = [
   { seq: 1, at: at(1), from: alice, to: [], text: 'Hello, everyone.' },
   { seq: 2, at: at(2), from: alice, to: ['migrator-1'], text: 'How far is cron?' },
@@ -40,6 +66,10 @@ beforeEach(() => {
     ['GET', /^\/v1\/runs\/run-migrator-1\/transcript/, () => ({ run: { id: 'run-migrator-1', agent: 'migrator', state: 'running', seq: 3, createdAt: at(0), updatedAt: at(0) }, items: [{ seq: 3, time: at(2), kind: 'tool', tool: 'bash', callId: 'c1', input: { command: 'ansible-lint roles/cron' } }], next: 0, prev: 0 })],
     ['GET', /^\/v1\/runs\/run-migrator-1\/live$/, liveStream],
     ['GET', /^\/v1\/runs\/run-migrator-1\/result$/, () => ({ runId: 'run-migrator-1', title: 'Migrate cron', agent: 'migrator', status: 'working', files: [{ path: 'a.yml', op: 'created', seq: 1 }], started: at(0), changed: at(0) })],
+    ['GET', /^\/v1\/runs\/run-notes\/result$/, () => ({ runId: 'run-notes', title: 'Write the runbook of the alerts', agent: 'writer', status: 'failed', error: PREFILL, steps: [{ seq: 12, tool: 'front.bridge_read', text: 'front.bridge_read', done: true }, { seq: 14, tool: 'front.pages_write', text: 'front.pages_write', done: true }, { seq: 16, tool: 'front.bridge_post', text: 'front.bridge_post', done: true }], started: at(0), changed: at(5) })],
+    ['GET', /^\/v1\/runs\/run-notes\/transcript/, () => ({ run: NOTES_RUN, items: NOTES_ITEMS, next: 0, prev: 0 })],
+    ['GET', /^\/v1\/runs\/run-notes$/, () => NOTES_RUN],
+    ['PATCH', /^\/v1\/bridges\/b1\/members\/notes$/, (b) => ({ handle: 'notes', agent: 'writer', task: 'Write the runbook of the alerts', runs: ['run-notes', 'run-notes-2'], fired: false, muted: false, presence: 'working', ...(b as object) })],
     ['GET', /^\/v1\/runs\/run-tester\/result$/, () => ({ runId: 'run-tester', title: 'Run molecule', agent: 'tester', status: 'ready', summary: 'Molecule passed.', files: [], started: at(0), changed: at(0) })],
     ['GET', /^\/v1\/runs\/run-tester\/transcript/, () => ({ run: { id: 'run-tester', agent: 'tester', state: 'completed', seq: 2, createdAt: at(0), updatedAt: at(0), member: 'default/crew-1' }, items: [], next: 0, prev: 0 })],
   ]);
@@ -253,6 +283,59 @@ describe('the member conversation', () => {
     expect(chat.querySelector('header .mark')!.getAttribute('aria-label')).toBe('bare, needs you');
     await new Promise((r) => setTimeout(r, 20));
     expect(currentNotice()).toBe('');
+  });
+
+  it('shows a failure of the run as a plain line with the message of the provider, Seat again, and the whole error behind Details', async () => {
+    seatFailed();
+    const el = mount(<MemberMain bridge="b1" handle="notes" tab="run" />);
+    await vi.waitFor(() => expect(el.querySelector('.run-fail-line')).not.toBeNull());
+    expect(el.querySelector('.run-fail-line')!.textContent).toBe('The model refused the request');
+    expect(el.querySelector('.run-fail-said')!.textContent).toBe(SAID);
+    expect(el.querySelector('.run-status .status-word')!.textContent).toBe('failed');
+    expect(el.textContent).not.toContain('req_011');
+    const more = el.querySelector('.run-fail-more') as HTMLButtonElement;
+    expect(more.textContent).toBe('Details');
+    expect(more.getAttribute('aria-expanded')).toBe('false');
+    act(() => more.click());
+    expect(more.getAttribute('aria-expanded')).toBe('true');
+    expect(el.querySelector('pre.command.run-fail-raw')!.textContent).toBe(PREFILL);
+    // The steps say what the run did, with the page that it wrote.
+    await vi.waitFor(() => expect([...el.querySelectorAll('.run-steps li > span')].map((x) => x.textContent)).toEqual(['Read the channel', 'Wrote ' + PAGE, 'Posted to the bridge']));
+    act(() => (el.querySelector('.run-fail .seat-again') as HTMLButtonElement).click());
+    await vi.waitFor(() => expect(calls.some((c) => c.method === 'PATCH')).toBe(true));
+    expect(calls.find((c) => c.method === 'PATCH')).toEqual({ method: 'PATCH', path: '/v1/bridges/b1/members/notes', body: { task: 'Write the runbook of the alerts' } });
+    expect(el.querySelector('dialog.confirm')).toBeNull();
+  });
+
+  it('puts the plain line and Seat again over the composer of a seat whose run failed', async () => {
+    seatFailed();
+    const el = mount(<MemberMain bridge="b1" handle="notes" tab="chat" />);
+    await vi.waitFor(() => expect(el.querySelector('.seat-bar-why')!.textContent).toBe('The model refused the request'));
+    expect(el.querySelector('.seat-bar-why')!.getAttribute('title')).toBe(SAID);
+    expect(el.querySelector('.seat-bar .status-word')!.textContent).toBe('error');
+    act(() => (el.querySelector('.seat-bar .seat-again') as HTMLButtonElement).click());
+    await vi.waitFor(() => expect(calls.some((c) => c.method === 'PATCH' && c.path === '/v1/bridges/b1/members/notes')).toBe(true));
+    expect(el.querySelector('dialog.confirm')).toBeNull();
+  });
+
+  it('lists the pages of the wiki that the run wrote as links to the Wiki, and counts them on the tab Files', async () => {
+    seatFailed();
+    const el = mount(<MemberMain bridge="b1" handle="notes" tab="files" />);
+    await vi.waitFor(() => expect(el.querySelector('.run-pages a.file')).not.toBeNull());
+    const link = el.querySelector('.run-pages a.file')!;
+    expect(link.getAttribute('href')).toBe('#pages/' + PAGE);
+    expect(link.querySelector('b')!.textContent).toBe('prometheusrule');
+    expect(el.querySelector('.run-pages h4')!.textContent).toBe('Wiki pages');
+    expect(el.textContent).not.toContain('No files changed in this run.');
+    expect(el.querySelector('.tabs .chip .sr')!.textContent).toBe('1 file');
+  });
+
+  it('says that a run changed no file, with no empty list', async () => {
+    seatAsleep();
+    const el = mount(<MemberMain bridge="b1" handle="tester" tab="files" />);
+    await vi.waitFor(() => expect(el.textContent).toContain('No files changed in this run.'));
+    expect(el.querySelector('.files')).toBeNull();
+    expect(el.querySelector('.run-pages')).toBeNull();
   });
 
   it('says so for a seat that is not on the bridge', () => {

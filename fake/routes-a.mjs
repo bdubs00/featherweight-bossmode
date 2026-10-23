@@ -11,8 +11,11 @@
 //     fired seat, a fold of four system lines with a failure and a line
 //     about a wiki page, a card in the state unknown, and the end of the
 //     artboard: reactions, a message of alice to the reviewer, and its answer.
-//   - br-logrotate is a second open bridge with two unread messages and a
-//     seat with no run, whose job waits on the queue.
+//   - br-logrotate is a second open bridge with two unread messages, a
+//     seat with no run, whose job waits on the queue, and a seat whose run
+//     failed with the error of a real fleet: the provider refused the
+//     request with a 400 and a JSON message. That run read the channel,
+//     wrote a page of the wiki, and posted before it failed.
 //   - br-notes-23 is a closed bridge.
 // The routes of the server serve all of it. This file adds no route.
 
@@ -133,6 +136,44 @@ function puppet(S) {
   S.reads.set('br-puppet|' + ALICE, ch.length);
 }
 
+/** The error of a seat on the homelab fleet, as the run held it. */
+const PREFILL =
+  'model: anthropic: stream claude-haiku-5-5: POST "http://ax-anthropic.fw-fleet.svc.cluster.local:8080/v1/messages?beta=true": 400 Bad Request (Request-ID: req_011CgJhPGRsjUd3vHdi7JLjE) (Workspace-ID: wrkspc_018mMkT171jg5neTmcSP7ha8) {"type":"error","error":{"type":"invalid_request_error","message":"This model does not support assistant message prefill. The conversation must end with a user message."},"request_id":"req_011CgJhPGRsjUd3vHdi7JLjE"}';
+
+/** failedWriter seats a writer on a bridge whose run read the channel, wrote a page, posted, and failed at its next model call. */
+function failedWriter(S, bridge) {
+  const id = 'run-lr-writer';
+  const task = 'Write the runbook of the logrotate role in the wiki';
+  const page = 'runbooks/logrotate.md';
+  const text = '---\ntitle: The logrotate role\n---\n# The logrotate role\n\nThe role keeps the rotation of the Puppet module: daily, seven copies, compressed.\n';
+  const run = addRun(S, { id, agentName: 'writer', handle: 'writer', bridge, task, state: 'failed', minutes: 36, error: PREFILL });
+  run.member = 'default/notes-0';
+  run.seq = 9;
+  run.usage = { turns: 4, toolCalls: 3, costUSD: 0.02 };
+  const t = (m) => ago(m);
+  S.transcripts.set(id, [
+    { seq: 1, time: t(36), kind: 'user', text: task, who: ALICE },
+    { seq: 2, time: t(35), kind: 'tool', tool: 'front.bridge_read', callId: 'w1', input: {} },
+    { seq: 3, time: t(35), kind: 'result', tool: 'front.bridge_read', callId: 'w1', text: '3 messages' },
+    { seq: 4, time: t(34), kind: 'tool', tool: 'front.pages_write', callId: 'w2', input: { path: page, text, summary: 'The runbook of the logrotate role' } },
+    { seq: 5, time: t(34), kind: 'result', tool: 'front.pages_write', callId: 'w2', text: 'Wrote ' + page + '.' },
+    { seq: 6, time: t(33), kind: 'tool', tool: 'front.bridge_post', callId: 'w3', input: { text: 'The runbook of the logrotate role is in the wiki.' } },
+    { seq: 7, time: t(33), kind: 'result', tool: 'front.bridge_post', callId: 'w3', text: 'Posted.' },
+    { seq: 9, time: t(32), kind: 'end', text: 'failed', isError: true },
+  ]);
+  // The kernel words a step of the front by the name of its tool, as on the real fleet.
+  S.results.set(id, {
+    runId: id, title: task, agent: 'writer', status: 'failed', error: PREFILL, started: run.createdAt, changed: t(32), next: [{ kind: 'retry', label: 'Try again' }],
+    steps: [
+      { seq: 10, tool: 'front.bridge_read', text: 'front.bridge_read', done: true },
+      { seq: 12, tool: 'front.pages_write', text: 'front.pages_write', done: true },
+      { seq: 14, tool: 'front.bridge_post', text: 'front.bridge_post', done: true },
+    ],
+  });
+  if (!S.pages.has(page)) S.pages.set(page, { path: page, versions: [{ version: 900, text, hash: 'lr-writer-1', by: 'run:' + id, run: id, at: t(34), summary: 'The runbook of the logrotate role' }] });
+  return { handle: 'writer', agent: 'writer', pool: 'notes', task, runs: [id], fired: false, muted: false, presence: 'error', activity: null };
+}
+
 function logrotate(S) {
   const id = 'br-logrotate';
   const seats = [
@@ -145,6 +186,7 @@ function logrotate(S) {
   });
   // A seat with no run yet: its job waits on the queue of its agent.
   members.push({ handle: 'reviewer', agent: 'reviewer', pool: 'review', task: 'Review the logrotate role against its manifest', runs: [], fired: false, muted: false, presence: 'waiting', activity: null });
+  members.push(failedWriter(S, id));
   S.bridges.set(id, {
     id, title: 'Migrate logrotate', goal: 'Migrate the logrotate module to an Ansible role and test it with molecule.', operator: ALICE, state: 'open', placement: 'queue',
     createdAt: ago(52), closedAt: null, manager: null,
@@ -155,14 +197,17 @@ function logrotate(S) {
   S.channels.set(
     id,
     renumber([
-      entry(ago(41), system, 'alice opened the bridge with 3 members.', { event: 'opened' }),
+      entry(ago(41), system, 'alice opened the bridge with 4 members.', { event: 'opened' }),
       entry(ago(41), system, 'migrator started: Migrate the logrotate module to an Ansible role.', { event: 'started', mirrors: { run: 'run-lr-migrator', seq: 1, type: 'fw.run.queued' } }),
       entry(ago(41), system, 'tester started: Run molecule for the logrotate role.', { event: 'started', mirrors: { run: 'run-lr-tester', seq: 1, type: 'fw.run.queued' } }),
+      entry(ago(36), system, 'writer started: Write the runbook of the logrotate role in the wiki.', { event: 'started', mirrors: { run: 'run-lr-writer', seq: 1, type: 'fw.run.queued' } }),
+      entry(ago(33), agent('writer', 'run-lr-writer'), 'The runbook of the logrotate role is in the wiki.'),
+      entry(ago(32), system, 'writer failed: ' + PREFILL, { event: 'failed', mirrors: { run: 'run-lr-writer', seq: 9, type: 'fw.run.finished' } }),
       entry(ago(30), agent('migrator', 'run-lr-migrator'), 'logrotate has one class and one template. I keep the handler style of nginx.'),
       entry(ago(20), agent('tester', 'run-lr-tester'), 'molecule converge passed on Debian 12. I wait for the role to settle before idempotence.'),
     ]),
   );
-  S.reads.set(id + '|' + ALICE, 3);
+  S.reads.set(id + '|' + ALICE, 6);
 }
 
 function closedNotes(S) {
