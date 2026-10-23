@@ -45,7 +45,7 @@ The code of the look:
 | `src/styles/fonts.css`, `base.css` | The typeface and the base styles |
 | `src/ui/primitives/` | The primitives, with `primitives.css` and their tests |
 | `src/ui/Shell.tsx`, `src/styles/shell.css` | The app bar and the three panes |
-| `src/styles/channel.css`, `fleet.css`, `wiki.css` | The styles of the screens: the bridges, the fleet and the people, and what you make |
+| `src/styles/channel.css`, `fleet.css`, `wiki.css`, `chat.css`, `routines.css` | The styles of the screens: the bridges, the fleet and the people, what you make, the quick chat, and the routines |
 
 ## Build
 
@@ -66,7 +66,9 @@ routes. They test the question forms and the Markdown sanitizer against
 hostile input. They test the live answer of a run, the quick chat, and the
 agents of the fleet. They test the statuses of the workers and the seats,
 and the reads of a worker that sleeps. They test the words and the folds of
-a system line, and the links of every screen of the page.
+a system line, and the links of every screen of the page. They test the
+Routines place: the groups, the sign-off card and its moves, the evidence,
+the runbook, and the week of an agent.
 
 ## Run against the fake server
 
@@ -76,7 +78,9 @@ real workbench checks. It serves every route of `docs/CONTRACT.md` with
 sample data. The data holds two bridges, a channel of forty entries, an
 approval card, and a question card. It also holds a manager conversation
 and a quick chat with a history of six chats. Last come a fleet with two
-pools, a wiki of eight pages, and a face for every agent. Timers move members between
+pools, a wiki of eight pages, and a face for every agent. The Routines place
+has nine routines of three agents: one needs your sign-off, four are live,
+one rehearses, one is proposed, and two are retired. Timers move members between
 presences, with their runs and their workers, and post messages every few
 seconds.
 

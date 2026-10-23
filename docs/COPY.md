@@ -99,6 +99,7 @@ Capacity shows where seating happens:
 |---|---|---|---|
 | `Activity`, `Bridges`, `Fleet`, `Skills`, `Wiki`, `Manager` | keep | | done |
 | `Chat` (the place between Activity and Bridges, with a speech bubble) | add | the quick chat of section 7 | done |
+| `Routines` (the place between Skills and Wiki, with two arrows that turn back into each other) | add | the Routines place of section 8 | done |
 | `1 member needs you`, `N members need you` (count of Activity) | keep | | done |
 | `<name>, account` (account key) | keep | | done |
 | `Match the system`, `Light`, `Graphite` | keep | | done |
@@ -607,3 +608,98 @@ Capacity shows where seating happens:
 | Now | Verdict | New text | Who |
 |---|---|---|---|
 | new | add | `More for workers`, the name of the menu key of the section of the workers, for an owner | done |
+
+## 8. The Routines place
+
+The words of `docs/ROUTINES.md` of the kernel hold here. A routine
+rehearses, a person signs it off, and a ticket that the world rejects comes
+back sent back. These words never show: procedure, rung, shadow, decider,
+calibration, receipt, template, hole, memory, compile, and matched. The
+column Now names the string of the approved boards where one changed.
+
+### src/ui/Routines.tsx: the list
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| new | add | `Routines` with the count chip of the routines that are not retired, and `1 routine` or `N routines` for a screen reader | done |
+| new | add | `N live`, a chip with a green light, and `1 routine live` or `N routines live` for a screen reader | done |
+| new | add | `Find a routine`, the field above the list | done |
+| new | add | the heads of the groups, each with its count chip. `Needs you` comes first, with an amber chip. Then come `Live`, `Rehearsing`, `Proposed`, and `Paused`. | done |
+| new | add | `Retired` with its count chip, the toggle of the last group | done |
+| new | add | the statuses of a routine, each a light with its word: `needs you` (amber, breathes), `live` (green), `rehearsing`, `proposed`, and `paused` (grey), and `retired` (grey, struck) | done |
+| new | add | the meta line of a row. A routine that needs you says `triage, rehearsed 1,480 tickets`. A live one says `identity-desk, 96 this week`. A rehearsing one says `triage, 84% agreed over 150 tickets`. A proposed, paused, or retired one says the agent and `since()`, such as `triage, 2 d`. | done |
+| `triage, from 14 tickets` (a proposed row of the board) | change | `triage, 2 d`, the time of the proposal. The card of the routine says `Proposed from 14 tickets`, so the number shows once. | done |
+| `triage, signed off just now` (a row of the board) | change | `triage, 0 this week`, the meta of every live row. The quiet card says when. | done |
+| new | add | `Loading the routines.`, `No routine yet.`, `No routine holds those words.`, `Pick a routine.` | done |
+
+### src/ui/Routines.tsx: a routine
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| new | add | the title of a routine from its name: `acknowledge-a-new-ticket` is `Acknowledge a new ticket`, and a short word such as VPN keeps its capitals | done |
+| new | add | `Steps`, `Evidence`, `Runbook`, the tabs, with the title of the routine as the name of the tab list | done |
+| new | add | `More`, with `Pause`, `Resume`, and `Retire` as the moves allow. A window that hides the details pane adds the name of the agent. | done |
+| new | add | `Retire <title>?`, `A retired routine stays retired.`, and the keys `Cancel` and `Retire` | done |
+| new | add | `Loading the routine.`, `This routine is not here. It was removed, or you cannot see it.` | done |
+| `A routine of triage. Proposed 11 Oct from 212 tickets.` (the line under the header) | remove | the agent is in the details pane, and Made from is on the Evidence tab | done |
+| `Needs your sign-off` | keep | `Needs a sign-off` for a person who does not own the agent, who gets no key | done |
+| `Triage rehearsed this routine on 1,480 tickets over 12 days. It still handed each ticket to the agent, and the two were compared.` | remove | the row says the size of the rehearsal, and the Evidence tab says the rest | done |
+| `97.6%` `agreed with the agent`, `48` `handed to the agent`, `0` `sent back by a requester` | change | `agreed with the agent`, `handed to the agent`, `sent back`, the three figures of the card | done |
+| `Signed off, it handles these tickets on its own. The agent still checks 1 in 20.` | remove | the chrome never explains | done |
+| `Note` | keep | the field of the decision card, with the placeholder `Optional` | done |
+| `Not yet`, `Sign off` | keep | the two keys of the card. Sign off is the primary key. | done |
+| `Kept for later` and `It stays under Needs you, and triage keeps rehearsing.` | change | `Not yet`, a quiet card with who and when, such as `By you, today.`, and the note. The routine goes back to Rehearsing until it is ready again. | done |
+| `Signed off` and `By you, just now. Live from the next ticket, with the agent checking 1 in 20.` | change | `Signed off`, a quiet card with `By you, today.` or `By grace, Oct 2.`, and the note of the sign-off | done |
+| new | add | `Proposed from N tickets`, the card of a proposed routine, with the keys `Retire` and `Rehearse` | done |
+| `Steps` with a count chip | change | `Steps` alone. The numbers of the steps give the count. | done |
+| new | add | the words of a step: the method of its call, such as `Add labels`, or the tool, with the answers that it uses as slots, and the tool as meta | done |
+| `What it decides` with a count chip, and `Question`, `Answers`, `Acts when` | change | `What it decides` alone, with the same columns | done |
+| `Under those, the agent decides, with the answers of the routine in hand.` | change | behind the question mark `When it is not sure`: `When an answer is under its mark, the agent handles the ticket, with the answers of the routine in hand.` | done |
+| `85% sure`, `95% sure it is no` | keep | and `, not other` for an answer that keeps the routine from acting, or `always` for a question without a mark | done |
+| `Afterward` | keep | the check: the read, such as `Get issue`, then `holds` and `and not` with the strings as slots, and a hole as `…` | done |
+| `Made from` on the Steps tab | remove | it lives on the Evidence tab only | done |
+
+### src/ui/RoutineEvidence.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `Rehearsal` with the chips `12 days` and `1,480 tickets` | change | `Rehearsal` alone. The axis gives the days, and the row of the list gives the tickets. | done |
+| `Triage handled every ticket. The routine answered beside it, and the two were compared.` | remove | | done |
+| `agreed with the agent`, `disagreed`, `handed to the agent` with their totals | keep | the legend, and `<day>: N agreed, N disagreed, N handed to the agent` in the tooltip of a bar | done |
+| `Of the 1,432 tickets it would have acted on, it agreed on 97.6%.` | remove | the figure is on the card of the Steps tab | done |
+| new | add | `Rehearsal per day` with `Day` and the three words, the table of the chart for a screen reader | done |
+| `Past tickets` with a count chip, and `212 of 212 past tickets matched` | change | `Past tickets` alone, and `212 of 212 past tickets, handled the same way` | done |
+| `Open the tickets` | keep | it opens the list of the past tickets in place, and says `Hide the tickets` while open. A ticket that the routine handled another way says `handled another way`. | done |
+| `How sure it was` with the question mark `How sureness is measured` | change | the question mark `How it counts` with `Each answer of the routine comes with how sure it was. Each row counts the tickets at that level, and how often the agent chose the same answer.` | done |
+| `It said`, `Tickets`, `It was right`, `90% sure or more`, `85 to 90% sure`, `under 85% sure`, `98.4% of the time`, `handed to the agent` | change | `95% sure or more`, `85% to 95% sure`, and `under 85% sure`, with a percent at each end of a band. The question heads its rows where the routine has more than one. | done |
+| `Where it disagreed` with its count chip, and `Ticket`, `The routine said`, `The agent chose`, `Afterward` | keep | `91% sure` beside what it said, and `none` where the agent chose nothing | done |
+| `requester accepted`, `a person relabeled it identity` | change | the verification of the receipt of the run: `accepted`, `checked`, `sent back`, or `no answer yet` | done |
+| `Open all 35` | change | `Show all`, then `Show fewer`, after the five newest | done |
+| `None of the 1,397 tickets where both agreed came back from a requester.` | change | `Sent back` with its count chip. A count above zero adds `N where it acted` and `N where it agreed with the agent`. | done |
+| `Tickets that triage handled between 14 Sep and 21 Oct, each accepted by its requester.` with `Open the tickets` | change | `Made from` with `212 tickets of triage, Sep 14 to Oct 10` and `Proposed by fw routine propose`. Past tickets holds the key. | done |
+| new | add | `Loading the evidence.` | done |
+
+### src/ui/Routines.tsx: the runbook
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `Signed off by you, 23 Oct`, `Live since today, the agent checks 1 in 20`, `Rehearsed 1,480 tickets, 97.6% agreed` | remove | the page of the wiki holds what the front writes | done |
+| new | add | `Not yet signed off` above the runbook that the page renders before a sign-off, and `Not signed off` for a retired routine | done |
+| new | add | the runbook that the page renders: `What it decides`, `Steps`, `Afterward`, and `Where it comes from`, in the words of the Steps tab | done |
+| `Open in wiki` | keep | | done |
+| `Propose to Confluence`, `In Confluence`, `A runbook disagrees`, `Open the 40 tickets`, `Propose a change` | remove | Confluence is a later change | done |
+| new | add | `Loading the runbook.`, and `Runbook of <title>` for a screen reader | done |
+
+### src/ui/Routines.tsx: the week of the agent
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `Triage` with the chip `agent`, and `Profile` | keep | the name of the face of the agent | done |
+| `Routines: 4 live, 1 rehearsing, 1 proposed` | remove | the list says it | done |
+| `This week` with the chip `1,912 tickets` | change | `This week` with `1,912` in the chip, and `1,912 tickets` for a screen reader | done |
+| `by routines`, `by the agent`, `by a person` | change | `by routines`, `by the agent`, `with a person`, the words of the summary | done |
+| `Per ticket` with `by a routine`, `by the agent`, and `7 min by a person, on average` | change | `Per ticket` with `by a routine` and `by the agent`. The summary has no time of a person. | done |
+| `Sent back` with its chip and `7 of 1,912 tickets came back from a requester this week, all handled by the agent or a person.` | change | `Sent back` with its chip | done |
+| `Signed off by` with the names of people | remove | who signed a routine off lives on the routine | done |
+| `Proposed by agents` and `Open in Confluence` | remove | Confluence is a later change | done |
+| new | add | `Loading the week.` | done |

@@ -186,7 +186,7 @@ describe('the body of a routine', () => {
     });
     const text = runbookOf(r);
     expect(text.indexOf('## What it decides')).toBeLessThan(text.indexOf('## Steps'));
-    expect(text).toContain('- Which team owns the ticket? Network, identity, endpoint, or other. It acts when it is 85% sure, not other.');
+    expect(text).toContain('- Which team owns the ticket? `network`, `identity`, `endpoint`, or `other`. It acts when it is 85% sure, not other.');
     expect(text).toContain('1. Add labels, with the answers team. `gitea.issue_write`');
     expect(text).toContain('- Get issue: holds `team/…`, and not `status/new`. `gitea.issue_read`');
     expect(text).toContain('From 212 tickets of triage');

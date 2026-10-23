@@ -30,7 +30,8 @@
   gap: 2px;
   min-width: 0;
   min-height: var(--h-row);
-  padding: var(--s-2) var(--s-3);
+  /* The text of a row lines up with the heads of the groups. */
+  padding: var(--s-2);
   border: 1px solid transparent;
   border-radius: var(--r);
   color: var(--ink);

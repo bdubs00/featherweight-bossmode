@@ -362,9 +362,9 @@ export function runbookOf(r: RoutineRecord): string {
     out.push('## What it decides', '');
     for (const k of keys) {
       const q = qs[k];
-      const answers = answersOf(q);
+      const answers = answersOf(q).map((a) => '`' + a + '`');
       const list = answers.length > 1 ? answers.slice(0, -1).join(', ') + ', or ' + answers[answers.length - 1] : answers.join('');
-      out.push(`- ${questionWords(k, q)} ${list ? cap(list) + '. ' : ''}It acts when it is ${actsWhen(q)}.`);
+      out.push(`- ${questionWords(k, q)} ${list ? list + '. ' : ''}It acts when it is ${actsWhen(q)}.`);
     }
     out.push('');
   }

@@ -400,9 +400,9 @@ function runbook(r) {
   if (keys.length) {
     out.push('## What it decides', '');
     for (const k of keys) {
-      const a = answersOf(qs[k]);
+      const a = answersOf(qs[k]).map((x) => '`' + x + '`');
       const list = a.length > 1 ? a.slice(0, -1).join(', ') + ', or ' + a[a.length - 1] : a.join('');
-      out.push(`- ${qs[k].instructions || cap(k)} ${list ? cap(list) + '. ' : ''}It acts when it is ${actsWhen(qs[k])}.`);
+      out.push(`- ${qs[k].instructions || cap(k)} ${list ? list + '. ' : ''}It acts when it is ${actsWhen(qs[k])}.`);
     }
     out.push('');
   }

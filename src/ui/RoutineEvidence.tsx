@@ -227,6 +227,8 @@ function Disagreed({ rec }: { rec: RoutineRecord }) {
 function SentBack({ rec }: { rec: RoutineRecord }) {
   const sb = (rec.evidence && rec.evidence.sentBack) || { applied: 0, agreed: 0 };
   const total = (sb.applied || 0) + (sb.agreed || 0);
+  // A routine that never ran beside the agent has nothing that could come back.
+  if (total === 0 && !(rec.evidence && rec.evidence.days.length)) return null;
   return (
     <section class="rt-sec" aria-labelledby="rt-sent">
       <h2 class="t-sub rt-sec-head" id="rt-sent">
