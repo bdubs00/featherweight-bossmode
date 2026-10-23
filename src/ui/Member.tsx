@@ -38,7 +38,7 @@ import { Composer } from './Composer';
 import { useTranscript } from './Conversation';
 import { FilesView, RunView, failureOf, filesCount, useResult } from './RunPane';
 import { SeatAgainKey, seatAgain } from './SeatAgain';
-import { ThreadView, useStickToEnd } from './Thread';
+import { FollowBox, ThreadView } from './Thread';
 import { LiveLines, useLiveAnswer } from './Live';
 import { works } from '../lib/chat';
 import { Profile } from './Profile';
@@ -188,10 +188,12 @@ function Chat({ bridge, m, items, closed, stopped, reason, said }: { bridge: str
   const names = useMemo(() => commands.map((c) => c.name), [commands]);
   const handles = useMemo(() => (roster ? roster.order : undefined), [roster]);
   const agentOf = (h: string) => (roster && roster.byHandle[h] ? roster.byHandle[h].agent : h === 'manager' ? (store.get().config?.manager?.agent ?? 'manager') : h.replace(/-\d+$/, ''));
-  const box = useStickToEnd<HTMLDivElement>(rows.length + live.text.length + (live.tool ? 1 : 0));
+  // The end of the conversation: its newest row, which an earlier page never changes, and the live answer.
+  const last = rows.length ? rows[rows.length - 1] : null;
+  const end = [last ? last.key : '', last && last.kind === 'entry' && last.entry.decision ? last.entry.decision.state : '', live.text.length, live.tool].join(':');
   return (
     <>
-      <div class="scroll thread-scroll" ref={box}>
+      <FollowBox end={end}>
         <div class="thread" role="log" aria-label={'Messages with ' + m.handle}>
           {ch && ch.prev > 0 && (
             <div class="tearlier">
@@ -212,7 +214,7 @@ function Chat({ bridge, m, items, closed, stopped, reason, said }: { bridge: str
           <ThreadView rows={rows} bridge={bridge} agentOf={agentOf} handles={handles} runHref={run ? hrefOf({ place: 'member', bridge, handle: m.handle, tab: 'run' }) : undefined} />
           <LiveLines live={live} />
         </div>
-      </div>
+      </FollowBox>
       {stopped && <SeatBar bridge={bridge} m={m} how={stopped} reason={reason} said={said} />}
       <Composer
         draft={'member:' + bridge + '/' + m.handle}

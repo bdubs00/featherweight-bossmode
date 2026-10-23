@@ -258,7 +258,7 @@ Capacity shows where seating happens:
 | `Loading` | keep | | A |
 | `Loading the channel.` | keep | | A |
 | `This bridge is not here, or you cannot see it.` | change | `This bridge is not here. It was removed, or you cannot see it.` and the key `Bridges` | A |
-| `New messages below` | change | `New messages` | A |
+| `New messages below` | change | `New below`, the key at the foot of the list while something new waits under the fold, the same in the channel and in every conversation. The list follows new entries while the person reads at the end or within a screen of it, so a card that needs the person comes into view | done |
 | `Message the bridge` (placeholder) | keep | was `Message every member, or @ one member` | done |
 | `This bridge is closed. Open it again to send.` | change | `Closed. Reopen it to send.` | A |
 | `Messages of <title>` (log label) | keep | | A |

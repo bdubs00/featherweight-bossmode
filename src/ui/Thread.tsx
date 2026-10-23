@@ -16,6 +16,7 @@ import { lineWords, napWords, whoName } from '../lib/lines';
 import { hrefOf } from '../lib/route';
 import type { Tone } from '../lib/presence';
 import { attempt } from './notice';
+import { smooth } from './keys';
 import { useWhole } from '../state/whole';
 import { CutEnd } from './Whole';
 import { InlineMarkdown, Markdown, When } from './common';
@@ -318,25 +319,81 @@ export function ThreadView({ rows, bridge, agentOf, handles, runHref }: ThreadVi
   );
 }
 
+/** nearEnd reports whether a scroll box shows its end, or lies within one screen of it. */
+export function nearEnd(el: HTMLElement): boolean {
+  return el.scrollHeight - el.scrollTop - el.clientHeight <= Math.max(80, el.clientHeight);
+}
+
 /**
- * useStickToEnd keeps a scroll box at its end when new rows arrive, unless
- * the person scrolled up to read. It opens at the end.
+ * useFollow keeps a conversation at its end while the person reads at the
+ * end or within a screen of it: when a new entry arrives, and when an entry
+ * grows after it arrived, as a card that reads its plan. A card that needs
+ * the person thus comes into view. Where the person scrolled up to read,
+ * the box stays, and below says that something new waits under the fold.
+ * end names the newest content, such as the seq of the last item: it
+ * changes for a new entry and never for an earlier page.
  */
-export function useStickToEnd<T extends HTMLElement>(size: number) {
+export function useFollow<T extends HTMLElement>(end: string) {
   const ref = useRef<T>(null);
-  const atEnd = useRef(true);
+  const near = useRef(true);
+  const [below, setBelow] = useState(false);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     const f = () => {
-      atEnd.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+      near.current = nearEnd(el);
+      if (near.current) setBelow(false);
     };
     el.addEventListener('scroll', f, { passive: true });
     return () => el.removeEventListener('scroll', f);
   }, [ref.current]);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => {
+      if (near.current) el.scrollTop = el.scrollHeight;
+    });
+    ro.observe(el);
+    for (const c of Array.from(el.children)) ro.observe(c);
+    return () => ro.disconnect();
+  }, [ref.current, end]);
   useLayoutEffect(() => {
     const el = ref.current;
-    if (el && atEnd.current) el.scrollTop = el.scrollHeight;
-  }, [size]);
-  return ref;
+    if (!el) return;
+    if (near.current) el.scrollTop = el.scrollHeight;
+    else setBelow(true);
+  }, [end]);
+  const toEnd = () => {
+    const el = ref.current;
+    near.current = true;
+    setBelow(false);
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: smooth() });
+  };
+  return { ref, below, toEnd };
+}
+
+/** NewBelow is the key at the foot of a list that takes the person to what arrived below the fold. */
+export function NewBelow({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" class="fresh" onClick={onClick}>
+      New below
+    </button>
+  );
+}
+
+/**
+ * FollowBox is the scroll box of a conversation that follows its end
+ * (useFollow), with New below at its foot while something new waits under
+ * the fold.
+ */
+export function FollowBox({ end, children }: { end: string; children: ComponentChildren }) {
+  const f = useFollow<HTMLDivElement>(end);
+  return (
+    <div class="follow">
+      <div class="scroll thread-scroll" ref={f.ref}>
+        {children}
+      </div>
+      {f.below && <NewBelow onClick={f.toEnd} />}
+    </div>
+  );
 }

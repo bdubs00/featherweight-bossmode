@@ -24,7 +24,7 @@ import { Avatar } from './common';
 import { Button, Help, Led, Mark, PaneHeader } from './primitives';
 import { Composer } from './Composer';
 import { Conversation, POLL_MS, usePoll, useTranscript } from './Conversation';
-import { Msg, Quiet, useStickToEnd } from './Thread';
+import { FollowBox, Msg, Quiet } from './Thread';
 import { useLiveAnswer } from './Live';
 import { answerSeqs, lastSeq, works } from '../lib/chat';
 
@@ -90,7 +90,8 @@ export function Manager() {
   // A run that completed waits for nothing, also when its last turn gave no answer.
   const waiting = !stopped && (!!sent || (lastUser >= 0 && !answered && !(run && run.state === 'completed'))) && !(run && run.state === 'input-required');
   const live = useLiveAnswer(runId, { working: works(run) || waiting, seq: run ? run.seq : 0, mark: lastSeq(t.items, run), answers });
-  const box = useStickToEnd<HTMLDivElement>(t.items.length + (sent ? 1 : 0) + live.text.length + (live.tool ? 1 : 0));
+  // The end of the conversation: its newest item, the sent text, the live answer, and a card that waits.
+  const end = [t.items.length ? t.items[t.items.length - 1].seq : 0, sent ? 1 : 0, live.text.length, live.tool || '', pendingId].join(':');
 
   if (!manager) return <NoManager />;
   // The Task of the manager sleeps between messages, so the first answer waits for it to wake.
@@ -147,9 +148,9 @@ export function Manager() {
           </Button>
         }
       />
-      <div class="scroll thread-scroll" ref={box}>
+      <FollowBox end={end}>
         {!runId && !sent ? <p class="thread-empty">Ask about the fleet, or ask for a bridge.</p> : <Conversation run={run} result={res} t={t} agentLabel={agent} tail={tail} live={live} />}
-      </div>
+      </FollowBox>
       <Composer draft="manager" label="Message to the manager" placeholder="Ask the manager" commands={commands} onSend={(text) => send(text)} />
     </section>
   );

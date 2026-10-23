@@ -18,6 +18,7 @@ import { useRoving, smooth } from './keys';
 import { attempt } from './notice';
 import { Confirm, Empty, Menu } from './common';
 import { EntryRow, NapRow, markLoaded } from './Message';
+import { NewBelow, nearEnd } from './Thread';
 import { Composer } from './Composer';
 import { foldOf, foldShapes, foldWords, shapeKey, shapeOf, shapesOf, type Item, type Part, type Shape } from './fold';
 import { wavesLine } from './seats';
@@ -207,13 +208,15 @@ function Posts({ id, closed }: { id: string; closed: boolean }) {
   };
   useEffect(show, [open]);
 
-  // Scroll: the list opens at the end and follows new entries when the
-  // person is at the end. An older page keeps the place of the reader.
+  // Scroll: the list opens at the end and follows new entries while the
+  // person reads at the end or within a screen of it, so a card that
+  // needs the person comes into view. An older page keeps the place of
+  // the reader.
   const shape = useRef({ first: 0, last: 0, height: 0, top: 0, atEnd: true });
   const onScroll = () => {
     const el = scroller.current;
     if (!el) return;
-    shape.current.atEnd = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    shape.current.atEnd = nearEnd(el);
     if (shape.current.atEnd) setFresh(false);
   };
   useLayoutEffect(() => {
@@ -236,7 +239,8 @@ function Posts({ id, closed }: { id: string; closed: boolean }) {
     shape.current = { first: 0, last: 0, height: 0, top: 0, atEnd: true };
   }, [id]);
   // A reader at the end stays there when the pane changes height, such as
-  // when the composer grows with a reply chip or a long draft.
+  // when the composer grows with a reply chip or a long draft, and when an
+  // entry grows after it arrived, as a card that reads its whole entry.
   useEffect(() => {
     const el = scroller.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
@@ -244,8 +248,9 @@ function Posts({ id, closed }: { id: string; closed: boolean }) {
       if (shape.current.atEnd) el.scrollTop = el.scrollHeight;
     });
     ro.observe(el);
+    for (const c of Array.from(el.children)) ro.observe(c);
     return () => ro.disconnect();
-  }, [id]);
+  }, [id, seqs]);
 
   const onReply = useCallback((seq: number) => setReply(seq), []);
   const replyEntry = useSelect((s) => (reply && s.channels[id] ? s.channels[id].bySeq[reply] : undefined));
@@ -299,17 +304,14 @@ function Posts({ id, closed }: { id: string; closed: boolean }) {
         )}
       </div>
       {fresh && (
-        <button
-          type="button"
-          class="fresh"
+        <NewBelow
           onClick={() => {
             const el = scroller.current;
             if (el) el.scrollTo({ top: el.scrollHeight, behavior: smooth() });
+            shape.current.atEnd = true;
             setFresh(false);
           }}
-        >
-          New messages
-        </button>
+        />
       )}
       <ChannelComposer id={id} closed={closed} reply={replyEntry || null} onClearReply={() => setReply(null)} />
     </>

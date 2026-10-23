@@ -409,6 +409,11 @@ color, radius, shadow, or type size of its own.
     beside it as a key. The words of the provider sit in a tooltip and in
     the run, and the whole error sits behind Details, in monospace. The
     light and the word of the status carry the red, so the line stays ink.
+13. A list of messages follows its end while the person reads at the end
+    or within a screen of it, also when an entry grows after it arrived, so
+    a card that needs the person comes into view. A person who scrolled up
+    to read keeps the place, and the key `New below` at the foot of the
+    list takes them down.
 
 ## 8. The theme of a deployment
 

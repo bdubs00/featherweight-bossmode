@@ -407,6 +407,18 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* The scroll box of a conversation, with New below at its foot (FollowBox in Thread.tsx). */
+.follow {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.follow > .fresh {
+  bottom: var(--s-3);
+}
+/* New below: the key that takes the person to what arrived under the fold. */
 .fresh {
   position: absolute;
   z-index: 3;

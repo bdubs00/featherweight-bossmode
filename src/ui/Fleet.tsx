@@ -20,7 +20,7 @@ import { attempt } from './notice';
 import { Composer } from './Composer';
 import { Conversation, useTranscript, usePoll } from './Conversation';
 import { useResult } from './RunPane';
-import { useStickToEnd } from './Thread';
+import { FollowBox } from './Thread';
 import { useLiveAnswer } from './Live';
 import { answerSeqs, lastSeq, works } from '../lib/chat';
 import { Profile } from './Profile';
@@ -242,7 +242,8 @@ export function AgentChat({ agent }: { agent: string }) {
   const names = useMemo(() => commands.map((c) => c.name), [commands]);
   const answers = useMemo(() => answerSeqs(t.items), [t.items]);
   const live = useLiveAnswer(runId, { working: works(run), seq: run ? run.seq : 0, mark: lastSeq(t.items, run), answers });
-  const box = useStickToEnd<HTMLDivElement>(t.items.length + live.text.length + (live.tool ? 1 : 0));
+  // The end of the conversation: its newest item, the live answer, and a card that waits.
+  const end = [t.items.length ? t.items[t.items.length - 1].seq : 0, live.text.length, live.tool, run && run.pending ? run.pending.id : ''].join(':');
   const stopped = !!run && ['failed', 'canceled'].includes(run.state);
   const send = async (text: string): Promise<boolean> =>
     attempt(async () => {
@@ -274,9 +275,9 @@ export function AgentChat({ agent }: { agent: string }) {
         back={{ href: '#fleet', label: 'Fleet', to: 'list' }}
         lead={<ProfileLink href={hrefOf({ place: 'fleet', agent, profile: true })} agent={agent} label={name} light={light} />}
       />
-      <div class="scroll thread-scroll" ref={box}>
+      <FollowBox end={end}>
         {runId ? <Conversation run={run} result={res} t={t} agentLabel={agent} live={live} /> : <div class="thread" />}
-      </div>
+      </FollowBox>
       <Composer draft={'agent:' + agent} label={'Message to ' + agent} placeholder={'Message ' + agent} disabled={member ? '' : 'Keep 0'} commands={commands} onSend={send} />
     </section>
   );

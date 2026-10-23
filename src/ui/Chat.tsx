@@ -34,7 +34,7 @@ import { attempt } from './notice';
 import { Composer } from './Composer';
 import { Conversation, usePoll, useTranscript } from './Conversation';
 import { useResult } from './RunPane';
-import { Msg, Quiet, useStickToEnd } from './Thread';
+import { FollowBox, Msg, Quiet } from './Thread';
 import { useLiveAnswer } from './Live';
 import { Avatar, Button, Chip, Find, Help, Led, Mark, PaneHeader } from './primitives';
 
@@ -414,7 +414,8 @@ function ChatRun({ chat, runId }: { chat: QuickChat; runId: string }) {
   const waiting = !stopped && (!!sent || (lastUser >= 0 && !answered && !(run && run.state === 'completed'))) && !(run && run.state === 'input-required');
   const answers = useMemo(() => answerSeqs(t.items), [t.items]);
   const live = useLiveAnswer(runId, { working: works(run) || waiting, seq: run ? run.seq : 0, mark: lastSeq(t.items, run), answers });
-  const box = useStickToEnd<HTMLDivElement>(t.items.length + (sent ? 1 : 0) + live.text.length + (live.tool ? 1 : 0));
+  // The end of the conversation: its newest item, the sent text, the live answer, and a card that waits.
+  const end = [t.items.length ? t.items[t.items.length - 1].seq : 0, sent ? 1 : 0, live.text.length, live.tool, run && run.pending ? run.pending.id : ''].join(':');
   const start = useStart(run, runId);
   const picks = picksOfRun(run, runId, agent, start);
   const commands = useMemo(() => slashCommands(skills, picks.skills || loadable || (skills || []).map((s) => s.name)), [skills, picks.skills, loadable]);
@@ -483,9 +484,9 @@ function ChatRun({ chat, runId }: { chat: QuickChat; runId: string }) {
           </a>
         }
       />
-      <div class="scroll thread-scroll" ref={box}>
+      <FollowBox end={end}>
         <Conversation run={run} result={res} t={t} agentLabel={chat.agent} tail={tail} live={live} />
-      </div>
+      </FollowBox>
       <Composer draft={'chat:' + runId} label={'Message to ' + chat.agent} placeholder="Ask a question" commands={commands} onSend={send} />
     </section>
   );
