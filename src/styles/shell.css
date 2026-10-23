@@ -311,7 +311,17 @@
   }
   .account {
     margin: var(--s-1);
-    width: 56px;
+    width: var(--h-row);
+  }
+  /* A place takes the width of its label, and the rest of the bar is shared. */
+  .place {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .place-label {
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
   }
   .menu-account {
     left: auto;
@@ -323,5 +333,13 @@
   }
   .pane-head-title {
     padding: 0 var(--s-4);
+  }
+}
+
+/* Eight places and the account share a phone. Under 380 pixels the labels
+   take the condensed width of the typeface, so every place stays in sight. */
+@media (max-width: 379px) {
+  .place-label {
+    font-stretch: 75%;
   }
 }

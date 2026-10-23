@@ -59,7 +59,7 @@ export function Icon({ name, class: cls }: { name: IconName; class?: string }) {
 }
 
 export type GlyphName =
-  | 'activity' | 'chat' | 'bridges' | 'fleet' | 'skills' | 'wiki' | 'manager' | 'logo' | 'thumb-up' | 'thumb-down' | 'heart'
+  | 'activity' | 'chat' | 'bridges' | 'fleet' | 'skills' | 'routines' | 'wiki' | 'manager' | 'logo' | 'thumb-up' | 'thumb-down' | 'heart'
   | 'search' | 'close' | 'more' | 'plus' | 'back' | 'reply' | 'question' | 'check' | 'gear' | 'board';
 
 const G: Record<GlyphName, JSX.Element> = {
@@ -69,6 +69,8 @@ const G: Record<GlyphName, JSX.Element> = {
   bridges: <><circle cx="7" cy="6" r="3" /><circle cx="17" cy="6" r="3" /><path d="M2 20v-1a5 5 0 0 1 5-5a5 5 0 0 1 5 5v1" /><path d="M12 20v-1a5 5 0 0 1 5-5a5 5 0 0 1 5 5v1" /></>,
   fleet: <><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></>,
   skills: <><path d="M12 3l9 5-9 5-9-5z" /><path d="M3 12.5l9 5 9-5" /><path d="M3 17l9 5 9-5" /></>,
+  // Two arrows that turn back into each other, for the routines: work that comes round again.
+  routines: <><path d="M17 3l3 3-3 3" /><path d="M4 11V9a3 3 0 0 1 3-3h13" /><path d="M7 21l-3-3 3-3" /><path d="M20 13v2a3 3 0 0 1-3 3H4" /></>,
   wiki: <><path d="M4 4h7a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H4z" /><path d="M20 4h-7a3 3 0 0 0-3 3v13a2 2 0 0 1 2-2h8z" /></>,
   manager: <><circle cx="12" cy="8" r="4" /><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1" /></>,
   logo: <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 16l5-5 4 4 3-3 6 6" /><circle cx="16" cy="8" r="1.5" /></>,

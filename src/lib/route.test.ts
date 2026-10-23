@@ -36,6 +36,11 @@ describe('routes', () => {
     ['#skills/add', { place: 'skills', add: true }],
     ['#skills/skill/ansible-style', { place: 'skills', item: { kind: 'skill', id: 'ansible-style' } }],
     ['#skills/tool/github/create_issue', { place: 'skills', item: { kind: 'tool', id: 'github/create_issue' } }],
+    ['#routines', { place: 'routines' }],
+    ['#routines/triage/acknowledge-a-new-ticket', { place: 'routines', agent: 'triage', name: 'acknowledge-a-new-ticket' }],
+    ['#routines/triage/acknowledge-a-new-ticket/evidence', { place: 'routines', agent: 'triage', name: 'acknowledge-a-new-ticket', tab: 'evidence' }],
+    ['#routines/identity%20desk/reset/runbook', { place: 'routines', agent: 'identity desk', name: 'reset', tab: 'runbook' }],
+    ['#routines/triage/acknowledge-a-new-ticket/agent', { place: 'routines', agent: 'triage', name: 'acknowledge-a-new-ticket', details: true }],
   ];
 
   it('reads and writes each route', () => {
@@ -101,6 +106,20 @@ describe('routes', () => {
     expect(parentOf({ place: 'chat', run: 'r', details: true })).toEqual({ place: 'chat', run: 'r' });
     expect(parentOf({ place: 'chat', run: 'r' })).toEqual({ place: 'chat' });
     expect(parentOf({ place: 'chat', fresh: true })).toEqual({ place: 'chat' });
+  });
+
+  it('gives the Routines place its columns: the list, a routine, and the week of its agent', () => {
+    const r = { place: 'routines' as const, agent: 'triage', name: 'ack' };
+    expect(placeOf({ place: 'routines' })).toBe('routines');
+    expect(columnOf({ place: 'routines' })).toBe('list');
+    expect(columnOf(r)).toBe('main');
+    expect(columnOf({ ...r, tab: 'evidence' })).toBe('main');
+    expect(columnOf({ ...r, details: true })).toBe('details');
+    expect(parentOf({ ...r, details: true })).toEqual(r);
+    expect(parentOf({ ...r, tab: 'runbook' })).toEqual({ place: 'routines' });
+    expect(parentOf({ place: 'routines' })).toEqual({ place: 'home' });
+    expect(parseRoute('#routines/triage')).toEqual({ place: 'routines' });
+    expect(parseRoute('#routines/triage/ack/steps')).toEqual(r);
   });
 
   it('adds the slash that the sign-in needs to the path of the page', () => {

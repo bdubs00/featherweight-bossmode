@@ -35,6 +35,7 @@ import { NewBridge } from './NewBridge';
 import { NewAgent } from './NewAgent';
 import { Appearance } from './Appearance';
 import { SkillActions, SkillList, SkillMain } from './Skills';
+import { RoutineAgent, RoutineList, RoutineMain } from './Routines';
 import { Signin } from './Signin';
 import { Button, Card, Led } from './primitives';
 
@@ -125,6 +126,12 @@ function panesOf(r: Route): Panes {
       return { list: <FleetList />, main: <NewAgent />, details: null };
     case 'skills':
       return { list: <SkillList current={r.item} />, main: <SkillMain item={r.item} add={r.add} />, details: <SkillActions item={r.item} /> };
+    case 'routines':
+      return {
+        list: <RoutineList agent={r.agent} name={r.name} />,
+        main: <RoutineMain agent={r.agent} name={r.name} tab={r.tab || 'steps'} />,
+        details: r.agent && r.name ? <RoutineAgent agent={r.agent} name={r.name} /> : null,
+      };
     case 'pages': {
       let main: ComponentChildren;
       if (r.mode === 'create') main = <PageEditor path={r.path} create />;
@@ -273,7 +280,7 @@ export function App() {
         // Where three panes show, the list and the main pane stay, so Escape
         // goes back only from what the details pane or the main pane opened.
         const wide = window.matchMedia(THREE_PANES).matches;
-        if (wide && shown !== 'details' && (r.place === 'bridge' || r.place === 'home' || r.place === 'manager' || r.place === 'chat' || r.place === 'activity' || r.place === 'member' || (r.place === 'fleet' && !r.board) || (r.place === 'skills' && !r.item))) return;
+        if (wide && shown !== 'details' && (r.place === 'bridge' || r.place === 'home' || r.place === 'manager' || r.place === 'chat' || r.place === 'activity' || r.place === 'member' || r.place === 'routines' || (r.place === 'fleet' && !r.board) || (r.place === 'skills' && !r.item))) return;
         e.preventDefault();
         go(parentOf(r));
       }

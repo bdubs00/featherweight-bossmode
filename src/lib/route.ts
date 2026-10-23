@@ -7,6 +7,7 @@
 
 export type BridgeTab = 'posts' | 'wiki' | 'decisions';
 export type MemberTab = 'chat' | 'run' | 'files';
+export type RoutineTab = 'steps' | 'evidence' | 'runbook';
 
 /** A skill or a tool on the Skills place. The id of a tool can hold a slash, such as github/create_issue. */
 export interface SkillItem {
@@ -26,10 +27,11 @@ export type Route =
   | { place: 'new-agent' }
   | { place: 'appearance' }
   | { place: 'skills'; item?: SkillItem; add?: boolean }
+  | { place: 'routines'; agent?: string; name?: string; tab?: RoutineTab; details?: boolean }
   | { place: 'pages'; path?: string; mode: 'tree' | 'read' | 'history' | 'edit' | 'create'; version?: number };
 
 /** The places of the app bar. */
-export type Place = 'activity' | 'chat' | 'bridges' | 'fleet' | 'skills' | 'wiki' | 'manager' | 'account';
+export type Place = 'activity' | 'chat' | 'bridges' | 'fleet' | 'skills' | 'routines' | 'wiki' | 'manager' | 'account';
 
 /** The column that a narrow window shows for a route. */
 export type Column = 'list' | 'main' | 'details';
@@ -76,6 +78,15 @@ export function parseRoute(hash: string): Route {
       if (rest[0] === 'add' && rest.length === 1) return { place: 'skills', add: true };
       if ((rest[0] === 'skill' || rest[0] === 'tool') && rest.length > 1 && rest.slice(1).join('/')) return { place: 'skills', item: { kind: rest[0], id: rest.slice(1).map(dec).join('/') } };
       return { place: 'skills' };
+    // #routines/<agent>/<name> is a routine, with /evidence or /runbook for
+    // a tab, and /agent for the week of its agent in a narrow window.
+    case 'routines': {
+      if (!rest[0] || !rest[1]) return { place: 'routines' };
+      const base = { place: 'routines' as const, agent: dec(rest[0]), name: dec(rest[1]) };
+      if (rest[2] === 'agent') return { ...base, details: true };
+      if (rest[2] === 'evidence' || rest[2] === 'runbook') return { ...base, tab: rest[2] };
+      return base;
+    }
     case 'bridge': {
       if (!rest[0]) return { place: 'home' };
       const id = dec(rest[0]);
@@ -139,6 +150,12 @@ export function hrefOf(r: Route): string {
     case 'skills':
       if (r.add) return '#skills/add';
       return r.item ? '#skills/' + r.item.kind + '/' + encPath(r.item.id) : '#skills';
+    case 'routines': {
+      if (!r.agent || !r.name) return '#routines';
+      const base = '#routines/' + encodeURIComponent(r.agent) + '/' + encodeURIComponent(r.name);
+      if (r.details) return base + '/agent';
+      return r.tab === 'evidence' || r.tab === 'runbook' ? base + '/' + r.tab : base;
+    }
     case 'bridge': {
       const base = '#bridge/' + encodeURIComponent(r.id);
       if (r.pane === 'roster') return base + '/roster';
@@ -178,6 +195,8 @@ export function placeOf(r: Route): Place {
       return 'wiki';
     case 'skills':
       return 'skills';
+    case 'routines':
+      return 'routines';
     case 'appearance':
       return 'account';
   }
@@ -202,6 +221,9 @@ export function columnOf(r: Route): Column {
       return r.mode === 'tree' ? 'list' : 'main';
     case 'skills':
       return r.item || r.add ? 'main' : 'list';
+    case 'routines':
+      if (r.name) return r.details ? 'details' : 'main';
+      return 'list';
     case 'chat':
       if (r.run) return r.details ? 'details' : 'main';
       return r.fresh ? 'main' : 'list';
@@ -227,6 +249,9 @@ export function parentOf(r: Route): Route {
       return { place: 'fleet' };
     case 'skills':
       return r.item || r.add ? { place: 'skills' } : { place: 'home' };
+    case 'routines':
+      if (r.agent && r.name && r.details) return { place: 'routines', agent: r.agent, name: r.name };
+      return r.name ? { place: 'routines' } : { place: 'home' };
     case 'chat':
       if (r.run && r.details) return { place: 'chat', run: r.run };
       return r.run || r.fresh ? { place: 'chat' } : { place: 'home' };

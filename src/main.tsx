@@ -13,6 +13,7 @@ import './styles/channel.css';
 import './styles/fleet.css';
 import './styles/wiki.css';
 import './styles/chat.css';
+import './styles/routines.css';
 
 applyChoice(readChoice());
 render(<App />, document.getElementById('app')!);

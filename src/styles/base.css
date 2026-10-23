@@ -1,5 +1,5 @@
 /* The base of the page: the reset, the body, the type roles, links, code,
-   focus, the text of Markdown, and the three motions. */
+   focus, the text of Markdown, the scrollbars, and the three motions. */
 
 *,
 *::before,
@@ -223,6 +223,36 @@ h2[tabindex='-1']:focus {
   border: 0;
   border-top: 1px solid var(--line-soft);
   margin: var(--s-4) 0;
+}
+
+/* Scrollbars are part of the instrument: thin, a thumb of the line color
+   with the radius of the page that turns muted under the pointer, and no
+   track, in both themes and on every pane that scrolls. A browser with the
+   WebKit pseudo-elements draws them, so the thumb can change under the
+   pointer. Another browser takes the standard properties, which since
+   Chrome 121 would turn the pseudo-elements off. */
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--line) transparent;
+  }
+}
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+  background: transparent;
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: var(--r);
+}
+::-webkit-scrollbar-thumb:hover,
+::-webkit-scrollbar-thumb:active {
+  background: var(--muted);
 }
 
 /* The three motions of section 4.5 of the design. */

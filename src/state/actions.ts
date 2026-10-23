@@ -7,6 +7,7 @@ import type { Entry, Fleet, FleetChange, MessageEventData, ReactionKind, RunStat
 import { managerRunOf } from './reducer';
 import { store } from './store';
 import { ApiError, type SigninNeeded } from '../api/client';
+import { routineChanged } from './routines';
 
 const loading = new Map<string, Promise<unknown>>();
 
@@ -403,6 +404,7 @@ async function onEvent(raw: StreamEvent): Promise<void> {
   }
   store.dispatch({ type: 'stream', event: e });
   if (e.kind === 'reset') await reload();
+  if (e.kind === 'routine') routineChanged(e.data);
   // A Task that the fleet view does not list, such as a new worker after a
   // change of Keep, brings the fleet view again, so its worker shows.
   if (e.kind === 'task') {

@@ -70,6 +70,7 @@ const PLACES: PlaceItem[] = [
   { id: 'bridges', label: 'Bridges', glyph: 'bridges', href: '#' },
   { id: 'fleet', label: 'Fleet', glyph: 'fleet', href: '#fleet' },
   { id: 'skills', label: 'Skills', glyph: 'skills', href: '#skills' },
+  { id: 'routines', label: 'Routines', glyph: 'routines', href: '#routines' },
   { id: 'wiki', label: 'Wiki', glyph: 'wiki', href: '#pages' },
   { id: 'manager', label: 'Manager', glyph: 'manager', href: '#manager' },
 ];
@@ -172,7 +173,7 @@ function AccountMenu({ onSignOut }: { onSignOut: () => void }) {
   );
 }
 
-/** AppBar is the column of places: the logo well, the seven places, and the account. */
+/** AppBar is the column of places: the logo well, the eight places, and the account. */
 export function AppBar({ route, onSignOut }: { route: Route; onSignOut: () => void }) {
   const place = placeOf(route);
   const config = useSelect((s) => s.config);
