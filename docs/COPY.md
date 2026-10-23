@@ -585,10 +585,14 @@ Capacity shows where seating happens:
 | new | add | a row of the history: the title of the run, the status of the run, and `since()`, such as `25 min`. The status is a light with its word: `working`, `waiting for a worker`, `needs you`, `ready`, `ended`, `failed`, or `stopped`. A run without a title shows the start of its first message, else `Chat`. | done |
 | new | add | `Loading the chats.`, `No chat holds those words.` | done |
 | new | add | `No chat yet.` with the key `New chat` | done |
+| the key `New chat` under `No chat yet.` | remove | the key `New` of the header starts a chat, and the main pane already holds a new chat, so the empty list holds no second key | done |
 | new | add | `New chat`, the title of a chat before its first message | done |
+| the mark of the agent beside `New chat` | remove | the header of a new chat holds its title alone. The mark of a chat links to This chat, which a new chat does not have yet. | done |
+| the picks above the composer | change | a new chat is a question first: the composer, and right above it one quiet line that opens the picks, such as `Can use files, memory, the time, the wiki, and 2 skills`. The line names each tool by a short noun, counts the tools without one as `N more tools`, and counts the skills. It reads `Tools and skills` when the page cannot tell the tools, and `Loading the tools.` while they load. The picks open when the person turns every tool off. | done |
 | new | add | `Tools`, `Skills`, the two headings of the picks. Each has the count chip of the picks that are on, with `N of M` for a screen reader. | done |
-| the picks of `Tools` from the catalog of the front | change | `Tools` holds the tool list of the profile of the agent: each tool of the catalog that an entry names, and an entry that names none, such as `front.pages_*`, as one chip by its name. Every chip of `Tools` starts on. | done |
-| `More tools` | add | the heading of the other tools of the catalog, which start off, with its count chip. `spawn_task`, `await_task`, `propose_agent`, and `ask_user` never start on, so they sit here. | done |
+| the picks of `Tools` from the catalog of the front | change | `Tools` holds the tool list of the profile of the agent: each tool of the catalog that an entry names, and an entry that names none, such as `front.pages_*`. Every row of the profile starts on. | done |
+| a pick by its raw name, such as `front.pages_list` | change | each row of `Tools` in plain words, as the profile says it: the phrase of the catalog, such as `Read and change files in the workspace`, and one row for the tools of the wiki, `Read and write the wiki`, and one for the tools of the bridges. The raw names sit in the tooltip. A row of `Skills` holds the name of the skill and its description below it. | done |
+| `More tools` | remove | the other tools of the catalog follow the tools of the profile in the same list, below a line, and start off. Its count chip said 0 beside eight tools. `spawn_task`, `await_task`, `propose_agent`, and `ask_user` never start on, so they sit there. | done |
 | new | add | `Find a tool`, `Find a skill`, the fields of a row of picks that holds more than twelve | done |
 | new | add | `Loading the tools.`, while the picks wait for the catalogs | done |
 | new | add | `A chat needs at least one tool. Pick one.`, the error of the picks with every tool off. An empty tool list gives a run every tool. | done |
@@ -597,10 +601,11 @@ Capacity shows where seating happens:
 | new | add | `Stopped. Your next message starts a new chat.` | done |
 | new | add | `This chat`, the heading of the details, and `This chat, <status>`, the name of the mark that opens it | done |
 | new | add | `Tools`, `Skills` with the count chip, `1 tool` and `N tools`, `1 skill` and `N skills` for a screen reader | done |
+| the tools and the skills of This chat as chips of raw names | change | `What it can do`, as on the profile of an agent: one plain line per ability, the tools of the wiki as one line, the raw names in the tooltip, and `for this chat` on a tool that the picks gave. The skills follow in one line, such as `2 skills: notes and plan`, or `5 skills: a, b, and 3 more`. | done |
 | `Tools 0` (This chat of a chat whose picks the page cannot tell) | remove | `Tools` names the tools that the chat started with. They come from the resolved profile of the run, the picks of the tab, or the first event of the run. Else they are the list of the profile with the tools for this chat. The section leaves out where the page cannot tell. | done |
 | new | add | `for this chat`, the quiet word on the chip of a tool that the picks gave beyond the list of the agent | done |
 | new | add | `Model`, with the model of the resolved profile. It shows only for a run object that carries it. | done |
-| new | add | `Usage`, with `N turns`, `N tokens`, and `$N`, and `so far` while the run works. `1 turn` and `1 token` for one. | done |
+| new | add | `Usage`, with `N turns`, `N tokens`, and `$N`, and `so far` while the run works. `1 turn` and `1 token` for one. A cost below one cent reads `under $0.01`, never `$0.00`. | done |
 | new | add | `No quick chat is set up.` with the question mark `Where the quick chat is set up` and `The setting workbench.bossmode.chat names the agent of the quick chat.` | done |
 | `Rename`, `Save as agent` | remove | the backend has no route that sets the title of a run, and the new-agent screen takes no run to start from | done |
 

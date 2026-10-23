@@ -14,7 +14,7 @@ export function Abilities({ abilities, rules = [], extra = [], label }: { abilit
       {abilities.map((a) => (
         <li title={a.names.join(', ')}>
           {a.text}
-          {a.names.some((n) => extra.includes(n)) && <span class="chip-note">for this chat</span>}
+          {a.names.some((n) => extra.includes(n)) && <span class="ability-note">for this chat</span>}
         </li>
       ))}
       {rules.map((r) => (

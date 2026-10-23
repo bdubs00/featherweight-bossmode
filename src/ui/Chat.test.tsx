@@ -74,7 +74,9 @@ const send = (box: HTMLTextAreaElement, v: string) => {
   });
 };
 const posts = () => calls.filter((c) => c.method === 'POST');
-const chip = (el: HTMLElement, name: string) => [...el.querySelectorAll('.pick-chip')].find((l) => l.textContent!.trim() === name) as HTMLLabelElement;
+/** pick finds the row of the picks whose plain words are label. */
+const pick = (el: HTMLElement, label: string) => [...el.querySelectorAll('.kit-row')].find((l) => l.querySelector('.kit-label')!.textContent!.trim() === label) as HTMLLabelElement;
+const rowsOf = (el: HTMLElement, id: string) => [...el.querySelectorAll(`section[aria-labelledby="${id}"] .kit-row`)].map((l) => l.querySelector('.kit-label')!.textContent!.trim() + (l.querySelector('input')!.checked ? ' on' : ''));
 
 describe('the Chat place', () => {
   it('says that no quick chat is set up, and names the setting behind the question mark', () => {
@@ -101,23 +103,33 @@ describe('the Chat place', () => {
     expect(el.querySelector('header .chip .sr')!.textContent).toBe('1 chat');
   });
 
+  it('asks the question first, with what the chat can use in one quiet line that opens the picks', async () => {
+    configure(CHAT);
+    const el = mount(<ChatMain />);
+    await vi.waitFor(() => expect(el.querySelector('.chat-kit > summary')).not.toBeNull());
+    // The header holds the title alone, and the picks wait behind the line.
+    expect(el.querySelector('header .mark')).toBeNull();
+    const kit = el.querySelector('details.chat-kit') as HTMLDetailsElement;
+    expect(kit.open).toBe(false);
+    expect(kit.querySelector('summary')!.textContent).toBe('Can use files and 1 skill');
+    expect((el.querySelector('#composer') as HTMLTextAreaElement).placeholder).toBe('Ask a question');
+  });
+
   it('starts a new chat with the picks of the person, and opens it', async () => {
     configure(CHAT);
     const el = mount(<ChatMain />);
-    await vi.waitFor(() => expect(el.querySelectorAll('.pick-chip').length).toBe(5));
-    // The picks start from the lists of the agent.
-    expect(chip(el, 'files').querySelector('input')!.checked).toBe(true);
-    expect(chip(el, 'bash').querySelector('input')!.checked).toBe(false);
-    expect(chip(el, 'notes').querySelector('input')!.checked).toBe(true);
-    expect(chip(el, 'plan').querySelector('input')!.checked).toBe(false);
-    // The tools of the profile sit in Tools, and the other tools of the catalog under More tools.
-    expect([...el.querySelectorAll('.pick-sec h2')].map((h) => h.textContent)).toEqual(['Tools', 'More tools', 'Skills']);
-    expect([...el.querySelectorAll('#chat-tools ~ .pick-chips .pick-chip, section[aria-labelledby="chat-tools"] .pick-chip')].map((l) => l.textContent!.trim())).toEqual(['files']);
-    expect([...el.querySelectorAll('section[aria-labelledby="chat-more-tools"] .pick-chip')].map((l) => l.textContent!.trim())).toEqual(['bash', 'web_fetch']);
-    act(() => chip(el, 'web_fetch').querySelector('input')!.click());
-    act(() => chip(el, 'notes').querySelector('input')!.click());
+    await vi.waitFor(() => expect(el.querySelectorAll('.kit-row').length).toBe(5));
+    // The picks start from the lists of the agent, each tool in the words of the catalog with its name in the tooltip.
+    expect(rowsOf(el, 'chat-tools')).toEqual(['The tool files on', 'The tool bash', 'The tool web_fetch']);
+    expect(pick(el, 'The tool files').getAttribute('title')).toBe('files');
+    expect(rowsOf(el, 'chat-skills')).toEqual(['notes on', 'plan']);
+    expect([...el.querySelectorAll('.pick-sec h2')].map((h) => h.textContent)).toEqual(['Tools', 'Skills']);
+    // Each count is the rows that are on, of the rows of its list.
+    expect([...el.querySelectorAll('.pick-head .chip')].map((c) => c.textContent)).toEqual(['11 of 3', '11 of 2']);
+    act(() => pick(el, 'The tool web_fetch').querySelector('input')!.click());
+    act(() => pick(el, 'notes').querySelector('input')!.click());
+    expect(el.querySelector('.chat-kit > summary')!.textContent).toBe('Can use files and the web');
     const box = el.querySelector('#composer') as HTMLTextAreaElement;
-    expect(box.placeholder).toBe('Ask a question');
     send(box, 'How do I rotate the logs?');
     await vi.waitFor(() => expect(posts().length).toBe(1));
     expect(posts()[0]).toEqual({
@@ -131,7 +143,7 @@ describe('the Chat place', () => {
   it('starts a new chat with the text of a slash command, because the chat has no run yet', async () => {
     configure(CHAT);
     const el = mount(<ChatMain />);
-    await vi.waitFor(() => expect(el.querySelectorAll('.pick-chip').length).toBe(5));
+    await vi.waitFor(() => expect(el.querySelectorAll('.kit-row').length).toBe(5));
     const box = el.querySelector('#composer') as HTMLTextAreaElement;
     send(box, '/notes the freeze');
     await vi.waitFor(() => expect(posts().length).toBe(1));
@@ -144,8 +156,10 @@ describe('the Chat place', () => {
     tools = [];
     configure(CHAT);
     const el = mount(<ChatMain />);
-    await vi.waitFor(() => expect(el.querySelectorAll('.pick-chip').length).toBe(3));
+    await vi.waitFor(() => expect(el.querySelectorAll('.kit-row').length).toBe(3));
     expect([...el.querySelectorAll('.pick-sec h2')].map((h) => h.textContent)).toEqual(['Tools', 'Skills']);
+    // Without the catalog, a built-in tool takes the words of the kernel.
+    expect(rowsOf(el, 'chat-tools')).toEqual(['Read and change files in the workspace on']);
     send(el.querySelector('#composer') as HTMLTextAreaElement, 'Hello?');
     await vi.waitFor(() => expect(posts().length).toBe(1));
     expect((posts()[0].body as { profile: unknown }).profile).toEqual({ tools: ['files'], skills: ['notes'] });
@@ -157,8 +171,9 @@ describe('the Chat place', () => {
     const f = fakeFetch([['GET', /^\/v1\/agents\/chat$/, () => ({ name: 'chat', role: 'operator', skills: ['notes'] })]]);
     try {
       const el = mount(<ChatMain />);
-      await vi.waitFor(() => expect(el.querySelectorAll('.pick-chip').length).toBe(2));
+      await vi.waitFor(() => expect(el.querySelectorAll('.kit-row').length).toBe(2));
       expect([...el.querySelectorAll('.pick-sec h2')].map((h) => h.textContent)).toEqual(['Skills']);
+      expect(el.querySelector('.chat-kit > summary')!.textContent).toBe('Tools and skills');
       send(el.querySelector('#composer') as HTMLTextAreaElement, 'Hello?');
       await vi.waitFor(() => expect(calls.filter((c) => c.method === 'POST').length + f.calls.filter((c) => c.method === 'POST').length).toBe(1));
       expect((f.calls.find((c) => c.method === 'POST')!.body as { profile: unknown }).profile).toEqual({ skills: ['notes'] });
@@ -177,10 +192,11 @@ describe('the Chat place', () => {
     ]);
     try {
       const el = mount(<ChatMain />);
-      await vi.waitFor(() => expect(el.querySelectorAll('.pick-chip').length).toBe(9));
-      const row = (id: string) => [...el.querySelectorAll(`section[aria-labelledby="${id}"] .pick-chip`)].map((l) => l.textContent!.trim() + (l.querySelector('input')!.checked ? ' on' : ''));
-      expect(row('chat-tools')).toEqual(['files on', 'front.pages_* on']);
-      expect(row('chat-more-tools')).toEqual(['bash', 'spawn_task', 'await_task', 'propose_agent', 'ask_user']);
+      await vi.waitFor(() => expect(el.querySelectorAll('.kit-row').length).toBe(9));
+      // The tools of the wiki, which only the worker has, make one row in plain words, and the tools that start off follow a line.
+      expect(rowsOf(el, 'chat-tools')).toEqual(['The tool files on', 'Read and write the wiki on', 'The tool bash', 'The tool spawn_task', 'The tool await_task', 'The tool propose_agent', 'The tool ask_user']);
+      expect(pick(el, 'Read and write the wiki').getAttribute('title')).toBe('front.pages_*');
+      expect(el.querySelectorAll('section[aria-labelledby="chat-tools"] .kit-sep').length).toBe(1);
       send(el.querySelector('#composer') as HTMLTextAreaElement, 'Hello?');
       await vi.waitFor(() => expect(f.calls.some((c) => c.method === 'POST')).toBe(true));
       expect((f.calls.find((c) => c.method === 'POST')!.body as { profile: unknown }).profile).toEqual({ tools: ['files', 'front.pages_*'], skills: ['notes'] });
@@ -192,10 +208,12 @@ describe('the Chat place', () => {
   it('asks for a tool when the person turns every tool off', async () => {
     configure(CHAT);
     const el = mount(<ChatMain />);
-    await vi.waitFor(() => expect(el.querySelectorAll('.pick-chip').length).toBe(5));
-    act(() => chip(el, 'files').querySelector('input')!.click());
+    await vi.waitFor(() => expect(el.querySelectorAll('.kit-row').length).toBe(5));
+    act(() => pick(el, 'The tool files').querySelector('input')!.click());
     send(el.querySelector('#composer') as HTMLTextAreaElement, 'Hello?');
     await vi.waitFor(() => expect(el.querySelector('.pick-sec [role="alert"]')).not.toBeNull());
+    // The picks open, so the person sees the reason beside the tools.
+    expect((el.querySelector('details.chat-kit') as HTMLDetailsElement).open).toBe(true);
     expect(el.querySelector('.pick-sec [role="alert"]')!.textContent).toBe('A chat needs at least one tool. Pick one.');
     expect(posts().length).toBe(0);
   });
@@ -216,14 +234,16 @@ describe('the Chat place', () => {
     expect(posts()[1]).toEqual({ method: 'POST', path: '/v1/bossmode/runs/run-chat-1/skill', body: { name: 'notes', args: 'the freeze' } });
   });
 
-  it('shows the tools and skills in use, an extra tool for this chat, the model, and the usage', () => {
+  it('says what the chat can do in plain words, an extra tool for this chat, its skills in one line, the model, and the usage', async () => {
     configure(CHAT);
     // The run finished after the skill of the test before.
     act(() => store.dispatch({ type: 'run', run: { ...OLD, seq: 10 } }));
     const el = mount(<ChatDetails run="run-chat-1" />);
     expect(el.querySelector('h2')!.textContent).toBe('This chat');
-    const chips = [...el.querySelectorAll('.chat-chips .chip')].map((c) => c.textContent);
-    expect(chips).toEqual(['files', 'web_fetchfor this chat', 'notes']);
+    await vi.waitFor(() => expect(el.querySelector('.abilities li')!.textContent).toBe('The tool files'));
+    expect([...el.querySelectorAll('.abilities li')].map((c) => c.textContent)).toEqual(['The tool files', 'The tool web_fetchfor this chat']);
+    expect([...el.querySelectorAll('.abilities li')].map((c) => c.getAttribute('title'))).toEqual(['files', 'web_fetch']);
+    expect(el.querySelector('.chat-skills')!.textContent).toBe('1 skill: notes');
     expect(el.querySelector('.chat-model')!.textContent).toBe('model-large');
     expect(el.querySelector('.today')!.textContent).toBe('1 turn1,200 tokens$0.02');
     expect([...el.querySelectorAll('button')].map((b) => b.textContent)).not.toContain('Rename');
@@ -238,11 +258,34 @@ describe('the Chat place', () => {
     ]);
     try {
       const el = mount(<ChatDetails run="run-chat-2" />);
-      await vi.waitFor(() => expect(el.querySelectorAll('.chat-chips .chip').length).toBe(4));
-      expect([...el.querySelectorAll('.chat-chips .chip')].map((c) => c.textContent)).toEqual(['files', 'front.pages_*', 'bashfor this chat', 'notes']);
-      expect(el.querySelector('#chat-tools-in-use')!.parentElement!.querySelector('.chip')!.textContent).toContain('3');
+      await vi.waitFor(() => expect(el.querySelectorAll('.abilities li').length).toBe(3));
+      // This read has no catalog, so the built-in tools take the words of the kernel.
+      expect([...el.querySelectorAll('.abilities li')].map((c) => c.textContent)).toEqual(['Read and change files in the workspace', 'Read and write the wiki', 'Run shell commandsfor this chat']);
+      expect(el.querySelector('.chat-skills')!.textContent).toBe('1 skill: notes');
     } finally {
       f.restore();
     }
+  });
+  it('shows one key for a new chat while the history is empty', async () => {
+    configure(CHAT);
+    // Bob has no chat yet: the chats of alice in the store are not his.
+    act(() => store.dispatch({ type: 'me', me: { principal: { subject: 'bob@example.com', name: 'Bob' }, roles: {}, admin: false, canCreate: true } }));
+    const f = fakeFetch([['GET', /^\/v1\/fleet\/runs\?/, () => ({ runs: [], total: 0 })]]);
+    try {
+      const el = mount(<ChatList />);
+      await vi.waitFor(() => expect(el.textContent).toContain('No chat yet.'));
+      const keys = [...el.querySelectorAll('a, button')].map((k) => k.textContent!.trim()).filter((t) => /new/i.test(t));
+      expect(keys).toEqual(['New']);
+    } finally {
+      f.restore();
+    }
+  });
+
+  it('says under $0.01 for a chat that cost less than one cent, never $0.00', () => {
+    configure(CHAT);
+    act(() => store.dispatch({ type: 'run', run: { ...OLD, seq: 11, usage: { inputTokens: 25000, outputTokens: 2076, turns: 4, costUSD: 0.0031 } } }));
+    const el = mount(<ChatDetails run="run-chat-1" />);
+    expect(el.querySelector('.today')!.textContent).toBe('4 turns27,076 tokensunder $0.01');
+    expect(el.textContent).not.toContain('$0.00');
   });
 });

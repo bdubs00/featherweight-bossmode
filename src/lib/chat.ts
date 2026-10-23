@@ -6,6 +6,7 @@
 
 import type { InlineProfile, Item, NewRun, Run, RunUsage, Tool } from '../api/types';
 import { dayWords, excerpt } from './words';
+import { costParts } from './cost';
 
 /** The metadata that marks a run that the quick chat started. */
 export const CHAT_VIEW = { key: 'fw.view', value: 'quickchat' } as const;
@@ -184,14 +185,24 @@ export function tokensOf(u: RunUsage | undefined): number {
   return (u.inputTokens || 0) + (u.outputTokens || 0) + (u.cacheReadTokens || 0) + (u.cacheWriteTokens || 0);
 }
 
-/** usageParts are the figures of the usage of a run and their words: turns, tokens, and cost, with so far while it works. */
-export function usageParts(u: RunUsage | undefined, working: boolean): { n: string; word: string }[] {
+/** One figure of the usage: a quiet lead word, such as under, the figure, and its word. */
+export interface UsagePart {
+  lead?: string;
+  n: string;
+  word: string;
+}
+
+/** usageParts are the figures of the usage of a run and their words: turns, tokens, and cost, with so far while it works. A cost below one cent reads under $0.01. */
+export function usageParts(u: RunUsage | undefined, working: boolean): UsagePart[] {
   if (!u) return [];
-  const out: { n: string; word: string }[] = [];
+  const out: UsagePart[] = [];
   if (u.turns !== undefined) out.push({ n: u.turns.toLocaleString('en-US'), word: u.turns === 1 ? 'turn' : 'turns' });
   const tokens = tokensOf(u);
   if (tokens > 0) out.push({ n: tokens.toLocaleString('en-US'), word: tokens === 1 ? 'token' : 'tokens' });
-  if (u.costUSD !== undefined) out.push({ n: '$' + u.costUSD.toFixed(2), word: working ? 'so far' : '' });
+  if (u.costUSD !== undefined) {
+    const c = costParts(u.costUSD);
+    out.push({ ...(c.lead ? { lead: c.lead } : {}), n: c.n, word: working ? 'so far' : '' });
+  }
   else if (working && out.length) out[out.length - 1] = { ...out[out.length - 1], word: out[out.length - 1].word + ' so far' };
   return out;
 }

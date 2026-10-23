@@ -526,22 +526,6 @@ a.people-title:hover {
   line-height: var(--t-body-lh);
   color: var(--muted);
 }
-.prof-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.prof-chips .chip {
-  height: 26px;
-  line-height: 24px;
-}
-.prof-tool {
-  font-weight: 600;
-  color: var(--ink);
-}
 /* What the agent can do: one plain line per ability, and the rules that ask first in the amber word. */
 .abilities {
   display: flex;
@@ -554,7 +538,7 @@ a.people-title:hover {
   line-height: var(--t-control-lh);
   overflow-wrap: anywhere;
 }
-.abilities .chip-note {
+.ability-note {
   margin-left: var(--s-2);
   font-size: var(--t-meta);
   font-weight: 600;

@@ -681,12 +681,17 @@ The last screen adds the Chat place and the live answer. The files are
   light with its word, and the time as a short meta, under a quiet heading
   per day. The main pane holds the conversation of the run, with the
   thread and the composer of a member on no bridge, the slash menu
-  included. A new chat shows the picks above the composer: `Tools` and
-  `Skills`, each a row of chips with check boxes and a count chip, and a
-  field to find one past twelve. The details pane holds `This chat`. It
-  shows the tools and the skills in use as chips, and an extra tool with
-  `for this chat`. It also shows the model, and the usage, with `so far`
-  while the run works. Without
+  included. A new chat is a question first: its header holds the title
+  alone, and the pane holds the composer with one quiet line right above
+  it that says what the chat can use, such as `Can use files, memory, the
+  time, the wiki, and 2 skills`. The line opens the picks: `Tools` and
+  `Skills`, each a list of check boxes in plain words with a count chip of
+  the rows that are on, and a field to find one past twelve. The tools of
+  the profile come first, and the other tools follow below a line. The
+  details pane holds `This chat`. It says what the chat can do as the
+  profile of an agent does, with `for this chat` on an extra tool, and its
+  skills in one line. It also shows the model, and the usage, with `so
+  far` while the run works. A cost below one cent reads `under $0.01`. Without
   `chat` in the settings, the place says `No quick chat is set up.` beside
   a question mark that names the setting.
 - The live answer. Only a one-on-one view opens the live stream of a
