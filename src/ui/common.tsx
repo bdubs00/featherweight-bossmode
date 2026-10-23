@@ -152,6 +152,13 @@ export function Confirm(props: {
     const cancel = d && (d.querySelector('[data-cancel]') as HTMLElement | null);
     if (cancel) cancel.focus();
     return () => {
+      // A modal dialog makes the rest of the page inert until it closes,
+      // and the dialog leaves the document only after this cleanup. So the
+      // dialog closes first, else the focus falls to the body.
+      if (d && d.open) {
+        if (typeof d.close === 'function') d.close();
+        else d.removeAttribute('open');
+      }
       const el = back.current as HTMLElement | null;
       if (el && typeof el.focus === 'function' && document.contains(el)) el.focus();
     };
