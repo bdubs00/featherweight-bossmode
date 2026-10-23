@@ -126,6 +126,31 @@ describe('NewAgent', () => {
     expect(el.textContent).toContain('2 workers start when you create the agent.');
   });
 
+  it('previews what the agent can do: the tools of its workers and the rules that ask first', async () => {
+    config();
+    api = fakeApi({
+      'PUT /v1/agents/linter?dryRun=true': {
+        name: 'linter',
+        exists: false,
+        pool: { name: 'linter', template: 'worker', wanted: 2, tasks: [] },
+        workerTools: ['bash', 'files'],
+        workerPolicy: { ask: ['bash: git push*'] },
+      },
+    });
+    const el = mount(<NewAgent />);
+    typeIn(fieldOf(el, 'Name'), 'linter');
+    click(keyNamed(el, 'Preview'));
+    await settle();
+    const can = el.querySelector('[aria-labelledby="can-out"]');
+    expect(can).not.toBeNull();
+    expect(can!.querySelector('h2')!.textContent).toBe('What it can do');
+    expect(can!.querySelectorAll('.abilities li').length).toBeGreaterThan(1);
+    expect(can!.querySelector('.ability-rule')!.textContent).toContain('git push');
+    // One template: its name is noise.
+    expect(el.querySelector('#workers-out')!.textContent).not.toContain('worker ');
+    expect(el.querySelector('#workers-out .t-meta')).toBeNull();
+  });
+
   it('refuses a name that an agent holds, and a bad number of workers', () => {
     const f = { ...emptyForm([]), name: 'migrator', workers: '0' };
     const e = formErrors(f, ['migrator']);
