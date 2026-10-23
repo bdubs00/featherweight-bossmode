@@ -247,14 +247,16 @@ export function MemberMain({ bridge, handle, tab }: { bridge: string; handle: st
   // A worker that the page knows awake can take a read. Run and Files read when the person opens them, and say so when the read wakes the worker.
   const awake = useSelect((s) => (runId ? awakeFor(selectFacts(s), s.runs[runId]) : null));
   const opened = tab === 'run' || tab === 'files';
-  const wakes = opened && awake === false;
-  const res = useResult(runId, opened || awake === true);
+  // No worker holds a run that the front calls gone, so the page reads nothing of it.
+  const gone = !!(m && m.gone);
+  const wakes = opened && awake === false && !gone;
+  const res = useResult(runId, !gone && (opened || awake === true));
   // Files reads the transcript too, for the pages of the wiki that the run wrote.
-  const t = useTranscript(runId, opened || awake === true);
+  const t = useTranscript(runId, !gone && (opened || awake === true));
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
-    if (runId) ensureRuns([runId]);
-  }, [runId]);
+    if (runId && !gone) ensureRuns([runId]);
+  }, [runId, gone]);
   useEffect(() => {
     if (heading.current && document.activeElement === document.body) heading.current.focus();
   }, [bridge, handle]);
@@ -309,10 +311,10 @@ export function MemberMain({ bridge, handle, tab }: { bridge: string; handle: st
       {tab === 'chat' && <Chat bridge={bridge} m={m} items={t.items} closed={!!b && b.state === 'closed'} stopped={stopped} reason={fail.line} said={fail.said} />}
       {tab === 'run' && (
         <div class="scroll">
-          {runId ? <RunView runId={runId} result={res} bridge={bridge} member={m} who={handle} items={t.items} endSeq={end ? end.seq : undefined} gone={t.gone} wakes={wakes} /> : <p class="run-note">{handle + ' has no seat on this bridge, or no run yet.'}</p>}
+          {runId ? <RunView runId={runId} result={res} bridge={bridge} member={m} who={handle} items={t.items} endSeq={end ? end.seq : undefined} gone={t.gone || gone} wakes={wakes} /> : <p class="run-note">{handle + ' has no seat on this bridge, or no run yet.'}</p>}
         </div>
       )}
-      {tab === 'files' && <div class="scroll">{runId && <FilesView runId={runId} result={res} items={t.items} wakes={wakes} gone={t.gone} />}</div>}
+      {tab === 'files' && <div class="scroll">{runId && <FilesView runId={runId} result={res} items={t.items} wakes={wakes} gone={t.gone || gone} />}</div>}
     </section>
   );
 }

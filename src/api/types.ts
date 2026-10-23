@@ -134,6 +134,12 @@ export interface Member {
    * questions in the channel.
    */
   question?: number;
+  /**
+   * True when no worker of the fleet holds the newest run of the seat, as
+   * the channel said, so a read of the run answers 404. A front before
+   * this key leaves it out.
+   */
+  gone?: boolean;
 }
 
 export interface Delegation {
