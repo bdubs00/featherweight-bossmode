@@ -309,6 +309,13 @@ The plan gives the entry. The page reads four more fields:
 - `page` is the wiki path that a system line is about, when the text of
   the line holds no link to it. The page links it.
 - `skill` is the slash command of a message, `{"name", "args"}`, or absent.
+- **New.** `files` names the files of a message of a person:
+  `[{"name": "team.csv", "size": 25, "mediaType": "text/plain"}]`, or
+  absent. The front sniffs the media type from the bytes. The channel holds
+  no bytes, and no route of the page reads them: the workspace of each run
+  that got the message holds them under `attachments/`. The page shows each
+  file by its name and its size under the text, and an entry with files and
+  no text names its files for a screen reader.
 - **New.** `ask` marks a message of a seat that asks the person:
   `{"choices": ["Yes", "No"]}`, two to four answers to pick from, or `{}`
   for an answer in words, and absent elsewhere. The entry waits while the
@@ -386,16 +393,46 @@ The plan gives the entry. The page reads four more fields:
 ### 6.3 A message of the caller
 
 `POST /v1/bridges/{id}/messages` takes `{"text", "to", "replyTo", "pinned",
-"skill"}`. `to`, `replyTo`, `pinned`, and `skill` are optional, and without
-`to` the message goes to every active member. `skill` is a slash command,
-`{"name", "args"}`, and with it `text` is optional: it is the text of the
-person that follows the skill. A one-on-one conversation with a seat sends
-its slash commands this way, to that seat alone. The answer is 201 with the
-entry. An unknown skill answers 404, a skill that is not for people 400,
-and a message over 64 KB 413. The page sends no `files` yet. A handle in
-`to` that is not on the roster, or that is fired, answers 400. The handle
-`operator` in `to` answers 400 too: an agent can address the operator, and a
-person cannot. A closed bridge answers 409.
+"skill", "files"}`. `to`, `replyTo`, `pinned`, `skill`, and `files` are
+optional, and without `to` the message goes to every active member. `skill`
+is a slash command, `{"name", "args"}`, and with it `text` is optional: it
+is the text of the person that follows the skill. A one-on-one conversation
+with a seat sends its slash commands this way, to that seat alone. The
+answer is 201 with the entry. An unknown skill answers 404, a skill that is
+not for people 400, and a message over 64 KB 413. A handle in `to` that is
+not on the roster, or that is fired, answers 400. The handle `operator` in
+`to` answers 400 too: an agent can address the operator, and a person
+cannot. A closed bridge answers 409.
+
+**New.** `files` attaches files to the message, in the shape of `POST
+/v1/runs` of the kernel: `[{"name": "team.csv", "data": "bmFtZSxyb2xl"}]`,
+where `data` is base64 without the prefix of a data URL. With files, `text`
+is optional. The front takes at most 20 files, each with bytes, at most 32
+MiB of bytes together, and names of at most 255 bytes without a slash, a
+backslash, or a control character. More files, an empty file, and a bad
+name answer 400, more bytes 413, and a body over 32 MiB in base64 and 1 MB
+more 413. A pinned message and a slash command take no files and answer
+400. Each delivery gives the files to the run of the member, whose kernel
+keeps them under `attachments/` and applies the rules of its workspace,
+such as 8 MiB per file by default. A file that the workspace refuses
+reaches no member, and the channel says so with a line `failed`.
+
+The channel keeps no bytes for a later run, so a message with files goes
+out only when each member that it reaches has a run that takes it now.
+When a member has no run yet, its run failed, or a cap of the bridge holds
+the message back, the post answers 409 and changes nothing: no entry, no
+cap, no delivery. The detail says what to do, such as `files go only to a
+member with a run, and reviewer has none yet: send them once it works, or
+address another member`. The front also answers 409 while it still sends
+the files of earlier messages, 64 MiB on one replica. The page keeps the
+text and the files of a refused post, shows the sentence of the detail,
+and words a 413 itself, because a proxy that refuses a large body sends no
+sentence: `The files are too large to send. Remove some, and send again.`
+
+The composer of a bridge and of the manager takes files from the key Attach
+files, a drop, and a paste, and checks the count and the size before it
+takes them. The files of a draft stay in the memory of the tab, so a move
+to another screen keeps them and a reload drops them.
 
 When the person replies to a message of an agent and names no handle, the
 page sets `to` to that agent, as section 4.2 of the plan says.
@@ -549,7 +586,15 @@ The first message starts a run with
 `{"agent": "<manager.agent>", "input": "..."}`, as `/ui` starts a run on a
 member. A later message is `POST /v1/runs/{id}/messages` with
 `{"content": "..."}`. A run that failed or was canceled ends the
-conversation, and the next message starts a new run. While the run is
+conversation, and the next message starts a new run. **New.** A message
+with files carries `files` in either body, in the shape of section 6.3, and
+`input` or `content` can then be empty. The front passes the files on as the
+person sent them, and the kernel of the manager run keeps them under
+`attachments/`, with the limits of section 6.3 and of its workspace. The
+kernel answers a file that it refuses with 400 at once. The transcript
+names the files of a user item in `files`, `[{"path", "name", "mediaType",
+"size", "sha256"}]`, and the page shows their names and sizes. A slash
+command takes no files, so the page sends none with it and says so. While the run is
 `queued` or `suspended` and the first answer is missing, the status says
 `waking`, with "Waking the manager" in its tooltip.
 
@@ -1011,7 +1056,6 @@ never from that read.
 
 ## 14. What the page does not call yet
 
-- `files` on a message of the channel.
 - The budget of a run. The plan offers a button to raise the budget of a
   member that failed at a limit. The page shows the limit and has no button.
 - `DELETE /v1/pages/{path}`.
