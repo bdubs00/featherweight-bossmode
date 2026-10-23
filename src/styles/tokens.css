@@ -91,6 +91,8 @@
   --w-appbar: 76px;
   --w-list: 300px;
   --w-details: 340px;
+  /* The reading measure of a message: about 72 characters of body text. */
+  --measure: 34em;
   --r: 4px;
   --r-led: 2px;
 

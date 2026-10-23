@@ -124,11 +124,17 @@ a.people-title:hover {
   display: flex;
   flex-direction: column;
 }
+/* The column of a conversation keeps the reading measure: the text, the
+   cards, and the quiet lines. Its width adds the face, its gap, and the
+   padding of the pane to the measure, and the composer takes the same
+   width, so the eye never travels across a wide pane. */
 .thread {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
   flex: 1 0 auto;
+  width: 100%;
+  max-width: calc(var(--measure) + 92px);
   padding: var(--s-2) 0;
 }
 .tmsg {
@@ -298,6 +304,7 @@ a.people-title:hover {
   display: flex;
   align-items: center;
   gap: var(--s-3);
+  max-width: calc(var(--measure) + 44px);
   margin: 0 var(--s-5) var(--s-2);
   padding: var(--s-2) var(--s-2) var(--s-2) var(--s-3);
   border: 1px solid var(--line);
