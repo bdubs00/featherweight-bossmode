@@ -13,7 +13,7 @@ import { ApiError } from '../api/client';
 import { api } from '../api/routes';
 import type { Item, Result, Run } from '../api/types';
 import { store, useSelect } from '../state/store';
-import { stepsOf, type Step } from '../state/thread';
+import { placedSteps, type Step } from '../state/thread';
 import { decisionOf } from '../lib/decision';
 import { whoName } from '../lib/lines';
 import { showError } from './notice';
@@ -180,25 +180,32 @@ export function usePoll(runId: string, also = false): void {
 
 type Block = { kind: 'item'; it: Item } | { kind: 'steps'; steps: Step[] };
 
-/** blocksOf folds the tool calls between two messages into one block of steps. */
+/**
+ * blocksOf folds the step lines between two messages into one block of
+ * steps. A step goes where placedSteps puts it: a call that asked for a
+ * decision shows after the decision, at its result, and not at all while
+ * it waits.
+ */
 export function blocksOf(items: Item[]): Block[] {
+  const placed = placedSteps(items);
   const out: Block[] = [];
-  let calls: Item[] = [];
+  let steps: Step[] = [];
   const flush = () => {
-    if (calls.length) out.push({ kind: 'steps', steps: stepsOf(calls) });
-    calls = [];
+    if (steps.length) out.push({ kind: 'steps', steps });
+    steps = [];
   };
   for (const it of items) {
     if (it.kind === 'tools') continue;
     if (it.kind === 'tool' || it.kind === 'result' || it.kind === 'file') {
-      calls.push(it);
+      const s = placed.get(it.seq);
+      if (s) steps.push(s);
       continue;
     }
     flush();
     out.push({ kind: 'item', it });
   }
   flush();
-  return out.filter((b) => b.kind === 'item' || b.steps.length > 0);
+  return out;
 }
 
 /** within5 reports whether two items of one sender are close enough to share a header. */

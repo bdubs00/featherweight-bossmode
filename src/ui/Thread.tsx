@@ -65,8 +65,19 @@ export function Quiet({ tone, at, err, title, children }: { tone?: Tone; at?: st
   );
 }
 
-/** StepText words a step: the verb, and the command as code. */
+/** BridgeRef links a bridge by its id, with the title that the page knows, else the title that the call gave. */
+export function BridgeRef({ id, title }: { id: string; title?: string }) {
+  const known = useSelect((s) => (s.bridges.byId[id] ? s.bridges.byId[id].title : ''));
+  return <a href={hrefOf({ place: 'bridge', id, pane: 'none' })}>{known || title || id}</a>;
+}
+
+/**
+ * StepText words a step: the verb, then the command or the path as code,
+ * or the bridge as a link with its title. A failed step that its words do
+ * not already say adds Error.
+ */
 export function StepText({ step }: { step: Step }) {
+  const path = step.path ? <code>{step.path}</code> : null;
   return (
     <>
       {step.text}
@@ -76,7 +87,20 @@ export function StepText({ step }: { step: Step }) {
           <code>{step.cmd}</code>
         </>
       )}
-      {step.isError && <span class="tline-err"> Error</span>}
+      {step.bridge ? (
+        <>
+          {' '}
+          <BridgeRef id={step.bridge} title={step.target} />
+        </>
+      ) : path ? (
+        <>
+          {' '}
+          {step.href ? <a href={step.href}>{path}</a> : path}
+        </>
+      ) : step.target ? (
+        ' ' + step.target
+      ) : null}
+      {step.isError && !step.worded && <span class="tline-err"> Error</span>}
     </>
   );
 }

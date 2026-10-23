@@ -147,7 +147,20 @@ describe('the thread', () => {
     ];
     const blocks = blocksOf(items);
     expect(blocks.map((b) => b.kind)).toEqual(['item', 'steps', 'item']);
-    expect(blocks[1].kind === 'steps' && blocks[1].steps.map((x) => x.cmd || x.text)).toEqual(['ls', 'Used fleet']);
+    expect(blocks[1].kind === 'steps' && blocks[1].steps.map((x) => x.cmd || x.text)).toEqual(['ls', 'Reading the fleet']);
+  });
+
+  it('puts the step of a call that asked for a decision after the decision, and none while it waits', () => {
+    const call: Item[] = [
+      ASK,
+      { seq: 2, time: T, kind: 'tool', tool: 'front.bridge_open', callId: 'c1', input: { title: 'Notes' } },
+      { seq: 3, time: T, kind: 'ask', id: 'ap', tool: 'front.bridge_open', callId: 'c1' },
+    ];
+    expect(blocksOf(call).map((b) => (b.kind === 'item' ? b.it.kind : 'steps'))).toEqual(['user', 'ask']);
+    const after: Item[] = [...call, { seq: 4, time: T, kind: 'decided', id: 'ap', text: 'allow' }, { seq: 5, time: T, kind: 'result', callId: 'c1', text: 'Opened the bridge br-n "Notes".' }, { seq: 6, time: T, kind: 'assistant', text: 'Open.' }];
+    const blocks = blocksOf(after);
+    expect(blocks.map((b) => (b.kind === 'item' ? b.it.kind : 'steps'))).toEqual(['user', 'ask', 'decided', 'steps', 'assistant']);
+    expect(blocks[3].kind === 'steps' && blocks[3].steps[0]).toMatchObject({ text: 'Opened the bridge', bridge: 'br-n', target: 'Notes' });
   });
 
   it('reads a slash command of a known skill, also the skill of a server', () => {
