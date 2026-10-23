@@ -49,13 +49,17 @@ export async function encodeFiles(files: readonly File[]): Promise<Attachment[]>
 /**
  * refusalOf words a failed send of a message with files. A body that a
  * proxy or the front finds too large gets the words of the page, because a
- * proxy sends no sentence. Any other failure keeps the sentence of the
- * backend, which says what to do, such as for a member without a run.
+ * proxy sends no sentence. A refusal of the front that names a file, such
+ * as a file over the limit of a member, keeps its sentence, and so does any
+ * other failure, which says what to do, such as for a member without a run.
  */
 export function refusalOf(e: unknown, files: number): unknown {
-  if (files > 0 && e instanceof ApiError && e.status === 413) return new Error('The files are too large to send. Remove some, and send again.');
+  if (files > 0 && e instanceof ApiError && e.status === 413 && !/^the file /i.test(e.message)) return new Error('The files are too large to send. Remove some, and send again.');
   return e;
 }
+
+/** NO_FILES_WITH_COMMAND says that a slash command goes without the files of the composer. */
+export const NO_FILES_WITH_COMMAND = 'A command takes no files. Send the files in a message of their own.';
 
 /** describeFiles names the files of a send with their sizes, as an entry names them. */
 export function describeFiles(files: readonly Attachment[]): AttachedFile[] {

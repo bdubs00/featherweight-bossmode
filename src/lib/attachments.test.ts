@@ -30,3 +30,12 @@ describe('the files of a message', () => {
     expect(conflict.message).toBe('Files go only to a member with a run, and reviewer has none yet: send them once it works, or address another member.');
   });
 });
+
+describe('refusalOf of a file that the front names', () => {
+  it('keeps the sentence of the front for a file over the limit of a member, and words a bare 413 itself', () => {
+    const named = new ApiError(413, { title: 'Request Entity Too Large', status: 413, detail: 'the file "big.bin" holds 9 MiB, and reviewer takes files of at most 8 MiB (tools.files.maxFileBytes of its workers): send a smaller file' });
+    expect((refusalOf(named, 1) as Error).message).toMatch(/^The file "big.bin" holds 9 MiB, and reviewer takes files of at most 8 MiB/);
+    const bare = new ApiError(413, { title: 'Request Entity Too Large', status: 413, detail: 'the body is larger than 44739242 bytes' });
+    expect((refusalOf(bare, 1) as Error).message).toBe('The files are too large to send. Remove some, and send again.');
+  });
+});

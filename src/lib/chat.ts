@@ -4,7 +4,7 @@
 // starts a chat, and the words of its usage. The tests read them without a
 // page.
 
-import type { InlineProfile, Item, NewRun, Run, RunUsage, Tool } from '../api/types';
+import type { Attachment, InlineProfile, Item, NewRun, Run, RunUsage, Tool } from '../api/types';
 import { dayWords, excerpt } from './words';
 import { costParts } from './cost';
 
@@ -166,14 +166,16 @@ export function toggle(list: string[], name: string, on: boolean): string[] {
  * whose lists replace the lists of the agent for this run, and the mark of
  * the page. A list that the page did not offer stays out, so the list of
  * the agent holds, because an empty tool list gives the run every tool.
+ * The files of the first message go with it.
  */
-export function startBody(agent: string, input: string, picks: InlineProfile): NewRun {
+export function startBody(agent: string, input: string, picks: InlineProfile, files?: Attachment[]): NewRun {
   const profile: InlineProfile = {};
   if (picks.tools) profile.tools = [...picks.tools];
   if (picks.skills) profile.skills = [...picks.skills];
   const body: NewRun = { agent, input };
   if (profile.tools || profile.skills) body.profile = profile;
   body.metadata = { [CHAT_VIEW.key]: CHAT_VIEW.value };
+  if (files && files.length) body.files = files;
   return body;
 }
 

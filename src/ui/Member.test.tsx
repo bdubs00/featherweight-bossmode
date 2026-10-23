@@ -232,6 +232,22 @@ describe('the member conversation', () => {
     expect(calls.find((c) => c.method === 'POST')).toEqual({ method: 'POST', path: '/v1/bridges/b1/messages', body: { text: 'Go ahead with logrotate.', to: ['migrator-1'] } });
   });
 
+  it('sends files to the seat alone through the bridge', async () => {
+    const el = mount(<MemberMain bridge="b1" handle="migrator-1" tab="chat" />);
+    const box = el.querySelector('#composer') as HTMLTextAreaElement;
+    const input = el.querySelector('.composer input[type=file]') as HTMLInputElement;
+    Object.defineProperty(input, 'files', { value: [new File(['hello'], 'note.txt')], configurable: true });
+    act(() => {
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    type(box, 'Read this.');
+    act(() => {
+      box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true }));
+    });
+    await vi.waitFor(() => expect(calls.some((c) => c.method === 'POST')).toBe(true));
+    expect(calls.find((c) => c.method === 'POST')).toEqual({ method: 'POST', path: '/v1/bridges/b1/messages', body: { text: 'Read this.', to: ['migrator-1'], files: [{ name: 'note.txt', data: 'aGVsbG8=' }] } });
+  });
+
   it('opens the menu of the seat with Profile, Mute, Change task, and Fire, and Seat again for a seat that stopped', () => {
     const el = mount(<MemberMain bridge="b1" handle="migrator-1" tab="chat" />);
     act(() => (el.querySelector('button[aria-label="More for migrator-1"]') as HTMLButtonElement).click());
