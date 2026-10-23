@@ -743,8 +743,22 @@
   background: none;
   padding: 0;
 }
-.member .act.err {
-  color: var(--word-red);
+/* The plain line of a failure reads in ink, apart from the muted task: the light and the word of the status already say error. */
+.member .act.fail {
+  color: var(--ink);
+}
+/* The keys of a row sit under its text, past the mark, as the keys of a new seat do. */
+.member.has-keys {
+  flex-wrap: wrap;
+}
+.member.has-keys .open {
+  padding-bottom: var(--s-2);
+}
+.member-keys {
+  flex-basis: 100%;
+  display: flex;
+  gap: var(--s-2);
+  padding: 0 0 var(--s-3) calc(var(--s-4) + 36px + var(--s-3));
 }
 .member .pop {
   margin-top: var(--s-3);

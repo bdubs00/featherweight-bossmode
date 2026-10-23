@@ -195,11 +195,11 @@ A fire of a fired member answers 200 with the member and changes nothing.
 
 A seat whose newest run was canceled, failed, or stopped at a limit gets no
 delivery from the channel. A `PATCH` with `task` seats it again: a new run
-starts with the task. The page offers Seat again in the menu of such a
-member, beside Change its task. Seat again opens the task of the member,
-which the person can change, and sends it as `task`. The page needs the
-workbench to seat the member again also when the text of the task is the
-same. The page knows that a newest run stopped from the presence `error`, or
+starts with the task. The page offers Seat again on the row of such a
+member and in its menu, beside Change task. Seat again sends the task of
+the member unchanged as `task`, in one click. Change task opens the task,
+which the person can change first. The page needs the workbench to seat
+the member again also when the text of the task is the same. The page knows that a newest run stopped from the presence `error`, or
 from the state `failed` or `canceled` of the run on the stream.
 
 ## 6. The channel

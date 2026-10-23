@@ -183,6 +183,25 @@ Capacity shows where seating happens:
 | `Today`, `Yesterday` | keep | | Lead |
 | `someone`, `bossmode` (sender of a system line) | keep | | Lead |
 
+### src/lib/runerror.ts
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| the whole error of a run, such as `model: anthropic: stream claude-haiku-5-5: POST "http://...": 400 Bad Request (Request-ID: ...) {"type":"error",...}`, cut to one red line in a row and in full in the run | change | one plain line from `plainError`, without an end mark: `The model refused the request` (a 4xx), `The model provider refused the key` (401), `The model provider refused access` (403), `The model provider does not know this model` (404), `The conversation is too long for the model`, `The model was busy` (429, or overloaded), `The model provider had an error` (5xx), and `The model did not answer in time`. An error of another service says `A service` in place of the model and its provider, and `A step did not finish in time` | done |
+| `budget exceeded: maxTurns` and the other limits of the budget | change | `Stopped at its turn limit`, `Stopped at its token limit`, `Stopped at its cost limit`, `Stopped at its time limit`, `Stopped at its tool call limit`, `Stopped: it kept repeating one step`, and `Stopped at its budget` for another limit. The older words keep the number: `The run reached its limit of 40 turns.` gives `Stopped at 40 turns`, and so does a limit of the result, such as `Stopped at the limit of 40 turns.` | done |
+| `canceled`, `context canceled` | change | `Stopped before it finished`, where the status does not say stopped already | done |
+| `<handle> lost its run <id>: no worker of the fleet holds it` | change | `Lost its worker` | done |
+| any other error | change | its first sentence, without addresses, request ids, JSON, the package names in front, or an end mark, at most 100 characters. `The run failed` when nothing is left | done |
+| the message of the provider inside its JSON, such as `This model does not support assistant message prefill. The conversation must end with a user message.` | add | `providerMessage` gives it: the tooltip of the plain line, and a muted line under it in the run | done |
+
+### src/lib/steps.ts
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `front.pages_write` (a step of the run that the kernel names by its tool), `Used pages_write` (a step line of a thread) | change | the step as a person says it, with its target: `Wrote <path>`, `Read <path>`, `Read the history of <path>`, `Searched the wiki for "<words>"`, `Listed the pages`, `Listed the pages under <prefix>`, `Posted to the bridge`, `Posted to <a> and <b>`, `Read the channel`, `Listed the bridges`, `Opened a bridge`, `Seated <handle>`, `Fired <handle>`, `Closed the bridge`, and `Asked you`. Without a target: `Wrote a page`, `Read a page`, `Seated a member`, and the like | done |
+| `Ran "<command>"`, `Wrote <path>`, and the other words of the kernel for a step | keep | the command shows as code | done |
+| `Used <tool>` | keep | only for a tool that the page does not know and that the kernel names only by its name | done |
+
 ### src/lib/handles.ts, src/lib/pagepath.ts
 
 | Now | Verdict | New text | Who |
@@ -313,7 +332,7 @@ Capacity shows where seating happens:
 | `Reply to <who>: <excerpt>` | change | the chip `Replying to <who>` with `Stop replying` | done |
 | `Cancel the reply` | change | `Stop replying` | done |
 | `To every active member`, `To @a and @b` | change | `To everyone`, `To a and b` | A |
-| `Ctrl+Enter`, `⌘+Enter` | keep | | A |
+| `Ctrl+Enter`, `⌘+Enter` | keep | `⌘+Enter` on a Mac, from the platform hint of the browser. A touch screen (a coarse pointer) has no such key, so the composer names none there | done |
 | `Send` | keep | | done |
 | `Members` (list label) | keep | and `Commands` for the slash menu | done |
 | the argument hint of a command, such as `<module>` | add | in a slot of its own: beside the name in the slash menu, and as `/<name> <hint>` in the address line while the person types the arguments | done |
@@ -326,13 +345,15 @@ Capacity shows where seating happens:
 | `Roster` | change | `Members` | done |
 | `N members` under the heading | change | the count chip on the heading line | done |
 | `Add` | keep | it opens the picker | done |
-| `<handle>, <word>. <task>. <phrase>. Open its run.` (label) | change | `<handle>, <word>. <task>. Open its conversation.` | A |
+| `<handle>, <word>. <task>. <phrase>. Open its run.` (label) | change | `<handle>, <word>. <task>. Open its conversation.`, and `<handle>, <word>. <task>. <plain line>. Open its conversation.` for a failure | done |
 | `muted` (tag) | keep | | A |
 | `More for <handle>` | keep | | A |
 | `Open its run` | change | `Open conversation` | A |
 | `Mute`, `Unmute` | keep | | A |
 | `It gets the messages of the channel again.`, `It gets no broadcast, only a message to it.` | remove | | A |
-| `Seat again` | keep | | A |
+| `Seat again` | keep | a small secondary key on the row of a seat whose newest run failed or stopped, under its text, and the item of More. One click sends the task unchanged, with no dialog. Change task changes the task first | done |
+| new | add | `Seat <handle> again`, the screen-reader name of the key of a row | done |
+| the reason of an error in red, such as the raw error cut to one line | change | the plain line of `plainError` in ink, with the message of the provider in its tooltip. The light and the word `error` carry the red | done |
 | `Its newest run stopped, so it gets no message. A new run starts with its task.` | remove | the status `error` says it | A |
 | `Change its task` | change | `Change task` | A |
 | `Fire` | keep | | A |
@@ -343,8 +364,8 @@ Capacity shows where seating happens:
 | `Add and start` | change | `Seat` | A |
 | `The member starts a run on the queue of the pool of its agent, as you.` | remove | | A |
 | new seat row | add | `<handle>` with `new seat`, the task field, `Seat`, and `Cancel` | A |
-| `Seat <handle> again`, `A new task for <handle>` | change | `Seat <handle> again`, `Change the task of <handle>` | A |
-| `Seat again`, `Save the task` | change | `Seat again`, `Change task` | A |
+| `Seat <handle> again`, `A new task for <handle>` | change | `Change the task of <handle>`. Seat again has no dialog | done |
+| `Seat again`, `Save the task` | change | `Change task` | done |
 | `A new run of <handle> starts with this task, and the channel reaches it again. You can change the task first.` | remove | | A |
 | `This bridge has no member.` | change | `No one has a seat yet.` with the key `Add` | A |
 | `Loading the roster.` | change | `Loading the members.` | A |
@@ -431,6 +452,10 @@ Capacity shows where seating happens:
 | ` · started <time>` | change | the clock time alone, without the middle dot | B |
 | `Files`, `What it did`, `N steps` | change | the tabs `Chat`, `Run`, `Files` of the member | B |
 | `Error`, `Done`, `No result` | keep | | B |
+| the whole error of a failed run, in large red text above the result | change | the plain line of `plainError` under the status, the message of the provider as a muted line, `Seat again` for the newest run of a seat, and the whole error behind the quiet key `Details`, in monospace. A stopped run says it in its status and has no line | done |
+| `front.pages_write`, `front.bridge_post`, `front.bridge_read` (the steps of What it did) | change | the words of `stepWords`, such as `Wrote k3s/monitoring/manifests/prometheusrule.md`, `Posted to the bridge`, and `Read the channel`, with the target from the transcript | done |
+| the tab Files of a run that changed no file: an empty pane with a stray rule | change | `No files changed in this run.` | done |
+| new | add | `Wiki pages` with its count chip (`1 page`, `N pages` for a screen reader), the pages that the run wrote, each a link to the page in the Wiki. The count of the tab Files counts them too | done |
 | `Close the file` | keep | | B |
 | `Loading the file.`, `The file does not exist now.` | keep | | B |
 | `This file is not text, or it is too large to show here.` | change | `This file is not text, or it is too large to show.` | B |
@@ -464,6 +489,7 @@ Capacity shows where seating happens:
 | `Profile of <agent>, <status>` (the mark at the head of a conversation) | add | the name of the link to the profile, which a window narrower than three panes keeps out of sight | done |
 | `Profile` (the first item of the More menu of a seat) | add | a narrow window hides the mark, so the menu reaches the profile there | done |
 | `stopped` (a seat whose newest run was canceled) | add | the status beside `error`, with a grey light, and the key `Seat again` | done |
+| the reason of the bar over the composer of a stopped seat: a limit of the result, or the whole error, cut | change | the plain line of a failure, in ink, with the message of the provider in its tooltip, and the key `Seat again`, which acts at once. A stopped seat shows only its status and the key | done |
 
 ## 6. Screen C
 

@@ -5,6 +5,7 @@
 
 import type { Entry, Item } from '../api/types';
 import { commandOf } from '../lib/words';
+import { stepWords } from '../lib/steps';
 import { decidedRuns, hiddenLine, napOf, napRuns } from '../lib/lines';
 
 /** One quiet line for one tool call of a run, such as Ran "ls" or Created a/b.yml. */
@@ -54,14 +55,14 @@ export function directEntries(entries: Entry[], handle: string, runs: string[]):
   return kept.filter((e) => !hiddenLine(e, decided));
 }
 
-/** stepOf words one tool call as a quiet line, without a tool name where it can. */
+/** stepOf words one tool call as a quiet line, without a tool name where it can, such as Wrote notes/plan.md for a page of the wiki. */
 export function stepOf(it: Item, file?: Item): Step {
   const base = { key: 'step-' + it.seq, at: it.time };
   const f = file || (it.kind === 'file' ? it : undefined);
   if (f) return { ...base, text: (f.text === 'created' ? 'Created ' : f.text === 'deleted' ? 'Removed ' : 'Edited ') + (f.path || 'a file') };
   const cmd = commandOf(it.input);
   if (cmd) return { ...base, text: 'Ran', cmd: cmd.length > 80 ? cmd.slice(0, 79) + '…' : cmd };
-  return { ...base, text: 'Used ' + (it.tool || 'a tool').replace(/^front\./, '') };
+  return { ...base, text: stepWords(it.tool, it.input) };
 }
 
 /** stepsOf turns the tool calls of a transcript into step lines, with the error of a failed call. */

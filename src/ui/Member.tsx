@@ -9,6 +9,10 @@
 // run streams in from its live route while the run works, and the finished
 // answer of the channel takes its place.
 //
+// A seat whose newest run failed or stopped shows a bar over the composer:
+// the status, the plain line of the failure, and the key Seat again, which
+// starts the seat anew with its task in one click.
+//
 // A read of a run goes to its worker and wakes a worker that sleeps. Chat
 // shows what the page has from the channel and the stream, and reads the
 // steps and the files of the run only while its worker is awake. Run and
@@ -27,13 +31,13 @@ import { ensureChannels, ensureRuns } from '../state/fetchers';
 import { newestRun, slashCommands } from '../state/people';
 import { selectFacts } from '../state/reducer';
 import { awakeFor, seatPresence, statusOf } from '../lib/status';
-import { errorReason } from '../lib/words';
 import { directEntries, foldNaps, stepsOf, threadOf, withLive } from '../state/thread';
 import { attempt } from './notice';
 import { Confirm, Menu, type MenuItem } from './common';
 import { Composer } from './Composer';
 import { useTranscript } from './Conversation';
-import { FilesView, RunView, useResult } from './RunPane';
+import { FilesView, RunView, failureOf, filesCount, useResult } from './RunPane';
+import { SeatAgainKey, seatAgain } from './SeatAgain';
 import { ThreadView, useStickToEnd } from './Thread';
 import { LiveLines, useLiveAnswer } from './Live';
 import { works } from '../lib/chat';
@@ -68,7 +72,12 @@ function useStopped(m: MemberT | undefined): '' | 'failed' | 'stopped' | 'not-st
   return '';
 }
 
-/** TaskDialog seats a member again, or changes its task. Seat again sends the task also when its text stays the same. */
+/**
+ * TaskDialog changes the task of a seat, and a new run starts with it. With
+ * again, its title and its key say Seat again. The page seats again in one
+ * click with SeatAgainKey, and the dialog stays for a screen that asks
+ * first.
+ */
 export function TaskDialog({ bridge, m, again, onClose }: { bridge: string; m: MemberT; again: boolean; onClose: () => void }) {
   const [task, setTask] = useState(m.task);
   const [busy, setBusy] = useState(false);
@@ -94,22 +103,23 @@ export function TaskDialog({ bridge, m, again, onClose }: { bridge: string; m: M
 
 /**
  * SeatMenu is the More key of the header: Profile, which a narrow window
- * reaches only here, Mute, Seat again, Change task, and Fire.
+ * reaches only here, Mute, Seat again, Change task, and Fire. Seat again
+ * acts at once, as its key does.
  */
 function SeatMenu({ bridge, m, stopped }: { bridge: string; m: MemberT; stopped: boolean }) {
-  const [dialog, setDialog] = useState<'' | 'again' | 'task' | 'fire'>('');
+  const [dialog, setDialog] = useState<'' | 'task' | 'fire'>('');
   if (m.fired) return null;
   const items: MenuItem[] = [
     { label: 'Profile', onSelect: () => go({ place: 'member', bridge, handle: m.handle, tab: 'chat', profile: true }) },
     { label: m.muted ? 'Unmute' : 'Mute', onSelect: () => attempt(() => patchMember(bridge, m.handle, { muted: !m.muted })) },
-    ...(stopped ? [{ label: 'Seat again', onSelect: () => setDialog('again') }] : []),
+    ...(stopped ? [{ label: 'Seat again', onSelect: () => seatAgain(bridge, m) }] : []),
     { label: 'Change task', onSelect: () => setDialog('task') },
     { label: 'Fire', danger: true, onSelect: () => setDialog('fire') },
   ];
   return (
     <>
       <Menu label={'More for ' + m.handle} kind="secondary" items={items} />
-      {(dialog === 'again' || dialog === 'task') && <TaskDialog bridge={bridge} m={m} again={dialog === 'again'} onClose={() => setDialog('')} />}
+      {dialog === 'task' && <TaskDialog bridge={bridge} m={m} again={false} onClose={() => setDialog('')} />}
       {dialog === 'fire' && (
         <Confirm
           title={'Fire ' + m.handle + '?'}
@@ -128,23 +138,26 @@ function SeatMenu({ bridge, m, stopped }: { bridge: string; m: MemberT; stopped:
   );
 }
 
-/** SeatBar sits over the composer of a seat whose newest run stopped, or that never started: the status, the reason, and Seat again. */
-function SeatBar({ bridge, m, how, reason }: { bridge: string; m: MemberT; how: 'failed' | 'stopped' | 'not-started'; reason: string }) {
-  const [again, setAgain] = useState(false);
+/**
+ * SeatBar sits over the composer of a seat whose newest run stopped, or
+ * that never started: the status, the plain line of the failure with the
+ * message of the provider in its tooltip, and Seat again.
+ */
+function SeatBar({ bridge, m, how, reason, said }: { bridge: string; m: MemberT; how: 'failed' | 'stopped' | 'not-started'; reason: string; said: string }) {
   return (
     <div class="seat-bar">
       {how === 'failed' ? <Led tone="red" word="error" /> : <Led tone="grey" word={how === 'not-started' ? 'not started' : 'stopped'} />}
-      {reason && <span class="seat-bar-why clip">{reason}</span>}
-      <Button size="s" onClick={() => setAgain(true)}>
-        Seat again
-      </Button>
-      {again && <TaskDialog bridge={bridge} m={m} again onClose={() => setAgain(false)} />}
+      {/* A stopped seat says it in its status, so only a failure has a line. */}
+      <span class="seat-bar-why" title={how === 'failed' ? said || reason || undefined : undefined}>
+        {how === 'failed' ? reason : ''}
+      </span>
+      <SeatAgainKey bridge={bridge} m={m} />
     </div>
   );
 }
 
 /** Chat is the direct thread of a seat and its composer. */
-function Chat({ bridge, m, items, closed, stopped, reason }: { bridge: string; m: MemberT; items: ReturnType<typeof useTranscript>['items']; closed: boolean; stopped: '' | 'failed' | 'stopped' | 'not-started'; reason: string }) {
+function Chat({ bridge, m, items, closed, stopped, reason, said }: { bridge: string; m: MemberT; items: ReturnType<typeof useTranscript>['items']; closed: boolean; stopped: '' | 'failed' | 'stopped' | 'not-started'; reason: string; said: string }) {
   const ch = useSelect((s) => s.channels[bridge]);
   const roster = useSelect((s) => s.rosters[bridge]);
   const skills = useSelect((s) => (s.skills ? s.skills.skills : null));
@@ -201,7 +214,7 @@ function Chat({ bridge, m, items, closed, stopped, reason }: { bridge: string; m
           <LiveLines live={live} />
         </div>
       </div>
-      {stopped && <SeatBar bridge={bridge} m={m} how={stopped} reason={reason} />}
+      {stopped && <SeatBar bridge={bridge} m={m} how={stopped} reason={reason} said={said} />}
       <Composer
         draft={'member:' + bridge + '/' + m.handle}
         label={'Message to ' + m.handle}
@@ -231,7 +244,8 @@ export function MemberMain({ bridge, handle, tab }: { bridge: string; handle: st
   const opened = tab === 'run' || tab === 'files';
   const wakes = opened && awake === false;
   const res = useResult(runId, opened || awake === true);
-  const t = useTranscript(runId, tab === 'run' || awake === true);
+  // Files reads the transcript too, for the pages of the wiki that the run wrote.
+  const t = useTranscript(runId, opened || awake === true);
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     if (runId) ensureRuns([runId]);
@@ -251,10 +265,10 @@ export function MemberMain({ bridge, handle, tab }: { bridge: string; handle: st
     );
   }
 
-  const files = (res && res.files) || [];
+  const files = filesCount(res, t.items);
   const base = { place: 'member' as const, bridge, handle };
   const end = [...t.items].reverse().find((x) => x.kind === 'end');
-  const reason = res ? (res.limits && res.limits[0]) || res.error || '' : errorReason(runObj);
+  const fail = failureOf(runObj, res);
   return (
     <section class="screen member-main" aria-labelledby="member-title">
       <PaneHeader
@@ -274,7 +288,7 @@ export function MemberMain({ bridge, handle, tab }: { bridge: string; handle: st
               items={[
                 { id: 'chat', label: 'Chat', href: hrefOf({ ...base, tab: 'chat' }) },
                 { id: 'run', label: 'Run', href: hrefOf({ ...base, tab: 'run' }) },
-                { id: 'files', label: 'Files', href: hrefOf({ ...base, tab: 'files' }), count: files.length, countLabel: files.length === 1 ? '1 file' : files.length + ' files' },
+                { id: 'files', label: 'Files', href: hrefOf({ ...base, tab: 'files' }), count: files, countLabel: files === 1 ? '1 file' : files + ' files' },
               ]}
             />
             <SeatMenu bridge={bridge} m={m} stopped={!!stopped} />
@@ -287,13 +301,13 @@ export function MemberMain({ bridge, handle, tab }: { bridge: string; handle: st
           </span>
         )}
       </PaneHeader>
-      {tab === 'chat' && <Chat bridge={bridge} m={m} items={t.items} closed={!!b && b.state === 'closed'} stopped={stopped} reason={reason} />}
+      {tab === 'chat' && <Chat bridge={bridge} m={m} items={t.items} closed={!!b && b.state === 'closed'} stopped={stopped} reason={fail.line} said={fail.said} />}
       {tab === 'run' && (
         <div class="scroll">
-          {runId ? <RunView runId={runId} result={res} member={m} who={handle} endSeq={end ? end.seq : undefined} gone={t.gone} wakes={wakes} /> : <p class="run-note">{handle + ' has no seat on this bridge, or no run yet.'}</p>}
+          {runId ? <RunView runId={runId} result={res} bridge={bridge} member={m} who={handle} items={t.items} endSeq={end ? end.seq : undefined} gone={t.gone} wakes={wakes} /> : <p class="run-note">{handle + ' has no seat on this bridge, or no run yet.'}</p>}
         </div>
       )}
-      {tab === 'files' && <div class="scroll">{runId && <FilesView runId={runId} result={res} wakes={wakes} />}</div>}
+      {tab === 'files' && <div class="scroll">{runId && <FilesView runId={runId} result={res} items={t.items} wakes={wakes} />}</div>}
     </section>
   );
 }

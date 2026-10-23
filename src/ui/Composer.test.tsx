@@ -33,9 +33,23 @@ describe('the address line', () => {
     expect(el.querySelector('.address')!.textContent).toBe('To reviewer and migrator-1');
   });
 
-  it('names the key that sends', () => {
+  it('names the key that sends, and names none on a touch screen', () => {
     expect(keyWords('MacIntel')).toBe('⌘+Enter');
+    expect(keyWords('macOS')).toBe('⌘+Enter');
     expect(keyWords('Linux x86_64')).toBe('Ctrl+Enter');
+    expect(keyWords('Windows')).toBe('Ctrl+Enter');
+    const el = mount(<Composer draft="c3" label="Message the bridge" placeholder="Message the bridge" onSend={async () => true} />);
+    expect(el.querySelector('.tools .keys')!.textContent).toMatch(/\+Enter$/);
+    // A touch screen has no such key.
+    const was = window.matchMedia;
+    window.matchMedia = ((q: string) => ({ matches: q === '(pointer: coarse)', media: q, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
+    try {
+      const touch = mount(<Composer draft="c4" label="Message the bridge" placeholder="Message the bridge" onSend={async () => true} />);
+      expect(touch.querySelector('.tools .keys')).toBeNull();
+      expect(touch.querySelector('.tools .send')).not.toBeNull();
+    } finally {
+      window.matchMedia = was;
+    }
   });
 
   it('shows no address line where no member takes the message', () => {

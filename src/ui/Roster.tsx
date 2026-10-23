@@ -1,17 +1,19 @@
 // The members of the open bridge. Each row holds the mark, the handle, the
-// status, the task, the phrase of the activity, and the reason of an
-// error. A row that needs you takes the wash of need. A click opens the
-// conversation of the member. The menu More holds Open conversation, Mute,
-// Seat again, Change task, and Fire. Add opens the picker, and each pick
-// puts a new seat row at the top. The foot sums the usage of the bridge.
-// A member dragged out of the pane asks to fire it.
+// status, the task, the phrase of the activity, and the plain line of an
+// error, with the message of the provider in its tooltip. A row that needs
+// you takes the wash of need. A row whose newest run failed or stopped
+// holds the key Seat again, so the way back is one click. A click on the
+// row opens the conversation of the member. The menu More holds Open
+// conversation, Mute, Seat again, Change task, and Fire. Add opens the
+// picker, and each pick puts a new seat row at the top. The foot sums the
+// usage of the bridge. A member dragged out of the pane asks to fire it.
 
 import { memo } from 'preact/compat';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { Member, UsageSum } from '../api/types';
 import { useSelect } from '../state/store';
 import { addMember, fire, loadPages, loadRunOnce, patchMember } from '../state/actions';
-import { errorReason } from '../lib/words';
+import { plainError, providerMessage } from '../lib/runerror';
 import { seatPresence, statusOf } from '../lib/status';
 import { selectFacts } from '../state/reducer';
 import { hrefOf, go } from '../lib/route';
@@ -21,11 +23,12 @@ import { Confirm, Empty, Menu } from './common';
 import { Picker } from './Picker';
 import { draftOf, seatReason, type Draft } from './seats';
 import { pagesOfBridge } from './Channel';
+import { SeatAgainKey, seatAgain } from './SeatAgain';
 import { Button, Chip, Field, Input, Led, Mark, PaneHeader, TextArea } from './primitives';
 
 const DRAG_TYPE = 'application/x-fw-member';
 
-type Ask = { kind: 'fire'; m: Member } | { kind: 'task'; m: Member } | { kind: 'seat'; m: Member } | null;
+type Ask = { kind: 'fire'; m: Member } | { kind: 'task'; m: Member } | null;
 
 /** Phrase shows the phrase of an activity. A quoted command, such as Ran "x", shows the command as code. */
 export function Phrase({ text }: { text: string }) {
@@ -45,7 +48,9 @@ const MemberRow = memo(function MemberRow({ bridge, handle, onAsk, current }: { 
   // The status of the seat comes from the state of its worker on the page, as on every screen.
   const presence = useSelect((s) => (m ? seatPresence(selectFacts(s), m) : ''));
   const light = useSelect((s) => (m ? statusOf(selectFacts(s), { seat: m }) : null));
-  const reason = useSelect((s) => (run && s.runs[run] && presence === 'error' ? errorReason(s.runs[run]) : ''));
+  const error = useSelect((s) => (run && s.runs[run] && presence === 'error' ? s.runs[run].error || '' : ''));
+  const reason = plainError(error);
+  const said = providerMessage(error);
   const quiet = m ? !m.activity : false;
   // A seat that works with no activity can wait in the queue, and a seat in
   // error has a reason: the row reads its run once to learn which.
@@ -60,7 +65,7 @@ const MemberRow = memo(function MemberRow({ bridge, handle, onAsk, current }: { 
   const phrase = m.activity && m.activity.phrase && (presence === 'working' || presence === 'needs-you') && light.word !== 'waiting for a worker' ? m.activity.phrase : '';
   return (
     <li
-      class={'member' + (m.fired ? ' fired' : '') + (current ? ' sel' : '') + (presence === 'needs-you' ? ' needs' : '')}
+      class={'member' + (m.fired ? ' fired' : '') + (current ? ' sel' : '') + (presence === 'needs-you' ? ' needs' : '') + (stopped && !m.fired ? ' has-keys' : '')}
       draggable={!m.fired}
       onDragStart={(e) => {
         if (!e.dataTransfer) return;
@@ -71,7 +76,7 @@ const MemberRow = memo(function MemberRow({ bridge, handle, onAsk, current }: { 
       }}
       onDragEnd={() => document.body.classList.remove('dragging-member')}
     >
-      <a class="open" href={href} data-item aria-label={`${m.handle}, ${light.word}. ${m.task}. Open its conversation.`}>
+      <a class="open" href={href} data-item aria-label={`${m.handle}, ${light.word}. ${m.task}. ${reason ? reason + '. ' : ''}Open its conversation.`}>
         <Mark agent={m.agent} size={36} />
         <span class="main">
           <span class="t">
@@ -85,7 +90,11 @@ const MemberRow = memo(function MemberRow({ bridge, handle, onAsk, current }: { 
               <Phrase text={phrase} />
             </span>
           )}
-          {reason && <span class="act err">{reason}</span>}
+          {reason && (
+            <span class="act fail" title={said || undefined}>
+              {reason}
+            </span>
+          )}
         </span>
       </a>
       {!m.fired && (
@@ -94,11 +103,16 @@ const MemberRow = memo(function MemberRow({ bridge, handle, onAsk, current }: { 
           items={[
             { label: 'Open conversation', onSelect: () => go(href) },
             { label: m.muted ? 'Unmute' : 'Mute', onSelect: () => attempt(() => patchMember(bridge, m.handle, { muted: !m.muted })) },
-            ...(stopped ? [{ label: 'Seat again', onSelect: () => onAsk({ kind: 'seat', m }) }] : []),
+            ...(stopped ? [{ label: 'Seat again', onSelect: () => seatAgain(bridge, m) }] : []),
             { label: 'Change task', onSelect: () => onAsk({ kind: 'task', m }) },
             { label: 'Fire', danger: true, onSelect: () => onAsk({ kind: 'fire', m }) },
           ]}
         />
+      )}
+      {stopped && !m.fired && (
+        <div class="member-keys">
+          <SeatAgainKey bridge={bridge} m={m} label={'Seat ' + m.handle + ' again'} />
+        </div>
       )}
     </li>
   );
@@ -158,19 +172,18 @@ function SeatRow({ bridge, d, taken, onChange, onDone }: { bridge: string; d: Dr
   );
 }
 
-/** NewTask asks for the task of Seat again and of Change task. */
-function NewTask({ bridge, m, seat, onClose }: { bridge: string; m: Member; seat?: boolean; onClose: () => void }) {
+/** NewTask asks for the new task of Change task. A new run starts with it. */
+function NewTask({ bridge, m, onClose }: { bridge: string; m: Member; onClose: () => void }) {
   const [task, setTask] = useState(m.task);
   const [busy, setBusy] = useState(false);
   return (
     <Confirm
-      title={seat ? 'Seat ' + m.handle + ' again' : 'Change the task of ' + m.handle}
-      confirm={seat ? 'Seat again' : 'Change task'}
+      title={'Change the task of ' + m.handle}
+      confirm="Change task"
       busy={busy || !task.trim()}
       onCancel={onClose}
       onConfirm={async () => {
         setBusy(true);
-        // Seat again sends the task also when its text is the same: a new run starts with it.
         const ok = await attempt(() => patchMember(bridge, m.handle, { task: task.trim() }));
         setBusy(false);
         if (ok) onClose();
@@ -356,7 +369,6 @@ export function Roster({ bridge, current }: { bridge: string; current?: string }
         </Confirm>
       )}
       {ask && ask.kind === 'task' && <NewTask bridge={bridge} m={ask.m} onClose={() => setAsk(null)} />}
-      {ask && ask.kind === 'seat' && <NewTask bridge={bridge} m={ask.m} seat onClose={() => setAsk(null)} />}
     </section>
   );
 }

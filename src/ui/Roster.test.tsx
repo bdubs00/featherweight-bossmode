@@ -8,6 +8,10 @@ import { bridgeOf, fakeFetch, memberOf, mount, settle, unmountAll } from './test
 
 const B = 'b-roster';
 
+// The error of a seat on the homelab fleet, as the run held it.
+const PREFILL =
+  'model: anthropic: stream claude-haiku-5-5: POST "http://ax-anthropic.fw-fleet.svc.cluster.local:8080/v1/messages?beta=true": 400 Bad Request (Request-ID: req_011CgJhPGRsjUd3vHdi7JLjE) (Workspace-ID: wrkspc_018mMkT171jg5neTmcSP7ha8) {"type":"error","error":{"type":"invalid_request_error","message":"This model does not support assistant message prefill. The conversation must end with a user message."},"request_id":"req_011CgJhPGRsjUd3vHdi7JLjE"}';
+
 const fleet: Fleet = {
   name: 'front-0',
   members: [
@@ -27,9 +31,10 @@ beforeAll(() => {
   f = fakeFetch([
     ['GET', /^\/v1\/pages$/, () => ({ pages: [{ path: 'bridges/b-roster/plan.md', title: 'Plan', hash: 'h', size: 1, by: 'token', at: '2026-10-21T10:00:00Z' }] })],
     ['GET', /^\/v1\/runs\/run-writer$/, () => ({ id: 'run-writer', agent: 'writer', state: 'failed', error: 'The run reached its limit of 40 turns.', seq: 9, createdAt: '', updatedAt: '' })],
+    ['GET', /^\/v1\/runs\/run-notes$/, () => ({ id: 'run-notes', agent: 'writer', state: 'failed', error: PREFILL, seq: 9, createdAt: '', updatedAt: '' })],
     ['GET', /^\/v1\/runs\/run-reviewer-2$/, () => ({ id: 'run-reviewer-2', agent: 'reviewer', state: 'queued', seq: 1, createdAt: '', updatedAt: '' })],
     ['POST', /\/members$/, (body) => ({ ...(body as object), runs: ['run-new'], fired: false, muted: false, presence: 'working', activity: null })],
-    ['PATCH', /\/members\//, (body) => ({ ...memberOf('writer', { presence: 'working' }), ...(body as object) })],
+    ['PATCH', /\/members\//, (body, path) => ({ ...memberOf(decodeURIComponent(path.split('/').pop()!), { agent: 'writer', presence: 'working' }), ...(body as object) })],
   ]);
   forgetRuns();
   act(() => {
@@ -48,6 +53,7 @@ beforeAll(() => {
           memberOf('reviewer-2', { agent: 'reviewer', presence: 'working', activity: null }),
           memberOf('tester', { presence: 'asleep', muted: true }),
           memberOf('writer', { presence: 'error' }),
+          memberOf('notes', { agent: 'writer', presence: 'error' }),
           memberOf('scribe', { presence: 'fired', fired: true, muted: true }),
         ],
       },
@@ -79,23 +85,36 @@ describe('the members', () => {
     expect(status(el, 'migrator-1').querySelector('.act')!.textContent).toBe('Ran ansible-lint roles/cron');
     expect(status(el, 'migrator-1').querySelector('.act code')!.textContent).toBe('ansible-lint roles/cron');
     expect(status(el, 'tester').querySelector('.chip')!.textContent).toBe('muted');
-    expect(status(el, 'writer').querySelector('.act.err')!.textContent).toBe('Stopped at 40 turns');
+    expect(status(el, 'writer').querySelector('.act.fail')!.textContent).toBe('Stopped at 40 turns');
+    // A refusal of the provider reads as one plain line, with the message of the provider in its tooltip.
+    const notes = status(el, 'notes').querySelector('.act.fail')!;
+    expect(notes.textContent).toBe('The model refused the request');
+    expect(notes.getAttribute('title')).toBe('This model does not support assistant message prefill. The conversation must end with a user message.');
+    expect(status(el, 'notes').textContent).not.toContain('anthropic');
+    expect(status(el, 'notes').querySelector('a.open')!.getAttribute('aria-label')).toBe('notes, error. Do the work of notes. The model refused the request. Open its conversation.');
     expect(status(el, 'migrator-1').querySelector('a.open')!.getAttribute('href')).toBe('#member/b-roster/migrator-1');
     expect(status(el, 'migrator-1').querySelector('a.open')!.getAttribute('aria-label')).toBe('migrator-1, working. Do the work of migrator-1. Open its conversation.');
   });
 
-  it('offers Seat again to a seat in error, and sends its task unchanged', async () => {
+  it('puts Seat again on the row of a seat in error and in its menu, and each sends its task unchanged at once', async () => {
     const el = mount(<Roster bridge={B} />);
     await settle();
-    act(() => (status(el, 'writer').querySelector('button[aria-label="More for writer"]') as HTMLButtonElement).click());
-    const items = [...status(el, 'writer').querySelectorAll('[role="menuitem"]')].map((x) => x.textContent);
+    const key = status(el, 'writer').querySelector('.member-keys button')!;
+    expect(key.textContent).toBe('Seat again');
+    expect(key.getAttribute('aria-label')).toBe('Seat writer again');
+    expect(status(el, 'migrator-1').querySelector('.member-keys')).toBeNull();
+    expect(status(el, 'scribe').querySelector('.member-keys')).toBeNull();
+    act(() => (status(el, 'notes').querySelector('button[aria-label="More for notes"]') as HTMLButtonElement).click());
+    const items = [...status(el, 'notes').querySelectorAll('[role="menuitem"]')].map((x) => x.textContent);
     expect(items).toEqual(['Open conversation', 'Mute', 'Seat again', 'Change task', 'Fire']);
-    act(() => ([...status(el, 'writer').querySelectorAll('[role="menuitem"]')].find((x) => x.textContent === 'Seat again') as HTMLButtonElement).click());
-    const dialog = el.querySelector('dialog.confirm')!;
-    expect(dialog.querySelector('h2')!.textContent).toBe('Seat writer again');
-    act(() => ([...dialog.querySelectorAll('button')].find((x) => x.textContent === 'Seat again') as HTMLButtonElement).click());
+    act(() => ([...status(el, 'notes').querySelectorAll('[role="menuitem"]')].find((x) => x.textContent === 'Seat again') as HTMLButtonElement).click());
     await settle();
-    expect(f.seen.find((s) => s.method === 'PATCH')).toEqual({ method: 'PATCH', path: '/v1/bridges/b-roster/members/writer', body: { task: 'Do the work of writer' } });
+    expect(el.querySelector('dialog.confirm')).toBeNull();
+    expect(f.seen.filter((s) => s.method === 'PATCH').pop()).toEqual({ method: 'PATCH', path: '/v1/bridges/b-roster/members/notes', body: { task: 'Do the work of notes' } });
+    act(() => (key as HTMLButtonElement).click());
+    await settle();
+    expect(el.querySelector('dialog.confirm')).toBeNull();
+    expect(f.seen.filter((s) => s.method === 'PATCH').pop()).toEqual({ method: 'PATCH', path: '/v1/bridges/b-roster/members/writer', body: { task: 'Do the work of writer' } });
     expect(status(el, 'migrator-1').querySelector('[aria-label="More for migrator-1"]')).not.toBeNull();
   });
 
