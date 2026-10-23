@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'preact/test-utils';
-import type { Decision } from '../api/types';
-import { DecisionCard, canAlways } from './Decision';
+import type { Decision, Run } from '../api/types';
+import { store } from '../state/store';
+import { DecisionCard, canAlways, mayDecide } from './Decision';
 import { fakeFetch, mount, settle, unmountAll } from './testkit-a';
 import { clearNotice, currentNotice } from './notice';
 
@@ -169,5 +170,37 @@ describe('Always allow for a person who does not own the agent', () => {
     } finally {
       globalThis.fetch = real;
     }
+  });
+});
+
+describe('a card that the person may not decide', () => {
+  const runOf = (operate: boolean): Run => ({ id: 'run-m2', agent: 'migrator', state: 'input-required', seq: 4, createdAt: '', updatedAt: '', can: { view: true, operate } });
+
+  it('decides by the field can of the run, and offers the keys while the page does not know', () => {
+    expect(mayDecide(undefined)).toBe(true);
+    expect(mayDecide({})).toBe(true);
+    expect(mayDecide({ can: { view: true, operate: true } })).toBe(true);
+    expect(mayDecide({ can: { view: true, operate: false } })).toBe(false);
+  });
+
+  it('shows the request quietly, with no key and no note, and says who decides', () => {
+    act(() => store.dispatch({ type: 'run', run: runOf(false) }));
+    const el = mount(<DecisionCard d={push} who="migrator-2" />);
+    const card = el.querySelector('section.card')!;
+    expect(card.classList.contains('quiet')).toBe(true);
+    expect(card.querySelector('.card-title h3')!.textContent).toBe('Waits for a decision');
+    expect(card.querySelector('.card-title .led-amber')).not.toBeNull();
+    expect(card.querySelector('.breathe')).toBeNull();
+    expect(card.textContent).toContain('migrator-2 wants to run a command.');
+    expect(card.querySelector('pre.command')!.textContent).toBe('git push origin migrate/nginx');
+    expect(card.querySelector('.note')!.textContent).toBe('An operator of migrator decides it.');
+    expect(keys(el)).toEqual([]);
+    expect(card.querySelector('input')).toBeNull();
+  });
+
+  it('offers the keys once the front says that the person may operate the run', () => {
+    act(() => store.dispatch({ type: 'run', run: runOf(true) }));
+    const el = mount(<DecisionCard d={push} who="migrator-2" />);
+    expect(keys(el)).toEqual(['Deny', 'Always allow', 'Run command']);
   });
 });

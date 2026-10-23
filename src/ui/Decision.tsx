@@ -5,9 +5,11 @@
 // the label of the decision. A question shows the form of its schema,
 // because an answer is not a thumb. A decided card turns quiet. A card in
 // the state unknown shows its note and no key, and it can change in place.
+// A card that the person may not decide shows no key either: it says who
+// decides, so the page never offers an action that the front refuses.
 
 import { useState } from 'preact/hooks';
-import type { Decision } from '../api/types';
+import type { Decision, Run } from '../api/types';
 import { formOf, type Field as SchemaField } from '../lib/schema';
 import { commandOf, decisionTitle, rawInput, whyWords } from '../lib/words';
 import { whoName } from '../lib/lines';
@@ -281,6 +283,28 @@ export function QuestionCard({ d, who, onDecide, settle }: { d: Decision; who: s
   );
 }
 
+/** mayDecide reports whether the person may decide a card of a run: yes, unless the front says that the person cannot operate the run. */
+export function mayDecide(run: Pick<Run, 'can'> | undefined): boolean {
+  return !(run && run.can && run.can.operate === false);
+}
+
+/**
+ * WatchCard is a card that waits for a decision that the person may not
+ * make. It is quiet: the light holds, the edge is a line, and no key
+ * shows. It says who decides.
+ */
+function WatchCard({ d, who, agent }: { d: Decision; who: string; agent: string }) {
+  const title = d.question ? d.reason || 'A question' : decisionTitle(who, d as Decision);
+  const cmd = commandOf(d.input);
+  return (
+    <Card class="decide watch" title="Waits for a decision" tone="amber" quiet label={'Waits for a decision: ' + title}>
+      <p>{title}.</p>
+      {cmd && <Command>{cmd}</Command>}
+      <p class="note">{'An operator of ' + (agent || 'this agent') + ' decides it.'}</p>
+    </Card>
+  );
+}
+
 /** UnknownCard is a card whose decision the page cannot confirm: no key, and the note of the backend. */
 function UnknownCard({ d, who }: { d: Decision; who: string }) {
   const title = d.question ? d.reason || 'A question for you' : decisionTitle(who, d as Decision);
@@ -298,6 +322,8 @@ function UnknownCard({ d, who }: { d: Decision; who: string }) {
  * arrives on the stream after the channel loaded: it settles once.
  */
 export function DecisionCard({ d, who, onDecide, settle }: { d: Decision; who: string; onDecide?: () => void; settle?: boolean }) {
+  const run = useSelect((s) => s.runs[d.run]);
   if (d.state === 'unknown') return <UnknownCard d={d} who={who} />;
+  if (d.state === 'pending' && !mayDecide(run)) return <WatchCard d={d} who={who} agent={run ? run.agent : ''} />;
   return d.question || d.schema ? <QuestionCard d={d} who={who} onDecide={onDecide} settle={settle} /> : <ApprovalCard d={d} who={who} onDecide={onDecide} settle={settle} />;
 }

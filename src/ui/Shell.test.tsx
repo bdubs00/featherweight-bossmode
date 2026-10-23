@@ -1,9 +1,9 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, type ComponentChildren } from 'preact';
 import { act } from 'preact/test-utils';
 import type { Fleet } from '../api/types';
 import { store } from '../state/store';
-import { FleetFoot, RACK_LAMPS, Shell, captionOf, shownOf } from './Shell';
+import { FleetFoot, GRACE_MS, RACK_LAMPS, Shell, captionOf, shownOf } from './Shell';
 
 let box: HTMLElement | null = null;
 
@@ -107,12 +107,24 @@ describe('FleetFoot', () => {
     expect(el.querySelector('.readout-head .t-meta')!.textContent).toBe(RACK_LAMPS + 1 + ' workers');
   });
 
-  it('darkens the lamps and says the state of the stream while it is down', () => {
+  it('darkens the lamps and says the state of the stream once it has been down for the grace time', () => {
+    vi.useFakeTimers();
     act(() => {
       store.dispatch({ type: 'fleet', fleet: fleetOf(['Running']) });
       store.dispatch({ type: 'stream-status', status: 'lost' });
     });
     const el = mount(<FleetFoot />);
+    // The reads of the page are fresh while the stream connects, so the lamps stand at first.
+    expect(el.querySelector('.readout.stale')).toBeNull();
+    expect(el.querySelector('.readout-figures')!.textContent).toBe('1 awake');
+    act(() => {
+      vi.advanceTimersByTime(GRACE_MS - 1);
+    });
+    expect(el.querySelector('.readout.stale')).toBeNull();
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    vi.useRealTimers();
     expect(el.querySelector('.readout.stale')).not.toBeNull();
     expect(el.querySelector('.readout-figures')!.textContent).toBe('Connecting');
     expect(el.querySelector('[role="status"]')!.textContent).toBe('Connecting');

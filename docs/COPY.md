@@ -105,7 +105,7 @@ Capacity shows where seating happens:
 | `Match the system`, `Light`, `Graphite` | keep | | done |
 | `Connections`, `Sign out` | keep | | done |
 | `Live` | remove | The stream is live in the normal state, so the word said nothing. The readout of the fleet takes the foot of the Bridges list. | done |
-| `Connecting`, `Offline` | keep | the words of the readout while the stream is down, with `The page connects to the workbench again.` and `The page gets no updates.` in the tooltip | done |
+| `Connecting`, `Offline` | keep | the words of the readout while the stream is down, with `The page connects to the workbench again.` and `The page gets no updates.` in the tooltip. `Connecting` shows only after 6 seconds down, and `Offline` at once. | done |
 | `Updates arrive as they happen.` (tooltip) | remove | | done |
 | `N workers awake` | change | the readout of the fleet: the caption `N workers`, `1 worker`, or `No workers`, and the figures `N failed`, `N working`, `N awake`, `N starting`, `N asleep`, `N stopping`, in that order, each only when its count is not 0 | done |
 | new | add | `<agent>, <worker>: <status>`, the tooltip of a lamp, such as `migrator, crew-0: working`, and `N <status>` for a share of a large fleet | done |
@@ -297,6 +297,7 @@ Capacity shows where seating happens:
 | `Note for <who>, if you want` | change | `Note` with the placeholder `Optional` | done |
 | `Deny`, `Always allow`, `<label>` or `Allow` | keep | | done |
 | `Always allow needs an owner of the agent. Allow once instead.` | new | the notice when the backend refuses the rule with 403, in place of its sentence with the subject of the caller | done |
+| new | add | `Waits for a decision` with a still amber light, and `An operator of <agent> decides it.`, the quiet card of a decision that the person may not make. It offers no key and no Note. | done |
 | `Allow this call, and let <who> use <tool> from now on without asking` | change | `Allow <tool> for <who> from now on` | A |
 | `No decision: <note>` | keep | | A |
 | `<who> answered: <answer>`, `<who> declined the question`, `<who> allowed this`, `<who> denied this` | keep | | A |

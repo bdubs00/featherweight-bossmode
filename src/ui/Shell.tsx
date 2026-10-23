@@ -224,6 +224,31 @@ export function figuresOf(r: Readout): Figure[] {
   return LAMP_ORDER.filter((k) => r.counts[k] > 0).map((k) => ({ kind: k, n: r.counts[k], word: LAMP_WORDS[k] }));
 }
 
+/**
+ * GRACE_MS is how long the stream may connect, or connect again, before the
+ * readout says so. The reads of the page are fresh while the stream
+ * connects, so a short wait is no news: through a proxy the first byte of
+ * the stream can take seconds.
+ */
+export const GRACE_MS = 6000;
+
+/**
+ * useDownWord is the word of a stream that is down: Offline at once for a
+ * stream that the page closed, and Connecting only once the stream has
+ * been down for GRACE_MS, else "".
+ */
+export function useDownWord(status: string): string {
+  const [late, setLate] = useState(false);
+  useEffect(() => {
+    setLate(false);
+    if (status === 'live' || status === 'closed') return;
+    const t = setTimeout(() => setLate(true), GRACE_MS);
+    return () => clearTimeout(t);
+  }, [status === 'live' || status === 'closed']);
+  if (status === 'closed') return 'Offline';
+  return status !== 'live' && late ? 'Connecting' : '';
+}
+
 /** captionOf names the size of the fleet: 1 worker, 9 workers, or No workers. */
 export function captionOf(total: number): string {
   if (total === 0) return 'No workers';
@@ -254,17 +279,17 @@ function Rack({ lamps, counts }: Readout) {
  * FleetFoot is the foot of the Bridges list: the readout of the workers of
  * the fleet. A rack holds one lamp per worker, in the order of attention,
  * and the figures below it count each status. The readout opens the Fleet
- * place. While the stream is down, the lamps go dark and the state of the
- * connection takes the place of the figures, because the page no longer
- * gets the changes. A deployment without a fleet shows the foot only while
- * the stream is down.
+ * place. Once the stream has been down for GRACE_MS, the lamps go dark and
+ * the state of the connection takes the place of the figures, because the
+ * page no longer gets the changes. A deployment without a fleet shows the
+ * foot only then.
  */
 export function FleetFoot() {
   const status = useSelect((s) => s.stream.status);
   const facts = useSelect(selectFacts);
   const r = useMemo(() => readoutOf(facts), [facts]);
   const known = !!facts.fleet;
-  const down = status === 'live' ? '' : status === 'closed' ? 'Offline' : 'Connecting';
+  const down = useDownWord(status);
   if (!known && !down) return null;
   const caption = known ? captionOf(r.lamps.length) : 'Workers';
   const figures = known ? figuresOf(r) : [];

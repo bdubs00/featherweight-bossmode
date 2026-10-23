@@ -391,6 +391,16 @@ sends it. `content` is the answer of a form or a choice. A free answer goes
 in `note`. Always allow calls `POST /v1/runs/{id}/approvals/{approval}/rule`
 with `{"note"}` and then allows, as `/ui` does.
 
+**New.** The front decides every action of a person on a run with the
+rules of what the person sees, and calls the worker with the credential of
+the fleet, naming the person in the header `Fw-On-Behalf-Of`. So a person
+who can see a decision and holds the operator role decides it, whichever
+worker holds the run, and the ledger names that person as the decider. The
+run object that the front answers to a person carries
+`"can": {"view": true, "operate": <bool>}`. The page shows the keys of a
+card that waits only when `operate` is true or `can` is absent. Otherwise
+the card says who decides and offers no key.
+
 ### 7.3 Reactions on a run
 
 `POST /v1/runs/{id}/reactions` takes `{"seq", "reaction", "note"}`. The page
@@ -619,9 +629,14 @@ stream route takes the same `Authorization` header as every route.
   The page keeps ids as strings. On a reconnect the page sends
   `Last-Event-ID`, and the front sends every event after that id.
 - The front closes a stream on its own after 15 minutes. The page connects
-  again at once with `Last-Event-ID`, and the light in the rail stays on
-  Live. Only a stream that ends within 5 seconds, or a failed connection,
-  makes the page wait and show that it connects again.
+  again at once with `Last-Event-ID`, and the readout of the fleet stays as
+  it is. Only a stream that ends within 5 seconds, or a failed connection,
+  makes the page wait. The readout says `Connecting` only after the stream
+  has been down for 6 seconds, because the reads of the page are fresh
+  while it connects.
+- **New.** The front writes one comment line, `: connected`, at once after
+  the headers, so a proxy that waits for the first bytes of a body passes
+  the stream on. The page skips comment lines.
 - **New.** When the front cannot resume from the id, it sends one event of
   the kind `reset` with `data: null`. The page then reads the bridges, the
   faces, the open channel, and its roster again.

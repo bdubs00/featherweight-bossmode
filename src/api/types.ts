@@ -288,6 +288,12 @@ export interface Run {
   extraTools?: string[];
   /** The profile that the kernel resolved when it queued the run, when the run object carries it. */
   resolved?: ResolvedProfile | null;
+  /**
+   * What the person may do with the run, as the front decides it with the
+   * rules of what the person sees: view, and operate, which decides,
+   * cancels, and sends. A front before this field sends none.
+   */
+  can?: { view: boolean; operate: boolean };
 }
 
 /** The usage of a run, as the kernel sums it. Every field is a sum. */
