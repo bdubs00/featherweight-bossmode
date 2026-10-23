@@ -14,6 +14,7 @@ import type { Member, UsageSum } from '../api/types';
 import { useSelect } from '../state/store';
 import { addMember, fire, loadPages, loadRunOnce, patchMember } from '../state/actions';
 import { plainError, providerMessage } from '../lib/runerror';
+import { costParts } from '../lib/cost';
 import { seatPresence, statusOf } from '../lib/status';
 import { selectFacts } from '../state/reducer';
 import { hrefOf, go } from '../lib/route';
@@ -196,11 +197,14 @@ function NewTask({ bridge, m, onClose }: { bridge: string; m: Member; onClose: (
   );
 }
 
-/** usageParts are the numbers of the foot and their words: turns, cost, and pages. */
-export function usageParts(u: UsageSum, pages: number): { n: string; word: string }[] {
-  const out: { n: string; word: string }[] = [];
+/** usageParts are the numbers of the foot and their words: turns, cost, and pages. A cost below one cent reads under $0.01, from costParts. */
+export function usageParts(u: UsageSum, pages: number): { lead?: string; n: string; word: string }[] {
+  const out: { lead?: string; n: string; word: string }[] = [];
   if (u.turns !== undefined) out.push({ n: String(u.turns), word: u.turns === 1 ? 'turn' : 'turns' });
-  if (u.costUSD !== undefined) out.push({ n: '$' + u.costUSD.toFixed(2), word: 'so far' });
+  if (u.costUSD !== undefined) {
+    const c = costParts(u.costUSD);
+    out.push({ ...(c.lead ? { lead: c.lead } : {}), n: c.n, word: 'so far' });
+  }
   out.push({ n: String(pages), word: pages === 1 ? 'page' : 'pages' });
   return out;
 }
@@ -224,6 +228,7 @@ function BridgeFoot({ bridge }: { bridge: string }) {
       <div class="nums">
         {usageParts(u, pages).map((p) => (
           <span>
+            {p.lead && p.lead + ' '}
             <strong>{p.n}</strong> {p.word}
           </span>
         ))}

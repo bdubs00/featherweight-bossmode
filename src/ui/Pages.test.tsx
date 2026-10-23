@@ -157,4 +157,18 @@ describe('the editor', () => {
     expect(put.path).toBe('/v1/pages/runbooks/rollback.md');
     expect(put.headers['If-None-Match']).toBe('*');
   });
+
+  it('names the key that saves beside the keys, and names none on a touch screen', () => {
+    api = fakeApi({ 'GET /v1/pages': { pages: [] } });
+    const el = mount(<PageEditor create />);
+    expect(el.querySelector('.form-end .kbd')!.textContent).toMatch(/^(⌘|Ctrl)\+Enter$/);
+    const was = window.matchMedia;
+    window.matchMedia = ((q: string) => ({ matches: q === '(pointer: coarse)', media: q, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
+    try {
+      const touch = mount(<PageEditor create />);
+      expect(touch.querySelector('.form-end .kbd')).toBeNull();
+    } finally {
+      window.matchMedia = was;
+    }
+  });
 });

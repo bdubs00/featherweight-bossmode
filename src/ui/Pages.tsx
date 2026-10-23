@@ -18,6 +18,7 @@ import { go, hrefOf } from '../lib/route';
 import { useRoving } from './keys';
 import { attempt, showError } from './notice';
 import { Markdown } from './common';
+import { keyWords, useCoarse } from './Composer';
 import { Glyph } from './icons';
 import { Button, Card, Chip, Command, Field, Find, Input, PaneHeader, TextArea } from './primitives';
 
@@ -396,8 +397,6 @@ function writeDraft(p: string, d: Draft | null): void {
   }
 }
 
-const SAVE_KEY = typeof navigator !== 'undefined' && navigator.platform && /Mac/.test(navigator.platform) ? '⌘+Enter' : 'Ctrl+Enter';
-
 /** PageEditor edits a page, or creates one when create is set. */
 export function PageEditor({ path: initial, create }: { path?: string; create?: boolean }) {
   const [path, setPath] = useState(initial || '');
@@ -408,6 +407,8 @@ export function PageEditor({ path: initial, create }: { path?: string; create?: 
   const [busy, setBusy] = useState(false);
   const [conflict, setConflict] = useState<Page | null>(null);
   const box = useRef<HTMLTextAreaElement>(null);
+  // A touch screen has no Ctrl or Cmd key, so the editor names the key that saves only where one exists, as the composer does.
+  const coarse = useCoarse();
   // The heading names the page by its title, as the tree and the page do, and by its name only without one.
   const listed = useSelect((s) => (initial ? s.pages.byPath[initial] : undefined));
   const [title, setTitle] = useState('');
@@ -566,9 +567,11 @@ export function PageEditor({ path: initial, create }: { path?: string; create?: 
           />
         </Field>
         <div class="form-end">
-          <span class="kbd" aria-hidden="true">
-            {SAVE_KEY}
-          </span>
+          {!coarse && (
+            <span class="kbd" aria-hidden="true">
+              {keyWords()}
+            </span>
+          )}
           <Button href={cancelHref} onClick={() => !create && writeDraft(initial || '', null)}>
             Cancel
           </Button>

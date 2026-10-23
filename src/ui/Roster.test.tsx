@@ -125,6 +125,8 @@ describe('the members', () => {
     expect(foot.querySelector('.t-meta')!.textContent).toBe('This bridge');
     expect([...foot.querySelectorAll('.nums > span')].map((x) => x.textContent)).toEqual(['41 turns', '$0.62 so far', '1 page']);
     expect(usageParts({ reported: 1, final: 0, missing: 0, partial: false, turns: 1 }, 2).map((p) => p.n + ' ' + p.word)).toEqual(['1 turn', '2 pages']);
+    // A cost below one cent never reads $0.00.
+    expect(usageParts({ reported: 1, final: 0, missing: 0, partial: false, costUSD: 0.0042 }, 0).map((p) => (p.lead ? p.lead + ' ' : '') + p.n + ' ' + p.word)).toEqual(['under $0.01 so far', '0 pages']);
   });
 });
 

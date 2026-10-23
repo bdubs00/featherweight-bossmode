@@ -382,7 +382,7 @@ Capacity shows where seating happens:
 | `The open runs of <handle> in this bridge stop, and its seat gets no more messages. Its Task stays in its pool, so other bridges can still use it.` | change | `Its open runs stop, and it gets no more messages.` | A |
 | `Drop here to fire` | change | `Fire` | done |
 | new | add | the footer `This bridge` with turns, cost, and pages, from `usage`, for a bridge whose runs report usage | done |
-| `N turns`, `$N so far`, `N pages` (the figures of the foot, at `--t-control`) | add | `1 turn` and `1 page` for one | done |
+| `N turns`, `$N so far`, `N pages` (the figures of the foot, at `--t-control`) | add | `1 turn` and `1 page` for one. A cost below one cent reads `under $0.01 so far`, never `$0.00`, from `src/lib/cost.ts` | done |
 | `Add` (the screen-reader name of the picker) | add | the picker carries the name of the key that opens it | done |
 
 ### src/ui/Picker.tsx
@@ -538,7 +538,7 @@ Capacity shows where seating happens:
 | `The page will be <path>.` | keep | | C |
 | `Markdown`, `What changed, in a few words` | change | `Text`, `What changed` | C |
 | `Cancel`, `Create the page`, `Save` | change | `Cancel`, `Create page`, `Save` | C |
-| `Cmd or Ctrl+Enter saves. A save that meets a newer version stops and asks you.` | change | `Ctrl+Enter` beside the key, as in the composer | C |
+| `Cmd or Ctrl+Enter saves. A save that meets a newer version stops and asks you.` | change | `Ctrl+Enter` beside the key, `⌘+Enter` on a Mac, and no key on a touch screen, from `keyWords` and `useCoarse` of the composer | done |
 | `A page with this path exists already. Pick another path, or edit that page.` | keep | | C |
 | `the fleet token`, `run <id>` (writers) | keep | | C |
 
