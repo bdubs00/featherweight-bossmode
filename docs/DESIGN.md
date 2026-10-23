@@ -969,7 +969,9 @@ The work:
   of the agent to More, which opens its week.
 - Steps. A routine that needs you opens on the card of its sign-off. The
   card has the amber light, three figures, the Note field of the decision
-  card, and two keys: Not yet and Sign off. A proposed routine opens on a
+  card, and two keys: Not yet and Sign off. The first figure gives the
+  share with the tickets that it counts, such as `97.6% of 1,432`, so the
+  person sees the size of the sample beside the share. A proposed routine opens on a
   card with the number of tickets that it comes from, and the keys Retire
   and Rehearse. After a sign-off, the card turns quiet and says Signed off,
   with who and when. Not yet sends nothing. The card turns into the quiet
@@ -1005,6 +1007,11 @@ The work:
   it off.
 - The stream. A `routine` event reads that routine again while a pane of
   the place shows. A reset reads the list again.
+- Routines off. A front that keeps no routines answers 404 to the list.
+  The place stays in the app bar, as Chat and Manager stay without their
+  setting. The list pane and the main pane say `Routines are off.` with a
+  question mark that names the setting, and the list pane drops Find a
+  routine and the count. A routine address says the same.
 
 The rules of the owner for this screen, and how the screen keeps them:
 

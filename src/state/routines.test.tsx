@@ -48,6 +48,16 @@ describe('the routines of the page', () => {
     expect(s.byKey['triage/b'].evidence).toBeUndefined();
   });
 
+  it('marks the routines off when the front answers 404 to the list, and on again once a list loads', async () => {
+    api = fakeApi({ 'GET /v1/routines': () => ({ status: 404, body: { detail: 'not found' } }) });
+    await loadRoutines();
+    expect(routines.get()).toMatchObject({ off: true, error: '', order: null });
+    api.restore();
+    api = fakeApi({ 'GET /v1/routines': { routines: [] } });
+    await loadRoutines();
+    expect(routines.get()).toMatchObject({ off: false, order: [] });
+  });
+
   it('reads a routine again on a routine event of the stream while the place is open, once for a burst', async () => {
     let n = 0;
     api = fakeApi({

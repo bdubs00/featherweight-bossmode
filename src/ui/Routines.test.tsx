@@ -167,6 +167,21 @@ describe('the list of routines', () => {
     await settle();
     expect(el.querySelector('[role=alert]')!.textContent).toContain('The store did not answer.');
   });
+
+  it('says that routines are off on a front that keeps none, with the setting behind the question mark', async () => {
+    api = fakeApi({ 'GET /v1/routines': () => ({ status: 404, body: { detail: 'not found' } }) });
+    const list = mount(<RoutineList />);
+    const main = mount(<RoutineMain tab="steps" />);
+    await settle();
+    for (const el of [list, main]) {
+      expect(el.textContent).toContain('Routines are off.');
+      expect(el.querySelector('[aria-label="Where routines are turned on"]')).not.toBeNull();
+      expect(el.querySelector('[role=alert]')).toBeNull();
+      expect(el.textContent).not.toMatch(/not found|No routine yet|Loading/);
+    }
+    expect(list.querySelector('.find')).toBeNull();
+    expect(list.querySelector('.pane-head .chip')).toBeNull();
+  });
 });
 
 describe('a routine that needs you', () => {
@@ -181,7 +196,7 @@ describe('a routine that needs you', () => {
     expect(card.classList.contains('card')).toBe(true);
     expect(text(card.querySelector('h3'))).toBe('Needs your sign-off');
     expect([...card.querySelectorAll('.rt-figs > div')].map((d) => [text(d.querySelector('dd')), text(d.querySelector('dt'))])).toEqual([
-      ['97.6%', 'agreed with the agent'],
+      ['97.6% of 1,432', 'agreed with the agent'],
       ['48', 'handed to the agent'],
       ['0', 'sent back'],
     ]);

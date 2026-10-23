@@ -142,7 +142,7 @@ export function metaOf(r: RoutineRecord, now = Date.now()): string {
   return when ? `${r.agent}, ${when}` : r.agent;
 }
 
-/** The three figures of the sign-off card. */
+/** The three figures of the sign-off card. agreed gives the share with the tickets that it counts, such as 97.6% of 1,432. */
 export interface Figures {
   agreed: string;
   handed: number;
@@ -154,7 +154,7 @@ export function figuresOf(r: RoutineRecord): Figures | null {
   if (!ev) return null;
   const t = countsOf(ev);
   const sb = ev.sentBack || { applied: 0, agreed: 0 };
-  return { agreed: t.acted > 0 ? pct(t.agreed / t.acted) : '0%', handed: t.handed, sentBack: (sb.agreed || 0) + (sb.applied || 0) };
+  return { agreed: t.acted > 0 ? `${pct(t.agreed / t.acted)} of ${num(t.acted)}` : '0%', handed: t.handed, sentBack: (sb.agreed || 0) + (sb.applied || 0) };
 }
 
 /** The bars of the rehearsal: each day as its three parts, and the three labels of the axis. */

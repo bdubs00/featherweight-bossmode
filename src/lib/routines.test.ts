@@ -112,7 +112,7 @@ describe('the figures and the evidence', () => {
 
   it('gives the sign-off card three figures: agreed, handed to the agent, and sent back', () => {
     const r = rec('rehearsing', { ready: true, evidence: { days, questions: {}, disagreements: [], sentBack: { applied: 0, agreed: 0 } } });
-    expect(figuresOf(r)).toEqual({ agreed: '97.6%', handed: 48, sentBack: 0 });
+    expect(figuresOf(r)).toEqual({ agreed: '97.6% of 1,432', handed: 48, sentBack: 0 });
     expect(figuresOf(rec('rehearsing'))).toBeNull();
     expect(totalsOf(days)).toMatchObject({ decided: 1480, agreed: 1397, disagreed: 35, handed: 48 });
   });
