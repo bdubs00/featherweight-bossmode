@@ -61,6 +61,12 @@ form-action 'self'; frame-ancestors 'none'
 script, no inline style element, and no data URI. The page sets sizes
 through the style object of the DOM, which the policy allows.
 
+**New.** The build writes the element
+`<meta name="bossmode-build" content="<build>">` into the head of
+`index.html`. The build is a hash of the rest of `index.html`, which names
+each file of the build by its hash, so each new build has a new one. The
+page in development has no build. Section 10 says how the page uses it.
+
 ## 4. The settings of the page
 
 `GET /v1/bossmode` answers the settings that the page reads, with the keys
@@ -666,7 +672,7 @@ of `chat.agent` on `chat.member`.
 
 | Route | Answer |
 |---|---|
-| `GET /v1/pages` | `{"pages": [<info>]}` |
+| `GET /v1/pages` | `{"pages": [<info>]}`. `?prefix=` keeps the pages whose path starts with that text, such as `agents/reviewer/`. |
 | `GET /v1/pages/{path}` | `<info>` plus `"text"`, with `ETag: "<hash>"` |
 | `GET /v1/pages/{path}?version=<version>` | The same for an older version |
 | `PUT /v1/pages/{path}` | 200 with the page, or 201 for a new page |
@@ -771,6 +777,16 @@ stream route takes the same `Authorization` header as every route.
 - A comment line, such as `: keep-alive`, every 15 seconds keeps a proxy
   from closing the stream. `retry:` is optional.
 - A 401 ends the stream, and the page goes to sign-in.
+- **New.** The answer of the stream carries the header `Fw-Page-Build`,
+  the build of the page that the front serves, from the element of section
+  3. The page compares it with the element of its own `index.html` at each
+  start of the stream: at boot, after each end of a stream, and after a
+  replica stops in a deploy. When they differ, a deploy put out a new page,
+  and the page shows one line in the place of the notice,
+  `A new version of bossmode is out.`, with Reload and Dismiss. A notice of
+  a failed action takes the place first. The page never reloads on its own,
+  so no draft goes. A front without the header, or a page without the
+  element, gives no line.
 
 | Kind | Data |
 |---|---|

@@ -158,8 +158,26 @@ function wire(ev) {
   return { bridge: ev.data.bridge, message: { ...ev.data.message, decision }, partial: true };
 }
 
+/**
+ * pageBuild is the build of the page in dist/, from the element that the
+ * build writes into index.html, or "" without a build. It reads the file at
+ * each stream, as the workbench reads a directory, so a new build counts at
+ * the next stream.
+ */
+function pageBuild() {
+  try {
+    const m = /<meta\s+name="bossmode-build"\s+content="([A-Za-z0-9._-]{1,64})"\s*\/?>/.exec(fs.readFileSync(path.join(DIST, 'index.html'), 'utf8'));
+    return m ? m[1] : '';
+  } catch {
+    return '';
+  }
+}
+
 function stream(req, res) {
-  res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
+  const head = { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' };
+  const build = pageBuild();
+  if (build) head['Fw-Page-Build'] = build;
+  res.writeHead(200, head);
   res.write('retry: 2000\n\n');
   const last = req.headers['last-event-id'];
   if (last) {
@@ -1199,7 +1217,12 @@ on('POST', '/v1/runs/([^/]+)/reactions', async (c, id) => {
   return run;
 });
 
-on('GET', '/v1/pages', () => ({ pages: [...S.pages.values()].filter(live).map((p) => pageMeta(p)).sort((a, b) => (a.path < b.path ? -1 : 1)) }));
+// prefix keeps the pages whose path starts with it, as the workbench does.
+on('GET', '/v1/pages', (c) => {
+  const prefix = String(c.url.searchParams.get('prefix') || '');
+  const pages = [...S.pages.values()].filter((p) => live(p) && p.path.startsWith(prefix));
+  return { pages: pages.map((p) => pageMeta(p)).sort((a, b) => (a.path < b.path ? -1 : 1)) };
+});
 on('GET', '/v1/pages/search', (c) => {
   const q = String(c.url.searchParams.get('q') || '').trim().toLowerCase();
   if (!q) return { q, results: [], read: 0, unread: 0, cut: false };

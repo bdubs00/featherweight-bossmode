@@ -95,6 +95,9 @@ seconds.
 The fake server also serves `dist/`, at the address
 `http://127.0.0.1:8787/bossmode/`. It sends the content security policy of
 the page, so you can check a build under that policy after `npm run build`.
+Each stream names the build of `dist/` in the header `Fw-Page-Build`, as the
+workbench does. After a new build, an open tab offers a reload at its next
+stream.
 
 Variables of the fake server:
 

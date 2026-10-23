@@ -96,6 +96,7 @@ Capacity shows where seating happens:
 | `Try again` | keep | | done |
 | `Dismiss` | keep | | done |
 | `Failed` (the word of the notice) | keep | | done |
+| new | add | `A new version of bossmode is out.`, in the place of the notice, with the keys `Reload` and `Dismiss`, when the stream names a build of the page that is not the build of the tab. It stays through a move to another screen, a notice of a failed action takes the place first, and Dismiss hides it until a later build. | done |
 
 ### src/ui/Shell.tsx
 
