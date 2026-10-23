@@ -162,6 +162,22 @@ export async function loadPages(): Promise<void> {
   store.dispatch({ type: 'pages', pages });
 }
 
+/**
+ * loadBridgePages reads the pages of the work of a bridge, GET
+ * /v1/bridges/{id}/pages. A workbench without the route answers 404, and
+ * the list then takes the pages under bridges/<id>/ from the wiki.
+ */
+export async function loadBridgePages(id: string): Promise<void> {
+  try {
+    const pages = await once('bridge-pages:' + id, () => api.bridgePages(id));
+    store.dispatch({ type: 'bridge-pages', bridge: id, pages });
+  } catch (e) {
+    if (!(e instanceof ApiError) || e.status !== 404) throw e;
+    store.dispatch({ type: 'bridge-pages', bridge: id, pages: null });
+    if (!store.get().pages.loaded) await loadPages();
+  }
+}
+
 export async function loadAgents(): Promise<void> {
   const agents = await once('agents', () => api.agents());
   store.dispatch({ type: 'agents', agents });

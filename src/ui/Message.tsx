@@ -14,6 +14,8 @@ import { lineWords, napWords, whoName } from '../lib/lines';
 import type { Tone } from '../lib/presence';
 import { decide, react } from '../state/actions';
 import { attempt } from './notice';
+import { useWhole } from '../state/whole';
+import { CutEnd } from './Whole';
 import { InlineMarkdown, Markdown, When } from './common';
 import { DecisionCard } from './Decision';
 import { Avatar, Button, Chip, IconButton, LineLed, Mark, ReactionChip, TextArea } from './primitives';
@@ -240,6 +242,8 @@ export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, fresh, li
   const me = useSelect((s) => (s.me ? s.me.principal : null));
   // A card that arrives on the stream after the channel loaded settles once. A card on load never moves.
   const [settle] = useState(() => arrived(bridge, seq));
+  // The whole text of a long entry, once the person asked for it with Show all.
+  const whole = useWhole(bridge, e && e.cut ? seq : 0);
   if (!e) return null;
   const day = listed ? '' : !prev || dayWords(prev.at) !== dayWords(e.at) ? dayWords(e.at) : '';
   const id = 'entry-' + bridge + '-' + seq;
@@ -335,13 +339,8 @@ export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, fresh, li
             </header>
           )}
           {e.replyTo ? <ReplyChip bridge={bridge} seq={e.replyTo} /> : null}
-          <Markdown text={e.text} handles={handles} refs />
-          {e.cut && (
-            <p class="cut">
-              Cut at 4 KB.{' '}
-              {e.from.kind === 'agent' && e.from.handle && <a href={hrefOf({ place: 'member', bridge, handle: e.from.handle, tab: 'chat' })}>Whole text</a>}
-            </p>
-          )}
+          <Markdown text={whole && !whole.cut ? whole.text : e.text} handles={handles} refs />
+          {e.cut && <CutEnd bridge={bridge} seq={e.seq} whole={whole} runHref={e.from.kind === 'agent' && e.from.handle ? hrefOf({ place: 'member', bridge, handle: e.from.handle, tab: 'chat' }) : undefined} class="cut" />}
         </div>
         <Reactions bridge={bridge} e={e} onReply={onReply} />
       </article>

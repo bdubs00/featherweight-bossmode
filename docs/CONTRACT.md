@@ -295,7 +295,8 @@ The plan gives the entry. The page reads four more fields:
     declined <handle>'s question`. The decider is the subject, so the token
     of the fleet shows as `token`.
 - **New.** `cut` is true when the channel holds only the first 4 KB of the
-  text.
+  text. The page then shows a quiet `Show all` at the cut and reads the
+  whole entry only when the person presses it (section 6.4).
 - **New.** `decision` is set on the entry that mirrors an approval or a
   question of a member run, and null elsewhere. It holds the fields of
   `dashboard.Decision` (the label, the reason, the effect, the input, and the
@@ -336,7 +337,21 @@ person cannot. A closed bridge answers 409.
 When the person replies to a message of an agent and names no handle, the
 page sets `to` to that agent, as section 4.2 of the plan says.
 
-### 6.4 Reactions
+### 6.4 One entry, whole
+
+`GET /v1/bridges/{id}/messages/{seq}` answers one entry in the shape of
+section 6.2, with `text` the whole text, up to 64 KB. The channel keeps the
+whole text of a cut entry, so `cut` stays true only for an old entry whose
+start alone was kept. An unknown entry answers 404, and a seq that is no
+positive whole number 400.
+
+The page reads the route only when the person presses `Show all` under a
+cut entry, never for each entry on load, and keeps the text for the visit,
+so a later change of the entry on the stream, such as a reaction, keeps it
+whole. An entry that stays cut shows `Cut at 4 KB.` with the link `Whole
+text` to the conversation of its agent.
+
+### 6.5 Reactions
 
 `POST /v1/bridges/{id}/messages/{seq}/reactions` takes
 `{"reaction": "up" | "down" | "heart", "note": "..."}`, with the note
@@ -347,6 +362,45 @@ the entry. The page never removes a reaction.
 On a card that waits, the thumbs do not call this route. A thumb up calls
 `POST /v1/runs/{run}/approvals/{id}` with `{"decision": "allow"}`, and a
 thumb down with `{"decision": "deny"}` (section 7.2).
+
+### 6.6 The pages of a bridge
+
+`GET /v1/bridges/{id}/pages` answers the pages of the wiki that belong to
+the work of the bridge, sorted by path:
+
+```json
+{
+  "bridge": "br-puppet",
+  "pages": [
+    { "path": "k3s/monitoring/alerts.md", "title": "Alerts of the node", "tags": [], "hash": "8d3c...", "version": 41, "size": 812,
+      "by": "agent:migrator", "run": "run-...", "at": "2026-10-23T01:12:00Z", "summary": "The alert rules", "seat": "migrator-1" }
+  ],
+  "count": 1
+}
+```
+
+- The list holds each page under `bridges/<id>/`, such as the report, and
+  each page whose newest version a run of the bridge wrote, wherever the
+  agents put it. The runs of the bridge are the runs of its seats, their
+  helpers, and, in a spawn bridge, the manager run and its children. A page
+  that somebody wrote again since belongs to its newest writer and leaves
+  the list.
+- Each page has the fields of `GET /v1/pages` (section 8) and `seat`, the
+  handle of the seat whose run wrote it, or `manager`, when the front knows
+  it.
+- The caller needs the rule of the bridge and the rule of the wiki.
+
+The tab Wiki of the channel lists these pages, each a link to the page in
+the Wiki place with the seat that wrote it, and the foot of the members
+counts them. The event `page` of the stream carries `run` (section 10), so
+the page keeps the list current: a page under `bridges/<id>/` or of a run of
+a seat joins, with its seat; a page that a person, the front, or a run of
+another bridge wrote last leaves, and so does a removed page. A run that the
+page holds names its bridge in its metadata `fw.batch`, as `bridge:<id>`,
+and its seat in `fw.bridge.member`. A page of a run that the page cannot
+place makes the page read the list again while a screen shows it. A
+workbench without the route answers 404, and the page then lists the pages
+under `bridges/<id>/` from `GET /v1/pages`.
 
 ## 7. Runs
 
@@ -657,7 +711,7 @@ stream route takes the same `Authorization` header as every route.
 | `bridge.message` | `{"bridge": "<id>", "message": <entry>}`. A new entry, or a changed one with the same seq. An entry with `"partial": true` lacks `decision.input` and `decision.schema`: the page reads it again with `?from=<seq>&limit=1` and never shows the cut card. |
 | `bridge.member` | `{"bridge": "<id>", "member": <member>}`. A new seat, or a change of a seat: its presence, its activity, its task, muted, or fired. |
 | `run` | The run object, with `member`, `activity`, and `reactions`. One event per change of a run that the caller can see. |
-| `page` | `{"path", "title", "hash", "by", "at", "size"}`, plus `"deleted": true` for a removed page |
+| `page` | The info of the page as `GET /v1/pages` lists it, with `run` when a run wrote it, plus `"deleted": true` for a removed page |
 | `face` | The entry of `GET /v1/faces` for that agent |
 | `member` | `{"kind": "member", "member": "default/crew-2", "state": "live", "time"}`, or `"gone": true` in place of `state` for a member that left the view |
 | `task` | `{"kind": "task", "member": "default/crew-2", "phase": "Running", "time"}`, or `"gone": true` |

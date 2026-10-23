@@ -8,6 +8,7 @@ import type {
   Agent,
   BossConfig,
   Bridge,
+  BridgePage,
   Entry,
   FaceMeta,
   Fleet,
@@ -41,6 +42,21 @@ export interface Roster {
   byHandle: Record<string, Member>;
 }
 
+/**
+ * The pages of the work of one bridge, from GET /v1/bridges/{id}/pages:
+ * the pages under bridges/<id>/ and the pages whose newest version a run of
+ * the bridge wrote, anywhere in the wiki. The page events keep the list
+ * current. stale is true after a page event that the page cannot place,
+ * such as a page of a run that no seat of the roster names, so the list is
+ * read again. missing is true for a workbench without the route: the page
+ * then takes the pages under bridges/<id>/ from the list of the wiki.
+ */
+export interface BridgePagesState {
+  byPath: Record<string, BridgePage>;
+  stale: boolean;
+  missing: boolean;
+}
+
 export interface State {
   me: Whoami | null;
   config: BossConfig | null;
@@ -49,6 +65,8 @@ export interface State {
   rosters: Record<string, Roster>;
   runs: Record<string, Run>;
   pages: { byPath: Record<string, PageMeta>; loaded: boolean };
+  /** The pages of the work of each bridge that the page read. */
+  bridgePages: Record<string, BridgePagesState>;
   faces: Record<string, FaceMeta>;
   /** The agents that the caller can see, from GET /v1/agents. */
   agents: Agent[] | null;
@@ -98,6 +116,7 @@ export const initialState: State = {
   rosters: {},
   runs: {},
   pages: { byPath: {}, loaded: false },
+  bridgePages: {},
   faces: {},
   agents: null,
   fleet: null,
@@ -125,6 +144,7 @@ export type Action =
   | { type: 'run'; run: Run }
   | { type: 'pages'; pages: PageMeta[] }
   | { type: 'page'; page: PageEventData }
+  | { type: 'bridge-pages'; bridge: string; pages: BridgePage[] | null }
   | { type: 'agents'; agents: Agent[] }
   | { type: 'fleet'; fleet: Fleet }
   | { type: 'open-runs'; runs: Run[] }
@@ -309,14 +329,68 @@ function applyMember(state: State, bridgeId: string, m: Member): State {
 function applyPage(state: State, p: PageEventData): State {
   const byPath = { ...state.pages.byPath };
   if (p.deleted) {
-    if (!byPath[p.path]) return state;
+    if (!byPath[p.path]) return applyBridgePage(state, p);
     delete byPath[p.path];
   } else {
     const { deleted: _, ...meta } = p;
     void _;
     byPath[p.path] = meta;
   }
-  return { ...state, pages: { ...state.pages, byPath } };
+  return applyBridgePage({ ...state, pages: { ...state.pages, byPath } }, p);
+}
+
+/** seatOfRun names the seat of a roster whose runs hold a run, or "". */
+export function seatOfRun(roster: Roster | undefined, run: string): string {
+  if (!roster || !run) return '';
+  return roster.order.find((h) => roster.byHandle[h] && roster.byHandle[h].runs.includes(run)) || '';
+}
+
+/**
+ * applyBridgePage keeps the lists of the pages of the bridges current on a
+ * page event. A page belongs to a bridge when it sits under bridges/<id>/,
+ * or when a run of the bridge wrote its newest version: a run of a seat,
+ * or a run whose batch names the bridge. A page that a person, the front,
+ * or a run of another bridge wrote last leaves the list, and so does a
+ * removed page. A page of a run that the page cannot place, such as a
+ * helper of a seat that the page never read, makes the list stale, so it
+ * is read again.
+ */
+function applyBridgePage(state: State, p: PageEventData): State {
+  const ids = Object.keys(state.bridgePages);
+  if (!ids.length) return state;
+  const run = p.run || '';
+  let next: Record<string, BridgePagesState> | null = null;
+  for (const id of ids) {
+    const cur = state.bridgePages[id];
+    if (cur.missing) continue;
+    const held = cur.byPath[p.path];
+    // A run that the page holds names its bridge in the metadata of its batch, as a helper of a seat does.
+    const meta = run && state.runs[run] ? state.runs[run].metadata : undefined;
+    const batch = (meta && meta['fw.batch']) || '';
+    const ours = batch === 'bridge:' + id;
+    const seat = seatOfRun(state.rosters[id], run) || (ours && meta ? meta['fw.bridge.member'] || '' : '');
+    let belongs: boolean | null;
+    if (p.deleted) belongs = false;
+    else if (p.path.startsWith('bridges/' + id + '/') || seat || ours) belongs = true;
+    else if (!run || batch.startsWith('bridge:') || Object.keys(state.rosters).some((o) => o !== id && seatOfRun(state.rosters[o], run))) belongs = false;
+    else belongs = null;
+    let after: BridgePagesState = cur;
+    if (belongs === null) {
+      if (!cur.stale) after = { ...cur, stale: true };
+    } else if (belongs) {
+      const { deleted: _, ...meta } = p;
+      void _;
+      // A page that the same run wrote again keeps the seat that the list named.
+      const keep = !seat && held && held.run === run && held.seat ? held.seat : '';
+      after = { ...cur, byPath: { ...cur.byPath, [p.path]: { ...meta, ...(seat || keep ? { seat: seat || keep } : {}) } } };
+    } else if (held) {
+      const byPath = { ...cur.byPath };
+      delete byPath[p.path];
+      after = { ...cur, byPath };
+    }
+    if (after !== cur) (next ||= { ...state.bridgePages })[id] = after;
+  }
+  return next ? { ...state, bridgePages: next } : state;
 }
 
 /** taskKey tells whether a task event names a Task of a pool: atespace/name, or the name alone. */
@@ -397,7 +471,8 @@ export function applyStream(state: State, ev: StreamEvent): State {
       break;
     }
     case 'reset':
-      next = { ...state, resets: state.resets + 1 };
+      // The lists of the pages of the bridges missed the events of the gap, so the screens read them again.
+      next = { ...state, resets: state.resets + 1, bridgePages: {} };
       break;
     // An event that the page read and dropped, such as a partial entry that
     // it could not read again. Only its id moves.
@@ -484,6 +559,11 @@ export function reduce(state: State, a: Action): State {
     }
     case 'page':
       return applyPage(state, a.page);
+    case 'bridge-pages': {
+      const byPath: Record<string, BridgePage> = {};
+      for (const p of a.pages || []) byPath[p.path] = p;
+      return { ...state, bridgePages: { ...state.bridgePages, [a.bridge]: { byPath, stale: false, missing: !a.pages } } };
+    }
     case 'agents':
       return { ...state, agents: a.agents };
     case 'fleet':

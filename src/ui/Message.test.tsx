@@ -138,10 +138,34 @@ describe('the messages', () => {
     expect(row(7).querySelector('header .chip')).toBeNull();
   });
 
-  it('say that the channel cut a long text, and link the whole text', () => {
-    const cut = row(8).querySelector('.cut')!;
-    expect(cut.textContent).toBe('Cut at 4 KB. Whole text');
-    expect(cut.querySelector('a')!.getAttribute('href')).toBe('#member/b-msg/migrator-1');
+  it('show a long text whole only when the person asks, and say so where the front kept only its start', async () => {
+    const whole = 'A long answer. ' + 'More words. '.repeat(400);
+    const f = fakeFetch([
+      ['GET', /\/v1\/bridges\/b-msg\/messages\/8$/, () => ({ ...entries[7], text: whole, cut: false })],
+      ['GET', /\/v1\/bridges\/b-msg\/messages\/13$/, () => ({ ...entries[7], seq: 13, cut: true })],
+    ]);
+    try {
+      // Nothing reads the whole text on load.
+      const el = row(8);
+      expect(f.seen.length).toBe(0);
+      const more = el.querySelector('.cut .cut-more') as HTMLButtonElement;
+      expect(more.textContent).toBe('Show all');
+      act(() => more.click());
+      await settle();
+      expect(f.seen.map((x) => x.path)).toEqual(['/v1/bridges/b-msg/messages/8']);
+      expect(el.querySelector('.md')!.textContent).toContain('More words. More words.');
+      expect(el.querySelector('.cut')).toBeNull();
+      // An old entry whose start alone was kept says it, with the link to the run of its agent.
+      act(() => store.dispatch({ type: 'entry', bridge: B, entry: entryOf(13, { text: 'An old long answer.', cut: true }) }));
+      const old = row(13);
+      act(() => (old.querySelector('.cut-more') as HTMLButtonElement).click());
+      await settle();
+      const cut = old.querySelector('.cut')!;
+      expect(cut.textContent).toBe('Cut at 4 KB. Whole text');
+      expect(cut.querySelector('a')!.getAttribute('href')).toBe('#member/b-msg/migrator-1');
+    } finally {
+      f.restore();
+    }
   });
 
   it('draw the mark of the manager in ink', () => {

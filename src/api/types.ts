@@ -606,6 +606,18 @@ export interface PageEventData extends PageMeta {
   deleted?: boolean;
 }
 
+/** A page of the work of a bridge: a page of GET /v1/pages, and the seat whose run wrote its newest version, when the front knows it. */
+export interface BridgePage extends PageMeta {
+  seat?: string;
+}
+
+/** The answer of GET /v1/bridges/{id}/pages: the pages of the work of a bridge, sorted by path. */
+export interface BridgePages {
+  bridge: string;
+  pages: BridgePage[];
+  count: number;
+}
+
 /**
  * The data of a member or a task event of the fleet view. A member event
  * has state, a task event has phase, and gone marks one that left the view.

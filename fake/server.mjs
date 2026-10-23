@@ -27,7 +27,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { AGENTS, FLEET, hash, seed, wiki } from './data.mjs';
+import { AGENTS, FLEET, WHOLE, hash, seed, wiki } from './data.mjs';
 import { checkSvg, identicon } from './faces.mjs';
 import { TEMPLATES } from './routes-c.mjs';
 import { TOOLS_OF, allowlistOf, givesTool } from './skills.mjs';
@@ -261,7 +261,11 @@ function post(bridgeId, from, text, more = {}) {
   const ch = S.channels.get(bridgeId);
   const seq = ch.length ? ch[ch.length - 1].seq + 1 : 1;
   const e = { seq, at: now(), from, to: [], replyTo: null, text: String(text).slice(0, 4096), mirrors: null, reactions: { up: [], down: [], heart: [] }, decision: null, pinned: false, ...more };
-  if (String(text).length > 4096) e.cut = true;
+  // The channel keeps the whole text of a cut entry, up to 64 KB, for GET /v1/bridges/{id}/messages/{seq}.
+  if (String(text).length > 4096) {
+    e.cut = true;
+    WHOLE.set(bridgeId + '.' + seq, String(text).slice(0, 65536));
+  }
   ch.push(e);
   publish('bridge.message', { bridge: bridgeId, message: e });
   return e;
@@ -875,6 +879,40 @@ on('POST', '/v1/bridges/([^/]+)/messages', async (c, id) => {
   fanOut(id, e);
   c.status = 201;
   return e;
+});
+// One entry with its whole text, up to 64 KB. cut stays true only for an entry whose start alone was kept.
+on('GET', '/v1/bridges/([^/]+)/messages/([^/]+)', (c, id, seqText) => {
+  bridgeOr404(id);
+  const seq = Number(seqText);
+  if (!Number.isInteger(seq) || seq < 1) refuse(400, 'the seq of an entry is a positive whole number');
+  const e = (S.channels.get(id) || []).find((x) => x.seq === seq);
+  if (!e) refuse(404, `no entry ${seq} in the bridge ${id}`);
+  const whole = WHOLE.get(id + '.' + seq);
+  return whole ? { ...e, text: whole, cut: false } : e;
+});
+/**
+ * The pages of the work of a bridge: each page under bridges/<id>/, and each
+ * page whose newest version a run of the bridge wrote, with the seat of that
+ * run, sorted by path.
+ */
+on('GET', '/v1/bridges/([^/]+)/pages', (c, id) => {
+  const b = bridgeOr404(id);
+  const seatOf = (run) => {
+    const m = b.members.find((x) => x.runs.includes(run));
+    if (m) return m.handle;
+    const r = S.runs.get(run);
+    return r && r.metadata && r.metadata['fw.batch'] === 'bridge:' + id ? r.metadata['fw.bridge.member'] || '' : null;
+  };
+  const pages = [];
+  for (const p of S.pages.values()) {
+    const v = live(p);
+    if (!v) continue;
+    const seat = v.run ? seatOf(v.run) : null;
+    if (!p.path.startsWith('bridges/' + id + '/') && seat === null) continue;
+    pages.push({ ...pageMeta(p), ...(seat ? { seat } : {}) });
+  }
+  pages.sort((a, b2) => (a.path < b2.path ? -1 : 1));
+  return { bridge: id, pages, count: pages.length };
 });
 on('POST', '/v1/bridges/([^/]+)/messages/(\\d+)/reactions', async (c, id, seqText) => {
   bridgeOr404(id);

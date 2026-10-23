@@ -290,7 +290,7 @@ export function seed(ask = '') {
     [b2, channelTwo(b2)],
   ]);
   const reads = new Map([
-    [b1 + '|' + ALICE, 36],
+    [b1 + '|' + ALICE, 37],
     [b2 + '|' + ALICE, 5],
   ]);
 
@@ -396,6 +396,10 @@ function channelOne(b) {
   push(sys('started'), 'tester woke up.', { mirrors: { run: 'run-tester', seq: 2, type: 'fw.turn.started' } });
   push(agent('tester'), 'molecule converge passed on Debian 12. Idempotence passed: the second run changed nothing.');
   push(agent('tester'), 'Ubuntu 24.04 passed too.\n\n| platform | converge | idempotence |\n|---|---|---|\n| debian-12 | ok | ok |\n| ubuntu-24.04 | ok | ok |');
+  // A long answer: the channel keeps its first 4 KB, and the whole text waits for Show all.
+  const log = longLog();
+  const cut = push(agent('tester'), log.slice(0, 4096), { cut: true });
+  WHOLE.set(b + '.' + cut.seq, log);
   push(sys('asleep'), 'tester went to sleep.', { mirrors: { run: 'run-tester', seq: 9, type: 'fw.run.finished' } });
   const done = push(agent('reviewer'), 'I reviewed **roles/cron**. It matches the manifest, with two notes:\n\n1. The role keeps `root` as the default user, as hiera does.\n2. `minute` defaults to `0` now, as Bob asked.\n\nI approve the role.', { mirrors: { run: 'run-reviewer', seq: 12, type: 'fw.run.finished' } });
   done.reactions.up = [ALICE];
@@ -447,6 +451,29 @@ function channelTwo(b) {
 }
 
 /**
+ * The whole text of each entry that the channel cut at 4 KB, by
+ * <bridge>.<seq>, as the channel of the front keeps it, up to 64 KB.
+ */
+export const WHOLE = new Map();
+
+/** longLog is the summary of a molecule run of every scenario of a role, long enough that the channel cuts it. */
+function longLog() {
+  const hosts = ['debian-12', 'ubuntu-24.04', 'rocky-9'];
+  const tasks = ['Install the cron package', 'Place the jobs of hiera', 'Purge the jobs that hiera no longer names', 'Set the mail address of the jobs', 'Restart cron after a change'];
+  const parts = ['The molecule log of **roles/cron**, every scenario, as the channel cannot hold it whole.'];
+  for (const scenario of ['default', 'purge', 'upgrade', 'mail', 'removal']) {
+    parts.push('## Scenario ' + scenario);
+    for (const h of hosts) {
+      parts.push('### ' + h);
+      parts.push(tasks.map((t, i) => `${i + 1}. ${t}: ok, changed=${i === 1 ? 1 : 0}, in ${(0.4 + i * 0.13).toFixed(2)} s`).join('\n'));
+      parts.push('Idempotence passed: the second run changed nothing. Verify passed: `crontab -l -u root` lists the jobs of hiera and no other job.');
+    }
+  }
+  parts.push('Every scenario passed on every platform. The purge stays off by default, as the reviewer asked.');
+  return parts.join('\n\n');
+}
+
+/**
  * The revision of the wiki. Each write of any page takes the next one, as
  * the bucket of the store counts, so the versions of one page grow but are
  * not consecutive.
@@ -470,9 +497,9 @@ function seedPages() {
     { m: 500, by: BOB, summary: 'First rules', text: '---\ntitle: How we write Ansible\ntags: [ansible, style]\n---\n# How we write Ansible\n\n1. Every task has a `name` that says what it does.\n2. Use the fully qualified names of modules, such as `ansible.builtin.package`.\n3. A destructive option is false by default.\n' },
     { m: 200, by: 'agent:reviewer', summary: 'Add the rule about handlers', text: '---\ntitle: How we write Ansible\ntags: [ansible, style]\n---\n# How we write Ansible\n\n1. Every task has a `name` that says what it does.\n2. Use the fully qualified names of modules, such as `ansible.builtin.package`.\n3. A destructive option is false by default.\n4. A handler name starts with a verb: `Reload nginx`, not `nginx reload`.\n' },
   ]));
-  add(page('modules/cron.md', [{ m: 90, by: 'run:run-migrator-1', summary: 'Notes of the cron role', text: '---\ntitle: The cron module\ntags: [puppet, ansible]\n---\n# The cron module\n\n| Puppet | Ansible |\n|---|---|\n| `cron::job` | `ansible.builtin.cron` with a loop |\n| `cron::purge` | `cron_purge`, false by default |\n\nSee [the style guide](../runbooks/ansible-style.md).\n' }]));
+  add(page('modules/cron.md', [{ m: 90, by: 'agent:migrator', run: 'run-migrator-1', summary: 'Notes of the cron role', text: '---\ntitle: The cron module\ntags: [puppet, ansible]\n---\n# The cron module\n\n| Puppet | Ansible |\n|---|---|\n| `cron::job` | `ansible.builtin.cron` with a loop |\n| `cron::purge` | `cron_purge`, false by default |\n\nSee [the style guide](../runbooks/ansible-style.md).\n' }]));
   add(page('modules/nginx.md', [
-    { m: 60, by: 'agent:migrator', summary: 'Notes of the nginx role', text: '---\ntitle: The nginx module\n---\n# The nginx module\n\nThe site templates keep their names: `site.conf.erb` becomes `site.conf.j2`.\n\n## Notes from the old wiki\n\nThe old wiki held raw HTML. The page shows it as text and runs nothing:\n\n<img src=x onerror="alert(1)"> <script>alert(2)</script>\n\n![a chart from another site](https://example.com/chart.png)\n\n[a link that runs code](javascript:alert(3)) and [a safe link](https://nginx.org/en/docs/).\n' },
+    { m: 60, by: 'agent:migrator', run: 'run-migrator-2', summary: 'Notes of the nginx role', text: '---\ntitle: The nginx module\n---\n# The nginx module\n\nThe site templates keep their names: `site.conf.erb` becomes `site.conf.j2`.\n\n## Notes from the old wiki\n\nThe old wiki held raw HTML. The page shows it as text and runs nothing:\n\n<img src=x onerror="alert(1)"> <script>alert(2)</script>\n\n![a chart from another site](https://example.com/chart.png)\n\n[a link that runs code](javascript:alert(3)) and [a safe link](https://nginx.org/en/docs/).\n' },
   ]));
   add(page('bridges/br-puppet/plan.md', [{ m: 124, by: 'token', summary: 'The plan of the bridge', text: '---\ntitle: The plan of the Puppet bridge\n---\n# Migrate the remaining Puppet modules\n\n- [x] cron, by migrator-1\n- [ ] nginx, by migrator-2\n- [ ] logrotate, next\n\nThe reviewer reads each role against [the house style](../../runbooks/ansible-style.md). The tester runs molecule. The writer keeps the notes.\n' }]));
   // A runbook that an agent wrote in a folder of its own, long enough that the editor scrolls.

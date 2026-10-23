@@ -6,9 +6,10 @@
 // that the person reads in its place.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
-import type { Delegation, Entry } from '../api/types';
+import type { BridgePage, Delegation, Entry } from '../api/types';
 import { store, useSelect } from '../state/store';
-import { loadAllCards, loadBridge, loadChannel, loadOlder, loadPages, markRead, patchBridge, postMessage } from '../state/actions';
+import { loadAllCards, loadBridge, loadChannel, loadOlder, markRead, patchBridge, postMessage } from '../state/actions';
+import { useBridgePages } from '../state/bridgepages';
 import { membersOf, type Channel as ChannelState } from '../state/reducer';
 import { senderName, since } from '../lib/words';
 import { decidedRuns, hiddenLine } from '../lib/lines';
@@ -20,7 +21,8 @@ import { EntryRow, NapRow, markLoaded } from './Message';
 import { Composer } from './Composer';
 import { foldOf, foldShapes, foldWords, shapeKey, shapeOf, shapesOf, type Item, type Part, type Shape } from './fold';
 import { wavesLine } from './seats';
-import { Button, Chip, Led, LineLed, PaneHeader, Tabs, countText } from './primitives';
+import { Button, Chip, Led, LineLed, Mark, PaneHeader, Tabs, countText } from './primitives';
+import { byName } from './Pages';
 import { Glyph } from './icons';
 
 /** Delegations is the dialog of what the manager can do in this bridge. */
@@ -316,43 +318,56 @@ function Posts({ id, closed }: { id: string; closed: boolean }) {
 
 /* ---------- Wiki ---------- */
 
-/** pagesOfBridge lists the paths of the pages under bridges/<id>/. */
-export function pagesOfBridge(paths: string[], id: string): string[] {
-  const head = 'bridges/' + id + '/';
-  return paths.filter((p) => p.startsWith(head)).sort();
+/**
+ * PageWriter names who wrote the newest version of a page of the bridge:
+ * the seat, with its face, else the person or the agent that the page
+ * names.
+ */
+function PageWriter({ id, p }: { id: string; p: BridgePage }) {
+  const agent = useSelect((s) => (p.seat && s.rosters[id] && s.rosters[id].byHandle[p.seat] ? s.rosters[id].byHandle[p.seat].agent : ''));
+  if (!p.seat) return <span class="clip">{byName(p.by)}</span>;
+  return (
+    <span class="prow-seat">
+      <Mark agent={agent || p.seat} size={20} ink={p.seat === 'manager' || undefined} />
+      <span class="clip">{p.seat}</span>
+    </span>
+  );
 }
 
+/**
+ * WikiTab lists the pages of the work of the bridge: the pages under
+ * bridges/<id>/ and every page that a run of the bridge wrote last,
+ * wherever its agents put it. Each row links the page in the Wiki and
+ * names the seat that wrote it.
+ */
 function WikiTab({ id }: { id: string }) {
-  const loaded = useSelect((s) => s.pages.loaded);
-  const key = useSelect((s) => pagesOfBridge(Object.keys(s.pages.byPath), id).join('\n'));
-  const byPath = useSelect((s) => s.pages.byPath);
+  const { pages, loaded, failed } = useBridgePages(id);
   const list = useRoving<HTMLUListElement>();
-  useEffect(() => {
-    if (!loaded) attempt(loadPages);
-  }, [loaded]);
-  const paths = key ? key.split('\n') : [];
   const head = 'bridges/' + id + '/';
   return (
     <div class="scroll tab-list">
-      {!loaded && <Empty>Loading the pages.</Empty>}
-      {loaded && paths.length === 0 && (
+      {!loaded && !failed && <Empty>Loading the pages.</Empty>}
+      {!loaded && failed && <Empty>{failed}</Empty>}
+      {loaded && pages.length === 0 && (
         <div class="empty center">
           <Button href={hrefOf({ place: 'pages', mode: 'create', path: head })}>New page</Button>
         </div>
       )}
-      {paths.length > 0 && (
-        <ul class="prows" ref={list}>
-          {paths.map((p) => {
-            const m = byPath[p];
+      {pages.length > 0 && (
+        <ul class="prows" ref={list} aria-label="Pages of this bridge">
+          {pages.map((p) => {
+            // A page under the folder of the bridge needs no folder in its name.
+            const where = (p.path.startsWith(head) ? p.path.slice(head.length) : p.path).replace(/\.md$/, '');
             return (
               <li>
-                <a class="prow" href={hrefOf({ place: 'pages', path: p, mode: 'read' })} data-item>
-                  <span class="prow-title clip">{m && m.title ? m.title : p.slice(head.length).replace(/\.md$/, '')}</span>
+                <a class="prow" href={hrefOf({ place: 'pages', path: p.path, mode: 'read' })} data-item aria-label={(p.title || where) + ', ' + (p.seat || byName(p.by)) + ', ' + since(p.at)}>
+                  <span class="prow-title clip">{p.title || where}</span>
                   <span class="prow-meta">
-                    <span class="clip">{p.slice(head.length).replace(/\.md$/, '')}</span>
-                    {m && m.at && (
-                      <time dateTime={m.at} title={new Date(m.at).toLocaleString()}>
-                        {since(m.at)}
+                    <PageWriter id={id} p={p} />
+                    <span class="prow-path clip">{where}</span>
+                    {p.at && (
+                      <time dateTime={p.at} title={new Date(p.at).toLocaleString()}>
+                        {since(p.at)}
                       </time>
                     )}
                   </span>

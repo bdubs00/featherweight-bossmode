@@ -16,6 +16,8 @@ import { lineWords, napWords, whoName } from '../lib/lines';
 import { hrefOf } from '../lib/route';
 import type { Tone } from '../lib/presence';
 import { attempt } from './notice';
+import { useWhole } from '../state/whole';
+import { CutEnd } from './Whole';
 import { InlineMarkdown, Markdown, When } from './common';
 import { DecisionCard } from './Decision';
 import { Avatar, Button, Chip, IconButton, LineLed, Mark, ReactionChip, TextArea } from './primitives';
@@ -207,6 +209,8 @@ const reacted = (e: Entry): boolean => KINDS.some((k) => ((e.reactions || {})[k]
 function EntryMsg({ bridge, e, prev, agentOf, handles, runHref }: { bridge: string; e: Entry; prev?: Entry; agentOf: (handle: string) => string; handles?: string[]; runHref?: string }) {
   const [heart, setHeart] = useState(false);
   const me = useSelect((s) => (s.me ? s.me.principal : null));
+  // The whole text of a long entry, once the person asked for it with Show all.
+  const whole = useWhole(bridge, e.cut ? e.seq : 0);
   if (e.from.kind === 'system' && !e.decision) {
     // The page words the line from its event, and keeps the sentence of the backend for the tooltip.
     const w = lineWords(e, me);
@@ -239,12 +243,8 @@ function EntryMsg({ bridge, e, prev, agentOf, handles, runHref }: { bridge: stri
   const face = agent ? <Mark agent={agentOf(e.from.handle || '')} size={32} /> : <Avatar subject={e.from.name || ''} display={e.from.display} size={32} />;
   return (
     <Msg face={face} name={name} at={e.at} compact={sameSender(prev, e) && !e.pinned && !reacted(e)} id={'t-' + e.seq} tag={e.pinned ? <Chip>pinned</Chip> : undefined} corner={<Reactions bridge={bridge} e={e} onHeart={() => setHeart(true)} />}>
-      <Markdown text={e.text} handles={handles} refs />
-      {e.cut && (
-        <p class="tmsg-cut">
-          Cut at 4 KB. {runHref && <a href={runHref}>Whole text</a>}
-        </p>
-      )}
+      <Markdown text={whole && !whole.cut ? whole.text : e.text} handles={handles} refs />
+      {e.cut && <CutEnd bridge={bridge} seq={e.seq} whole={whole} runHref={runHref} class="tmsg-cut" />}
       {heart && (
         <HeartNote
           onCancel={() => setHeart(false)}

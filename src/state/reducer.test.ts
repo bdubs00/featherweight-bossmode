@@ -177,6 +177,41 @@ describe('the reducer', () => {
     expect(s.pages.byPath['index.md']).toBeUndefined();
   });
 
+  it('keeps the pages of the work of a bridge current, and reads the list again after a page that it cannot place', () => {
+    let s = reduce(initialState, { type: 'bridge', bridge: { ...bridge('b1'), members: [member('migrator-1'), member('reviewer')] } });
+    s = reduce(s, { type: 'bridge', bridge: { ...bridge('b2'), members: [member('scribe')] } });
+    const page = (path: string, more: object = {}) => ({ path, title: path, hash: 'h', by: 'agent:x', at: '', size: 1, ...more });
+    s = reduce(s, { type: 'bridge-pages', bridge: 'b1', pages: [{ ...page('k3s/alerts.md', { run: 'run-migrator-1' }), seat: 'migrator-1' }] });
+    const list = () => Object.keys(s.bridgePages.b1.byPath).sort();
+    // A page of a seat of the bridge joins, with its seat, wherever it sits.
+    s = reduce(s, { type: 'stream', event: ev('page', page('k3s/rules.md', { run: 'run-reviewer' })) });
+    expect(s.bridgePages.b1.byPath['k3s/rules.md'].seat).toBe('reviewer');
+    // A page under the folder of the bridge joins whoever wrote it.
+    s = reduce(s, { type: 'stream', event: ev('page', page('bridges/b1/report.md', { by: 'bossmode' })) });
+    expect(list()).toEqual(['bridges/b1/report.md', 'k3s/alerts.md', 'k3s/rules.md']);
+    // A page that a person or a seat of another bridge wrote last leaves, and so does a removed page.
+    s = reduce(s, { type: 'stream', event: ev('page', page('k3s/alerts.md', { by: 'bob' })) });
+    s = reduce(s, { type: 'stream', event: ev('page', page('k3s/rules.md', { run: 'run-scribe' })) });
+    s = reduce(s, { type: 'stream', event: ev('page', page('bridges/b1/report.md', { deleted: true })) });
+    expect(list()).toEqual([]);
+    expect(s.bridgePages.b1.stale).toBe(false);
+    // A page of a run that no seat names, such as a helper of a seat, makes the list stale.
+    s = reduce(s, { type: 'stream', event: ev('page', page('k3s/helper.md', { run: 'run-helper' })) });
+    expect(s.bridgePages.b1.stale).toBe(true);
+    s = reduce(s, { type: 'bridge-pages', bridge: 'b1', pages: [] });
+    expect(s.bridgePages.b1.stale).toBe(false);
+    // A run that the page holds places itself by the batch of its metadata.
+    s = reduce(s, { type: 'run', run: { id: 'run-helper', agent: 'x', state: 'running', seq: 1, createdAt: '', updatedAt: '', metadata: { 'fw.batch': 'bridge:b1', 'fw.bridge.member': 'reviewer' } } });
+    s = reduce(s, { type: 'stream', event: ev('page', page('k3s/helper.md', { run: 'run-helper' })) });
+    expect(s.bridgePages.b1.byPath['k3s/helper.md'].seat).toBe('reviewer');
+    expect(s.bridgePages.b1.stale).toBe(false);
+    // A workbench without the route marks the list missing, and a reset drops every list.
+    s = reduce(s, { type: 'bridge-pages', bridge: 'b2', pages: null });
+    expect(s.bridgePages.b2.missing).toBe(true);
+    s = reduce(s, { type: 'stream', event: ev('reset', null) });
+    expect(s.bridgePages).toEqual({});
+  });
+
   it('takes a new face', () => {
     const s = reduce(initialState, { type: 'stream', event: ev('face', { agent: 'reviewer', displayName: 'Rev', tagline: 'Reads', hash: 'f2', custom: true }) });
     expect(s.faces.reviewer.hash).toBe('f2');

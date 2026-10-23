@@ -219,6 +219,11 @@
 .msg .cut a {
   font-weight: 600;
 }
+/* Show all sits where the channel cut the text, its word in line with the text above it. */
+.cut-more {
+  margin-left: -12px;
+  color: var(--ink);
+}
 .msg .heart-note {
   grid-column: 2;
 }
@@ -770,10 +775,26 @@
 }
 .prow-meta {
   display: flex;
+  align-items: center;
   gap: var(--s-3);
+  min-width: 0;
   font-size: var(--t-meta);
   line-height: var(--t-meta-lh);
   color: var(--muted);
+}
+/* The seat that wrote the page: its face and its handle, in ink, never cut before the path. */
+.prow-seat {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--s-1);
+  color: var(--ink);
+}
+.prow-path {
+  min-width: 0;
+}
+.prow-meta time {
+  flex: none;
 }
 .cards .entries {
   margin-top: 0;

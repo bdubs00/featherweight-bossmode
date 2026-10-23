@@ -8,6 +8,7 @@ import type {
   AgentSkills,
   BossConfig,
   Bridge,
+  BridgePages,
   Caps,
   Delegation,
   Entry,
@@ -119,6 +120,10 @@ export const api = {
     if (m.skill) body.skill = m.skill.args ? { name: m.skill.name, args: m.skill.args } : { name: m.skill.name };
     return call<Entry>(bridge(id) + '/messages', { method: 'POST', body });
   },
+  /** entry reads one entry with its whole text, up to 64 KB. cut stays true for an old entry whose start alone was kept. */
+  entry: (id: string, seq: number) => call<Entry>(bridge(id) + '/messages/' + enc(seq)),
+  /** bridgePages lists the pages of the work of a bridge: those under bridges/<id>/, and those whose newest version a run of the bridge wrote. */
+  bridgePages: (id: string) => call<BridgePages>(bridge(id) + '/pages').then((r) => (r && r.pages) || []),
   react: (id: string, seq: number, reaction: ReactionKind, note?: string) =>
     call<Entry>(bridge(id) + '/messages/' + enc(seq) + '/reactions', { method: 'POST', body: note ? { reaction, note } : { reaction } }),
   addMember: (id: string, m: NewMember) => call<Member>(bridge(id) + '/members', { method: 'POST', body: m }),

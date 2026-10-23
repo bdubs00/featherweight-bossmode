@@ -521,8 +521,11 @@ The work:
   the More menu with What the manager can do and Reopen. The title takes
   the width that the tabs and the keys leave, and the tabs never shrink.
   Below 1500 pixels, Close bridge moves into More, so the title keeps its
-  room. The tab Wiki lists
-  the pages under `bridges/<id>/`. The tab Decisions lists the cards of the
+  room. The tab Wiki lists the pages of the work of the bridge, from `GET
+  /v1/bridges/{id}/pages`: the pages under `bridges/<id>/` and every page
+  that a run of the bridge wrote last, wherever its agents put it. Each row
+  holds the title, the face and the handle of the seat that wrote it, the
+  path, and `since()`, and links the page in the Wiki. The tab Decisions lists the cards of the
   bridge, waiting first. The routes are `#bridge/<id>/wiki` and
   `#bridge/<id>/decisions`.
 - The entries. Reaction chips at the top right of an entry, with

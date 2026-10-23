@@ -270,6 +270,7 @@ Capacity shows where seating happens:
 | `More` (the menu of the header) | add | it holds `What the manager can do`, `Reopen`, and, below 1500 pixels, `Close bridge`, so the title keeps its room | done |
 | the empty tab Decisions | add | `Nothing needs you.`, the words of Activity | done |
 | the tab Wiki | add | `Loading the pages.` and `New page`, the words of the wiki | done |
+| the pages under `bridges/<id>/` alone, by name (the tab Wiki) | change | every page of the work of the bridge: the title, then the seat that wrote it with its face, the path (without `bridges/<id>/` for a page of that folder), and `14 min`. A page that no seat wrote names its writer, such as `alice`. `Pages of this bridge` for a screen reader | done |
 
 ### src/ui/Message.tsx
 
@@ -284,7 +285,7 @@ Capacity shows where seating happens:
 | `Reply`, `Reply to <who>` | keep | | A |
 | `Go to the message`, `Load earlier messages to see it` | change | `Go to the message`, `Earlier messages hold it` | A |
 | `An earlier message` | keep | | A |
-| `The channel holds the first 4 KB. The run holds the whole text.` | change | `Cut at 4 KB.` with the link `Whole text` to the run | A |
+| `The channel holds the first 4 KB. The run holds the whole text.` | change | a quiet key `Show all` at the cut, which shows the whole entry in place. `Cut at 4 KB.` with the link `Whole text` to the run stays only for an old entry whose start alone was kept | done |
 | `to @a, @b` (address line) | change | `to a and b` | A |
 | new | add | `pinned`, a quiet chip after the clock time of a pinned message, which keeps its header after a message of the same sender | done |
 | the id of a bridge in a message, such as `The bridge is open: 01m5kpw79kyq9j8nbpnhvtwm95` | change | a link with the title of the bridge, open or closed, that opens the bridge, in a code span and in plain text, in a channel, a thread, a conversation, and Activity | done |
@@ -383,7 +384,7 @@ Capacity shows where seating happens:
 | `Fire <handle>?`, `Fire <handle>` | keep | | A |
 | `The open runs of <handle> in this bridge stop, and its seat gets no more messages. Its Task stays in its pool, so other bridges can still use it.` | change | `Its open runs stop, and it gets no more messages.` | A |
 | `Drop here to fire` | change | `Fire` | done |
-| new | add | the footer `This bridge` with turns, cost, and pages, from `usage`, for a bridge whose runs report usage | done |
+| new | add | the footer `This bridge` with turns, cost, and pages, from `usage`, for a bridge whose runs report usage. The pages are the pages of the work of the bridge, as the tab Wiki lists them, wherever its agents wrote them | done |
 | `N turns`, `$N so far`, `N pages` (the figures of the foot, at `--t-control`) | add | `1 turn` and `1 page` for one. A cost below one cent reads `under $0.01 so far`, never `$0.00`, from `src/lib/cost.ts` | done |
 | `Add` (the screen-reader name of the picker) | add | the picker carries the name of the key that opens it | done |
 

@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { act } from 'preact/test-utils';
 import { store } from '../state/store';
 import type { Entry, Fleet } from '../api/types';
-import { Channel, cardOrder, pagesOfBridge } from './Channel';
+import { Channel, cardOrder } from './Channel';
 import { bridgeOf, entryOf, fakeFetch, memberOf, mount, settle, unmountAll } from './testkit-a';
 
 const B = 'b-chan';
@@ -45,6 +45,18 @@ beforeAll(() => {
     ['GET', /^\/v1\/bridges\/b-chan\/messages/, () => ({ bridge: B, messages, next: 0, prev: 0 })],
     ['PUT', /\/read$/, () => null],
     ['GET', /^\/v1\/pages$/, () => ({ pages: [] })],
+    [
+      'GET',
+      /^\/v1\/bridges\/b-chan\/pages$/,
+      () => ({
+        bridge: B,
+        pages: [
+          { path: 'bridges/b-chan/plan.md', title: 'The plan', hash: 'h1', size: 9, by: 'alice@example.com', at: '2026-10-21T20:00:00Z' },
+          { path: 'k3s/monitoring/alerts.md', title: 'Alerts of the node', hash: 'h2', size: 9, by: 'agent:migrator', run: 'run-migrator-1', seat: 'migrator-1', at: '2026-10-21T20:01:00Z' },
+        ],
+        count: 2,
+      }),
+    ],
     ['PATCH', /^\/v1\/bridges\/b-chan$/, (body) => ({ ...bridgeOf(B), ...(body as object), members })],
   ]);
   act(() => {
@@ -169,8 +181,24 @@ describe('the channel', () => {
     expect(cardOrder(list)).toEqual([2, 3, 4, 1]);
   });
 
-  it('lists the pages of the bridge in the tab Wiki', () => {
-    expect(pagesOfBridge(['bridges/b-chan/plan.md', 'bridges/b-chan2/x.md', 'index.md', 'bridges/b-chan/a/b.md'], 'b-chan')).toEqual(['bridges/b-chan/a/b.md', 'bridges/b-chan/plan.md']);
+  it('lists the pages of the work of the bridge in the tab Wiki, wherever its seats wrote them, and keeps the list current', async () => {
+    const el = mount(<Channel id={B} tab="wiki" />);
+    await settle();
+    const rows = () => [...el.querySelectorAll('.prow')] as HTMLAnchorElement[];
+    expect(rows().map((a) => a.getAttribute('href'))).toEqual(['#pages/bridges/b-chan/plan.md', '#pages/k3s/monitoring/alerts.md']);
+    expect(rows().map((a) => a.querySelector('.prow-title')!.textContent)).toEqual(['The plan', 'Alerts of the node']);
+    // The folder of the bridge needs no name, a page elsewhere keeps its path, and each row names who wrote it.
+    expect(rows().map((a) => a.querySelector('.prow-path')!.textContent)).toEqual(['plan', 'k3s/monitoring/alerts']);
+    expect(rows()[0].querySelector('.prow-meta')!.textContent).toMatch(/^alice/);
+    expect(rows()[1].querySelector('.prow-seat')!.textContent).toBe('migrator-1');
+    expect(rows()[1].querySelector('.prow-seat .mark')).not.toBeNull();
+    // A page that a seat of the bridge writes joins the list, and a page that a person writes again leaves it.
+    const page = (path: string, more: object) => ({ type: 'stream' as const, event: { id: '', kind: 'page' as const, data: { path, title: '', hash: 'h', size: 1, by: 'agent:migrator', at: '2026-10-21T20:05:00Z', ...more } } });
+    act(() => store.dispatch(page('k3s/monitoring/rules.md', { title: 'Rules', run: 'run-migrator-2' })));
+    expect(rows().map((a) => a.getAttribute('href'))).toEqual(['#pages/bridges/b-chan/plan.md', '#pages/k3s/monitoring/alerts.md', '#pages/k3s/monitoring/rules.md']);
+    expect(rows()[2].querySelector('.prow-seat')!.textContent).toBe('migrator-2');
+    act(() => store.dispatch(page('k3s/monitoring/alerts.md', { title: 'Alerts', by: 'bob@example.com' })));
+    expect(rows().map((a) => a.querySelector('.prow-title')!.textContent)).toEqual(['The plan', 'Rules']);
   });
 
   it('asks before it closes the bridge, in the words of its key', async () => {

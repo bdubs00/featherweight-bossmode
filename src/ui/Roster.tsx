@@ -12,7 +12,8 @@ import { memo } from 'preact/compat';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { Member, UsageSum } from '../api/types';
 import { useSelect } from '../state/store';
-import { addMember, fire, loadPages, loadRunOnce, patchMember } from '../state/actions';
+import { addMember, fire, loadRunOnce, patchMember } from '../state/actions';
+import { useBridgePages } from '../state/bridgepages';
 import { plainError, providerMessage } from '../lib/runerror';
 import { costParts } from '../lib/cost';
 import { seatPresence, statusOf } from '../lib/status';
@@ -23,7 +24,6 @@ import { attempt } from './notice';
 import { Confirm, Empty, Menu } from './common';
 import { Picker } from './Picker';
 import { draftOf, seatReason, type Draft } from './seats';
-import { pagesOfBridge } from './Channel';
 import { SeatAgainKey, seatAgain } from './SeatAgain';
 import { Button, Chip, Field, Input, Led, Mark, PaneHeader, TextArea } from './primitives';
 
@@ -212,15 +212,12 @@ export function usageParts(u: UsageSum, pages: number): { lead?: string; n: stri
 /** BridgeFoot is the foot of the members: This bridge, with turns, cost, and pages, for runs that report usage. */
 function BridgeFoot({ bridge }: { bridge: string }) {
   const usage = useSelect((s) => (s.bridges.byId[bridge] ? s.bridges.byId[bridge].usage : undefined));
-  const pages = useSelect((s) => pagesOfBridge(Object.keys(s.pages.byPath), bridge).length);
-  const pagesLoaded = useSelect((s) => s.pages.loaded);
+  // The pages of the work of the bridge, wherever its agents wrote them, as the tab Wiki lists them.
+  const pages = useBridgePages(bridge).pages.length;
   // Only the record of one bridge carries usage, so a later change of the record keeps the last one.
   const last = useRef<{ bridge: string; u: UsageSum } | null>(null);
   if (usage) last.current = { bridge, u: usage };
   const u = usage || (last.current && last.current.bridge === bridge ? last.current.u : undefined);
-  useEffect(() => {
-    if (!pagesLoaded) loadPages().catch(() => {});
-  }, [pagesLoaded]);
   if (!u || !u.reported) return null;
   return (
     <footer class="pane-foot bridge-foot">
