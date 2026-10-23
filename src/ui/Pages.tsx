@@ -327,6 +327,8 @@ export function PageView({ path, version }: { path: string; version?: number }) 
 export function PageHistory({ path }: { path: string }) {
   const [versions, setVersions] = useState<PageVersion[] | null>(null);
   const meta = useSelect((s) => s.pages.byPath[path]);
+  // The title that the tree and the page show, else the name of the file.
+  const name = (meta && meta.title) || pageName(path);
   const list = useRoving<HTMLOListElement>();
   useEffect(() => {
     setVersions(null);
@@ -334,7 +336,7 @@ export function PageHistory({ path }: { path: string }) {
   }, [path, meta && meta.hash]);
   return (
     <section class="screen pagehistory" aria-labelledby="history-title">
-      <PaneHeader id="history-title" title={'History of ' + pageName(path)} size="title" level={1} back={{ href: hrefOf({ place: 'pages', path, mode: 'read' }), label: pageName(path), to: 'here' }} />
+      <PaneHeader id="history-title" title={'History of ' + name} size="title" level={1} back={{ href: hrefOf({ place: 'pages', path, mode: 'read' }), label: name, to: 'here' }} />
       <div class="scroll pad">
         {!versions && <p class="t-meta">Loading the history.</p>}
         <ol class="versions" ref={list}>
