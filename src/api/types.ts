@@ -906,3 +906,213 @@ export interface AgentSaved {
   /** On a dry run for workers: their rules, which the rules of the profile can only tighten. */
   workerPolicy?: Rules | null;
 }
+
+/* ---------- duties ---------- */
+
+/** The repeat of a schedule. */
+export type Repeat = 'daily' | 'weekdays' | 'weekly' | 'monthly' | 'hourly' | 'every';
+
+/** A day of the week, as a schedule names it. */
+export type Day = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
+
+/**
+ * The schedule of a duty: a small record that matches how a person says a
+ * time. The front reads each time in timeZone. docs/CONTRACT.md, section
+ * 16, gives the rule of each field.
+ */
+export interface Schedule {
+  repeat: Repeat;
+  /** With weekly, and optional with hourly and every. */
+  days?: Day[];
+  /** 1 to 4, with weekly. 2 is every other week. */
+  everyWeeks?: number;
+  /** With monthly: 1 to 31, last, or first, second, third, fourth, or last with a weekday, such as first monday. */
+  dayOfMonth?: string;
+  /** HH:MM in 24 hours, with daily, weekdays, weekly, and monthly. */
+  times?: string[];
+  /** A span from 15m to 24h, with every. */
+  every?: string;
+  /** Two HH:MM, with hourly and every. */
+  between?: [string, string];
+  timeZone?: string;
+  start?: string;
+  end?: string;
+}
+
+/** An event of the fleet that starts a duty. Phase 1 of the page shows it and keeps it. */
+export interface DutyEvent {
+  kind: string;
+  agent?: string;
+  after?: string;
+  path?: string;
+}
+
+/** What starts a duty: exactly one of a schedule, the words of a person, an event, or a call of another app. */
+export interface DutyWhen {
+  schedule?: Schedule;
+  /** The words of a person, such as every weekday at 9am. The front turns them into a schedule and keeps only the schedule. */
+  say?: string;
+  event?: DutyEvent;
+  webhook?: { auth: { mode: string; secret: string; header?: string } };
+}
+
+/** A filter of the items of a check: a dotted path in an item and one test. */
+export interface CheckWhere {
+  field: string;
+  is?: unknown;
+  isNot?: unknown;
+  oneOf?: unknown[];
+  contains?: unknown;
+  atLeast?: number;
+  atMost?: number;
+}
+
+/** When the items of a check wake the agent: new items (the default), any item, or at a count. */
+export interface CheckWake {
+  when: 'new' | 'any' | 'atLeast';
+  count?: number;
+}
+
+/** Check first: one look at an address or a tool before the duty wakes the model. */
+export interface CheckFirst {
+  look: {
+    http?: { url: string; secret?: string; header?: string };
+    tool?: string;
+    input?: Record<string, unknown>;
+  };
+  /** Where the list is in the answer, such as result.records. */
+  items?: string;
+  /** What makes an item new: the field that names an item. */
+  key?: string;
+  where?: CheckWhere[];
+  wake?: CheckWake;
+}
+
+/** What a duty does: exactly one action. Phase 1 has ask. */
+export interface DutyDo {
+  ask?: { message: string; [k: string]: unknown };
+  post?: { bridge: string; to?: string[]; message: string };
+  open?: { playbook: string; goal?: string };
+  manager?: { message: string };
+}
+
+/** The limits of a duty. budget is required, with at least one limit above zero. */
+export interface DutyLimits {
+  budget: { maxCostUSD?: number; maxTurns?: number; maxTokens?: number; maxToolCalls?: number };
+  perDayUSD?: number;
+  /** skip (the default), queue, or allow, for a time that comes while the last run still works. */
+  overlap?: 'skip' | 'queue' | 'allow';
+  /** A duration from 0 to 24h. A missed time younger than this runs once. */
+  catchUp?: string;
+  retries?: number;
+}
+
+/** Who decides a question of a run of the duty while the person is away, and what happens after the timeout. */
+export interface WhileAway {
+  decider: 'manager' | 'nobody';
+  timeout: string;
+  then: 'deny' | 'cancel';
+}
+
+/** Who hears of a failure and of a question that needs a person. owner is the owner of the duty. */
+export interface DutyNotify {
+  failure?: string[];
+  needsYou?: string[];
+}
+
+/** One run of a duty, as lastRun and the history show it. */
+export interface DutyRun {
+  at: string;
+  /** The time of the schedule that the run belongs to. */
+  slot?: string;
+  /** The run of the agent, or "" for a time that started no run. */
+  run?: string;
+  state: string;
+  costUSD?: number;
+  /** The count of the items that the check found. */
+  found?: number;
+  /** False when the check found no work, so the agent slept. */
+  woke?: boolean;
+  /** Why the time started no run, in words, such as a skip. */
+  reason?: string;
+}
+
+/** The state of a duty that the front keeps. */
+export interface DutyState {
+  lastRun?: DutyRun | null;
+  todayUSD?: number;
+  failuresInRow?: number;
+  /** Why the duty paused itself, such as after three failed runs in a row. */
+  pausedReason?: string;
+}
+
+/** The record of a duty, as the page writes it. */
+export interface DutyRecord {
+  name: string;
+  agent: string;
+  pool?: string;
+  owner?: string;
+  when: DutyWhen;
+  checkFirst?: CheckFirst | null;
+  do: DutyDo;
+  limits: DutyLimits;
+  whileAway?: WhileAway;
+  notify?: DutyNotify;
+  runAs?: string;
+  paused?: boolean;
+  /** The revision that the person read, on a change, so a change in the meantime answers 409. */
+  revision?: number;
+}
+
+/** A duty as a read answers it: the record, and what the front adds. */
+export interface Duty extends DutyRecord {
+  /** store for a duty of the bucket, file for an entry of the settings that the routes never change. */
+  source?: 'store' | 'file' | string;
+  revision?: number;
+  /** The schedule in words, such as Every weekday at 9:00 AM, New York time. */
+  readback?: string;
+  /** The next times, in UTC. */
+  next?: string[];
+  state?: DutyState;
+  /** The last 50 runs, newest first, on a read of one duty. */
+  history?: DutyRun[];
+}
+
+/** The answer of GET /v1/duties. paused is the switch that pauses every duty. */
+export interface DutyList {
+  duties: Duty[];
+  paused: boolean;
+}
+
+/** What a check finds now: at most 20 items, the count, and whether they wake the agent. */
+export interface CheckFound {
+  found: unknown[];
+  count: number;
+  wakes: boolean;
+}
+
+/** A problem of a dry run: a sentence, or a sentence with the field that it concerns. */
+export type DutyProblem = string | { field?: string; path?: string; message?: string; detail?: string };
+
+/** The answer of PUT /v1/duties/{name}?dryRun=true: the record that a save keeps, its readback, the next times, and every problem. */
+export interface DutyDryRun {
+  duty?: Duty | null;
+  readback?: string;
+  next?: string[];
+  problems?: DutyProblem[] | null;
+  /** With test=true: what the check finds now. */
+  check?: CheckFound | null;
+}
+
+/** The answer of POST /v1/duties/{name}/write-check: the check that the agent proposed, its readback, and a test of it. */
+export interface WrittenCheck {
+  checkFirst: CheckFirst;
+  readback?: string;
+  check?: CheckFound | null;
+}
+
+/** The answer of POST /v1/duties/{name}/run: the run that started, or why the duty skipped. */
+export interface DutyStarted {
+  run?: string;
+  skipped?: string;
+}

@@ -1,7 +1,7 @@
 // One function for each route that the page calls. The shapes are in
 // types.ts, and docs/CONTRACT.md says which of them the page chose.
 
-import { call, enc, encPath, query, send, ApiError } from './client';
+import { browserZone, call, enc, encPath, query, send, ApiError } from './client';
 import type {
   Agent,
   AgentSaved,
@@ -12,6 +12,11 @@ import type {
   BridgePages,
   Caps,
   Delegation,
+  Duty,
+  DutyDryRun,
+  DutyList,
+  DutyRecord,
+  DutyStarted,
   Entry,
   FaceMeta,
   FileView,
@@ -44,6 +49,7 @@ import type {
   Transcript,
   Whoami,
   WorkersAsk,
+  WrittenCheck,
 } from './types';
 
 const bridge = (id: string) => '/v1/bridges/' + enc(id);
@@ -91,6 +97,11 @@ async function orNull<T>(p: Promise<T>): Promise<T | null> {
 }
 
 const pool = (name: string) => '/v1/pools/' + enc(name);
+
+const duty = (name: string) => '/v1/duties/' + enc(name);
+
+/** dutyCall calls a route of the duties with X-Time-Zone, the zone of the browser, in which the front reads a time that a person says. */
+const dutyCall = <T>(path: string, opts: { method?: string; body?: unknown } = {}) => call<T>(path, { ...opts, headers: { 'X-Time-Zone': browserZone() } });
 
 export const api = {
   whoami: () => call<Whoami>('/v1/whoami'),
@@ -236,6 +247,28 @@ export const api = {
   removeSkill: (name: string) => call<null>('/v1/bossmode/skills/' + enc(name), { method: 'DELETE' }),
   /** runSkill hands a skill to a run as a slash command of the person. The answer is 202 with the run. */
   runSkill: (run: string, s: SkillCall) => call<Run>('/v1/bossmode/runs/' + enc(run) + '/skill', { method: 'POST', body: s.args ? { name: s.name, args: s.args } : { name: s.name } }),
+
+  /** duties lists the duties that the caller can view, and paused, the switch that pauses every duty. */
+  duties: () => dutyCall<DutyList>('/v1/duties').then((r) => ({ duties: (r && r.duties) || [], paused: !!(r && r.paused) })),
+  /** duty reads one duty with its history, the last 50 runs, newest first. */
+  duty: (name: string) => dutyCall<Duty>(duty(name)),
+  /**
+   * putDuty creates (201) or changes (200) a duty. With dryRun it saves
+   * nothing and answers the record, the readback, the next times, and
+   * every problem. With test it also runs the check once.
+   */
+  putDuty: (name: string, record: DutyRecord) => dutyCall<Duty>(duty(name), { method: 'PUT', body: record }),
+  dryRunDuty: (name: string, record: DutyRecord, test = false) =>
+    dutyCall<DutyDryRun>(duty(name) + query({ dryRun: 'true', test: test ? 'true' : undefined }), { method: 'PUT', body: record }),
+  /** pauseDuty pauses or resumes one duty. */
+  pauseDuty: (name: string, paused: boolean) => dutyCall<Duty>(duty(name), { method: 'PATCH', body: { paused } }),
+  deleteDuty: (name: string) => dutyCall<null>(duty(name), { method: 'DELETE' }),
+  /** runDuty starts a duty now, out of its schedule: the run, or why it skipped. */
+  runDuty: (name: string) => dutyCall<DutyStarted>(duty(name) + '/run', { method: 'POST', body: {} }),
+  /** writeCheck asks the agent of a duty for a check from the words of a person. A 422 says why it could not. */
+  writeCheck: (name: string, words: string) => dutyCall<WrittenCheck>(duty(name) + '/write-check', { method: 'POST', body: { words } }),
+  /** pauseAllDuties is the switch that pauses or resumes every duty, for an admin. */
+  pauseAllDuties: (paused: boolean, reason?: string) => dutyCall<unknown>('/v1/duties', { method: 'PATCH', body: reason ? { paused, reason } : { paused } }),
 
   faces: () => call<{ faces: FaceMeta[] }>('/v1/faces').then((r) => (r && r.faces) || []),
   /** faceBlob reads a face as SVG bytes behind the token. */

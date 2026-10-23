@@ -221,3 +221,16 @@ export function query(params: Record<string, string | number | undefined | null 
   const s = q.toString();
   return s ? '?' + s : '';
 }
+
+/**
+ * browserZone is the IANA time zone of the browser, such as
+ * America/New_York, or UTC where the browser names none. The duties read a
+ * time that a person says in this zone.
+ */
+export function browserZone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  } catch {
+    return 'UTC';
+  }
+}
