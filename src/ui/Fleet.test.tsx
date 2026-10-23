@@ -3,6 +3,8 @@ import { act } from 'preact/test-utils';
 import { FleetList } from './Fleet';
 import { Board } from './Board';
 import { FLEET, fakeFetch, mount, seedFleet, unmountAll } from './testkit-b';
+import { settle } from './testkit-a';
+import { currentNotice } from './notice';
 import { store } from '../state/store';
 
 let restore = () => {};
@@ -94,5 +96,61 @@ describe('the board', () => {
     expect(el.querySelector('.strip-seg[aria-pressed="true"]')!.textContent).toBe('1 needs you');
     act(() => (el.querySelector('.strip-seg[aria-pressed="true"]') as HTMLButtonElement).click());
     expect(el.querySelectorAll('a.board-light').length).toBe(4);
+  });
+});
+
+describe('the orphan Tasks', () => {
+  const orphan = (member: string, open = 0) => ({ member, parent: 'ax:default/manager-0', phase: 'Suspended', open });
+  const button = (root: Element, text: string) => [...root.querySelectorAll('button')].find((b) => b.textContent === text) as HTMLButtonElement;
+
+  it('tells an admin how many child Tasks lost their parent, and removes them after a confirmation', async () => {
+    let left = [orphan('default/manager-0-a', 1), orphan('default/manager-0-b')];
+    const f = fakeFetch([
+      ['GET', /^\/v1\/fleet\/orphans$/, () => ({ orphans: left })],
+      [
+        'DELETE',
+        /^\/v1\/fleet\/orphans$/,
+        () => {
+          const removed = left.map((o) => o.member);
+          left = [];
+          return { removed, failed: [] };
+        },
+      ],
+    ]);
+    const el = mount(<FleetList />);
+    await settle();
+    const note = el.querySelector('.orphan-note')!;
+    expect(note.querySelector('p')!.textContent).toContain('2 child Tasks lost their parent.');
+    act(() => button(note, 'Remove').click());
+    const dialog = el.querySelector('dialog.confirm')!;
+    expect(dialog.querySelector('h2')!.textContent).toBe('Remove 2 child Tasks?');
+    expect(dialog.textContent).toContain('1 of them holds a run that did not end, and that run stops.');
+    act(() => button(dialog, 'Remove 2 Tasks').click());
+    await settle();
+    expect(f.calls.filter((c) => c.method === 'DELETE').map((c) => c.path)).toEqual(['/v1/fleet/orphans']);
+    expect(el.querySelector('dialog.confirm')).toBeNull();
+    expect(el.querySelector('.orphan-note')).toBeNull();
+  });
+
+  it('names each Task that stays after a removal', async () => {
+    fakeFetch([
+      ['GET', /^\/v1\/fleet\/orphans$/, () => ({ orphans: [orphan('default/manager-0-a')] })],
+      ['DELETE', /^\/v1\/fleet\/orphans$/, () => ({ removed: [], failed: [{ member: 'default/manager-0-a', error: 'the ax API did not answer' }] })],
+    ]);
+    const el = mount(<FleetList />);
+    await settle();
+    act(() => button(el.querySelector('.orphan-note')!, 'Remove').click());
+    act(() => button(el.querySelector('dialog.confirm')!, 'Remove the Task').click());
+    await settle();
+    expect(currentNotice()).toBe('1 Task stays: default/manager-0-a, the ax API did not answer.');
+    expect(el.querySelector('.orphan-note p')!.textContent).toContain('1 child Task lost its parent.');
+  });
+
+  it('shows nothing to a person who is no admin', async () => {
+    const f = fakeFetch([['GET', /^\/v1\/fleet\/orphans$/, () => new Response(JSON.stringify({ status: 403, detail: 'no' }), { status: 403, headers: { 'Content-Type': 'application/problem+json' } })]]);
+    const el = mount(<FleetList />);
+    await settle();
+    expect(f.calls.some((c) => c.path === '/v1/fleet/orphans')).toBe(true);
+    expect(el.querySelector('.orphan-note')).toBeNull();
   });
 });

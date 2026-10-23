@@ -1,11 +1,13 @@
 // The Fleet place. The list pane holds the people: the seats of every open
 // bridge, grouped by bridge, then the agents that sit on no bridge, with a
-// field to find a member and a key that switches to the board. The main
+// field to find a member, a key that switches to the board, and for an
+// admin the child Tasks that lost their parent. The main
 // pane holds the conversation with an agent that sits on no bridge, the
 // manager among them, as a run. The details pane holds the profile.
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
+import type { Orphan } from '../api/types';
 import { go, hrefOf, parseRoute, type Route } from '../lib/route';
 import { awakeCount, statusOf } from '../lib/status';
 import { store, useSelect } from '../state/store';
@@ -25,7 +27,8 @@ import { useLiveAnswer } from './Live';
 import { answerSeqs, lastSeq, works } from '../lib/chat';
 import { Profile } from './Profile';
 import { EmptyPane } from './Shell';
-import { Button, Chip, Find, IconButton, Led, Mark, PaneHeader } from './primitives';
+import { Confirm } from './common';
+import { Button, Chip, Find, Help, IconButton, Led, Mark, PaneHeader } from './primitives';
 import type { Tone } from '../lib/presence';
 
 /** The width from which two panes show side by side, as App names it. */
@@ -112,6 +115,61 @@ function PersonLink({ r, on }: { r: PersonRow; on: boolean }) {
   );
 }
 
+/**
+ * OrphanNote tells an admin about the child Tasks whose parent Task is
+ * gone, such as the children of a Task that a pool replaced. Nothing else
+ * removes them, so the note offers to, after a confirmation. A person who
+ * is no admin, and a front without the list, see nothing.
+ */
+export function OrphanNote() {
+  const [orphans, setOrphans] = useState<Orphan[] | null>(null);
+  const [asking, setAsking] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const resets = useSelect((s) => s.resets);
+  const read = () =>
+    api
+      .orphans()
+      .then(setOrphans)
+      .catch(() => setOrphans(null));
+  useEffect(() => {
+    read();
+  }, [resets]);
+  if (!orphans || !orphans.length) return null;
+  const n = orphans.length;
+  const open = orphans.filter((o) => o.open > 0).length;
+  const tasks = n === 1 ? '1 child Task' : n + ' child Tasks';
+  const remove = async () => {
+    setBusy(true);
+    await attempt(async () => {
+      const r = await api.removeOrphans();
+      if (r.failed.length) throw new Error((r.failed.length === 1 ? '1 Task stays: ' : r.failed.length + ' Tasks stay: ') + r.failed.map((f) => f.member + ', ' + f.error).join('; ') + '.');
+    });
+    setBusy(false);
+    setAsking(false);
+    read();
+    loadFleet().catch(() => {});
+  };
+  return (
+    <div class="orphan-note" role="status">
+      <p>
+        {tasks} lost {n === 1 ? 'its' : 'their'} parent.{' '}
+        <Help label="What a child Task without its parent is">
+          An agent starts a child Task for a piece of work, and the Task that started it removes it when the work ends. Here that Task is gone, for example because a pool replaced it, so nothing removes {n === 1 ? 'this one' : 'these'}.
+        </Help>
+      </p>
+      <Button size="s" onClick={() => setAsking(true)}>
+        Remove
+      </Button>
+      {asking && (
+        <Confirm title={'Remove ' + tasks + '?'} confirm={n === 1 ? 'Remove the Task' : 'Remove ' + n + ' Tasks'} danger busy={busy} onConfirm={remove} onCancel={() => setAsking(false)}>
+          <p>The Task that started {n === 1 ? 'it' : 'them'} is gone. A removed Task takes its runs with it.</p>
+          {open > 0 && <p>{n === 1 ? 'It holds' : open === 1 ? '1 of them holds' : open + ' of them hold'} a run that did not end, and that run stops.</p>}
+        </Confirm>
+      )}
+    </div>
+  );
+}
+
 /** FleetList is the list pane of the Fleet place: the people grouped by bridge, then Not on a bridge. */
 export function FleetList({ current, member }: { current?: string; member?: string }) {
   const route = useHashRoute();
@@ -148,6 +206,7 @@ export function FleetList({ current, member }: { current?: string; member?: stri
       <div class="list-find">
         <Find label="Find a member" value={q} onInput={setQ} />
       </div>
+      <OrphanNote />
       <div class="scroll" ref={list}>
         {shown.map((g) => (
           <div class="people-group" role="group" aria-labelledby={'pg-' + (g.key || 'none')}>
