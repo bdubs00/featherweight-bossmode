@@ -1032,7 +1032,7 @@ for the lab and the manager.
 
 | Route | What the page does with it |
 |---|---|
-| `GET /v1/routines` | `{"routines": [<record>]}`, newest change first, without `evidence`. The list pane calls it without `agent`, and the workbench answers the routines of every agent that the person can view. `?agent=<name>` narrows it to one agent. |
+| `GET /v1/routines` | `{"routines": [<record>]}`, newest change first, without `evidence`. The list pane calls it without `agent`, and the workbench answers the routines of every agent that the person can view. `?agent=<name>` narrows it to one agent. A 404 means that the front keeps no routines: `workbench.routines.enabled` is false, or the bus keeps no store. The place then says `Routines are off.` |
 | `GET /v1/routines/{agent}/{name}` | The record with `evidence`, always present and empty for a new version. The list leaves out evidence, and a row needs it for its meta line, so the page reads each routine that is not retired. A 404 says in place that the routine is gone. |
 | `POST /v1/routines/{agent}/{name}/standing` | `{"standing", "note", "version"}`. `version` is `routine.version` of the record that the person read, on every move. The page leaves out an empty note. The answer is the record, and the page reads the record again with its evidence. A 409 means that the routine changed: a newer version, or another standing. The page then reads the record again and shows it under the quiet line `This routine changed. Read it again.`, with no notice. A sign-off by the static token answers 403, and the notice shows its sentence. |
 | `GET /v1/routines/summary?agent=<name>&days=7` | The week of the agent in the details pane. A 404 leaves the week out. |
@@ -1091,7 +1091,8 @@ The evidence of the current version:
 - `totals` counts the version, and `days` holds the last 90 days in UTC.
   On a rehearsing routine `decided` is `acted` plus `handed`. `agreed` and
   `disagreed` count only the runs on which the routine was sure enough to
-  act.
+  act. The card of a sign-off shows `agreed / acted` with `acted`, such as
+  `97.6% of 1,432`.
   `handed` counts every decision that did not apply, and `applied` and
   `failed` count the live runs. The card of a sign-off and the meta lines
   take their figures from `totals`, and the bars of the rehearsal from

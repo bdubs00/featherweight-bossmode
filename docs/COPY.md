@@ -711,6 +711,7 @@ column Now names the string of the approved boards where one changed.
 | `triage, from 14 tickets` (a proposed row of the board) | change | `triage, 2 d`, the time of the proposal. The card of the routine says `Proposed from 14 tickets`, so the number shows once. | done |
 | `triage, signed off just now` (a row of the board) | change | `triage, 0 this week`, the meta of every live row. The quiet card says when. | done |
 | new | add | `Loading the routines.`, `No routine yet.`, `No routine holds those words.`, `Pick a routine.` | done |
+| new | add | `Routines are off.` with the question mark `Where routines are turned on` and `The setting workbench.routines.enabled turns them on. The front keeps them on its bus, which must be nats or mem.`, on a front that answers 404 to the list | done |
 
 ### src/ui/Routines.tsx: a routine
 
@@ -726,6 +727,7 @@ column Now names the string of the approved boards where one changed.
 | `Needs your sign-off` | keep | `Needs a sign-off` for a person who does not own the agent, who gets no key | done |
 | `Triage rehearsed this routine on 1,480 tickets over 12 days. It still handed each ticket to the agent, and the two were compared.` | remove | the row says the size of the rehearsal, and the Evidence tab says the rest | done |
 | `97.6%` `agreed with the agent`, `48` `handed to the agent`, `0` `sent back by a requester` | change | `agreed with the agent`, `handed to the agent`, `sent back`, the three figures of the card | done |
+| `97.6%` (the first figure of the card) | change | `97.6% of 1,432`: the share, and the tickets that the routine would have acted on, so the sample shows beside the share | done |
 | `Signed off, it handles these tickets on its own. The agent still checks 1 in 20.` | remove | the chrome never explains | done |
 | `Note` | keep | the field of the decision card, with the placeholder `Optional` | done |
 | `Not yet`, `Sign off` | keep | the two keys of the card. Sign off is the primary key. | done |

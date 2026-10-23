@@ -96,11 +96,24 @@ function RoutineRow({ r, on }: { r: RoutineRecord; on: boolean }) {
   );
 }
 
+/** OffWords say that the front keeps no routines, with where they are turned on behind the question mark. */
+function OffWords() {
+  return (
+    <>
+      Routines are off.{' '}
+      <Help label="Where routines are turned on">
+        The setting <code>workbench.routines.enabled</code> turns them on. The front keeps them on its bus, which must be <code>nats</code> or <code>mem</code>.
+      </Help>
+    </>
+  );
+}
+
 /** RoutineList is the list pane: the routines in the order of attention, with Find a routine and the retired ones behind a toggle. */
 export function RoutineList({ agent, name }: { agent?: string; name?: string }) {
   const order = useRoutines((s) => s.order);
   const byKey = useRoutines((s) => s.byKey);
   const error = useRoutines((s) => s.error);
+  const off = useRoutines((s) => s.off);
   const [q, setQ] = useState('');
   const [retiredOpen, setRetiredOpen] = useState(false);
   const list = useRoving<HTMLDivElement>();
@@ -117,6 +130,20 @@ export function RoutineList({ agent, name }: { agent?: string; name?: string }) 
   const live = all.filter((r) => r.standing === 'live').length;
   // A retired routine that the address names, or that a search finds, shows its group.
   const showRetired = retiredOpen || !!words || (!!retired && retired.items.some((r) => keyOf(r.agent, r.routine.name) === current));
+  if (off) {
+    return (
+      <section class="screen rt-list" aria-labelledby="routines-title">
+        <PaneHeader id="routines-title" title="Routines" />
+        <div class="scroll">
+          <div class="empty">
+            <p>
+              <OffWords />
+            </p>
+          </div>
+        </div>
+      </section>
+    );
+  }
   return (
     <section class="screen rt-list" aria-labelledby="routines-title">
       <PaneHeader id="routines-title" title="Routines" count={order ? count : undefined} countLabel={count === 1 ? '1 routine' : count + ' routines'}>
@@ -194,6 +221,7 @@ function RoutineHome() {
   const order = useRoutines((s) => s.order);
   const byKey = useRoutines((s) => s.byKey);
   const error = useRoutines((s) => s.error);
+  const off = useRoutines((s) => s.off);
   const first = useMemo(() => {
     const g = groupsOf((order || []).map((k) => byKey[k]).filter((r) => r && r.standing !== 'retired'));
     return g.length ? g[0].items[0] : undefined;
@@ -204,7 +232,7 @@ function RoutineHome() {
   }, [href]);
   return (
     <EmptyPane back={{ href: '#routines', label: 'Routines' }}>
-      <p>{error && !order ? error : !order ? 'Loading the routines.' : order.length === 0 ? 'No routine yet.' : 'Pick a routine.'}</p>
+      <p>{off ? <OffWords /> : error && !order ? error : !order ? 'Loading the routines.' : order.length === 0 ? 'No routine yet.' : 'Pick a routine.'}</p>
     </EmptyPane>
   );
 }
@@ -257,6 +285,7 @@ function RoutineView({ agent, name, tab }: { agent: string; name: string; tab: R
   const key = keyOf(agent, name);
   const rec = useRoutines((s) => s.byKey[key]);
   const gone = useRoutines((s) => !!s.gone[key]);
+  const off = useRoutines((s) => s.off);
   const owner = useOwner(agent);
   const agentName = useAgentName(agent);
   const [failed, setFailed] = useState('');
@@ -286,7 +315,7 @@ function RoutineView({ agent, name, tab }: { agent: string; name: string; tab: R
       <section class="screen routine" aria-labelledby="routine-title">
         <PaneHeader id="routine-title" title={title} size="title" level={1} back={back} />
         <div class="empty center">
-          <p>{gone ? 'This routine is not here. It was removed, or you cannot see it.' : failed || 'Loading the routine.'}</p>
+          <p>{gone && off ? <OffWords /> : gone ? 'This routine is not here. It was removed, or you cannot see it.' : failed || 'Loading the routine.'}</p>
         </div>
       </section>
     );
