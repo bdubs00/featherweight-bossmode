@@ -34,24 +34,47 @@ import { useToolCatalog } from '../state/tools';
 const WORKER_HELP = 'A worker runs the work of one agent, one seat at a time. Keep is how many it keeps ready.';
 const POLL_MS = 10_000;
 
-/** usePool reads Keep and the gaps of the workers of an agent now and every 10 seconds while the profile is open, and the counts of today. */
+/**
+ * usePool reads Keep and the gaps of the workers of an agent now and every
+ * 10 seconds while the profile is open, and the counts of today. The page
+ * asks only what exists: it reads a pool only once the fleet names it, so a
+ * profile of the front costs no read, and it stops a read that answered
+ * 404, so a workbench without the route of today costs no request every 10
+ * seconds.
+ */
 function usePool(agent: string): [Pool | null | undefined, (p: Pool | null) => void, Today | null | undefined] {
   const [pool, setPool] = useState<Pool | null | undefined>(undefined);
   const [today, setToday] = useState<Today | null | undefined>(undefined);
   const name = useSelect((s) => poolNameOf(s.fleet, agent));
+  // The fleet names the pools, so the page waits for it before it reads one, and the read of the fleet after a new agent names its pool.
+  const pooled = useSelect((s) => (s.fleet ? (s.fleet.pools || []).some((p) => p.agent === agent) : undefined));
   useEffect(() => {
     let live = true;
-    setPool(undefined);
+    let askPool = pooled === true;
+    let askToday = true;
+    setPool(pooled === false ? null : undefined);
     setToday(undefined);
     const read = () => {
-      api
-        .pool(name)
-        .then((p) => live && setPool(p))
-        .catch(() => live && setPool((old) => (old === undefined ? null : old)));
-      api
-        .today(agent)
-        .then((t) => live && setToday(t))
-        .catch(() => live && setToday((old) => (old === undefined ? null : old)));
+      if (askPool) {
+        api
+          .pool(name)
+          .then((p) => {
+            if (!live) return;
+            if (!p) askPool = false;
+            setPool(p);
+          })
+          .catch(() => live && setPool((old) => (old === undefined ? null : old)));
+      }
+      if (askToday) {
+        api
+          .today(agent)
+          .then((t) => {
+            if (!live) return;
+            if (!t) askToday = false;
+            setToday(t);
+          })
+          .catch(() => live && setToday((old) => (old === undefined ? null : old)));
+      }
     };
     read();
     const t = setInterval(read, POLL_MS);
@@ -59,16 +82,25 @@ function usePool(agent: string): [Pool | null | undefined, (p: Pool | null) => v
       live = false;
       clearInterval(t);
     };
-  }, [agent, name]);
+  }, [agent, name, pooled]);
   return [pool, setPool, today];
 }
 
-/** useLiked reads the page of what people liked about an agent, again when the page changes. */
+/**
+ * useLiked reads the page of what people liked about an agent, again when
+ * the page changes. Once the page knows the list of the wiki, it reads no
+ * page that the list does not hold: an agent without a heart costs no read.
+ */
 function useLiked(agent: string): { path: string; items: LikedEntry[] | null } {
   const path = 'agents/' + agent + '/learned.md';
   const hash = useSelect((s) => (s.pages.byPath[path] ? s.pages.byPath[path].hash : ''));
+  const absent = useSelect((s) => s.pages.loaded && !s.pages.byPath[path]);
   const [items, setItems] = useState<LikedEntry[] | null>(null);
   useEffect(() => {
+    if (absent) {
+      setItems([]);
+      return;
+    }
     let live = true;
     api
       .page(path)
@@ -81,7 +113,7 @@ function useLiked(agent: string): { path: string; items: LikedEntry[] | null } {
     return () => {
       live = false;
     };
-  }, [path, hash]);
+  }, [path, hash, absent]);
   return { path, items };
 }
 

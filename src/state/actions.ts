@@ -4,7 +4,7 @@
 import { api, type NewBridge, type NewMember, type NewMessage } from '../api/routes';
 import { openStream, type StreamHandle } from '../api/stream';
 import type { Entry, Fleet, FleetChange, MessageEventData, ReactionKind, RunState, StreamEvent } from '../api/types';
-import { managerRunOf } from './reducer';
+import { managerRunOf, type State } from './reducer';
 import { store } from './store';
 import { ApiError, type SigninNeeded } from '../api/client';
 
@@ -185,8 +185,9 @@ const OPEN_STATES = ['queued', 'running', 'input-required', 'suspended'];
 export async function loadOpenRuns(): Promise<void> {
   const runs = await once('open-runs', () => api.fleetRuns({ state: 'active' }));
   const listed = new Set(runs.map((r) => r && r.id));
+  const lost = store.get().lost;
   const left = Object.values(store.get().runs)
-    .filter((r) => !!r.member && OPEN_STATES.includes(r.state) && !listed.has(r.id))
+    .filter((r) => !!r.member && OPEN_STATES.includes(r.state) && !listed.has(r.id) && !lost[r.id])
     .map((r) => r.id);
   store.dispatch({ type: 'open-runs', runs });
   for (const id of left) {
@@ -246,7 +247,8 @@ export function noteLost(id: string, e: unknown): void {
  * current after that.
  */
 export async function loadRunOnce(id: string): Promise<void> {
-  if (!id || askedRuns.has(id) || store.get().runs[id]) return;
+  // A run that the fleet lost answers 404 to every read, so the page asks it no more.
+  if (!id || askedRuns.has(id) || store.get().runs[id] || store.get().lost[id]) return;
   askedRuns.add(id);
   try {
     const run = await api.run(id);
@@ -271,6 +273,18 @@ export function forgetRuns(): void {
  */
 export async function loadAgentSkills(agent: string): Promise<void> {
   if (!agent || store.get().agentSkills[agent]) return;
+  // The front answers the skills of an agent that a pool runs, and of a
+  // profile of its own. A profile that only a member of the fleet holds,
+  // such as a profile of the process of a worker, answers 404, so the page
+  // takes it as no skill without a request.
+  // The page first learns the fleet and the profiles, so it never asks the front for an agent that it cannot answer.
+  const known = store.get();
+  if (!known.fleet || !known.agents) await Promise.allSettled([known.fleet ? null : loadFleet(), known.agents ? null : loadAgents()]);
+  if (store.get().agentSkills[agent]) return;
+  if (!skillsAnswerFor(store.get(), agent)) {
+    store.dispatch({ type: 'agent-skills', agent, skills: [] });
+    return;
+  }
   try {
     const r = await once('agent-skills:' + agent, () => api.agentSkills(agent));
     store.dispatch({ type: 'agent-skills', agent, skills: ((r && r.skills) || []).map((x) => x.name) });
@@ -279,6 +293,20 @@ export async function loadAgentSkills(agent: string): Promise<void> {
     if (e instanceof ApiError && (e.status === 404 || e.status === 403)) store.dispatch({ type: 'agent-skills', agent, skills: [] });
     else throw e;
   }
+}
+
+/**
+ * skillsAnswerFor reports whether the front can answer the skills of an
+ * agent: a pool runs it, a worker of a pool holds it, or it is a profile
+ * of the front itself. A profile that only a member outside the pools
+ * holds is none of these. Before the page knows both the fleet and the
+ * profiles of the front, it asks.
+ */
+export function skillsAnswerFor(s: Pick<State, 'fleet' | 'agents'>, agent: string): boolean {
+  const fleet = s.fleet;
+  if (!fleet || !s.agents) return true;
+  if ((fleet.pools || []).some((p) => p.agent === agent) || s.agents.some((a) => a.name === agent)) return true;
+  return (fleet.members || []).some((m) => !m.self && (m.agents || []).some((a) => a && a.name === agent) && holdsTask(fleet, m.name));
 }
 
 /** forgetAgentSkills drops the skills of every agent. */

@@ -692,7 +692,9 @@ the facts. That is a newest run that the page does not hold, or a finished
 run on a worker whose phase the page does not know. A run that the fleet
 lost counts as missing: a line of `event: lost` names it, or a read of it
 answers 404. So does a run on a worker that left the fleet view, as after
-a roll of the workers. A worker is busy while it holds an open run. Until the page reads the open runs, the `active`
+a roll of the workers. The page reads a lost run no more, also after a
+reset of the stream, until a run event brings it back, and the 404 raises
+no notice. A worker is busy while it holds an open run. Until the page reads the open runs, the `active`
 count of `GET /v1/fleet` stands in.
 
 A read of the result, the transcript, or the files of a run wakes a worker
@@ -754,7 +756,13 @@ A skill of the catalog:
 - "Agents that can load it" on the Skills place comes from
   `GET /v1/agents/{name}/skills` of each agent that the fleet lists. The
   page reads them while the Skills place is open and forgets them when it
-  closes. A slash menu reads the skills of its one agent the same way.
+  closes. A slash menu reads the skills of its one agent the same way. The
+  route answers an agent that a pool runs, a profile that a worker of a
+  pool holds, and a profile of the front, and 404 for any other name. So
+  the page first reads the fleet and the profiles of the front, and asks
+  for no other agent, such as a profile of the process of a member outside
+  the pools: that agent loads no skill. A 404 also means no skill, with no
+  notice and no second read.
 
 A source names exactly one of these, as top-level fields:
 
@@ -835,7 +843,10 @@ from its pool.
 The page never says pool to a person: the profile says Workers and Keep.
 While the profile is open, it reads `GET /v1/pools/{name}` every 10
 seconds. That read gives Keep (`wanted`) and the `gaps`, which no event of
-the stream carries. The workers and their phases come from the stream (section 10.1),
+the stream carries. The page reads a pool only once the fleet view names
+it, and it stops a read of the pool or of Today that answered 404. The
+profile reads `agents/<agent>/learned.md` only while the list of the wiki,
+once loaded, holds it. The workers and their phases come from the stream (section 10.1),
 never from that read.
 
 ## 14. What the page does not call yet

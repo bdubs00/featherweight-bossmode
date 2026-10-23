@@ -84,15 +84,19 @@ describe('the Skills place', () => {
   });
 
   it('reads the skills of each agent of the fleet while the place is open, and forgets them when it closes', async () => {
-    // The agents of the fleet: a pool runs the migrator, and a member holds the scribe. The profile of the front itself names no worker.
+    // The agents of the fleet: a pool runs the migrator, and its worker holds the scribe too. A member outside
+    // the pools holds the profiles of its own process, such as paybot, whose skills the front cannot answer.
     act(() => {
       store.dispatch({ type: 'agents', agents: [{ name: 'default', role: 'owner' }] });
       store.dispatch({
         type: 'fleet',
         fleet: {
           name: 'front-0',
-          members: [{ name: 'default/notes-0', state: 'live', lastSeen: '', canForward: true, accessMode: '', agents: [{ name: 'scribe', role: 'operator' }], active: 0, inputRequired: 0 }],
-          pools: [{ name: 'crew', atespace: 'default', agent: 'migrator', intake: 'q', wanted: 1, actual: 1, ready: 1, hash: 'h', checkedAt: '', tasks: [] }],
+          members: [
+            { name: 'default/crew-0', state: 'live', lastSeen: '', canForward: true, accessMode: '', agents: [{ name: 'migrator', role: 'owner' }, { name: 'scribe', role: 'operator' }], active: 0, inputRequired: 0 },
+            { name: 'default/lab-0', state: 'quiet', lastSeen: '', canForward: true, accessMode: '', agents: [{ name: 'paybot', role: 'operator' }], active: 0, inputRequired: 0 },
+          ],
+          pools: [{ name: 'crew', atespace: 'default', agent: 'migrator', intake: 'q', wanted: 1, actual: 1, ready: 1, hash: 'h', checkedAt: '', tasks: [{ name: 'crew-0', phase: 'Running', current: true }] }],
         },
       });
     });
@@ -103,7 +107,9 @@ describe('the Skills place', () => {
     });
     const el = mount(<SkillList />);
     await settle();
-    expect(store.get().agentSkills).toEqual({ migrator: ['ansible-style'], scribe: ['ansible-style', 'release-notes'] });
+    // paybot loads no skill, and the page never asks the front for it.
+    expect(store.get().agentSkills).toEqual({ migrator: ['ansible-style'], scribe: ['ansible-style', 'release-notes'], paybot: [] });
+    expect(api.calls.some((c) => c.path.includes('/agents/paybot'))).toBe(false);
     expect(el.querySelector('.srow')).toBeTruthy();
     unmountAll();
     expect(store.get().agentSkills).toEqual({});

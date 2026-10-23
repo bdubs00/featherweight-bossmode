@@ -142,6 +142,22 @@ describe('the profile', () => {
     expect([...el.querySelectorAll('.today b')].map((b) => b.textContent)).toEqual(['1', '$0.01', '0']);
   });
 
+  it('reads no pool for an agent that no pool runs, so its profile asks nothing that answers 404', async () => {
+    const el = mount(<Profile agent="reviewer" />);
+    await vi.waitFor(() => expect(calls.some((c) => c.path.startsWith('/v1/bossmode/agents/reviewer/today'))).toBe(true));
+    expect(calls.some((c) => c.path.startsWith('/v1/pools/'))).toBe(false);
+    expect(el.querySelector('.keep-read, .keep input')).not.toBeNull();
+  });
+
+  it('reads no page of hearts that the list of the wiki does not hold', async () => {
+    act(() => store.dispatch({ type: 'pages', pages: [{ path: 'index.md', title: 'Index', hash: 'h', by: 'alice', at: '', size: 1 }] }));
+    const el = mount(<Profile agent="migrator" />);
+    await vi.waitFor(() => expect(el.querySelector('.liked-sec, [aria-labelledby="liked-migrator"]')).not.toBeNull());
+    await new Promise((r) => setTimeout(r, 20));
+    expect(calls.some((c) => c.path.startsWith('/v1/pages/agents/migrator/learned.md'))).toBe(false);
+    expect(el.querySelector('[aria-labelledby="liked-migrator"] .chip')!.textContent).toContain('0');
+  });
+
   it('words each worker from the phase of the stream, never from the read of the pool', async () => {
     const el = mount(<Profile agent="migrator" />);
     await vi.waitFor(() => expect(calls.some((c) => c.path === '/v1/pools/crew')).toBe(true));

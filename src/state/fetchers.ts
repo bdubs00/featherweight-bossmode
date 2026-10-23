@@ -39,7 +39,7 @@ export function ensureRosters(): void {
 export function ensureRuns(ids: string[]): void {
   const s = store.get();
   void pool(
-    ids.filter((id) => id && !s.runs[id]),
+    ids.filter((id) => id && !s.runs[id] && !s.lost[id]),
     3,
     loadRunOnce,
   );
@@ -126,7 +126,9 @@ export function refreshAfterReset(): void {
     if (!r) continue;
     for (const h of r.order) {
       const m = r.byHandle[h];
-      if (m && !m.fired && m.runs.length && (m.presence === 'working' || m.presence === 'needs-you')) runs.push(m.runs[m.runs.length - 1]);
+      const newest = m && m.runs.length ? m.runs[m.runs.length - 1] : '';
+      // A run that the fleet lost answers 404 to every read, so a reset does not ask it again.
+      if (m && !m.fired && newest && !s.lost[newest] && (m.presence === 'working' || m.presence === 'needs-you')) runs.push(newest);
     }
   }
   void pool(runs, 3, async (id) => {
