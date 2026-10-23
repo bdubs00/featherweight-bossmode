@@ -126,10 +126,13 @@
   flex: 1;
   min-height: 0;
 }
+/* A pane scrolls down and never sideways: long code and long words wrap, and a block of code scrolls on its own. */
 .scroll {
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overflow-wrap: break-word;
   overscroll-behavior: contain;
 }
 .pad {

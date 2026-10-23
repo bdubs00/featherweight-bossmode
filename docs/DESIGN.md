@@ -310,6 +310,9 @@ a back link to the column before.
 +---------------------------+
 ```
 
+A pane scrolls down and never sideways. Long code and long words wrap,
+and only a block of code scrolls on its own.
+
 Alignment: text is left aligned everywhere. System lines in a channel are
 centered, because they are not anyone's voice. Numbers in chips are centered
 in the chip. Nothing is justified.
