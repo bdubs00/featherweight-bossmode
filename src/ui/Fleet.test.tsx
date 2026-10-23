@@ -146,6 +146,21 @@ describe('the orphan Tasks', () => {
     expect(el.querySelector('.orphan-note p')!.textContent).toContain('1 child Task lost its parent.');
   });
 
+  it('says when the front removes them on its own, and that only Remove does without the sweep', async () => {
+    const help = async (removeAfter?: number) => {
+      fakeFetch([['GET', /^\/v1\/fleet\/orphans$/, () => ({ orphans: [orphan('default/manager-0-a'), orphan('default/manager-0-b')], removeAfter })]]);
+      const el = mount(<FleetList />);
+      await settle();
+      act(() => (el.querySelector('.orphan-note button[aria-label="What a child Task without its parent is"]') as HTMLButtonElement).click());
+      const text = el.querySelector('.orphan-note')!.textContent!;
+      unmountAll();
+      return text;
+    };
+    expect(await help(86400)).toContain('The front removes each one once it sleeps for 1 day, and Remove removes them now.');
+    expect(await help(0)).toContain('Nothing removes these but Remove.');
+    expect(await help()).toContain('Nothing removes these but Remove.');
+  });
+
   it('shows nothing to a person who is no admin', async () => {
     const f = fakeFetch([['GET', /^\/v1\/fleet\/orphans$/, () => new Response(JSON.stringify({ status: 403, detail: 'no' }), { status: 403, headers: { 'Content-Type': 'application/problem+json' } })]]);
     const el = mount(<FleetList />);

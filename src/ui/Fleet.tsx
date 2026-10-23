@@ -7,7 +7,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
-import type { Orphan } from '../api/types';
+import type { OrphanList } from '../api/types';
+import { spanWords } from '../lib/words';
 import { go, hrefOf, parseRoute, type Route } from '../lib/route';
 import { awakeCount, statusOf } from '../lib/status';
 import { store, useSelect } from '../state/store';
@@ -117,24 +118,27 @@ function PersonLink({ r, on }: { r: PersonRow; on: boolean }) {
 
 /**
  * OrphanNote tells an admin about the child Tasks whose parent Task is
- * gone, such as the children of a Task that a pool replaced. Nothing else
- * removes them, so the note offers to, after a confirmation. A person who
- * is no admin, and a front without the list, see nothing.
+ * gone, such as the children of a Task that a pool replaced. The front
+ * removes each one after it sleeps for removeAfter, and the note offers to
+ * remove them now, after a confirmation. A person who is no admin, and a
+ * front without the list, see nothing.
  */
 export function OrphanNote() {
-  const [orphans, setOrphans] = useState<Orphan[] | null>(null);
+  const [list, setList] = useState<OrphanList | null>(null);
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
   const resets = useSelect((s) => s.resets);
   const read = () =>
     api
       .orphans()
-      .then(setOrphans)
-      .catch(() => setOrphans(null));
+      .then(setList)
+      .catch(() => setList(null));
   useEffect(() => {
     read();
   }, [resets]);
-  if (!orphans || !orphans.length) return null;
+  const orphans = list ? list.orphans : [];
+  if (!orphans.length) return null;
+  const after = (list && list.removeAfter) || 0;
   const n = orphans.length;
   const open = orphans.filter((o) => o.open > 0).length;
   const tasks = n === 1 ? '1 child Task' : n + ' child Tasks';
@@ -154,7 +158,8 @@ export function OrphanNote() {
       <p>
         {tasks} lost {n === 1 ? 'its' : 'their'} parent.{' '}
         <Help label="What a child Task without its parent is">
-          An agent starts a child Task for a piece of work, and the Task that started it removes it when the work ends. Here that Task is gone, for example because a pool replaced it, so nothing removes {n === 1 ? 'this one' : 'these'}.
+          An agent starts a child Task for a piece of work, and the Task that started it removes it when the work ends. Here that Task is gone, for example because a pool replaced it.{' '}
+          {after > 0 ? 'The front removes each one once it sleeps for ' + spanWords(after) + ', and Remove removes them now.' : 'Nothing removes ' + (n === 1 ? 'this one' : 'these') + ' but Remove.'}
         </Help>
       </p>
       <Button size="s" onClick={() => setAsking(true)}>

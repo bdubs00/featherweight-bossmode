@@ -57,6 +57,22 @@ export function since(iso: string, now = Date.now()): string {
   return new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
+/** spanWords says a span of seconds in its largest whole unit, such as "1 day", "6 hours", or "30 minutes". */
+export function spanWords(seconds: number): string {
+  const units: [number, string][] = [
+    [86400, 'day'],
+    [3600, 'hour'],
+    [60, 'minute'],
+  ];
+  for (const [size, word] of units) {
+    if (seconds >= size && seconds % size === 0) {
+      const n = seconds / size;
+      return n + ' ' + word + (n === 1 ? '' : 's');
+    }
+  }
+  return Math.max(1, Math.round(seconds / 60)) + ' minutes';
+}
+
 /** ago says how long ago a moment was, such as "3 minutes ago". */
 export function ago(iso: string, now = Date.now()): string {
   const t = new Date(iso).getTime();

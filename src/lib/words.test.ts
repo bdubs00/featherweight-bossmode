@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { Decision } from '../api/types';
-import { commandOf, decisionTitle, errorReason, plainText, since, unreadText, whyWords } from './words';
+import { commandOf, decisionTitle, errorReason, plainText, since, spanWords, unreadText, whyWords } from './words';
+
+describe('spanWords', () => {
+  it('says a span in its largest whole unit', () => {
+    expect([86400, 172800, 21600, 3600, 1800, 90, 5400].map(spanWords)).toEqual(['1 day', '2 days', '6 hours', '1 hour', '30 minutes', '2 minutes', '90 minutes']);
+  });
+});
 
 describe('since', () => {
   const now = Date.parse('2026-10-21T20:00:00Z');

@@ -53,6 +53,12 @@ export interface Orphan {
   open: number;
 }
 
+/** The answer of GET /v1/fleet/orphans: the orphan Tasks, and the seconds that one sleeps before the front removes it, 0 when it does not. An older front leaves removeAfter out. */
+export interface OrphanList {
+  orphans: Orphan[];
+  removeAfter?: number;
+}
+
 /** The answer of DELETE /v1/fleet/orphans: the Tasks that went, and each Task whose delete failed. */
 export interface OrphanRemoval {
   removed: string[];
