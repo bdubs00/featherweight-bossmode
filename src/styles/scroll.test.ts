@@ -17,7 +17,8 @@ describe('the panes', () => {
     expect(scroll).toMatch(/overflow-wrap:\s*break-word/);
   });
 
-  it('break a long code span of a heart', () => {
+  it('break a long code span of a heart, and a long line of what an agent can do', () => {
     expect(rule(fleet, '.liked-body p')).toMatch(/overflow-wrap:\s*anywhere/);
+    expect(rule(fleet, '.abilities')).toMatch(/overflow-wrap:\s*anywhere/);
   });
 });

@@ -26,6 +26,10 @@ import { attempt, showError } from './notice';
 import { Confirm, InlineMarkdown, Menu } from './common';
 import { Glyph } from './icons';
 import { Button, Chip, Field, Help, Input, Led, Mark, PaneHeader } from './primitives';
+import { Abilities } from './Abilities';
+import { abilitiesOf, rulesWords } from '../lib/tools';
+import { costParts } from '../lib/cost';
+import { useToolCatalog } from '../state/tools';
 
 const WORKER_HELP = 'A worker runs the work of one agent, one seat at a time. Keep is how many it keeps ready.';
 const POLL_MS = 10_000;
@@ -309,6 +313,7 @@ function Liked({ agent }: { agent: string }) {
 /** TodaySec is the count of runs, the cost, and the decisions of the day of the agent. */
 function TodaySec({ agent, today }: { agent: string; today: Today | null | undefined }) {
   if (!today) return null;
+  const cost = typeof today.costUSD === 'number' ? costParts(today.costUSD) : null;
   return (
     <section class="prof-sec" aria-labelledby={'today-' + agent}>
       <h3 class="t-sub" id={'today-' + agent}>
@@ -318,9 +323,10 @@ function TodaySec({ agent, today }: { agent: string; today: Today | null | undef
         <span>
           <b>{today.runs}</b> {today.runs === 1 ? 'run' : 'runs'}
         </span>
-        {typeof today.costUSD === 'number' && (
+        {cost && (
           <span>
-            <b>${today.costUSD.toFixed(2)}</b>
+            {cost.lead && cost.lead + ' '}
+            <b>{cost.n}</b>
             {today.partial && ' so far'}
           </span>
         )}
@@ -409,8 +415,11 @@ export function Profile({ agent, back }: { agent: string; back?: { href: string;
   const toolNames = (info && info.tools) || (started && started.tools) || [];
   const policy = (info && info.policy) || (started && started.policy) || null;
   const skillCount = loadable ? loadable.length : 0;
-  // The rules of the profile, and the rules that its decisions named.
-  const rules = useMemo(() => [...new Set([...policyRules(policy), ...rulesOf(agent, runs, channels)])].sort(), [policy, agent, runs, channels]);
+  const catalog = useToolCatalog();
+  // What the agent can do, in plain words: the tools of the profile, a glob as one ability.
+  const abilities = useMemo(() => abilitiesOf(toolNames, catalog), [toolNames.join('\n'), catalog]);
+  // The rules of the profile, and the rules that its decisions named, as a person reads them.
+  const rules = useMemo(() => rulesWords([...new Set([...policyRules(policy), ...rulesOf(agent, runs, channels)])].sort(), catalog), [policy, agent, runs, channels, catalog]);
   const upload = async () => {
     const f = file.current && file.current.files && file.current.files[0];
     if (!f) return;
@@ -460,25 +469,6 @@ export function Profile({ agent, back }: { agent: string; back?: { href: string;
             ) : (
               <>
                 {((face && face.tagline) || (info && info.description)) && <p class="prof-tagline">{(face && face.tagline) || (info && info.description)}</p>}
-                {(toolNames.length > 0 || rules.length > 0) && (
-                  <ul class="prof-chips" aria-label="Tools and rules">
-                    {toolNames.map((t) => (
-                      <li>
-                        <Chip class="prof-tool">{t}</Chip>
-                      </li>
-                    ))}
-                    {rules.map((r) => (
-                      <li>
-                        <Chip class="prof-rule">{r}</Chip>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {loadable && (
-                  <a class="prof-link prof-skills" href="#skills">
-                    {skillCount === 1 ? '1 skill' : skillCount + ' skills'}
-                  </a>
-                )}
                 {owner && (
                   <div class="prof-face">
                     <Button size="s" disabled={busy} onClick={() => file.current && file.current.click()}>
@@ -496,6 +486,22 @@ export function Profile({ agent, back }: { agent: string; back?: { href: string;
             )}
           </div>
         </section>
+        {(abilities.length > 0 || rules.length > 0 || loadable) && (
+          <section class="prof-sec" aria-labelledby={'can-' + agent}>
+            <div class="prof-sec-head">
+              <h3 class="t-sub" id={'can-' + agent}>
+                What it can do
+              </h3>
+              <span class="grow" />
+              {loadable && (
+                <a class="prof-link prof-skills" href="#skills">
+                  {skillCount === 1 ? '1 skill' : skillCount + ' skills'}
+                </a>
+              )}
+            </div>
+            <Abilities abilities={abilities} rules={rules} label="Tools and rules" />
+          </section>
+        )}
         <Liked agent={agent} />
         <Workers agent={agent} owner={owner} pool={pool} setPool={setPool} />
         <TodaySec agent={agent} today={today} />

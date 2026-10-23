@@ -4,7 +4,6 @@
 // word. The functions here are pure, so the tests read them without a page.
 
 import type { Agent, Bridge, Fleet, Member, Rules, Run, Skill } from '../api/types';
-import { whyWords } from '../lib/words';
 import { presenceOf, type Light } from '../lib/presence';
 import { hrefOf } from '../lib/route';
 import { factsOf, statusOf } from '../lib/status';
@@ -247,22 +246,18 @@ export const presenceWord = (p: string): string => presenceOf(p).word;
 
 /* ---------- the profile ---------- */
 
-/**
- * rulesOf names the rules of an agent that the page has seen hold a call,
- * from the decisions of its runs, such as asks before git push. The agent
- * view of the backend can carry them instead.
- */
-/** policyRules words the rules of a profile that ask first, such as asks before git push. */
+/** policyRules lists the rules of a profile that ask first, as the policy writes them, such as bash: git push*. src/lib/tools.ts words them. */
 export function policyRules(policy: Rules | null | undefined): string[] {
-  const out = new Set<string>();
-  for (const e of (policy && policy.ask) || []) {
-    const w = whyWords(/^[a-z0-9_.-]+(: .+)?$/i.test(e) ? 'rule: ask ' + e : e);
-    const m = /^Rule: ask before (.+)$/.exec(w);
-    if (m) out.add('asks before ' + m[1]);
-  }
-  return [...out].sort();
+  return [...new Set(((policy && policy.ask) || []).map((e) => e.trim()).filter(Boolean))].sort();
 }
 
+/**
+ * rulesOf lists the rules of an agent that the page has seen hold a call,
+ * from the decisions of its runs, as the policy writes them: the reason
+ * rule: ask bash: git push* gives bash: git push*, and the reason default
+ * gives default. A reason that names no rule, such as a question, gives
+ * nothing. src/lib/tools.ts words them.
+ */
 export function rulesOf(agent: string, runs: Record<string, Run>, channels: Record<string, Channel>): string[] {
   const reasons = new Set<string>();
   for (const r of Object.values(runs)) if (r.agent === agent && r.pending && r.pending.reason) reasons.add(r.pending.reason);
@@ -275,10 +270,9 @@ export function rulesOf(agent: string, runs: Record<string, Run>, channels: Reco
   }
   const out = new Set<string>();
   for (const reason of reasons) {
-    const w = whyWords(reason);
-    const m = /^Rule: ask before (.+)$/.exec(w);
-    if (m) out.add('asks before ' + m[1]);
-    else if (w === 'Rule: ask first') out.add('asks first');
+    const m = /^rule: ask (.+)$/i.exec(reason.trim());
+    if (m) out.add(m[1].trim());
+    else if (reason.trim() === 'default') out.add('default');
   }
   return [...out].sort();
 }

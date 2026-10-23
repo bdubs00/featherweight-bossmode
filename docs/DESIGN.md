@@ -589,8 +589,12 @@ The work:
   no phrase, so the phrase comes from the member of the bridge. For the
   reads of each tab, see section 11.8.
 - The profile of the agent, in the details pane. The mark at 72, the
-  tagline, the tools as chips, a rule as an amber word, and the key New
-  face. What people liked, from `agents/<agent>/learned.md`, with a count
+  tagline, and the key New face. What it can do: one plain line per
+  ability, from the phrases of the catalog of tools, with the tools of the
+  wiki as one line and the tools of the bridges as another, and a rule
+  that asks first as an amber line, such as Asks before git push. The raw
+  names and the patterns sit in a tooltip. `src/lib/tools.ts` gives the
+  words. What people liked, from `agents/<agent>/learned.md`, with a count
   chip and Open page. Workers, with its chip, the question mark What is a
   worker, and Keep as a number field in place. Each worker: its name, its
   status, and the seat it serves or the time it slept, as `since()` gives

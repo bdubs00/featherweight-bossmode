@@ -918,7 +918,7 @@ on('PATCH', '/v1/bridges/([^/]+)/members/([^/]+)', async (c, id, handle) => {
 
 on('GET', '/v1/fleet', () => FLEET);
 // An agent of the view carries the parts of its profile that the page shows: the tools, the skills that it allows, and its rules.
-const agentView = ({ name, description, role }) => ({ name, description, role, tools: TOOLS_OF[name] || [], skills: allowlistOf(name), policy: name === 'migrator' ? { ask: ['bash: git push*'] } : name === 'reviewer' ? { ask: ['destructive'] } : undefined });
+const agentView = ({ name, description, role }) => ({ name, description, role, tools: TOOLS_OF[name] || [], skills: allowlistOf(name), policy: name === 'migrator' ? { ask: ['bash: git push*', 'ansible.playbook: check=false', 'ansible.adhoc: check=false'] } : name === 'reviewer' ? { ask: ['destructive'] } : undefined });
 // The front names only its own profile in GET /v1/agents, as the real
 // front does. The profiles that the workers of the pools run come from
 // GET /v1/agents/{name}, with the pool and with no abilities, and the page

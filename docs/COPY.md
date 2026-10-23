@@ -414,12 +414,13 @@ Capacity shows where seating happens:
 | `N awake` (a chip with a green light), with `N workers awake` for a screen reader | add | the chip shows only while a worker is awake. A green light never stands for zero, so `0 awake` never shows. | done |
 | `N free`, `Keep N` (a person who is not an owner reads Keep as a number) | add | | done |
 | `Keep 0` (the row of an agent with no worker in Not on a bridge) | remove | the row shows no words for an agent with no worker. The list holds the agents of the fleet, so a profile of the front with no pool and no run shows nowhere. | done |
-| `asks before <pattern>`, `asks first` (an amber word for a rule of the profile) | add | | done |
-| `Tools and rules` (the list of chips) | add | an accessible name | done |
+| `asks before <pattern>`, `asks first` (an amber word for a rule of the profile) | change | the rule as a person reads it, in an amber line under What it can do: `Asks before git push` for `bash: git push*`, `Asks before a real Ansible run` for `ansible.playbook: check=false`, `Asks before a tool that changes things`, `Asks first when <field> is <value>`, `Asks first: <ability>`, and `Asks first`. Two patterns with one meaning make one line. The patterns sit in the tooltip. | done |
+| `Tools and rules` (the list of chips) | add | an accessible name, now of the list of What it can do | done |
+| the tools of a profile as chips of raw names, such as `front.pages_read` | change | `What it can do`, a section of the profile with one plain line per ability: the phrase of the tool in the catalog of `GET /v1/tools`, such as `Run shell commands`. The tools of the wiki make one line, `Read and write the wiki`, `Read the wiki`, or `Write the wiki`, and the tools of the bridges make one line, `Read and post in bridges`, `Read bridges`, or `Post in bridges`. A whole server is `Use the tools of <server>`, and `*` is `Every tool`. The raw names sit in the tooltip. `N skills` moves to the end of the heading line of the section. | done |
 | `Edit` (the key of an owner on the profile) | add | | done |
 | `Keep is a whole number, 0 or more.` | add | the error of the Keep field | done |
 | `Remove workers`, with the dialog `Remove the workers of <agent>?`, `Every worker of <agent> stops. A seat of <agent> waits for a worker.`, and the key `Remove workers` | change | an owner only, as the danger item of the menu `More for workers` beside Keep, so no destructive key sits in plain sight | done |
-| `N runs`, `$N`, `N decisions` (Today) | add | `1 run` and `1 decision` for one. If a run reports no cost, `$N so far`. | done |
+| `N runs`, `$N`, `N decisions` (Today) | add | `1 run` and `1 decision` for one. If a run reports no cost, `$N so far`. A cost below one cent reads `under $0.01`, never `$0.00`, from `src/lib/cost.ts`. | done |
 
 ### src/ui/RunPane.tsx and src/ui/Conversation.tsx
 

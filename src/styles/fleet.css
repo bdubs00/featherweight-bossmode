@@ -542,7 +542,25 @@ a.people-title:hover {
   font-weight: 600;
   color: var(--ink);
 }
-.chip-plain.prof-rule {
+/* What the agent can do: one plain line per ability, and the rules that ask first in the amber word. */
+.abilities {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  margin: var(--s-1) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--t-control);
+  line-height: var(--t-control-lh);
+  overflow-wrap: anywhere;
+}
+.abilities .chip-note {
+  margin-left: var(--s-2);
+  font-size: var(--t-meta);
+  font-weight: 600;
+  color: var(--muted);
+}
+.ability-rule {
   font-weight: 600;
   color: var(--word-amber);
 }

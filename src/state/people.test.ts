@@ -248,7 +248,7 @@ describe('the profile', () => {
       r1: { ...run('r1', 'input-required'), agent: 'migrator', pending: { id: 'p', reason: 'rule: ask bash: git push*' } },
       r2: { ...run('r2', 'input-required'), agent: 'scribe', pending: { id: 'q', reason: 'Who reads these notes first?' } },
     };
-    expect(rulesOf('migrator', runs, {})).toEqual(['asks before git push']);
+    expect(rulesOf('migrator', runs, {})).toEqual(['bash: git push*']);
     expect(rulesOf('scribe', runs, {})).toEqual([]);
   });
 
