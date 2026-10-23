@@ -749,8 +749,10 @@
 .tab-list {
   padding: var(--s-2) 0 var(--s-5);
 }
+/* The pages of the tab Wiki take the column of the posts, so the content stays in place when the person switches tabs. */
 .prows {
-  margin: 0;
+  max-width: calc(var(--measure) + 92px);
+  margin: 0 auto;
   padding: 0 var(--s-2);
   list-style: none;
 }
@@ -1016,20 +1018,28 @@
 .pick-row:focus-visible .mark {
   background: var(--paper);
 }
+/* A row gives the name of its agent the room first: the name stays on one
+   line and never shrinks, the tagline takes the width that is left, and the
+   status shrinks. Where the word of the workers does not fit beside the
+   name, it wraps to a second line that the status hides, so the light
+   stands alone and the word stays in the tooltip and for a screen reader.
+   Only a name too long for the whole row ends in an ellipsis. */
 .pick-text {
-  flex: 1;
+  flex: 1 0 auto;
   min-width: 0;
+  max-width: calc(100% - 61px);
   display: flex;
   flex-direction: column;
 }
-/* The name of an agent stays on one line. The status gives up its word first (Row in Picker.tsx), and only a name too long for the row ends in an ellipsis. */
 .pick-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 700;
 }
+/* The tagline asks for no width of its own, so the name alone sets the width of the text. */
 .pick-tag {
+  contain: inline-size;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1038,8 +1048,17 @@
   color: var(--muted);
 }
 .pick-row .status {
-  flex: none;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-content: flex-start;
+  min-width: 9px;
+  height: var(--t-meta-lh);
+  overflow: hidden;
   font-size: var(--t-caption);
+}
+.pick-row .status-word {
+  flex: none;
 }
 .pick-foot {
   flex: none;

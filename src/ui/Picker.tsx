@@ -42,30 +42,19 @@ export interface PickerProps {
 /**
  * Row is one agent of the picker. The name stays on one line. Where the
  * name and the word of the workers do not fit side by side, the status
- * shrinks to its light, and the word goes to the tooltip and the
- * accessible name.
+ * keeps only its light (the styles of .pick-row), and the word stays in the
+ * tooltip and the accessible name.
  */
 function Row({ r, onPick }: { r: PickRow; onPick: (agent: string) => void }) {
   const word = r.free >= 0 ? freeWords(r.free) : '';
-  const name = useRef<HTMLSpanElement>(null);
-  // The word for which the row has no room. A new word measures again.
-  const [tightFor, setTightFor] = useState('');
-  const tight = !!word && tightFor === word;
-  useLayoutEffect(() => {
-    const el = name.current;
-    if (!el || !word || tight) return;
-    if (el.scrollWidth > el.clientWidth + 1) setTightFor(word);
-  }, [word, r.name, tight]);
   return (
     <button type="button" class="pick-row" data-pick onClick={() => onPick(r.agent)}>
       <Mark agent={r.agent} size={32} />
       <span class="pick-text">
-        <span class="pick-name" ref={name}>
-          {r.name}
-        </span>
+        <span class="pick-name">{r.name}</span>
         <span class="pick-tag">{r.tagline}</span>
       </span>
-      {word && <Led tone={r.free > 0 ? 'green' : 'grey'} word={word} quiet={tight} />}
+      {word && <Led tone={r.free > 0 ? 'green' : 'grey'} word={word} label={word} />}
     </button>
   );
 }
