@@ -71,6 +71,7 @@ const PLACES: PlaceItem[] = [
   { id: 'chat', label: 'Chat', glyph: 'chat', href: '#chat' },
   { id: 'bridges', label: 'Bridges', glyph: 'bridges', href: '#' },
   { id: 'fleet', label: 'Fleet', glyph: 'fleet', href: '#fleet' },
+  { id: 'duties', label: 'Duties', glyph: 'duties', href: '#duties' },
   { id: 'skills', label: 'Skills', glyph: 'skills', href: '#skills' },
   { id: 'routines', label: 'Routines', glyph: 'routines', href: '#routines' },
   { id: 'wiki', label: 'Wiki', glyph: 'wiki', href: '#pages' },

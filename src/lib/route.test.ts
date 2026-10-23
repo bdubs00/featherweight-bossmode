@@ -122,6 +122,32 @@ describe('routes', () => {
     expect(parseRoute('#routines/triage/ack/steps')).toEqual(r);
   });
 
+  it('gives the Duties place its routes and columns: the list, a new duty, a duty, and its editor', () => {
+    const cases: [string, Route][] = [
+      ['#duties', { place: 'duties' }],
+      ['#duties/new', { place: 'duties', fresh: true }],
+      ['#duties/daily-homelab-report', { place: 'duties', name: 'daily-homelab-report' }],
+      ['#duties/daily-homelab-report/edit', { place: 'duties', name: 'daily-homelab-report', edit: true }],
+      // A duty named new keeps its own address, with the slash.
+      ['#duties/new/', { place: 'duties', name: 'new' }],
+      ['#duties/new/edit', { place: 'duties', name: 'new', edit: true }],
+    ];
+    for (const [hash, route] of cases) {
+      expect(parseRoute(hash)).toEqual(route);
+      expect(hrefOf(route)).toBe(hash);
+    }
+    expect(placeOf({ place: 'duties' })).toBe('duties');
+    expect(placeOf({ place: 'duties', name: 'x', edit: true })).toBe('duties');
+    expect(columnOf({ place: 'duties' })).toBe('list');
+    expect(columnOf({ place: 'duties', fresh: true })).toBe('main');
+    expect(columnOf({ place: 'duties', name: 'x' })).toBe('main');
+    expect(columnOf({ place: 'duties', name: 'x', edit: true })).toBe('main');
+    expect(parentOf({ place: 'duties', name: 'x', edit: true })).toEqual({ place: 'duties', name: 'x' });
+    expect(parentOf({ place: 'duties', name: 'x' })).toEqual({ place: 'duties' });
+    expect(parentOf({ place: 'duties', fresh: true })).toEqual({ place: 'duties' });
+    expect(parentOf({ place: 'duties' })).toEqual({ place: 'home' });
+  });
+
   it('adds the slash that the sign-in needs to the path of the page', () => {
     expect(canonicalPath('/bossmode')).toBe('/bossmode/');
     expect(canonicalPath('/bossmode/')).toBe('/bossmode/');

@@ -58,9 +58,9 @@ describe('Shell', () => {
     expect(current.textContent).toContain('Bridges');
     const labels = () => [...el.querySelectorAll('.place-label')].map((x) => x.textContent);
     // Routines shows once the settings say that the front keeps routines.
-    expect(labels()).toEqual(['Activity', 'Chat', 'Bridges', 'Fleet', 'Skills', 'Wiki', 'Manager']);
+    expect(labels()).toEqual(['Activity', 'Chat', 'Bridges', 'Fleet', 'Duties', 'Skills', 'Wiki', 'Manager']);
     act(() => store.dispatch({ type: 'config', config: { manager: null, placement: 'queue', maxMembers: 16, routines: true } }));
-    expect(labels()).toEqual(['Activity', 'Chat', 'Bridges', 'Fleet', 'Skills', 'Routines', 'Wiki', 'Manager']);
+    expect(labels()).toEqual(['Activity', 'Chat', 'Bridges', 'Fleet', 'Duties', 'Skills', 'Routines', 'Wiki', 'Manager']);
     act(() => store.dispatch({ type: 'config', config: null }));
     // The count of Activity is the number of members that need you.
     expect(el.querySelector('.place-count .sr')!.textContent).toBe('2 members need you');

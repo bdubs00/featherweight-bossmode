@@ -14,6 +14,7 @@ import './styles/fleet.css';
 import './styles/wiki.css';
 import './styles/chat.css';
 import './styles/routines.css';
+import './styles/duties.css';
 
 applyChoice(readChoice());
 render(<App />, document.getElementById('app')!);

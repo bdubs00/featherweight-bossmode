@@ -28,10 +28,11 @@ export type Route =
   | { place: 'appearance' }
   | { place: 'skills'; item?: SkillItem; add?: boolean }
   | { place: 'routines'; agent?: string; name?: string; tab?: RoutineTab; details?: boolean }
+  | { place: 'duties'; name?: string; edit?: boolean; fresh?: boolean }
   | { place: 'pages'; path?: string; mode: 'tree' | 'read' | 'history' | 'edit' | 'create'; version?: number };
 
 /** The places of the app bar. */
-export type Place = 'activity' | 'chat' | 'bridges' | 'fleet' | 'skills' | 'routines' | 'wiki' | 'manager' | 'account';
+export type Place = 'activity' | 'chat' | 'bridges' | 'fleet' | 'duties' | 'skills' | 'routines' | 'wiki' | 'manager' | 'account';
 
 /** The column that a narrow window shows for a route. */
 export type Column = 'list' | 'main' | 'details';
@@ -86,6 +87,15 @@ export function parseRoute(hash: string): Route {
       if (rest[2] === 'agent') return { ...base, details: true };
       if (rest[2] === 'evidence' || rest[2] === 'runbook') return { ...base, tab: rest[2] };
       return base;
+    }
+    // #duties is the list, #duties/new a new duty, #duties/<name> a duty,
+    // and #duties/<name>/edit its editor. A duty named new opens at
+    // #duties/new/, with the slash, so it never meets the new duty.
+    case 'duties': {
+      if (!rest[0]) return { place: 'duties' };
+      if (rest[0] === 'new' && rest.length === 1) return { place: 'duties', fresh: true };
+      const name = dec(rest[0]);
+      return rest[1] === 'edit' ? { place: 'duties', name, edit: true } : { place: 'duties', name };
     }
     case 'bridge': {
       if (!rest[0]) return { place: 'home' };
@@ -156,6 +166,10 @@ export function hrefOf(r: Route): string {
       if (r.details) return base + '/agent';
       return r.tab === 'evidence' || r.tab === 'runbook' ? base + '/' + r.tab : base;
     }
+    case 'duties':
+      if (r.fresh) return '#duties/new';
+      if (!r.name) return '#duties';
+      return '#duties/' + encodeURIComponent(r.name) + (r.edit ? '/edit' : r.name === 'new' ? '/' : '');
     case 'bridge': {
       const base = '#bridge/' + encodeURIComponent(r.id);
       if (r.pane === 'roster') return base + '/roster';
@@ -197,6 +211,8 @@ export function placeOf(r: Route): Place {
       return 'skills';
     case 'routines':
       return 'routines';
+    case 'duties':
+      return 'duties';
     case 'appearance':
       return 'account';
   }
@@ -224,6 +240,8 @@ export function columnOf(r: Route): Column {
     case 'routines':
       if (r.name) return r.details ? 'details' : 'main';
       return 'list';
+    case 'duties':
+      return r.name || r.fresh ? 'main' : 'list';
     case 'chat':
       if (r.run) return r.details ? 'details' : 'main';
       return r.fresh ? 'main' : 'list';
@@ -252,6 +270,9 @@ export function parentOf(r: Route): Route {
     case 'routines':
       if (r.agent && r.name && r.details) return { place: 'routines', agent: r.agent, name: r.name };
       return r.name ? { place: 'routines' } : { place: 'home' };
+    case 'duties':
+      if (r.name && r.edit) return { place: 'duties', name: r.name };
+      return r.name || r.fresh ? { place: 'duties' } : { place: 'home' };
     case 'chat':
       if (r.run && r.details) return { place: 'chat', run: r.run };
       return r.run || r.fresh ? { place: 'chat' } : { place: 'home' };

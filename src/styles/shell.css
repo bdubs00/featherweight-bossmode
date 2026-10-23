@@ -386,6 +386,7 @@
     flex: 1;
     flex-direction: row;
     gap: var(--s-1);
+    min-width: 0;
     padding: var(--s-1);
   }
   .place {
@@ -444,9 +445,14 @@
   }
 }
 
-/* Eight places and the account share a phone. Under 380 pixels the labels
-   take the condensed width of the typeface, so every place stays in sight. */
-@media (max-width: 379px) {
+/* Nine places and the account share a phone. Under 440 pixels the labels
+   take the condensed width of the typeface, and the places touch, so every
+   place stays in sight. The bar never pushes the account out of sight: a
+   label that still lacks the room is cut at its end. */
+@media (max-width: 439px) {
+  .places {
+    gap: 0;
+  }
   .place-label {
     font-stretch: 75%;
   }

@@ -1,0 +1,390 @@
+/* The Duties place: the list of duties, a duty with its history, and the
+   editor of New duty and Edit. The screen lays out the primitives and adds
+   no color, radius, shadow, type size, or motion: every value is a token. */
+
+/* ---------- the list ---------- */
+.duty-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  padding: var(--s-2) var(--s-2) var(--s-4);
+}
+.duty-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  padding: var(--s-2);
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  color: var(--ink);
+  text-decoration: none;
+}
+.duty-row:hover {
+  background: var(--raised);
+}
+.duty-row.sel {
+  background: var(--raised);
+  border-color: var(--raised-line);
+  box-shadow: var(--e-row);
+}
+.duty-row:focus-visible {
+  outline-offset: -2px;
+}
+.duty-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+/* A long title wraps, and the status follows its last word, so no title is cut. */
+.duty-row-top {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.duty-row-title {
+  font-weight: 700;
+  margin-right: var(--s-2);
+}
+.duty-row-top .status {
+  vertical-align: 1px;
+  font-size: var(--t-caption);
+}
+.duty-row-when {
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+  overflow-wrap: anywhere;
+}
+.duty-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--s-3);
+  min-width: 0;
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+  color: var(--muted);
+}
+.duty-row-meta > .clip {
+  max-width: 100%;
+}
+/* Every duty is paused: one line under the header, with Resume for an admin. */
+.duty-note {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+  margin: var(--s-2) var(--s-2) 0;
+  padding: var(--s-1) var(--s-1) var(--s-1) var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--raised);
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+}
+.duty-note p {
+  flex: 1;
+  min-width: 0;
+}
+.duty-foot {
+  display: flex;
+  padding: var(--s-3) var(--s-4);
+}
+
+/* ---------- a duty ---------- */
+.duty .pane-head > h1 {
+  flex: 0 1 auto;
+}
+.duty .pane-head > .duty-status {
+  flex: none;
+}
+.duty-body > * {
+  max-width: 760px;
+}
+.duty-keys {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+}
+.duty-said {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+  margin-top: var(--s-3);
+  color: var(--muted);
+}
+.duty-sec {
+  margin-top: var(--s-5);
+}
+.duty-sec-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-width: 0;
+  margin-bottom: var(--s-2);
+}
+.duty-readback {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.duty-next {
+  margin: var(--s-1) 0 0;
+  padding-left: var(--s-5);
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+}
+.duty-who {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-width: 0;
+  margin-bottom: var(--s-2);
+}
+.duty-who a {
+  color: var(--ink);
+  font-weight: 600;
+}
+.duty-who-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+/* The message of a duty, with each placeholder set apart as its words. */
+.duty-message {
+  padding-left: var(--s-3);
+  border-left: 2px solid var(--line);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.duty-ph {
+  padding: 0 var(--s-1);
+  border-radius: var(--r);
+  background: var(--raised);
+  font-weight: 700;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+.duty-lines {
+  margin: 0;
+  padding-left: var(--s-5);
+}
+.duty-runs {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.duty-run {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-1) var(--s-3);
+  padding: var(--s-2) 0;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+}
+.duty-run:last-child {
+  border-bottom: 0;
+}
+.duty-run-at {
+  min-width: 9em;
+  font-weight: 600;
+}
+.duty-run-found,
+.duty-run-cost,
+.duty-run-why {
+  color: var(--muted);
+}
+.duty-run-why {
+  overflow-wrap: anywhere;
+}
+.duty-run-link {
+  margin-left: auto;
+  color: var(--ink);
+  font-weight: 600;
+}
+/* ---------- the editor ---------- */
+.duty-form {
+  gap: var(--s-5);
+}
+.duty-form > .duty-sec {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-3);
+  margin-top: 0;
+}
+.duty-form > .duty-sec > * {
+  max-width: 100%;
+}
+.duty-form > .duty-sec > .field,
+.duty-form > .duty-sec > .field-row,
+.duty-form > .duty-sec > .choice-set,
+.duty-form > .duty-sec > [role='group'],
+.duty-form > .duty-sec > .duty-say,
+.duty-form > .duty-sec > .duty-readback-box {
+  align-self: stretch;
+}
+.duty-form > .duty-sec > .duty-sec-head {
+  margin-bottom: 0;
+}
+.duty-narrow,
+.duty-form > .duty-sec > .duty-narrow {
+  max-width: 360px;
+  width: 100%;
+}
+.duty-presets,
+.duty-chips,
+.duty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+/* A preset that the sentence matches, and a day of the schedule, look pressed. */
+.duty-presets .key[aria-pressed='true'],
+.duty-day[aria-pressed='true'] {
+  top: 1px;
+  background: var(--raised);
+  border-color: var(--ink);
+  box-shadow: var(--e-selected);
+}
+.duty-sentence {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+  margin: 0;
+  min-width: 0;
+}
+.duty-sentence select.recess {
+  width: auto;
+  max-width: 100%;
+}
+.duty-word {
+  font-weight: 600;
+}
+.duty-days {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--s-1);
+}
+.duty-day {
+  min-width: 44px;
+  padding: 0 var(--s-2);
+}
+.duty-times {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+}
+.duty-time {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+}
+.duty-time .input {
+  width: auto;
+  min-width: 7.5em;
+}
+.duty-sentence .duty-between {
+  min-height: 0;
+  padding: 0;
+  align-items: center;
+}
+.duty-sentence .duty-between input {
+  margin: 0;
+}
+.duty-say {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--s-2);
+}
+.duty-say > .field {
+  flex: 1 1 240px;
+}
+/* The readback of the front: the schedule in words and the next five times. */
+.duty-readback-box {
+  min-height: var(--h-row);
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.duty-problems {
+  margin: 0;
+  padding-left: var(--s-5);
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+  font-weight: 600;
+  color: var(--word-red);
+}
+.duty-problems-box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--led-red);
+  border-radius: var(--r);
+}
+.duty-problems-box > p {
+  font-weight: 700;
+}
+.duty-check .advanced-body {
+  gap: var(--s-3);
+}
+.duty-write {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+.duty-input {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-2);
+}
+.duty-input-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto;
+  align-items: center;
+  gap: var(--s-2);
+  align-self: stretch;
+}
+.duty-where {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+  margin: 0;
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+  overflow-wrap: anywhere;
+}
+.duty-found {
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.duty-found > p {
+  font-weight: 600;
+}
+.duty-items {
+  margin: var(--s-1) 0 0;
+  padding-left: var(--s-5);
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+  overflow-wrap: anywhere;
+}
+.duty-money {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+}
+.duty-money > span {
+  font-weight: 600;
+  color: var(--muted);
+}
