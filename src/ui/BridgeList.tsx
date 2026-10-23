@@ -1,7 +1,9 @@
 // The list pane of the Bridges place: the open bridges, newest first, each
-// with its unread count and the light of what needs you, then the closed
-// bridges behind a toggle. A filter field shows above the list once it
-// holds more than ten bridges. The foot holds the readout of the fleet.
+// with its unread count and one light in the order of attention: needs
+// you, then a seat that failed, then working. Then the closed bridges
+// behind a toggle, with no unread count, because their work is done. A
+// filter field shows above the list once it holds more than ten bridges.
+// The foot holds the readout of the fleet.
 
 import { memo } from 'preact/compat';
 import { useState } from 'preact/hooks';
@@ -30,7 +32,13 @@ export function matches(title: string, filter: string): boolean {
 
 const BridgeRow = memo(function BridgeRow({ id, current }: { id: string; current: boolean }) {
   const b = useSelect((s) => s.bridges.byId[id]);
-  // A roster that the page holds shows whether a member works, in the status of every screen. The list loads no roster for it.
+  // A roster that the page holds shows whether a seat failed or works, in the status of every screen. The list loads no roster for it.
+  const failed = useSelect((s) => {
+    const r = s.rosters[id];
+    if (!r) return 0;
+    const f = selectFacts(s);
+    return r.order.filter((h) => seatPresence(f, r.byHandle[h]) === 'error').length;
+  });
   const working = useSelect((s) => {
     const r = s.rosters[id];
     if (!r) return false;
@@ -41,8 +49,25 @@ const BridgeRow = memo(function BridgeRow({ id, current }: { id: string; current
   const closed = b.state === 'closed';
   const needs = b.needsYou || 0;
   const members = b.memberCount || 0;
-  const unread = b.unread > 0 || b.unreadMore;
-  const label = [b.title, closed ? 'closed' : '', unread ? unreadText(b) + ' unread' : '', needs ? needs + (needs === 1 ? ' member needs' : ' members need') + ' you' : ''].filter(Boolean).join(', ');
+  // A closed bridge did its work: an unread count there would pull the eye to nothing that waits.
+  const unread = !closed && (b.unread > 0 || !!b.unreadMore);
+  const status = closed ? (
+    <Led tone="grey" word="closed" />
+  ) : needs > 0 ? (
+    <Led tone="amber" word={needs === 1 ? '1 needs you' : needs + ' need you'} />
+  ) : failed > 0 ? (
+    <Led tone="red" word={failed + ' failed'} />
+  ) : working ? (
+    <Led tone="green" word="working" />
+  ) : null;
+  const label = [
+    b.title,
+    closed ? 'closed' : '',
+    unread ? unreadText(b) + ' unread' : '',
+    needs ? needs + (needs === 1 ? ' member needs' : ' members need') + ' you' : failed ? failed + (failed === 1 ? ' member failed' : ' members failed') : '',
+  ]
+    .filter(Boolean)
+    .join(', ');
   return (
     <a
       class={'brow' + (current ? ' sel' : '') + (closed ? ' closed' : '') + (unread || current ? ' strong' : '')}
@@ -61,7 +86,7 @@ const BridgeRow = memo(function BridgeRow({ id, current }: { id: string; current
       </span>
       <span class="brow-meta">
         <span>{members === 1 ? '1 member' : members + ' members'}</span>
-        {closed ? <Led tone="grey" word="closed" /> : needs > 0 ? <Led tone="amber" word={needs === 1 ? '1 needs you' : needs + ' need you'} /> : working ? <Led tone="green" word="working" /> : null}
+        {status}
       </span>
     </a>
   );

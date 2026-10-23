@@ -41,6 +41,29 @@ describe('the list of bridges', () => {
     expect(el.querySelector('.list-find')).toBeNull();
   });
 
+  it('puts a failed seat before the work of the others, and shows no unread count on a closed bridge', () => {
+    act(() => {
+      store.dispatch({
+        type: 'bridges',
+        bridges: [
+          bridgeOf('e1', { title: 'Monitoring', unread: 1, memberCount: 3, createdAt: '2026-10-21T09:00:00Z' }),
+          bridgeOf('e2', { title: 'Done work', state: 'closed', unread: 6, memberCount: 2 }),
+        ],
+      });
+      store.dispatch({ type: 'bridge', bridge: { ...bridgeOf('e1', { title: 'Monitoring', unread: 1, createdAt: '2026-10-21T09:00:00Z' }), members: [memberOf('a', { presence: 'working' }), memberOf('b', { presence: 'error' }), memberOf('c', { presence: 'working' })] } });
+    });
+    const el = mount(<BridgeList current="" />);
+    const row = rowOf(el, 'Monitoring');
+    expect(row.querySelector('.status')!.textContent).toBe('1 failed');
+    expect(row.querySelector('.led-red')).not.toBeNull();
+    expect(row.getAttribute('aria-label')).toBe('Monitoring, 1 unread, 1 member failed');
+    act(() => (el.querySelector('.group-toggle') as HTMLButtonElement).click());
+    const done = rowOf(el, 'Done work');
+    expect(done.querySelector('.chip-ink')).toBeNull();
+    expect(done.getAttribute('aria-label')).toBe('Done work, closed');
+    expect(el.querySelector('.group-toggle')!.textContent).toBe('Closed1');
+  });
+
   it('shows a filter field above a list of more than ten bridges', () => {
     const many = Array.from({ length: FILTER_FROM + 1 }, (_, i) => bridgeOf('f' + i, { title: (i === 3 ? 'Migrate logrotate ' : 'Bridge ') + i, createdAt: '2026-10-2' + (i % 9) + 'T10:00:00Z' }));
     act(() => store.dispatch({ type: 'bridges', bridges: many }));
