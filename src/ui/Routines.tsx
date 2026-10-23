@@ -26,7 +26,8 @@ import {
   metaOf,
   money,
   num,
-  questionWords,
+  questionKeys,
+  questionShort,
   resumeTo,
   runbookOf,
   runbookPath,
@@ -38,10 +39,11 @@ import {
 import { useSelect } from '../state/store';
 import { loadRoutine, loadRoutines, loadWeek, move, useRoutines, useRoutinesView } from '../state/routines';
 import { useRoving } from './keys';
-import { attempt } from './notice';
+import { showError } from './notice';
+import { ApiError } from '../api/client';
 import { Confirm, Markdown, Menu, type MenuItem } from './common';
 import { Glyph } from './icons';
-import { Button, Card, Chip, Field, Find, Help, Input, Led, Mark, PaneHeader, Tabs } from './primitives';
+import { Button, Card, Chip, Field, Find, Help, Input, Led, LineLed, Mark, PaneHeader, Tabs } from './primitives';
 import { EmptyPane } from './Shell';
 import { RoutineEvidence } from './RoutineEvidence';
 
@@ -261,6 +263,8 @@ function RoutineView({ agent, name, tab }: { agent: string; name: string; tab: R
   const [retire, setRetire] = useState(false);
   // Not yet puts the card of a sign-off away for this visit of the routine. It sends nothing.
   const [later, setLater] = useState(false);
+  // True after a move met a newer version of the routine: the page read it again.
+  const [changed, setChanged] = useState(false);
   useRoutinesView();
   const [busy, setBusy] = useState(false);
   const narrow = useMedia(NARROW);
@@ -273,6 +277,7 @@ function RoutineView({ agent, name, tab }: { agent: string; name: string; tab: R
   useEffect(() => {
     setFailed('');
     setLater(false);
+    setChanged(false);
     loadRoutine(agent, name).catch((e) => setFailed(e instanceof Error ? e.message : 'The action failed. Try it again.'));
   }, [key]);
   const back = { href: '#routines', label: 'Routines', to: 'list' as const };
@@ -287,9 +292,22 @@ function RoutineView({ agent, name, tab }: { agent: string; name: string; tab: R
     );
   }
   const light = STATUS[status!];
+  /**
+   * shift moves the version of the routine that the person reads. A 409
+   * means that the routine changed in the meantime: the store read it
+   * again, and the pane shows it with a quiet line instead of a notice.
+   */
   const shift = async (standing: Standing, note?: string): Promise<boolean> => {
     setBusy(true);
-    const ok = await attempt(() => move(agent, name, standing, note));
+    setChanged(false);
+    let ok = false;
+    try {
+      await move(agent, name, standing, rec.routine.version, note);
+      ok = true;
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409) setChanged(true);
+      else showError(e);
+    }
     setBusy(false);
     return ok;
   };
@@ -341,6 +359,12 @@ function RoutineView({ agent, name, tab }: { agent: string; name: string; tab: R
         </div>
       )}
       <div class="scroll pad rt-body">
+        {changed && (
+          <p class="rt-changed" role="status">
+            <LineLed tone="grey" />
+            This routine changed. Read it again.
+          </p>
+        )}
         {tab === 'steps' && <StepsTab rec={rec} owner={owner} busy={busy} shift={shift} onRetire={() => setRetire(true)} later={later} onLater={() => setLater(true)} />}
         {tab === 'evidence' && <RoutineEvidence rec={rec} />}
         {tab === 'runbook' && <RunbookTab rec={rec} />}
@@ -495,7 +519,7 @@ function TopCard({ rec, owner, busy, shift, onRetire, later, onLater }: CardProp
 function StepsTab(p: CardProps) {
   const { rec } = p;
   const qs = rec.routine.questions || {};
-  const keys = Object.keys(qs);
+  const keys = questionKeys(qs);
   const after = rec.routine.after || [];
   return (
     <>
@@ -545,10 +569,14 @@ function StepsTab(p: CardProps) {
               {keys.map((k) => {
                 const q = qs[k];
                 const crit = q.criteria && !Array.isArray(q.criteria) ? (q.criteria as Record<string, string>) : null;
+                const words = questionShort(k, q);
                 return (
                   <tr>
                     <th scope="row" data-label="Question">
-                      {questionWords(k, q)}
+                      <span class="rt-question" title={words.cut ? words.whole : undefined}>
+                        {words.short}
+                      </span>
+                      {words.cut && <Help label="The whole question">{words.whole}</Help>}
                     </th>
                     <td data-label="Answers">
                       <span class="rt-answers">

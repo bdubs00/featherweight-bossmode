@@ -868,7 +868,13 @@ The work:
   the steps, numbered, each with the tool as meta, the answers that a step
   uses as slots, What it decides, and Afterward. What it decides is a table:
   each question, its answers, and the mark at which the routine acts. A
-  question mark beside it holds the words for an answer under its mark.
+  question mark beside it holds the words for an answer under its mark. A
+  question shows its first sentence, and a question mark in its row holds
+  the whole one. The choices come first by name, then the yes or no
+  questions.
+- A move names the version that the person read. When the routine
+  changed in the meantime, the page reads it again and shows it under the
+  quiet line `This routine changed. Read it again.`, with no notice.
 - Evidence. It says what happened, not why. Rehearsal draws one stacked bar
   per day out of placed elements: agreed in ink, disagreed in a hatch of
   `--muted` on `--paper`, and handed to the agent in `--led-grey`. A gap of

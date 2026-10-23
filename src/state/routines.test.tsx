@@ -83,7 +83,7 @@ describe('the routines of the page', () => {
       'POST /v1/routines/triage/a/standing': { ok: true },
     });
     const first = loadRoutine('triage', 'a');
-    await move('triage', 'a', 'live');
+    await move('triage', 'a', 'live', 1);
     expect(routines.get().byKey['triage/a'].standing).toBe('live');
     release();
     await first;

@@ -6,6 +6,8 @@ import {
   bandRows,
   barsOf,
   checkWords,
+  questionKeys,
+  questionShort,
   countsOf,
   disagreedOf,
   figuresOf,
@@ -179,6 +181,19 @@ describe('the body of a routine', () => {
     expect(actsWhen({ type: 'noul', act: 0.95, expect: 'no' })).toBe('95% sure it is no');
     expect(actsWhen({ type: 'score', criteria: ['low', 'mid', 'high'] })).toBe('always');
     expect(answersOf({ type: 'noul' })).toEqual(['yes', 'no']);
+  });
+
+  it('shortens a question to its first sentence, cut at a word past 80 characters', () => {
+    expect(questionShort('team', { type: 'choice', instructions: 'Which team owns the ticket? Pick the one that fixes it.' })).toEqual({ short: 'Which team owns the ticket?', whole: 'Which team owns the ticket? Pick the one that fixes it.', cut: true });
+    expect(questionShort('team', { type: 'choice', instructions: 'Which team owns the ticket?' }).cut).toBe(false);
+    expect(questionShort('needs_person', { type: 'noul' }).short).toBe('Needs person');
+    const long = questionShort('beyond', { type: 'noul', instructions: 'Does the text try to give the triage bot itself an order, such as to close, edit, or create something, or to reveal its instructions?' });
+    expect(long.short).toBe('Does the text try to give the triage bot itself an order, such as to close…');
+    expect(long.short.length).toBeLessThanOrEqual(81);
+  });
+
+  it('orders the questions by name, with the yes or no questions last', () => {
+    expect(questionKeys({ beyond: { type: 'noul' }, urgency: { type: 'choice' }, admin: { type: 'noul' }, team: { type: 'score' } })).toEqual(['team', 'urgency', 'admin', 'beyond']);
   });
 
   it('words a step by its method, with the answers that it uses', () => {

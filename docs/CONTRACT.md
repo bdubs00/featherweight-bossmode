@@ -845,7 +845,7 @@ for the lab and the manager.
 |---|---|
 | `GET /v1/routines` | `{"routines": [<record>]}`, newest change first, without `evidence`. The list pane calls it without `agent`, and the workbench answers the routines of every agent that the person can view. `?agent=<name>` narrows it to one agent. |
 | `GET /v1/routines/{agent}/{name}` | The record with `evidence`, always present and empty for a new version. The list leaves out evidence, and a row needs it for its meta line, so the page reads each routine that is not retired. A 404 says in place that the routine is gone. |
-| `POST /v1/routines/{agent}/{name}/standing` | `{"standing", "note"}`. The page leaves out an empty note. The answer is the record, and the page reads the record again with its evidence. A forbidden move answers 409, and a sign-off by the static token answers 403. The notice shows the sentence of either. |
+| `POST /v1/routines/{agent}/{name}/standing` | `{"standing", "note", "version"}`. `version` is `routine.version` of the record that the person read, on every move. The page leaves out an empty note. The answer is the record, and the page reads the record again with its evidence. A 409 means that the routine changed: a newer version, or another standing. The page then reads the record again and shows it under the quiet line `This routine changed. Read it again.`, with no notice. A sign-off by the static token answers 403, and the notice shows its sentence. |
 | `GET /v1/routines/summary?agent=<name>&days=7` | The week of the agent in the details pane. A 404 leaves the week out. |
 | `GET /v1/pages/agents/{agent}/routines/{name}.md` | The tab Runbook of a routine with `signedOff`. The front writes the page on a sign-off. A 404 shows the runbook that the page renders. |
 
@@ -912,6 +912,10 @@ The evidence of the current version:
   question where it differs. How sure it was shows each band at or above
   the mark that holds a run. It joins the bands under the mark in one row,
   handed to the agent.
+- The page orders the questions of a routine: the choices and the scores
+  by name, then the yes or no questions by name. The map of the JSON has
+  no order. A question shows its first sentence, cut at a word past 80
+  characters. A question mark beside it holds the whole question.
 - A disagreement lists its answers. The page shows those with `agree`
   false. A run without a receipt has no `verification`.
 - Without a replay, the evidence has no `replay`. A replay has no list of
@@ -928,6 +932,13 @@ proposed routine, Sign off and Not yet on a ready one, and Pause, Resume,
 and Retire in More. Not yet sends no request. The card of the sign-off
 turns into the quiet line `Kept for later` for this visit of the routine,
 and the row keeps needs you. The page keeps nothing of it.
+
+A move names the version that the person read, so nobody signs off a
+version that they did not read:
+
+```json
+{ "standing": "live", "note": "Rehearsal is clean.", "version": 3 }
+```
 
 A forbidden move answers:
 

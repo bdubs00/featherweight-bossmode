@@ -252,6 +252,13 @@
   display: block;
   white-space: nowrap;
 }
+/* The short form of a question, with the question mark of the whole one beside it. */
+.rt-question {
+  margin-right: var(--s-2);
+}
+.rt-decides tbody th .help {
+  vertical-align: middle;
+}
 .rt-table thead th,
 .rt-disagreed td:last-child {
   white-space: nowrap;
@@ -259,10 +266,24 @@
 .rt-disagreed tbody th {
   width: 50%;
 }
+.rt-decides tbody th {
+  width: 40%;
+}
+.rt-decides td:last-child {
+  white-space: nowrap;
+}
 .rt-disagreed tbody th a {
   color: var(--ink);
 }
 
+/* The quiet line after a move that met a newer version. */
+.rt-changed {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin-bottom: var(--s-4);
+  color: var(--muted);
+}
 .rt-keys {
   display: flex;
   gap: var(--s-2);
@@ -438,6 +459,9 @@
   .rt-table tbody th {
     width: auto;
     font-weight: 700;
+  }
+  .rt-table td:last-child {
+    white-space: normal;
   }
   /* The cells of a row follow its header on one line where they fit, each after its label. */
   .rt-table td {

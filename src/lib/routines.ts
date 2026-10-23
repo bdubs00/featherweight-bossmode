@@ -264,8 +264,40 @@ export function actsWhen(q: RoutineQuestion): string {
   return sure || 'always';
 }
 
-/** questionWords is the question as the person reads it: its instructions, else its name. */
-export const questionWords = (key: string, q: RoutineQuestion): string => (q.instructions && q.instructions.trim()) || titleOf(key);
+/** questionWords is the whole question as the person reads it: its instructions, else its name. */
+export const questionWords = (key: string, q: RoutineQuestion): string => (q.instructions && q.instructions.replace(/\s+/g, ' ').trim()) || titleOf(key);
+
+/** The longest short form of a question, in characters. */
+export const SHORT_QUESTION = 80;
+
+/**
+ * questionShort is the first sentence of a question, cut at a word and
+ * ended with an ellipsis past 80 characters, so a table of questions stays
+ * easy to scan. cut is true when the short form leaves part of the whole
+ * question out.
+ */
+export function questionShort(key: string, q: RoutineQuestion): { short: string; whole: string; cut: boolean } {
+  const whole = questionWords(key, q);
+  const m = /^.*?[.?!](?=\s|$)/.exec(whole);
+  let short = m ? m[0] : whole;
+  if (short.length > SHORT_QUESTION) {
+    const room = short.slice(0, SHORT_QUESTION);
+    const at = room.lastIndexOf(' ');
+    short = (at > SHORT_QUESTION / 2 ? room.slice(0, at) : room).replace(/[\s,;:.]+$/, '') + '…';
+  }
+  return { short, whole, cut: short !== whole };
+}
+
+/**
+ * questionKeys orders the questions of a routine: the choices and the
+ * scores first, by name, then the yes or no questions, by name. The order
+ * is stable, whatever the order of the map.
+ */
+export function questionKeys(questions: Record<string, RoutineQuestion> | undefined): string[] {
+  const qs = questions || {};
+  const last = (k: string) => (qs[k].type === 'noul' ? 1 : 0);
+  return Object.keys(qs).sort((a, b) => last(a) - last(b) || (a < b ? -1 : a > b ? 1 : 0));
+}
 
 /** holeless shows a template with each hole as an ellipsis: type/{{ .type }} is type/…. */
 export const holeless = (s: string): string => s.replace(/\{\{[\s\S]*?\}\}/g, '…');
@@ -352,7 +384,7 @@ export function groupsOf(records: RoutineRecord[]): RoutineGroup[] {
 /** runbookOf renders a routine as the prose of its runbook, in Markdown, as the front writes the page on a sign-off. */
 export function runbookOf(r: RoutineRecord): string {
   const qs = r.routine.questions || {};
-  const keys = Object.keys(qs);
+  const keys = questionKeys(qs);
   const out: string[] = [];
   if (keys.length) {
     out.push('## What it decides', '');

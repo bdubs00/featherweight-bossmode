@@ -7,6 +7,7 @@
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { routinesApi, type RoutineEvent, type RoutineRecord, type RoutineSummary, type Standing } from '../api/routines';
+import { ApiError } from '../api/client';
 import { keyOf } from '../lib/routines';
 import { store } from './store';
 
@@ -158,12 +159,21 @@ export async function loadWeek(agent: string): Promise<void> {
 }
 
 /**
- * move changes the standing of a routine, then reads the routine again and
- * the week of its agent. The page reads the record and does not rely on
- * the answer of the move.
+ * move changes the standing of the version of a routine that the person
+ * read, then reads the routine again and the week of its agent. A 409 means
+ * that the routine changed in the meantime: the page reads it again, so the
+ * person sees the routine as it is, and the error goes on to the screen.
  */
-export async function move(agent: string, name: string, standing: Standing, note?: string): Promise<void> {
-  await routinesApi.move(agent, name, standing, note);
+export async function move(agent: string, name: string, standing: Standing, version: number, note?: string): Promise<void> {
+  try {
+    await routinesApi.move(agent, name, standing, version, note);
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 409) {
+      reading.delete(keyOf(agent, name));
+      await loadRoutine(agent, name).catch(() => {});
+    }
+    throw e;
+  }
   reading.delete(keyOf(agent, name));
   await loadRoutine(agent, name);
   if (agent in state.weeks) loadWeek(agent).catch(() => {});

@@ -641,6 +641,7 @@ column Now names the string of the approved boards where one changed.
 | new | add | `More`, with `Pause`, `Resume`, and `Retire` as the moves allow. A window that hides the details pane adds the name of the agent. | done |
 | new | add | `Retire <title>?`, `A retired routine stays retired.`, and the keys `Cancel` and `Retire` | done |
 | new | add | `Loading the routine.`, `This routine is not here. It was removed, or you cannot see it.` | done |
+| new | add | `This routine changed. Read it again.`, a quiet line above the routine after a move that met a newer version or another standing. The page reads the routine again, and shows no notice. | done |
 | `A routine of triage. Proposed 11 Oct from 212 tickets.` (the line under the header) | remove | the agent is in the details pane, and Made from is on the Evidence tab | done |
 | `Needs your sign-off` | keep | `Needs a sign-off` for a person who does not own the agent, who gets no key | done |
 | `Triage rehearsed this routine on 1,480 tickets over 12 days. It still handed each ticket to the agent, and the two were compared.` | remove | the row says the size of the rehearsal, and the Evidence tab says the rest | done |
@@ -654,6 +655,7 @@ column Now names the string of the approved boards where one changed.
 | `Steps` with a count chip | change | `Steps` alone. The numbers of the steps give the count. | done |
 | new | add | the words of a step: the method of its call, such as `Add labels`, or the tool, with the answers that it uses as slots, and the tool as meta | done |
 | `What it decides` with a count chip, and `Question`, `Answers`, `Acts when` | change | `What it decides` alone, with the same columns | done |
+| the whole instructions of a question in the column Question | change | the first sentence, cut at a word past 80 characters with `…`. The question mark `The whole question` beside it holds the rest, and so does the tooltip. The choices come first by name, then the yes or no questions. | done |
 | `Under those, the agent decides, with the answers of the routine in hand.` | change | behind the question mark `When it is not sure`: `When an answer is under its mark, the agent handles the ticket, with the answers of the routine in hand.` | done |
 | `85% sure`, `95% sure it is no` | keep | and `, not other` for an answer that keeps the routine from acting, or `always` for a question without a mark | done |
 | `Afterward` | keep | the check: the read, such as `Get issue`, then `holds` and `and not` with the strings as slots, and a hole as `…` | done |

@@ -6,7 +6,7 @@
 
 import { useState } from 'preact/hooks';
 import type { RoutineRecord } from '../api/routines';
-import { barsOf, bandRows, countsOf, dayLabel, disagreedOf, num, pct0, questionWords, units, verificationWords } from '../lib/routines';
+import { barsOf, bandRows, countsOf, dayLabel, disagreedOf, num, pct0, questionKeys, questionShort, units, verificationWords } from '../lib/routines';
 import { runHref } from './Profile';
 import { Button, Chip, Help } from './primitives';
 
@@ -100,11 +100,16 @@ function PastTickets({ rec }: { rec: RoutineRecord }) {
   );
 }
 
+/** QuestionHead is the first sentence of a question, with the whole question in its tooltip when the sentence leaves part out. */
+function QuestionHead({ short }: { short: { short: string; whole: string; cut: boolean } }) {
+  return <span title={short.cut ? short.whole : undefined}>{short.short}</span>;
+}
+
 /** HowSure is the table of how sure the routine was, per question, and how often it was right at each level. */
 function HowSure({ rec }: { rec: RoutineRecord }) {
   const qs = rec.routine.questions || {};
   const per = (rec.evidence && rec.evidence.questions) || {};
-  const keys = Object.keys(qs).filter((k) => (per[k] || []).some((b) => b.runs > 0));
+  const keys = questionKeys(qs).filter((k) => (per[k] || []).some((b) => b.runs > 0));
   if (keys.length === 0) return null;
   return (
     <section class="rt-sec" aria-labelledby="rt-sure">
@@ -125,7 +130,7 @@ function HowSure({ rec }: { rec: RoutineRecord }) {
             {keys.length > 1 && (
               <tr class="rt-qrow">
                 <th scope="colgroup" colSpan={3}>
-                  {questionWords(k, qs[k])}
+                  <QuestionHead short={questionShort(k, qs[k])} />
                 </th>
               </tr>
             )}

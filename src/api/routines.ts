@@ -176,9 +176,14 @@ export const routinesApi = {
   list: (agent?: string) => call<{ routines: RoutineRecord[] }>('/v1/routines' + query({ agent })).then((r) => (r && r.routines) || []),
   /** get reads one routine with its evidence. */
   get: (agent: string, name: string) => call<RoutineRecord>(one(agent, name)),
-  /** move changes the standing of a routine and answers the record. A move that the table forbids answers 409 with the allowed moves, and a sign-off by the static token answers 403. */
-  move: (agent: string, name: string, standing: Standing, note?: string) =>
-    call<unknown>(one(agent, name) + '/standing', { method: 'POST', body: note ? { standing, note } : { standing } }),
+  /**
+   * move changes the standing of the version of a routine that the person
+   * read, and answers the record. A move that the table forbids, or a
+   * version that is no longer the current one, answers 409. A sign-off by
+   * the static token answers 403.
+   */
+  move: (agent: string, name: string, standing: Standing, version: number, note?: string) =>
+    call<unknown>(one(agent, name) + '/standing', { method: 'POST', body: note ? { standing, note, version } : { standing, version } }),
   /** summary reads the week of an agent, or null where the workbench has no such route. */
   summary: async (agent: string, days = 7): Promise<RoutineSummary | null> => {
     try {
