@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pageName, pageReason, withSuffix } from './pagepath';
+import { byPagePath, pageName, pageReason, withSuffix } from './pagepath';
 
 describe('the page path', () => {
   it('takes a relative path whose last part ends with .md', () => {
@@ -31,6 +31,11 @@ describe('the page path', () => {
     expect(withSuffix('search')).toBe('search.md');
     expect(withSuffix('dir/')).toBe('dir/');
     expect(withSuffix('')).toBe('');
+  });
+
+  it('orders a page before the pages that extend its name', () => {
+    const paths = ['b/role-v3.md', 'b/role.md', 'b/role-v2.md', 'a.md'].map((path) => ({ path }));
+    expect(paths.sort(byPagePath).map((x) => x.path)).toEqual(['a.md', 'b/role.md', 'b/role-v2.md', 'b/role-v3.md']);
   });
 
   it('shows the name without .md', () => {

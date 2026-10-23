@@ -7,12 +7,13 @@
 
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { BridgePage } from '../api/types';
+import { byPagePath } from '../lib/pagepath';
 import { loadBridgePages } from './actions';
 import { seatOfRun } from './reducer';
 import { useSelect } from './store';
 
-/** byPath sorts pages by their path, as the route sorts them. */
-const byPath = (a: BridgePage, b: BridgePage) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
+/** byPath sorts pages by their path, a page before the pages that extend its name. */
+const byPath = (a: BridgePage, b: BridgePage) => byPagePath(a, b);
 
 /**
  * useBridgePages gives the pages of the work of a bridge, and reads them
