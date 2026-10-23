@@ -171,6 +171,11 @@ plan plus two fields:
 **New.** `question` is the seq of the question of the seat that waits for
 the person, or 0 (section 5.1).
 
+**New.** `gone` is true when no worker of the fleet holds the newest run of
+the seat, as the channel said with the line lost. A read of that run
+answers 404, so the page does not ask for it, and the tabs Run and Files
+say that the run is gone. A front before this key leaves it out.
+
 `presence` is one word of the table of section 6.5 of the plan: `working`,
 `needs-you`, `waiting`, `not-started`, `idle`, `asleep`, `limit`, `error`,
 or `fired`. **New.** `limit` is a seat whose newest run stopped at a limit
@@ -179,7 +184,9 @@ Continue goes on with the run (section 5.4). The page derives it from a
 run in the state `failed` with that error.
 A seat with no run is `waiting` while its job waits on the queue of its agent
 or the manager of its spawn bridge still runs, and `not-started` when that
-manager stopped before it seated the member. A message to a `not-started`
+manager stopped before it seated the member. On a closed bridge, a seat
+with no run is `not-started`, and a seat whose newest run the front no
+longer holds is `idle`. A message to a `not-started`
 seat starts it, and so does Seat again. `activity` is the K4
 activity of the newest run of the member, or null. The page derives the
 presence of a seat itself where it holds the facts (section 10.1), and
