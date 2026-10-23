@@ -179,6 +179,9 @@ describe('the channel', () => {
     expect(el.querySelector('.composer')).toBeNull();
     const list = [card(1, 'allow'), card(2, 'pending'), { ...card(3, 'pending') }, { ...card(4, 'allow'), decision: { ...card(4, 'allow').decision!, state: 'unknown' } }, entryOf(5)] as Entry[];
     expect(cardOrder(list)).toEqual([2, 3, 4, 1]);
+    // A question of a seat is a decision for you: it waits with the cards, and an answered one goes with the decided.
+    const asks = [...list, entryOf(6, { to: ['operator'], text: 'Restart sshd?', ask: { choices: ['Yes', 'No'] } }), entryOf(7, { to: ['operator'], text: 'Which host?', ask: {} })];
+    expect(cardOrder(asks, (e) => e.seq === 6)).toEqual([2, 3, 6, 4, 7, 1]);
   });
 
   it('lists the pages of the work of the bridge in the tab Wiki, wherever its seats wrote them, and keeps the list current', async () => {

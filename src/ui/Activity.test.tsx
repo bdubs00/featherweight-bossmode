@@ -178,7 +178,7 @@ describe('a message that asks you', () => {
     expect(selectAttention(store.get())).toBe(3);
   });
 
-  it('answers in the bridge, to that member, in reply to the message', async () => {
+  it('shows its card, and answers in the bridge, to that member, in reply to the message', async () => {
     const f = fakeFetch([['POST', /\/v1\/bridges\/b2\/messages$/, (b) => ({ seq: 2, at: at(41), from: { kind: 'person', name: 'alice@example.com' }, ...(b as object) })]]);
     try {
       const el = mount(
@@ -188,18 +188,54 @@ describe('a message that asks you', () => {
         </>,
       );
       const pane = el.querySelector('.inbox-main-pane')!;
-      expect(pane.querySelector('.tmsg .md')!.textContent).toContain('Please say whether 14 is enough.');
-      const box = pane.querySelector('#composer') as HTMLTextAreaElement;
-      expect(box.getAttribute('placeholder')).toBe('Message migrator');
+      expect(pane.querySelector('.card-title h3')!.textContent).toBe('Needs your answer');
+      expect(pane.querySelector('.ask-text .md')!.textContent).toContain('Please say whether 14 is enough.');
+      const box = pane.querySelector('textarea') as HTMLTextAreaElement;
+      expect(box.getAttribute('placeholder')).toBe('Your answer');
       act(() => {
         box.value = 'Keep 14.';
         box.dispatchEvent(new Event('input', { bubbles: true }));
       });
-      act(() => ([...pane.querySelectorAll('button')].find((b) => b.textContent === 'Send') as HTMLButtonElement).click());
+      act(() => ([...pane.querySelectorAll('button')].find((b) => b.textContent === 'Answer') as HTMLButtonElement).click());
       await vi.waitFor(() => expect(f.calls.some((c) => c.method === 'POST')).toBe(true));
       expect(f.calls.find((c) => c.method === 'POST')).toMatchObject({ path: '/v1/bridges/b2/messages', body: { text: 'Keep 14.', to: ['migrator'], replyTo: 1 } });
       // The answer leaves the row of the question.
       await vi.waitFor(() => expect(rows(el).some((r) => r.getAttribute('data-key') === 'q:b2/1')).toBe(false));
+    } finally {
+      f.restore();
+    }
+  });
+});
+
+describe('a question that the front names on a seat', () => {
+  const Q = { seq: 7, at: at(42), from: { kind: 'agent' as const, handle: 'reviewer', run: 'run-reviewer' }, to: ['operator'], text: 'Do you consent to restarting sshd on both hosts?', ask: { choices: ['Yes', 'No'] } };
+  beforeEach(() => {
+    act(() => {
+      store.dispatch({ type: 'bridges', bridges: [bridge('b1', 'Migrate Puppet', undefined, { needsYou: 2 }), bridge('b3', 'Harden the lab hosts', undefined, { needsYou: 1, lastSeq: 9, read: 9 })] });
+      store.dispatch({ type: 'bridge', bridge: bridge('b3', 'Harden the lab hosts', [{ ...seat('reviewer', 'reviewer', 'needs-you'), question: 7 }, { ...seat('auditor', 'net-auditor', 'idle'), question: 0 }], { needsYou: 1, lastSeq: 9, read: 9 }) });
+      store.dispatch({ type: 'run', run: run('run-reviewer', 'reviewer', 'completed') });
+    });
+  });
+
+  it('needs you while the seat names it, reads its entry alone, and counts once in the app bar', async () => {
+    const f = fakeFetch([['GET', /\/v1\/bridges\/b3\/messages\/7$/, () => Q]]);
+    try {
+      const el = mount(
+        <>
+          <ActivityList />
+          <ActivityMain item="q:b3/7" />
+        </>,
+      );
+      const row = () => rows(el).find((r) => r.getAttribute('data-key') === 'q:b3/7')!;
+      expect(row().querySelector('.status-word')!.textContent).toBe('needs you');
+      await vi.waitFor(() => expect(row().querySelector('.inbox-text')!.textContent).toBe('reviewer asks: Do you consent to restarting sshd on both hosts?'));
+      const pane = el.querySelector('.inbox-main-pane')!;
+      await vi.waitFor(() => expect([...pane.querySelectorAll('.pick button')].map((b) => b.textContent)).toEqual(['Yes', 'No']));
+      // needsYou of the bridge counts the seat, so the question counts once.
+      expect(selectAttention(store.get())).toBe(3);
+      // The seat no longer names it: the row leaves.
+      act(() => store.dispatch({ type: 'member', bridge: 'b3', member: { ...seat('reviewer', 'reviewer', 'idle'), question: 0 } }));
+      expect(rows(el).some((r) => r.getAttribute('data-key') === 'q:b3/7')).toBe(false);
     } finally {
       f.restore();
     }

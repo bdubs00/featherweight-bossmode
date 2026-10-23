@@ -15,7 +15,7 @@ import { dayWords, list } from '../lib/words';
 import { napOf, napRuns } from '../lib/lines';
 import type { Entry } from '../api/types';
 
-/** line is a plain system line, chat a message of an agent to agents, card a decision, msg any other message. */
+/** line is a plain system line, chat a message of an agent to agents, card a decision or a question of a seat, msg any other message. */
 export type ShapeKind = 'line' | 'chat' | 'card' | 'msg';
 
 export interface Shape {
@@ -45,6 +45,8 @@ export function shapeOf(e: Entry, now?: Date): Shape {
     return { seq: e.seq, kind: 'line', day, who: [], failed: e.event === 'failed' };
   }
   const to = e.to || [];
+  // A question of a seat asks you, so it never folds into the chatter of the agents.
+  if (e.ask) return { seq: e.seq, kind: 'card', day, who: [], failed: false };
   if (e.from.kind === 'agent' && e.from.handle && to.length > 0 && !to.includes('operator') && !e.pinned) {
     return { seq: e.seq, kind: 'chat', day, who: [e.from.handle, ...to], failed: false };
   }

@@ -39,6 +39,12 @@ describe('shapeOf', () => {
     expect(shapeOf({ ...chat('migrator-1', ['reviewer']), pinned: true }, NOW).kind).toBe('msg');
   });
 
+  it('never folds a question of a seat, also one whose answer names a teammate first', () => {
+    const q = { ...chat('reviewer', ['net-auditor']), text: '@net-auditor go.\n\n@operator Two decisions are open.', ask: {} };
+    expect(shapeOf(q, NOW).kind).toBe('card');
+    expect(kinds(fold([chat('a', ['b']), q, chat('b', ['a'])]))).toEqual(['entry', 'entry', 'entry']);
+  });
+
   it('reads back the string of the shapes', () => {
     const shapes = [line(), chat('a', ['b', 'c']), msg()].map((e) => shapeOf(e, NOW));
     expect(shapesOf(shapeKey(shapes))).toEqual(shapes);

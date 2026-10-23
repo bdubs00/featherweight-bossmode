@@ -148,14 +148,14 @@ function write(res, ev) {
 
 /**
  * wire is the data of an event as the stream sends it. With FAKE_PARTIAL=1,
- * an entry with a decision goes out cut, as the backend can send it: with
- * partial set and without the input and the schema of the decision. The
- * page reads the entry again with ?from=<seq>&limit=1.
+ * an entry with a decision goes out cut, as the backend sends a large card:
+ * without the input and the schema of the decision, and partial set beside
+ * the entry. The page reads the entry again with ?from=<seq>&limit=1.
  */
 function wire(ev) {
   if (!PARTIAL || ev.kind !== 'bridge.message' || !ev.data || !ev.data.message || !ev.data.message.decision) return ev.data;
   const { input: _i, schema: _s, ...decision } = ev.data.message.decision;
-  return { bridge: ev.data.bridge, message: { ...ev.data.message, partial: true, decision } };
+  return { bridge: ev.data.bridge, message: { ...ev.data.message, decision }, partial: true };
 }
 
 function stream(req, res) {

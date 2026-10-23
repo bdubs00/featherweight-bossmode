@@ -3,8 +3,8 @@
 
 import { api, type NewBridge, type NewMember, type NewMessage } from '../api/routes';
 import { openStream, type StreamHandle } from '../api/stream';
-import type { Entry, FleetChange, MessageEventData, ReactionKind, RunState, StreamEvent } from '../api/types';
-import { managerRunOf, type State } from './reducer';
+import type { Entry, FleetChange, MemberEventData, MessageEventData, ReactionKind, Run, RunState, StreamEvent } from '../api/types';
+import { managerRunOf, seatOfRun, type State } from './reducer';
 import { store } from './store';
 import { ApiError, type SigninNeeded } from '../api/client';
 import { holdsTask } from '../lib/agents';
@@ -33,10 +33,27 @@ export async function loadBridge(id: string): Promise<void> {
 
 export const PAGE = 50;
 
-/** loadChannel reads the recent end of a channel. */
+/** loadChannel reads the recent end of a channel, and then what came while it read. */
 export async function loadChannel(id: string): Promise<void> {
   const page = await once('channel:' + id, () => api.messages(id, { limit: PAGE }));
   store.dispatch({ type: 'channel', bridge: id, page, mode: 'latest' });
+  // An entry that the stream brought while the read ran found no channel
+  // to join, and the read can answer before the entry landed. The record
+  // knows the newest seq, so the page reads on to it.
+  if (behind(id)) await loadNewer(id);
+}
+
+/** newestOf is the seq of the newest loaded entry of a channel, or 0. */
+function newestOf(id: string): number {
+  const ch = store.get().channels[id];
+  return ch && ch.seqs.length ? ch.seqs[ch.seqs.length - 1] : 0;
+}
+
+/** behind reports whether the record of a bridge knows a newer entry than the loaded part of its channel. */
+function behind(id: string): boolean {
+  const b = store.get().bridges.byId[id];
+  const ch = store.get().channels[id];
+  return !!b && !!ch && b.lastSeq > newestOf(id);
 }
 
 /** loadOlder reads the page in front of the loaded part. It returns false at the first page. */
@@ -52,12 +69,15 @@ export async function loadOlder(id: string): Promise<boolean> {
 export const CARD_PAGES = 8;
 
 /**
- * loadAllCards reads the channel back to its first entry, at most
- * CARD_PAGES pages of 500, so the tab Decisions lists every card of the
- * bridge. The entries join the loaded part of the channel, so the stream
- * keeps each card current.
+ * loadAllCards reads the channel forward past its newest loaded entry, so
+ * a card that the stream did not bring shows, and back to its first entry,
+ * at most CARD_PAGES pages of 500, so the tab Decisions lists every card
+ * of the bridge. The entries join the loaded part of the channel, so the
+ * stream keeps each card current. The tab says Nothing needs you only
+ * after both reads.
  */
 export async function loadAllCards(id: string): Promise<void> {
+  await loadNewer(id);
   for (let i = 0; i < CARD_PAGES; i++) {
     const ch = store.get().channels[id];
     if (!ch || ch.prev === 0) return;
@@ -66,7 +86,7 @@ export async function loadAllCards(id: string): Promise<void> {
   }
 }
 
-/** loadNewer reads what the stream missed, after a reset. */
+/** loadNewer reads the entries after the newest loaded one: what the stream missed, after a reset or a lost event. */
 export async function loadNewer(id: string): Promise<void> {
   const ch = store.get().channels[id];
   if (!ch || ch.seqs.length === 0) return loadChannel(id);
@@ -77,6 +97,84 @@ export async function loadNewer(id: string): Promise<void> {
     if (!page.next) return;
     from = page.next;
   }
+}
+
+/**
+ * The pauses before the page reads a channel for an entry that the stream
+ * did not bring: the first lets the event still come, and the later ones
+ * wait for a card that the front writes a moment after the run asked.
+ */
+export const MISSED_WAITS = [1500, 5000, 15000];
+
+const missedTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+/**
+ * readMissed reads a channel forward a moment later, once for a burst: a
+ * seat waits for a decision or for your answer and the loaded channel
+ * holds no card of it, or an entry came after a gap. A replica of the
+ * front can miss the event of an entry that the other replica wrote, and
+ * the page then showed needs you without the card. still tells whether
+ * the entry is still missing after a read, and the page then reads again
+ * after the next pause.
+ */
+export function readMissed(id: string, still: () => boolean = () => false, attempt = 0): void {
+  if (missedTimers.has(id) || !store.get().channels[id] || attempt >= MISSED_WAITS.length) return;
+  missedTimers.set(
+    id,
+    setTimeout(() => {
+      missedTimers.delete(id);
+      loadNewer(id)
+        .catch(() => {
+          // The next pause reads again.
+        })
+        .then(() => {
+          if (still()) readMissed(id, still, attempt + 1);
+        });
+    }, MISSED_WAITS[attempt]),
+  );
+}
+
+/** forgetMissed drops the reads that wait, for the tests. */
+export function forgetMissed(): void {
+  for (const t of missedTimers.values()) clearTimeout(t);
+  missedTimers.clear();
+}
+
+/**
+ * missedCard names the bridge whose loaded channel lacks the card or the
+ * question that an event says waits, or "": a run of a seat that waits for
+ * a decision, a seat whose question waits, or an entry after a gap.
+ */
+export function missedCard(s: State, e: StreamEvent): string {
+  const d = e.data as Record<string, unknown> | null;
+  if (!d) return '';
+  if (e.kind === 'run') {
+    const r = d as unknown as Run;
+    if (r.state !== 'input-required' || !r.pending || !r.pending.id) return '';
+    for (const id of Object.keys(s.rosters)) {
+      const ch = s.channels[id];
+      if (!ch || !seatOfRun(s.rosters[id], r.id)) continue;
+      const held = ch.seqs.some((q) => {
+        const x = ch.bySeq[q];
+        return !!x && !!x.decision && x.decision.run === r.id && x.decision.id === r.pending!.id;
+      });
+      return held ? '' : id;
+    }
+    return '';
+  }
+  if (e.kind === 'bridge.member') {
+    const m = d as unknown as MemberEventData;
+    const ch = m && m.member ? s.channels[m.bridge] : undefined;
+    if (!ch || !m.member.question) return '';
+    return ch.bySeq[m.member.question] || m.member.question < (ch.seqs[0] || 0) ? '' : m.bridge;
+  }
+  if (e.kind === 'bridge.message') {
+    const m = d as unknown as MessageEventData;
+    const ch = m && m.message ? s.channels[m.bridge] : undefined;
+    if (!ch || !ch.seqs.length) return '';
+    return m.message.seq > ch.seqs[ch.seqs.length - 1] + 1 ? m.bridge : '';
+  }
+  return '';
 }
 
 const readTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -109,6 +207,16 @@ export async function sendMessage(id: string, m: NewMessage): Promise<Entry> {
   const e = await api.post(id, m);
   if (e && typeof e.seq === 'number') store.dispatch({ type: 'entry', bridge: id, entry: e });
   return e;
+}
+
+/**
+ * answerQuestion answers the question of a seat: a message of the person to
+ * the seat in reply to the question, with a choice or the words of the
+ * person. The front ends the question and gives the answer to the seat,
+ * which starts its next turn.
+ */
+export async function answerQuestion(id: string, handle: string, seq: number, text: string): Promise<Entry> {
+  return sendMessage(id, { text, to: [handle], replyTo: seq });
 }
 
 export async function react(id: string, seq: number, reaction: ReactionKind, note?: string): Promise<void> {
@@ -406,7 +514,8 @@ let stream: StreamHandle | null = null;
 export async function completeEvent(e: StreamEvent): Promise<StreamEvent | null> {
   if (e.kind !== 'bridge.message') return e;
   const d = e.data as MessageEventData | null;
-  if (!d || !d.message || !d.message.partial || typeof d.bridge !== 'string') return e;
+  // The front marks the event partial beside the entry; an older page read the mark on the entry.
+  if (!d || !d.message || !(d.partial || d.message.partial) || typeof d.bridge !== 'string') return e;
   try {
     const page = await api.messages(d.bridge, { from: d.message.seq, limit: 1 });
     const whole = page && page.messages ? page.messages.find((m) => m.seq === d.message.seq) : undefined;
@@ -442,7 +551,11 @@ async function onEvent(raw: StreamEvent): Promise<void> {
       }
     }
   }
+  // A card or a question that the event says waits, and that the channel
+  // lacks, is read from the channel a moment later (readMissed).
+  const missed = missedCard(store.get(), e);
   store.dispatch({ type: 'stream', event: e });
+  if (missed) readMissed(missed, () => missedCard(store.get(), e) === missed);
   if (e.kind === 'reset') await reload();
   // A Task that the fleet view does not list, such as a new worker after a
   // change of Keep, brings the fleet view again, so its worker shows.

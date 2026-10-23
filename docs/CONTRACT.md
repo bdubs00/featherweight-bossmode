@@ -123,13 +123,22 @@ The workbench counts `unread` over at most the last 2000 entries of the
 channel, so a larger count stops there, and `unreadMore` says so. The page
 shows 99+ above 99, and 2000+ with `unreadMore`.
 
-A message of an agent whose `to` holds `operator`, or whose text starts
-with `@operator`, asks the person. The page finds such a message after
-`read` in the channel, from `to` and the text, and shows it in Activity
-among what needs you, until the person sends a message to that handle or
-in reply to it. The list carries no count of these messages, so the count
-of Activity takes them once the page reads the channel: Activity reads the
-channel of each bridge with `unread` above 0.
+**New.** A seat asks the person with the tool `bridge_post` and `ask`, and
+as a safety net any message of a seat whose `to` holds `operator`, or
+whose text holds the word `@operator` anywhere, asks too. The front marks
+the entry with `ask` (section 6.2) and names the question on the seat in
+`question`, the seq of the entry, until a person answers it or the seat
+posts again. While it waits, the presence of the seat is `needs-you`, and
+`needsYou` of the bridge counts it, so the row of the bridge, the count of
+the app bar, and Activity take it with no read of the channel. The page
+shows the entry as a question card in the channel and in Activity, and
+reads the entry alone, with `GET /v1/bridges/{id}/messages/{seq}`, when the
+loaded part of the channel does not hold it. A front before questions
+names no `question`. The page then finds a message of an agent that asks
+the person after `read` in the channel, from `to` and the text, and shows
+it in Activity until the person sends a message to that handle, to
+everyone, or in reply to it, or the seat posts again; Activity reads the
+channel of each bridge with `unread` above 0 for it.
 
 `GET /v1/bridges/{id}` answers the same item with `members` and `usage`.
 `usage` sums the usage of the runs of the bridge as the tool `batch` sums a
@@ -147,9 +156,13 @@ plan plus two fields:
   "task": "Migrate the cron module to an Ansible role",
   "runs": ["run-..."], "fired": false, "muted": false,
   "presence": "working",
-  "activity": { "turn": 7, "tool": "bash", "callId": "c4", "phrase": "Ran \"ansible-lint roles/cron\"", "since": "2026-10-21T20:04:00Z" }
+  "activity": { "turn": 7, "tool": "bash", "callId": "c4", "phrase": "Ran \"ansible-lint roles/cron\"", "since": "2026-10-21T20:04:00Z" },
+  "question": 0
 }
 ```
+
+**New.** `question` is the seq of the question of the seat that waits for
+the person, or 0 (section 5.1).
 
 `presence` is one word of the table of section 6.5 of the plan: `working`,
 `needs-you`, `waiting`, `not-started`, `idle`, `asleep`, `error`, or `fired`.
@@ -260,6 +273,13 @@ The plan gives the entry. The page reads four more fields:
 - `page` is the wiki path that a system line is about, when the text of
   the line holds no link to it. The page links it.
 - `skill` is the slash command of a message, `{"name", "args"}`, or absent.
+- **New.** `ask` marks a message of a seat that asks the person:
+  `{"choices": ["Yes", "No"]}`, two to four answers to pick from, or `{}`
+  for an answer in words, and absent elsewhere. The entry waits while the
+  `question` of its seat is its seq. The page draws it as a question card:
+  the words of the seat, a key per choice, and Your answer. A key or Answer
+  posts the answer as a message of the person with `to` the seat and
+  `replyTo` the question (section 6.3).
 
 - `from.kind` is `person`, `agent`, or `system`. A person has `name`, the
   subject, and `display`, a name to show, when the front knows one. An agent
@@ -309,7 +329,14 @@ The plan gives the entry. The page reads four more fields:
   | `decidedBy`, `decidedAt` | The subject and the time of the decision |
   | `note` | The note of the decision |
   | `answer` | The answer to a question, as words |
-  | `always` | True when the card can offer Always allow. Without it, the page applies the rule of `/ui` to `reason`. |
+  | `always` | True when the card can offer Always allow. Without it, the page applies the rule of the front to `reason`: a call of one tool on a worker, held by `default` or by a rule that names the tool, never a flag such as `destructive` and never a pattern such as `bash: git push*`. A decision that the page builds from the run, as Activity does before it holds the card, takes the same rule, so both offer the same keys. |
+
+  **New.** `input` is the whole call. The view of the front holds a call
+  cut, or no input above 4 KB, so the front reads the run from its owner
+  for the card. An input above 32 KB keeps the start of each string with
+  the note of a cut, and every field. The card shows the short fields
+  first, a text of several lines as a short block of code with Show all,
+  and a map of files by name, each of which opens its text.
 
   When a decision lands, from any surface, the front changes the same entry
   and sends it again on the stream with the same seq. The page replaces the
@@ -336,6 +363,12 @@ person cannot. A closed bridge answers 409.
 
 When the person replies to a message of an agent and names no handle, the
 page sets `to` to that agent, as section 4.2 of the plan says.
+
+**New.** A message of the person that reaches a seat whose question waits
+answers the question: a message whose `to` names the seat, a message to
+everyone, or a reply to the question. The front ends the question and the
+seat gets the message as its answer, which starts its next turn. The body
+takes no `ask`: only a seat asks.
 
 ### 6.4 One entry, whole
 
@@ -711,7 +744,7 @@ stream route takes the same `Authorization` header as every route.
 
 | Kind | Data |
 |---|---|
-| `bridge.message` | `{"bridge": "<id>", "message": <entry>}`. A new entry, or a changed one with the same seq. An entry with `"partial": true` lacks `decision.input` and `decision.schema`: the page reads it again with `?from=<seq>&limit=1` and never shows the cut card. |
+| `bridge.message` | `{"bridge": "<id>", "message": <entry>}`. A new entry, or a changed one with the same seq. An event with `"partial": true` beside `bridge` and `message` carries the entry without `decision.input` and `decision.schema`, because the whole entry is larger than an event: the page reads it again with `?from=<seq>&limit=1` and never shows the cut card. An entry can come twice, by the relay of the replica that wrote it and by the catch-up of the replica of the stream, and the page takes the same entry as it is. |
 | `bridge.member` | `{"bridge": "<id>", "member": <member>}`. A new seat, or a change of a seat: its presence, its activity, its task, muted, or fired. |
 | `run` | The run object, with `member`, `activity`, and `reactions`. One event per change of a run that the caller can see. |
 | `page` | The info of the page as `GET /v1/pages` lists it, with `run` when a run wrote it, plus `"deleted": true` for a removed page |
@@ -733,6 +766,17 @@ worker shows. The page reads `GET /v1/fleet` at boot and after a `reset`.
 A `bridge.message` or `bridge.member` event for a bridge that the page does
 not know makes the page read that bridge with `GET /v1/bridges/{id}`. A
 bridge that the manager opens therefore shows in the rail.
+
+**New.** The page reads a channel forward, from its newest loaded entry,
+where an event says that something waits that the loaded channel lacks: a
+`run` event of a seat that waits for a decision with no card of it, a
+`bridge.member` event that names a `question` that the channel lacks, and
+a `bridge.message` after a gap of seqs. It reads 1.5 seconds later, so the
+event can still come, and again after 5 and 15 seconds while the entry
+still lacks. The first read of a channel reads on to the `lastSeq` of the
+record, for an entry that came while it read, and the tab Decisions reads
+forward before it reads back, so it never says `Nothing needs you.` while a
+card waits.
 
 ### 10.1 One state per worker
 
@@ -919,10 +963,6 @@ once loaded, holds it. The workers and their phases come from the stream (sectio
 never from that read.
 
 ## 14. What the page does not call yet
-
-- A count of the messages that ask the person in `GET /v1/bridges`, such
-  as `asksYou` beside `needsYou`. Without it, the count of Activity on the
-  app bar takes such a message only after the page reads its channel.
 
 - `files` on a message of the channel.
 - The budget of a run. The plan offers a button to raise the budget of a

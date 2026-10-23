@@ -15,19 +15,17 @@ import type { Member } from '../api/types';
 import { go, hrefOf, parseRoute } from '../lib/route';
 import { decisionTitle, excerpt, personName, plainText, senderName, since } from '../lib/words';
 import { briefOf, planOf } from '../lib/decision';
-import { decide, sendMessage } from '../state/actions';
-import { ensureChannels, ensureResults, ensureRosters, ensureRuns, useResults } from '../state/fetchers';
+import { decide } from '../state/actions';
+import { ensureChannels, ensureEntries, ensureResults, ensureRosters, ensureRuns, useEntries, useResults } from '../state/fetchers';
 import { inboxRows, keyAction, sortInbox, type InboxRow } from '../state/inbox';
 import { newestRun } from '../state/people';
 import { useSelect } from '../state/store';
 import { selectFacts } from '../state/reducer';
 import { awakeFor, seatPresence } from '../lib/status';
-import { DecisionCard } from './Decision';
+import { AskCard, DecisionCard } from './Decision';
 import { useRoving } from './keys';
 import { attempt } from './notice';
-import { Markdown, When } from './common';
-import { Composer } from './Composer';
-import { Msg } from './Thread';
+import { Empty, Markdown, When } from './common';
 import { SeatAgainKey, seatAgain } from './SeatAgain';
 import { EmptyPane } from './Shell';
 import { Avatar, Button, Led, Mark, PaneHeader } from './primitives';
@@ -107,6 +105,7 @@ export function useInbox(): { rows: InboxRow[]; loaded: boolean } {
   const me = useSelect((s) => (s.me && s.me.principal ? s.me.principal.subject : ''));
   const facts = useSelect(selectFacts);
   const results = useResults();
+  const entries = useEntries();
   const open = useMemo(() => bridges.order.map((id) => bridges.byId[id]).filter((b) => b.state === 'open'), [bridges]);
   useEffect(() => {
     if (bridges.loaded) ensureRosters();
@@ -137,7 +136,15 @@ export function useInbox(): { rows: InboxRow[]; loaded: boolean } {
   useEffect(() => {
     if (unread) ensureChannels(unread.split(','));
   }, [unread]);
-  const rows = sortInbox(inboxRows({ bridges: open, rosters, runs, channels, results, me, facts }));
+  const rows = sortInbox(inboxRows({ bridges: open, rosters, runs, channels, results, me, facts, entries }));
+  // A question that waits and whose entry the page does not hold yet is read alone.
+  const missing = rows
+    .filter((r) => r.kind === 'asked' && !r.entry && r.seq)
+    .map((r) => r.bridge + '/' + r.seq)
+    .join(',');
+  useEffect(() => {
+    if (missing) ensureEntries(missing.split(','));
+  }, [missing]);
   // A read of the result goes to the worker of the run, so the inbox never reads the result of a worker that sleeps.
   const waiting = rows
     .filter((r) => r.run && (r.status === 'needs-you' || r.status === 'error') && awakeFor(facts, runs[r.run]) !== false)
@@ -184,6 +191,7 @@ function rowText(r: InboxRow): string {
   if (r.decision && r.kind === 'question') return (r.handle || '') + ' asks: ' + (r.decision.reason || 'A question for you');
   if (r.decision) return decisionTitle(r.handle || '', r.decision);
   if (r.kind === 'asked' && r.entry) return excerpt((r.handle || '') + ' asks: ' + askedText(r.entry.text), 120);
+  if (r.kind === 'asked') return (r.handle || '') + ' asks you';
   if (r.entry) return excerpt(plainText(r.entry.text), 90);
   return r.reason || '';
 }
@@ -340,7 +348,7 @@ export function ActivityMain({ item }: { item?: string }) {
   const tone = r.status === 'needs-you' ? 'amber' : r.kind === 'stopped' ? 'grey' : r.status === 'error' ? 'red' : undefined;
   const word = r.status === 'needs-you' ? 'needs you' : r.kind === 'stopped' ? 'stopped' : r.status === 'error' ? 'error' : '';
   const convo = r.handle && (r.kind !== 'message' || (r.entry && r.entry.from.kind === 'agent')) ? hrefOf({ place: 'member', bridge: r.bridge, handle: r.handle, tab: 'chat' }) : '';
-  const asked = r.kind === 'asked' && r.entry && r.handle ? { entry: r.entry, handle: r.handle } : null;
+  const asked = r.kind === 'asked' && r.handle ? { entry: r.entry, handle: r.handle } : null;
   return (
     <section class="screen inbox-main-pane" aria-labelledby="inbox-title">
       <PaneHeader
@@ -361,13 +369,9 @@ export function ActivityMain({ item }: { item?: string }) {
         {where}
       </PaneHeader>
       {asked ? (
-        // A message that asks you reads as the end of a conversation: the message, and the composer that answers it in the bridge.
-        <div class="scroll thread-scroll">
-          <div class="thread" role="log" aria-label={'Messages with ' + asked.handle}>
-            <Msg face={<Mark agent={r.agent || asked.handle} size={32} />} name={asked.handle} at={asked.entry.at}>
-              <Markdown text={asked.entry.text} refs />
-            </Msg>
-          </div>
+        // A question of a seat shows as its card in the channel does: its words, a key per choice, and Your answer.
+        <div class="scroll pad">
+          {asked.entry ? <AskCard key={r.key} bridge={r.bridge} e={asked.entry} who={asked.handle} body={<Markdown text={asked.entry.text} refs />} /> : <Empty>Loading the channel.</Empty>}
         </div>
       ) : (
         <div class="scroll pad">
@@ -396,15 +400,6 @@ export function ActivityMain({ item }: { item?: string }) {
             </article>
           )}
         </div>
-      )}
-      {asked && (
-        <Composer
-          key={r.key}
-          draft={'answer:' + r.bridge + '/' + asked.handle}
-          label={'Message to ' + asked.handle}
-          placeholder={'Message ' + asked.handle}
-          onSend={(text) => attempt(() => sendMessage(r.bridge, { text, to: [asked.handle], replyTo: asked.entry.seq }))}
-        />
       )}
     </section>
   );

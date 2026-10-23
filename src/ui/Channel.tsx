@@ -10,7 +10,8 @@ import type { BridgePage, Delegation, Entry } from '../api/types';
 import { store, useSelect } from '../state/store';
 import { loadAllCards, loadBridge, loadChannel, loadOlder, markRead, patchBridge, postMessage } from '../state/actions';
 import { useBridgePages } from '../state/bridgepages';
-import { membersOf, type Channel as ChannelState } from '../state/reducer';
+import { membersOf, type Channel as ChannelState, type Roster } from '../state/reducer';
+import { questionWaits } from '../state/inbox';
 import { senderName, since } from '../lib/words';
 import { decidedRuns, hiddenLine } from '../lib/lines';
 import { hrefOf, type BridgeTab } from '../lib/route';
@@ -388,29 +389,31 @@ function WikiTab({ id }: { id: string }) {
 const RANK: Record<string, number> = { pending: 0, unknown: 1, allow: 2, deny: 2 };
 
 /**
- * cardOrder lists the cards of a channel, waiting first: the cards that
- * wait, the oldest first, then the cards in the state unknown, then the
- * decided ones, the newest first.
+ * cardOrder lists the cards of a channel, waiting first: the cards and the
+ * questions of the seats that wait, the oldest first, then the cards in the
+ * state unknown, then the decided ones and the answered questions, the
+ * newest first. waits tells whether a question still waits.
  */
-export function cardOrder(entries: Entry[]): number[] {
+export function cardOrder(entries: Entry[], waits: (e: Entry) => boolean = () => false): number[] {
+  const rank = (e: Entry) => (e.decision ? (RANK[e.decision.state] ?? 2) : waits(e) ? 0 : 2);
   return entries
-    .filter((e) => !!e.decision)
+    .filter((e) => !!e.decision || !!e.ask)
     .sort((a, b) => {
-      const ra = RANK[a.decision!.state] ?? 2;
-      const rb = RANK[b.decision!.state] ?? 2;
+      const ra = rank(a);
+      const rb = rank(b);
       if (ra !== rb) return ra - rb;
       return ra === 0 ? a.seq - b.seq : b.seq - a.seq;
     })
     .map((e) => e.seq);
 }
 
-/** waitingCards counts the cards that wait in the loaded part of a channel. */
-function waitingCards(ch: ChannelState | undefined): number {
+/** waitingCards counts the cards and the questions that wait in the loaded part of a channel. */
+function waitingCards(ch: ChannelState | undefined, r: Roster | undefined): number {
   if (!ch) return 0;
   let n = 0;
   for (const seq of ch.seqs) {
-    const d = (ch.bySeq[seq] as Entry).decision;
-    if (d && d.state === 'pending') n++;
+    const e = ch.bySeq[seq] as Entry;
+    if ((e.decision && e.decision.state === 'pending') || questionWaits(r, e)) n++;
   }
   return n;
 }
@@ -419,7 +422,7 @@ function DecisionsTab({ id }: { id: string }) {
   const [loading, setLoading] = useState(true);
   const key = useSelect((s) => {
     const ch = s.channels[id];
-    return ch ? cardOrder(ch.seqs.map((q) => ch.bySeq[q] as Entry)).join(',') : '';
+    return ch ? cardOrder(ch.seqs.map((q) => ch.bySeq[q] as Entry), (e) => questionWaits(s.rosters[id], e)).join(',') : '';
   });
   const list = useRoving<HTMLDivElement>();
   useEffect(() => {
@@ -451,7 +454,7 @@ export function Channel({ id, tab: tabProp }: { id: string; tab?: BridgeTab }) {
   const b = useSelect((s) => s.bridges.byId[id]);
   const known = useSelect((s) => s.bridges.loaded);
   const loadedChannel = useSelect((s) => !!s.channels[id]);
-  const waiting = useSelect((s) => waitingCards(s.channels[id]));
+  const waiting = useSelect((s) => waitingCards(s.channels[id], s.rosters[id]));
   const firstLoaded = useSelect((s) => (s.channels[id] ? s.channels[id].prev === 0 : false));
   const tab: BridgeTab = tabProp || 'posts';
   const [confirm, setConfirm] = useState<'close' | 'delegation' | null>(null);

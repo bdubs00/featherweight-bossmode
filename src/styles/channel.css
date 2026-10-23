@@ -527,6 +527,74 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* A text of several lines of a call, such as a playbook, as code with its first lines, and a map of files by their names, each of which opens its text. */
+.plan-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  min-width: 0;
+}
+.plan-block-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 24px;
+}
+.plan-key {
+  font-size: var(--t-control);
+  line-height: var(--t-control-lh);
+  color: var(--muted);
+}
+.plan-toggle {
+  min-height: 24px;
+  padding: 0 var(--s-2);
+  font-size: var(--t-meta);
+  color: var(--muted);
+}
+.plan-files {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line-soft);
+}
+.plan-files li {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  min-width: 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.plan-file {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: var(--h-small);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--t-control);
+  text-align: left;
+  cursor: pointer;
+}
+.plan-file code {
+  overflow-wrap: anywhere;
+  background: none;
+  padding: 0;
+}
+.plan-file .glyph {
+  flex: none;
+  color: var(--muted);
+}
+.plan-file:focus-visible {
+  outline: none;
+  box-shadow: inset 2px 0 0 var(--ink);
+}
+.plan-files li > .plan-text {
+  margin-bottom: var(--s-1);
+}
 .rule-row {
   display: flex;
   align-items: center;
@@ -1140,6 +1208,8 @@
   .complete li,
   .fold-key,
   .pick-row,
+  .plan-file,
+  .plan-toggle,
   .details-key {
     min-height: var(--h-row);
   }

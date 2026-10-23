@@ -164,8 +164,17 @@ const newestRun = (m: Pick<Member, 'runs'>): string => (m.runs && m.runs.length 
  * lacks the run, or lacks the phase for a finished run, the presence of the
  * bridge stands. A run that the fleet lost counts as missing, and so does a
  * run on a worker that left the fleet view, as after a roll of the workers.
+ * A seat whose question waits for you needs you, unless it is fired or in
+ * error.
  */
-export function seatPresence(f: Facts, m: Pick<Member, 'fired' | 'presence' | 'runs'>): Presence {
+export function seatPresence(f: Facts, m: Pick<Member, 'fired' | 'presence' | 'runs' | 'question'>): Presence {
+  const p = runPresence(f, m);
+  // A question of the seat waits for you (the question of the member).
+  return m.question && p !== 'fired' && p !== 'error' ? 'needs-you' : p;
+}
+
+/** runPresence is the presence of a seat from its newest run and its worker, as seatPresence says it without a question. */
+function runPresence(f: Facts, m: Pick<Member, 'fired' | 'presence' | 'runs'>): Presence {
   if (m.fired) return 'fired';
   const run = runOf(f, newestRun(m));
   if (!run) return m.presence;
@@ -184,7 +193,7 @@ const STARTING = phaseOf('Pending');
 const FAILED = phaseOf('Failed');
 
 /** What a status is about: a seat of a bridge, a worker by its name, or an agent by its workers. */
-export type Subject = { seat: Pick<Member, 'fired' | 'presence' | 'runs'> } | { worker: string } | { agent: string };
+export type Subject = { seat: Pick<Member, 'fired' | 'presence' | 'runs' | 'question'> } | { worker: string } | { agent: string };
 
 /**
  * statusOf is the status of a seat, a worker, or an agent, as a light and

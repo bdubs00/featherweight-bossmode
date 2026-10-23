@@ -190,3 +190,37 @@ describe('the messages', () => {
     expect(row(6).querySelector('.card.settle')).toBeNull();
   });
 });
+
+describe('a question of a seat', () => {
+  const QB = 'b-ask';
+  const question = entryOf(20, { from: { kind: 'agent', handle: 'reviewer', run: 'run-reviewer' }, to: ['operator'], text: '@operator Do you consent to restarting sshd on both hosts?', ask: { choices: ['Yes', 'No'] } });
+  const put = (q: number) =>
+    act(() => {
+      store.dispatch({ type: 'bridge', bridge: { ...bridgeOf(QB), members: [memberOf('reviewer', { presence: q ? 'needs-you' : 'idle', question: q }), memberOf('net-auditor', { question: 0 })] } });
+    });
+
+  it('is a card while the seat names it: its words, a key per choice, and Your answer; after an answer it reads as a message', () => {
+    put(20);
+    act(() => store.dispatch({ type: 'channel', bridge: QB, page: { bridge: QB, messages: [question], next: 0, prev: 0 }, mode: 'latest' }));
+    const el = mount(<EntryRow bridge={QB} seq={20} prevSeq={0} />);
+    const row = el.querySelector('#entry-b-ask-20')!;
+    expect(row.classList.contains('card-row')).toBe(true);
+    expect(row.getAttribute('aria-label')).toBe('Question from reviewer');
+    expect(row.querySelector('.card-title h3')!.textContent).toBe('Needs your answer');
+    expect(row.querySelector('.ask-text')!.textContent).toContain('Do you consent to restarting sshd on both hosts?');
+    expect([...row.querySelectorAll('.pick button')].map((b) => b.textContent)).toEqual(['Yes', 'No']);
+    put(0);
+    const after = el.querySelector('#entry-b-ask-20')!;
+    expect(after.classList.contains('card-row')).toBe(false);
+    expect(after.querySelector('.card')).toBeNull();
+    expect(after.querySelector('.md')!.textContent).toContain('Do you consent');
+  });
+
+  it('is a plain message without the mark of the front, as from an older front', () => {
+    put(21);
+    const plain = entryOf(21, { from: { kind: 'agent', handle: 'reviewer', run: 'run-reviewer' }, to: ['operator'], text: 'Which host first?' });
+    act(() => store.dispatch({ type: 'entry', bridge: QB, entry: plain }));
+    const el = mount(<EntryRow bridge={QB} seq={21} prevSeq={0} />);
+    expect(el.querySelector('.card')).toBeNull();
+  });
+});

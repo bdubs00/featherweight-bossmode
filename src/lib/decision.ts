@@ -19,7 +19,7 @@ export function decisionOf(run: Run, res?: Result | null, card?: Entry): Decisio
   if (!p) return null;
   const rp = res && res.pending && res.pending.id === p.id ? res.pending : null;
   const question = !!(p.schema || (rp && (rp.question || rp.schema)));
-  return {
+  const d: Decision = {
     run: run.id,
     id: p.id,
     tool: p.tool,
@@ -31,6 +31,31 @@ export function decisionOf(run: Run, res?: Result | null, card?: Entry): Decisio
     schema: p.schema !== undefined ? p.schema : rp ? rp.schema : undefined,
     state: 'pending',
   };
+  // The card of the channel offers Always allow by the rule of the front,
+  // so the decision of the run offers the same keys.
+  d.always = alwaysByRule(d, !!run.member && !p.connect);
+  return d;
+}
+
+/** The flags of a policy, which no rule for one tool can stand for. */
+const FLAGS = /^(readonly|read-only|idempotent|destructive|parallel|parallelsafe)$/i;
+
+/**
+ * alwaysByRule is the rule of the front for Always allow (alwaysOffered of
+ * the workbench), for a decision that does not say: a call of one tool on a
+ * worker, held by the default rule or by a rule that names the tool, never
+ * by a flag such as destructive and never by a pattern such as
+ * "bash: git push*" or "ansible.playbook: check=false". A question is no
+ * permission to act. The channel and Activity then offer the same keys.
+ */
+export function alwaysByRule(d: Pick<Decision, 'tool' | 'reason' | 'question' | 'schema'>, onWorker = true): boolean {
+  if (!onWorker || !d.tool || d.question || d.schema) return false;
+  const r = d.reason || '';
+  if (r === 'default') return true;
+  const m = /^rule: ask (.+)$/.exec(r);
+  if (!m) return false;
+  const entry = m[1].trim();
+  return !FLAGS.test(entry) && !/[:*?[]/.test(entry);
 }
 
 /** One seat of a bridge that a call opens. agent is "" when the handle already names it. */
@@ -46,13 +71,25 @@ export interface PlanField {
   value: string;
 }
 
+/** A text of several lines in the input of a call, such as a playbook: the card shows its start, and the rest on Show all. */
+export interface PlanText {
+  key: string;
+  text: string;
+}
+
+/** A map of file names to their texts in the input of a call, such as the role files of a playbook: each name opens its text. */
+export interface PlanFiles {
+  key: string;
+  files: { name: string; text: string }[];
+}
+
 /** The plan of a call: what a click on the primary key of its card does. */
 export type Plan =
   | { kind: 'command'; command: string }
   | { kind: 'bridge'; title: string; goal: string; spawn: boolean; seats: PlanSeat[] }
   | { kind: 'page'; path: string; summary: string; lines: string[]; more: boolean }
   | { kind: 'handoff'; agent: string; task: string }
-  | { kind: 'fields'; fields: PlanField[]; more: number }
+  | { kind: 'fields'; fields: PlanField[]; texts: PlanText[]; files: PlanFiles[]; more: number }
   | { kind: 'none' };
 
 /** The most fields and lines that a card shows. Details holds the rest. */
@@ -60,6 +97,8 @@ export const PLAN_FIELDS = 6;
 export const PLAN_LINES = 4;
 /** The most characters of a goal and of the task of a hand-off that a card shows, from the start. Details holds the rest. */
 export const PLAN_TEXT = 280;
+/** The lines of a text of a call that a card shows before Show all. */
+export const PLAN_TEXT_LINES = 6;
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 
@@ -81,6 +120,27 @@ export function valueLine(v: unknown): string {
   return String(v);
 }
 
+/** isText reports whether a value is a text of several lines that a card shows as a block, such as a playbook, and not on one line. */
+export function isText(v: unknown): v is string {
+  return typeof v === 'string' && v.includes('\n') && (v.trim().split('\n').length >= 3 || v.length > 120);
+}
+
+/** A name that reads as the path of a file, such as roles/sshd/tasks/main.yml or site.yml. */
+const pathLike = (name: string): boolean => /[/\\]/.test(name) || /\.[A-Za-z0-9]{1,8}$/.test(name);
+
+/**
+ * filesOf reads a map of file names to their texts, such as the files of a
+ * playbook call, or null for any other value: an object whose values are
+ * all texts, and whose key is files or whose names read as paths.
+ */
+export function filesOf(key: string, v: unknown): PlanFiles | null {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+  const entries = Object.entries(v as Record<string, unknown>);
+  if (!entries.length || !entries.every(([, t]) => typeof t === 'string')) return null;
+  if (key !== 'files' && !entries.every(([name]) => pathLike(name))) return null;
+  return { key, files: entries.map(([name, text]) => ({ name, text: text as string })) };
+}
+
 /** textLines gives the lines of the text of a page that hold words, after its front matter. */
 function textLines(text: string): string[] {
   const body = text.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '');
@@ -95,8 +155,10 @@ function textLines(text: string): string[] {
  * its input. A shell call runs its command. bridge_open opens a bridge with
  * its title, its goal, and its seats. pages_write writes a page at a path.
  * spawn_task hands a task to an agent. Any other call shows the top-level
- * fields of its input, each cut to one line. The files tool says its change
- * in the sentence of the card, so its plan is none.
+ * fields of its input: the short ones first, each cut to one line, then a
+ * text of several lines as a block, such as a playbook, then a map of
+ * files by their names, such as the role files of a playbook. The files
+ * tool says its change in the sentence of the card, so its plan is none.
  */
 export function planOf(d: Pick<Decision, 'tool' | 'input'>): Plan {
   const base = toolBase(d.tool);
@@ -123,7 +185,20 @@ export function planOf(d: Pick<Decision, 'tool' | 'input'>): Plan {
   if ((!d.tool || base === 'files') && editOf(d.input)) return { kind: 'none' };
   if (v) {
     const keys = Object.keys(v);
-    if (keys.length) return { kind: 'fields', fields: keys.slice(0, PLAN_FIELDS).map((key) => ({ key, value: valueLine(v[key]) })), more: Math.max(0, keys.length - PLAN_FIELDS) };
+    if (keys.length) {
+      // The short facts come first, such as the hosts, check, and become,
+      // then the texts as blocks, such as a playbook, then the maps of files.
+      const scalars: PlanField[] = [];
+      const texts: PlanText[] = [];
+      const files: PlanFiles[] = [];
+      for (const key of keys) {
+        const f = filesOf(key, v[key]);
+        if (f) files.push(f);
+        else if (isText(v[key])) texts.push({ key, text: (v[key] as string).replace(/\s+$/, '') });
+        else scalars.push({ key, value: valueLine(v[key]) });
+      }
+      return { kind: 'fields', fields: scalars.slice(0, PLAN_FIELDS), texts, files, more: Math.max(0, scalars.length - PLAN_FIELDS) };
+    }
   }
   return { kind: 'none' };
 }

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'preact/test-utils';
 import type { Decision, Run } from '../api/types';
 import { store } from '../state/store';
-import { DecisionCard, canAlways, mayDecide } from './Decision';
+import { AskCard, DecisionCard, canAlways, mayDecide } from './Decision';
 import { bridgeOf, fakeFetch, mount, settle, unmountAll } from './testkit-a';
 import { clearNotice, currentNotice } from './notice';
 
@@ -70,8 +70,12 @@ describe('the card that waits', () => {
     }
   });
 
-  it('offers Always allow by the rule of the page when the backend does not say', () => {
-    expect(canAlways({ ...push, always: undefined })).toBe(true);
+  it('offers Always allow by the rule of the front when the backend does not say, so every surface offers the same keys', () => {
+    expect(canAlways({ ...push, always: undefined, reason: 'rule: ask bash' })).toBe(true);
+    expect(canAlways({ ...push, always: undefined, reason: 'default' })).toBe(true);
+    // A pattern, such as git push* or check=false, is no rule for the whole tool.
+    expect(canAlways({ ...push, always: undefined })).toBe(false);
+    expect(canAlways({ ...push, always: undefined, tool: 'ansible.playbook', reason: 'rule: ask ansible.playbook: check=false' })).toBe(false);
     expect(canAlways({ ...push, always: undefined, reason: 'rule: ask destructive' })).toBe(false);
     expect(canAlways({ ...push, always: false })).toBe(false);
   });
@@ -279,5 +283,88 @@ describe('a card that the person may not decide', () => {
     act(() => store.dispatch({ type: 'run', run: runOf(true) }));
     const el = mount(<DecisionCard d={push} who="migrator-2" />);
     expect(keys(el)).toEqual(['Deny', 'Always allow', 'Run command']);
+  });
+});
+
+describe('the card of a large call', () => {
+  const tasks = Array.from({ length: 10 }, (_, i) => '- name: step ' + (i + 1)).join('\n');
+  const call: Decision = {
+    run: 'run-na',
+    id: 'ap-9',
+    tool: 'ansible.playbook',
+    label: 'Allow',
+    reason: 'rule: ask ansible.playbook: check=false',
+    input: { playbook: '- hosts: lab\n' + tasks, hosts: 'lab', check: false, become: true, files: { 'roles/sshd/tasks/main.yml': 'sshd tasks\nline 2', 'roles/ntp/tasks/main.yml': 'ntp tasks' } },
+    state: 'pending',
+    always: false,
+  };
+
+  it('shows hosts, check, and become first, the playbook as a short block of code, and the role files by name, with no JSON', () => {
+    const el = mount(<DecisionCard d={call} who="net-auditor" />);
+    expect(el.textContent).toContain('net-auditor wants to use ansible.playbook.');
+    expect([...el.querySelectorAll('.plan-field')].map((f) => f.querySelector('dt')!.textContent + '=' + f.querySelector('dd')!.textContent)).toEqual(['hosts=lab', 'check=false', 'become=true']);
+    const block = el.querySelector('.plan-block')!;
+    expect(block.querySelector('.plan-key')!.textContent).toBe('playbook');
+    const code = block.querySelector('pre.plan-text')!;
+    expect(code.textContent!.split('\n')).toHaveLength(7);
+    expect(code.textContent).toContain('…');
+    expect([...el.querySelectorAll('.plan-file code')].map((c) => c.textContent)).toEqual(['roles/sshd/tasks/main.yml', 'roles/ntp/tasks/main.yml']);
+    expect(el.querySelector('.plan-files pre')).toBeNull();
+    expect(el.querySelector('.details')).toBeNull();
+    expect(el.textContent).not.toContain('{');
+    expect(keys(el)).toEqual(['Deny', 'Allow']);
+  });
+
+  it('opens the whole playbook with Show all, and a file with its name', () => {
+    const el = mount(<DecisionCard d={call} who="net-auditor" />);
+    const toggle = el.querySelector('.plan-toggle') as HTMLButtonElement;
+    expect(toggle.textContent).toBe('Show all');
+    act(() => toggle.click());
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(toggle.textContent).toBe('Show less');
+    expect(el.querySelector('.plan-block pre.plan-text')!.textContent).toBe('- hosts: lab\n' + tasks);
+    const file = el.querySelector('.plan-file') as HTMLButtonElement;
+    act(() => file.click());
+    expect(file.getAttribute('aria-expanded')).toBe('true');
+    expect(el.querySelector('.plan-files pre')!.textContent).toBe('sshd tasks\nline 2');
+    act(() => file.click());
+    expect(el.querySelector('.plan-files pre')).toBeNull();
+  });
+});
+
+describe('the card of a question of a seat', () => {
+  const q = { seq: 12, at: '2026-10-23T04:24:00Z', from: { kind: 'agent' as const, handle: 'reviewer', run: 'run-rev' }, to: ['operator'], text: 'Restart sshd on both hosts?', ask: { choices: ['Yes', 'No'] } };
+
+  it('shows the words of the seat, a key per choice, and Your answer, with the one orange key Answer', () => {
+    const el = mount(<AskCard bridge="b1" e={q} who="reviewer" body={<p>{q.text}</p>} />);
+    const card = el.querySelector('section.card')!;
+    expect(card.querySelector('.card-title h3')!.textContent).toBe('Needs your answer');
+    expect(card.querySelector('.card-title .led-amber.breathe')).not.toBeNull();
+    expect(card.querySelector('.ask-text')!.textContent).toBe('Restart sshd on both hosts?');
+    expect([...card.querySelectorAll('.pick button')].map((b) => b.textContent)).toEqual(['Yes', 'No']);
+    expect(card.querySelector('textarea')!.getAttribute('placeholder')).toBe('Your answer');
+    expect([...card.querySelectorAll('.key-primary')].map((b) => b.textContent)).toEqual(['Answer']);
+  });
+
+  it('answers with a key or in words: a message to the seat in reply to its question', async () => {
+    const f = fakeFetch([['POST', /\/v1\/bridges\/b1\/messages$/, (b) => ({ seq: 13, at: '2026-10-23T04:25:00Z', from: { kind: 'person', name: 'alice' }, ...(b as object) })]]);
+    try {
+      const el = mount(<AskCard bridge="b1" e={q} who="reviewer" body={<p>{q.text}</p>} />);
+      act(() => ([...el.querySelectorAll('.pick button')][0] as HTMLButtonElement).click());
+      await settle();
+      expect(f.seen[0]).toEqual({ method: 'POST', path: '/v1/bridges/b1/messages', body: { text: 'Yes', to: ['reviewer'], replyTo: 12 } });
+      const box = el.querySelector('textarea') as HTMLTextAreaElement;
+      act(() => {
+        box.value = 'lab-1 first, then lab-2.';
+        box.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      act(() => {
+        (el.querySelector('form') as HTMLFormElement).dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      });
+      await settle();
+      expect(f.seen[1].body).toEqual({ text: 'lab-1 first, then lab-2.', to: ['reviewer'], replyTo: 12 });
+    } finally {
+      f.restore();
+    }
   });
 });

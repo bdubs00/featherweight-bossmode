@@ -11,23 +11,24 @@
 // decides, so the page never offers an action that the front refuses.
 
 import { useState } from 'preact/hooks';
-import type { Decision, Run } from '../api/types';
+import type { ComponentChildren } from 'preact';
+import type { Decision, Entry, Run } from '../api/types';
 import { formOf, type Field as SchemaField } from '../lib/schema';
-import { planOf, verbOf } from '../lib/decision';
+import { PLAN_TEXT_LINES, alwaysByRule, planOf, verbOf, type PlanFiles, type PlanText } from '../lib/decision';
 import { commandOf, decisionTitle, editOf, rawInput, toolName, whyWords } from '../lib/words';
 import { whoName } from '../lib/lines';
 import { useSelect } from '../state/store';
-import { alwaysAllow, decide } from '../state/actions';
+import { alwaysAllow, answerQuestion, decide } from '../state/actions';
 import { attempt } from './notice';
 import { Markdown, When } from './common';
 import { Button, Card, Command, Field, Input, LineLed, TextArea } from './primitives';
+import { Glyph } from './icons';
 
 
-/** canAlways reports whether a card offers Always allow, with the rule of /ui. */
+/** canAlways reports whether a card offers Always allow: as the front says, else by the rule of the front (alwaysByRule). */
 export function canAlways(d: Decision): boolean {
   if (d.always !== undefined) return d.always;
-  const r = d.reason || '';
-  return !!d.tool && (r === 'default' || /^rule: ask /.test(r)) && !/^rule: ask (readonly|read-only|idempotent|destructive|parallel|parallelsafe)$/i.test(r);
+  return alwaysByRule(d);
 }
 
 /** RuleWords shows the rule of a card. The pattern of a command rule shows as code, as a person types it. */
@@ -63,6 +64,54 @@ function Details({ d, id }: { d: Decision; id: string }) {
         </div>
       )}
     </>
+  );
+}
+
+/**
+ * TextBlock shows a text of several lines of a call, such as a playbook,
+ * as code: its first lines, and the whole text on Show all.
+ */
+function TextBlock({ t }: { t: PlanText }) {
+  const [all, setAll] = useState(false);
+  const lines = t.text.split('\n');
+  const long = lines.length > PLAN_TEXT_LINES;
+  return (
+    <div class="plan-block">
+      <div class="plan-block-head">
+        <span class="plan-key">{t.key}</span>
+        {long && (
+          <Button kind="quiet" size="s" class="plan-toggle" aria-expanded={all} onClick={() => setAll(!all)}>
+            {all ? 'Show less' : 'Show all'}
+          </Button>
+        )}
+      </div>
+      <Command class="plan-text">{all || !long ? t.text : lines.slice(0, PLAN_TEXT_LINES).join('\n') + '\n…'}</Command>
+    </div>
+  );
+}
+
+/** FilesBlock lists the files of a call by their names, and a name opens its text. */
+function FilesBlock({ f }: { f: PlanFiles }) {
+  const [open, setOpen] = useState<string[]>([]);
+  const toggle = (name: string) => setOpen((o) => (o.includes(name) ? o.filter((x) => x !== name) : [...o, name]));
+  return (
+    <div class="plan-block">
+      <span class="plan-key">{f.key}</span>
+      <ul class="plan-files" aria-label={f.key}>
+        {f.files.map((x) => {
+          const on = open.includes(x.name);
+          return (
+            <li>
+              <button type="button" class="plan-file" aria-expanded={on} onClick={() => toggle(x.name)}>
+                <Glyph name="back" size={14} class={on ? 'turn-down' : 'turn-right'} />
+                <code>{x.name}</code>
+              </button>
+              {on && <Command class="plan-text">{x.text}</Command>}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 
@@ -116,15 +165,23 @@ export function What({ d }: { d: Pick<Decision, 'tool' | 'input'> }) {
     case 'fields':
       return (
         <div class="plan">
-          <dl class="plan-fields">
-            {plan.fields.map((f) => (
-              <div class="plan-field">
-                <dt>{f.key}</dt>
-                <dd title={f.value}>{f.value}</dd>
-              </div>
-            ))}
-          </dl>
+          {plan.fields.length > 0 && (
+            <dl class="plan-fields">
+              {plan.fields.map((f) => (
+                <div class="plan-field">
+                  <dt>{f.key}</dt>
+                  <dd title={f.value}>{f.value}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
           {plan.more > 0 && <p class="plan-meta">{plan.more === 1 ? '1 more field' : plan.more + ' more fields'}</p>}
+          {plan.texts.map((t) => (
+            <TextBlock key={t.key} t={t} />
+          ))}
+          {plan.files.map((f) => (
+            <FilesBlock key={f.key} f={f} />
+          ))}
         </div>
       );
   }
@@ -358,6 +415,59 @@ export function QuestionCard({ d, who, onDecide, settle }: { d: Decision; who: s
           </div>
         </form>
       )}
+    </Card>
+  );
+}
+
+/**
+ * AskCard is the card of a question that a seat asks you in its bridge: the
+ * words of the seat, one key per choice, and a field for an answer in
+ * words. It is the card of a question of the kernel (QuestionCard) for a
+ * message: Needs your answer with the amber light, the choices as keys,
+ * Your answer, and Answer. A key or Answer sends your answer to the seat,
+ * in reply to its question, and the front gives it to the seat, which
+ * starts its next turn. body draws the words of the seat, as the message
+ * draws them.
+ */
+export function AskCard({ bridge, e, who, body, settle }: { bridge: string; e: Entry; who: string; body: ComponentChildren; settle?: boolean }) {
+  const [busy, setBusy] = useState(false);
+  const [text, setText] = useState('');
+  const choices = (e.ask && e.ask.choices) || [];
+  const handle = (e.from.kind === 'agent' && e.from.handle) || who;
+  const answer = async (words: string) => {
+    const t = words.trim();
+    if (!t || busy) return;
+    setBusy(true);
+    const ok = await attempt(() => answerQuestion(bridge, handle, e.seq, t));
+    setBusy(false);
+    if (ok) setText('');
+  };
+  return (
+    <Card class="decide question ask" title="Needs your answer" tone="amber" settle={settle} label={'Question from ' + who}>
+      <div class="ask-text">{body}</div>
+      {choices.length > 0 && (
+        <div class={'pick' + (choices.length === 2 ? ' two' : '')} role="group" aria-label={'Answers for ' + who}>
+          {choices.map((c) => (
+            <Button disabled={busy} onClick={() => answer(c)}>
+              {c}
+            </Button>
+          ))}
+        </div>
+      )}
+      <form
+        class="answer"
+        onSubmit={(ev) => {
+          ev.preventDefault();
+          answer(text);
+        }}
+      >
+        <TextArea name="answer" aria-label="Your answer" placeholder="Your answer" value={text} onInput={(ev) => setText((ev.target as HTMLTextAreaElement).value)} />
+        <div class="card-actions">
+          <Button type="submit" kind="primary" disabled={busy || !text.trim()}>
+            Answer
+          </Button>
+        </div>
+      </form>
     </Card>
   );
 }

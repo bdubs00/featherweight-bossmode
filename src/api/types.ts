@@ -107,6 +107,12 @@ export interface Member {
   muted: boolean;
   presence: Presence;
   activity?: Activity | null;
+  /**
+   * The seq of the question of the seat that waits for a person, or 0. A
+   * front before questions leaves it out, and the page then finds the
+   * questions in the channel.
+   */
+  question?: number;
 }
 
 export interface Delegation {
@@ -235,10 +241,13 @@ export interface Entry {
   page?: string;
   /** The slash command of a message, such as {name: "ansible-style", args: "roles/nginx"}. */
   skill?: SkillCall | null;
+  /** On a message of a seat that asks you: the answers that you pick from, or none for an answer in words. Whether it still waits is the question of the member. */
+  ask?: { choices?: string[] } | null;
   /**
-   * True on a stream event that carries a cut entry: a card without
-   * decision.input and decision.schema. The page reads the entry again with
-   * ?from=<seq>&limit=1 and never shows the cut card.
+   * True on the entry of a stream event of an older page that carries a
+   * cut entry: a card without decision.input and decision.schema. The front
+   * sets partial beside the entry (MessageEventData). The page reads the
+   * entry again with ?from=<seq>&limit=1 and never shows the cut card.
    */
   partial?: boolean;
 }
@@ -593,6 +602,8 @@ export interface StreamEvent {
 export interface MessageEventData {
   bridge: string;
   message: Entry;
+  /** True when the event carries the entry without decision.input and decision.schema, because the whole entry is larger than an event. */
+  partial?: boolean;
 }
 
 /** The data of a bridge.member event. */

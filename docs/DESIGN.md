@@ -530,8 +530,10 @@ The work:
   /v1/bridges/{id}/pages`: the pages under `bridges/<id>/` and every page
   that a run of the bridge wrote last, wherever its agents put it. Each row
   holds the title, the face and the handle of the seat that wrote it, the
-  path, and `since()`, and links the page in the Wiki. The tab Decisions lists the cards of the
-  bridge, waiting first. The routes are `#bridge/<id>/wiki` and
+  path, and `since()`, and links the page in the Wiki. The tab Decisions lists the cards and the
+  questions of the bridge, waiting first. It reads the channel forward past
+  its newest loaded entry and back to its first, so it never says Nothing
+  needs you while a card waits. The routes are `#bridge/<id>/wiki` and
   `#bridge/<id>/decisions`.
 - The entries. Reaction chips at the top right of an entry, with
   `ReactionChip`. A system line with the light of its event: green for
@@ -552,14 +554,25 @@ The work:
   and the Note field. The plan says what a click does before Details: the
   command in `Command`; the title, the goal, and the seats of a bridge, one
   line per seat; the path and the first lines of a page; the task of a
-  hand-off; or the top-level fields of any other call, each cut to one
-  line. A goal and a task read from their start and end in an ellipsis
+  hand-off; or the top-level fields of any other call: the short ones
+  first, each cut to one line, such as the hosts, check, and become of a
+  playbook call; a text of several lines as a short block of code with
+  Show all, such as the playbook; and a map of files as a list of file
+  names, each of which opens its text. The plan never shows JSON. A goal
+  and a task read from their start and end in an ellipsis
   past 280 characters, and they link the bridges and the pages that they
   name, as a message does. Details holds the tool and the raw input, and never a rule id. Its
   keys are Deny, Always allow, and the verb of `verbOf`: Open bridge, Write
   page, Hand off, the label of the backend, such as Run command, and Allow
-  only as the fallback. A card that arrives on the stream after the channel
-  loaded settles once. A card on load never moves.
+  only as the fallback. Always allow shows only where the front offers it,
+  on every surface alike. A card that arrives on the stream after the
+  channel loaded settles once. A card on load never moves.
+- The question card. A seat that asks you gets the card of a question in
+  the channel and in Activity while it waits: `Card` with the title Needs
+  your answer and the amber light, the words of the seat, one key per
+  choice, the field Your answer, and the primary key Answer, as the card of
+  a question of the kernel draws them. Once you answer, or the seat posts
+  again, the entry reads as a message.
 - The links of a message. The id of a bridge that the page knows, open or
   closed, shows as a link with the title of the bridge, and the path of a
   page of the wiki shows as a link to the page, in a code span or in plain

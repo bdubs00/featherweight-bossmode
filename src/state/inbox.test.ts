@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Bridge, Entry, Member, Result, Run } from '../api/types';
 import type { Channel, Roster } from './reducer';
-import { asksOf, asksYou, inboxRows, keyAction, reasonOf, sortInbox, type InboxInput, type InboxRow } from './inbox';
+import { asksOf, asksYou, inboxRows, keyAction, questionWaits, questionsOf, reasonOf, selectAttention, sortInbox, type InboxInput, type InboxRow } from './inbox';
+import { initialState, type State } from './reducer';
 import { decisionOf } from '../lib/decision';
 
 const at = (min: number) => new Date(Date.UTC(2026, 9, 21, 20, min)).toISOString();
@@ -107,7 +108,7 @@ describe('the inbox', () => {
     expect(reasonOf(run('r', 'failed', { error: raw }), undefined)).toBe('The conversation is too long for the model');
   });
 
-  it('makes a row that needs you of a message that asks you, after your read mark, until you answer it', () => {
+  it('makes a row that needs you of a message that asks you, after your read mark, until you answer it or the seat posts again, for a front that names no question', () => {
     const s = input();
     const ask = (seq: number, min: number, handle: string, text: string, to: string[] = []): Entry => ({ seq, at: at(min), from: { kind: 'agent', handle }, text, to });
     s.bridges[1] = { ...s.bridges[1], unread: 3, read: 1 };
@@ -118,21 +119,51 @@ describe('the inbox', () => {
       ask(4, 52, 'asker', 'A note to the team.'),
     ]);
     const rows = sortInbox(inboxRows(s));
-    expect(rows.filter((r) => r.kind === 'asked').map((r) => [r.key, r.handle, r.status, r.entry!.seq])).toEqual([
-      ['q:b2/2', 'sleepy', 'needs-you', 2],
-      ['q:b2/3', 'asker', 'needs-you', 3],
-    ]);
+    // The note of asker after its question ends that question.
+    expect(rows.filter((r) => r.kind === 'asked').map((r) => [r.key, r.handle, r.status, r.entry!.seq])).toEqual([['q:b2/2', 'sleepy', 'needs-you', 2]]);
     // The newest message that does not ask you keeps its row of a message.
     expect(rows.find((r) => r.kind === 'message' && r.bridge === 'b2')!.entry!.seq).toBe(4);
     expect(['r', 'a', 'Enter'].map((k) => keyAction(k, rows.find((r) => r.kind === 'asked')!))).toEqual(['answer', null, 'open']);
     // A message of yours to that handle, or in reply to the message, answers it.
     const answered = channel([...s.channels.b2.seqs.map((q) => s.channels.b2.bySeq[q]), { seq: 5, at: at(53), from: { kind: 'person', name: 'me@example.com' }, text: 'main', to: ['asker'] }, { seq: 6, at: at(54), from: { kind: 'person', name: 'me@example.com' }, text: 'Lift it.', to: [], replyTo: 2 }]);
     expect(asksOf(s.bridges[1], answered, 'me@example.com')).toEqual([]);
+    // A message of yours to everyone answers it too.
+    const everyone = channel([...s.channels.b2.seqs.map((q) => s.channels.b2.bySeq[q]), { seq: 5, at: at(53), from: { kind: 'person', name: 'me@example.com' }, text: 'Lift it, all of you.', to: [] }]);
+    expect(asksOf(s.bridges[1], everyone, 'me@example.com')).toEqual([]);
   });
 
-  it('reads a message as asking you when its to holds operator or its text starts with @operator', () => {
+  it('takes the questions that the front names on the seats: a row per question, also before the page holds its entry, and no count of its own', () => {
+    const s = input();
+    const q = (seq: number, handle: string, text: string, ask = true): Entry => ({ seq, at: at(seq), from: { kind: 'agent', handle }, text, to: ['operator'], ask: ask ? { choices: ['Yes', 'No'] } : null });
+    s.bridges[1] = { ...s.bridges[1], unread: 0, read: 9, needsYou: 2 };
+    s.rosters.b2 = roster([seat('asker', 'needs-you', { question: 7 }), seat('sleepy', 'needs-you', { question: 3, runs: [] }), seat('quiet', 'idle', { question: 0 })]);
+    s.channels.b2 = channel([q(7, 'asker', 'Restart sshd?'), q(8, 'quiet', '@operator an old word', false)]);
+    // The question of sleepy is older than the loaded part, and the page read it alone.
+    s.entries = { 'b2/3': q(3, 'sleepy', 'Which host first?') };
+    const asked = sortInbox(inboxRows(s)).filter((r) => r.kind === 'asked');
+    expect(asked.map((r) => [r.key, r.handle, r.seq, r.entry && r.entry.text])).toEqual([
+      ['q:b2/3', 'sleepy', 3, 'Which host first?'],
+      ['q:b2/7', 'asker', 7, 'Restart sshd?'],
+    ]);
+    // Without the entry the row still needs you.
+    s.entries = {};
+    expect(questionsOf(s.bridges[1], s.channels.b2, 'me@example.com', s.rosters.b2).map((x) => [x.handle, x.seq, !!x.entry])).toEqual([
+      ['sleepy', 3, false],
+      ['asker', 7, true],
+    ]);
+    // The card in the channel waits while the seat names it.
+    expect(questionWaits(s.rosters.b2, s.channels.b2.bySeq[7])).toBe(true);
+    expect(questionWaits(roster([seat('asker', 'idle', { question: 0 })]), s.channels.b2.bySeq[7])).toBe(false);
+    expect(questionWaits(s.rosters.b2, s.channels.b2.bySeq[8])).toBe(false);
+    // The count of the app bar is the needsYou of the bridge, which counts the questions already.
+    const st: State = { ...initialState, bridges: { order: ['b2'], byId: { b2: s.bridges[1] }, loaded: true }, rosters: { b2: s.rosters.b2 }, channels: { b2: s.channels.b2 } };
+    expect(selectAttention(st)).toBe(2);
+  });
+
+  it('reads a message as asking you when the front marks it, its to holds operator, or its text holds the word @operator anywhere', () => {
     const e = (text: string, to: string[] = [], kind: 'agent' | 'person' = 'agent'): Entry => ({ seq: 1, at: at(1), from: kind === 'agent' ? { kind, handle: 'a' } : { kind, name: 'p' }, text, to });
-    expect([e('x', ['operator']), e(' @operator, x'), e('@operators x'), e('ask @operator'), e('@operator x', [], 'person')].map(asksYou)).toEqual([true, true, false, false, false]);
+    expect([e('x', ['operator']), e(' @operator, x'), e('@operators x'), e('@net-auditor go.\n\n@operator Two decisions are open.'), e('mail ops@operator.example'), e('@operator x', [], 'person')].map(asksYou)).toEqual([true, true, false, true, false, false]);
+    expect(asksYou({ ...e('Restart?'), ask: {} })).toBe(true);
   });
 
   it('maps the keys to actions: a allows, d denies, r replies, Enter opens', () => {

@@ -17,7 +17,8 @@ import { attempt } from './notice';
 import { useWhole } from '../state/whole';
 import { CutEnd } from './Whole';
 import { InlineMarkdown, Markdown, When } from './common';
-import { DecisionCard } from './Decision';
+import { AskCard, DecisionCard } from './Decision';
+import { questionWaits } from '../state/inbox';
 import { Avatar, Button, Chip, IconButton, LineLed, Mark, ReactionChip, TextArea } from './primitives';
 
 /** agentOf finds the agent behind a handle, from the roster or the handle itself. */
@@ -244,6 +245,8 @@ export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, fresh, li
   const [settle] = useState(() => arrived(bridge, seq));
   // The whole text of a long entry, once the person asked for it with Show all.
   const whole = useWhole(bridge, e && e.cut ? seq : 0);
+  // A question of a seat that waits for you, as the front names it.
+  const asking = useSelect((s) => (e && e.ask ? questionWaits(s.rosters[bridge], e) : false));
   if (!e) return null;
   const day = listed ? '' : !prev || dayWords(prev.at) !== dayWords(e.at) ? dayWords(e.at) : '';
   const id = 'entry-' + bridge + '-' + seq;
@@ -300,6 +303,31 @@ export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, fresh, li
       </>
     );
   }
+  const body = (
+    <>
+      <Markdown text={whole && !whole.cut ? whole.text : e.text} handles={handles} refs />
+      {e.cut && <CutEnd bridge={bridge} seq={e.seq} whole={whole} runHref={e.from.kind === 'agent' && e.from.handle ? hrefOf({ place: 'member', bridge, handle: e.from.handle, tab: 'chat' }) : undefined} class="cut" />}
+    </>
+  );
+  if (asking) {
+    // A question of a seat that waits for you is a card, as a decision is.
+    return (
+      <>
+        {dayLine}
+        <article class="msg card-row waiting" id={id} data-item data-seq={seq} aria-label={'Question from ' + handle}>
+          <Mark agent={agent} size={32} ink={handle === 'manager' || undefined} />
+          <div class="body">
+            <header>
+              <b>{handle}</b>
+              <When at={e.at} />
+            </header>
+            <AskCard bridge={bridge} e={e} who={handle} body={body} settle={settle} />
+          </div>
+          <Reactions bridge={bridge} e={e} />
+        </article>
+      </>
+    );
+  }
   const name = senderName(e.from);
   const sameAsPrev =
     !fresh &&
@@ -309,6 +337,7 @@ export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, fresh, li
     !e.pinned &&
     prev.from.kind === e.from.kind &&
     !prev.decision &&
+    !prev.ask &&
     prev.from.kind !== 'system' &&
     senderName(prev.from) === name &&
     new Date(e.at).getTime() - new Date(prev.at).getTime() < 5 * 60_000;
@@ -339,8 +368,7 @@ export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, fresh, li
             </header>
           )}
           {e.replyTo ? <ReplyChip bridge={bridge} seq={e.replyTo} /> : null}
-          <Markdown text={whole && !whole.cut ? whole.text : e.text} handles={handles} refs />
-          {e.cut && <CutEnd bridge={bridge} seq={e.seq} whole={whole} runHref={e.from.kind === 'agent' && e.from.handle ? hrefOf({ place: 'member', bridge, handle: e.from.handle, tab: 'chat' }) : undefined} class="cut" />}
+          {body}
         </div>
         <Reactions bridge={bridge} e={e} onReply={onReply} />
       </article>

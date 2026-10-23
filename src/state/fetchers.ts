@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from 'preact/hooks';
 import { api } from '../api/routes';
-import type { Result } from '../api/types';
+import type { Entry, Result } from '../api/types';
 import { forgetRuns, loadBridge, loadChannel, loadRunOnce, noteLost } from './actions';
 import { store } from './store';
 
@@ -97,11 +97,48 @@ export function useResults(): Record<string, Result> {
   return results;
 }
 
+/* ---------- the entries of questions ---------- */
+
+const entries: Record<string, Entry> = {};
+const askedEntries = new Set<string>();
+let entryTick = 0;
+const entryListeners = new Set<() => void>();
+
+/**
+ * ensureEntries reads the entries of questions that wait and that the
+ * loaded part of their channel does not hold, such as a question older
+ * than the recent end, once each, by bridge/seq.
+ */
+export function ensureEntries(keys: string[]): void {
+  const want = keys.filter((k) => !entries[k] && !askedEntries.has(k));
+  for (const k of want) askedEntries.add(k);
+  void pool(want, 3, async (k) => {
+    const [bridge, seq] = k.split('/');
+    entries[k] = await api.entry(bridge, Number(seq));
+    entryTick++;
+    for (const f of [...entryListeners]) f();
+  });
+}
+
+/** useEntries returns the entries of questions that the page read alone. It redraws when one arrives. */
+export function useEntries(): Record<string, Entry> {
+  const [, setTick] = useState(entryTick);
+  useEffect(() => {
+    const f = () => setTick(entryTick);
+    entryListeners.add(f);
+    return () => {
+      entryListeners.delete(f);
+    };
+  }, []);
+  return entries;
+}
+
 /** forgetLoads clears the marks of the loads, so a reset of the stream reads again. */
 export function forgetLoads(): void {
   askedBridges.clear();
   forgetRuns();
   askedChannels.clear();
+  askedEntries.clear();
   for (const k of Object.keys(resultKeys)) delete resultKeys[k];
 }
 

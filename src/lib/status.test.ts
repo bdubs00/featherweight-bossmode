@@ -123,6 +123,17 @@ describe('statusOf', () => {
     expect(workerOf(lost, 'crew-0')!.busy).toBe(false);
   });
 
+  it('says needs you for a seat whose question waits for you, whatever its run does, unless it is fired or in error', () => {
+    const idle = factsOf(fleet, { r: run('r', 'completed', 'default/crew-0') }, true);
+    expect(seatPresence(idle, seat('idle', ['r']))).toBe('idle');
+    expect(seatPresence(idle, seat('needs-you', ['r'], { question: 39 }))).toBe('needs-you');
+    expect(statusOf(idle, { seat: seat('needs-you', ['r'], { question: 39 }) })).toBe(PRESENCE['needs-you']);
+    // Its worker sleeps: the question still waits for you.
+    expect(seatPresence(factsOf(fleet, { r: run('r', 'completed', 'default/crew-1') }, true), seat('asleep', ['r'], { question: 39 }))).toBe('needs-you');
+    expect(seatPresence(factsOf(fleet, { r: run('r', 'failed', 'default/crew-0') }, true), seat('error', ['r'], { question: 39 }))).toBe('error');
+    expect(seatPresence(idle, seat('fired', ['r'], { question: 39, fired: true }))).toBe('fired');
+  });
+
   it('counts the awake workers for the headers', () => {
     expect(awakeCount(factsOf(fleet))).toBe(2);
     expect(awakeCount(factsOf(null))).toBe(0);

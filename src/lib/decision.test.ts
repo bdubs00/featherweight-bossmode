@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { PLAN_TEXT, briefOf, planOf, valueLine, verbOf } from './decision';
+import type { Run } from '../api/types';
+import { PLAN_TEXT, alwaysByRule, briefOf, decisionOf, filesOf, isText, planOf, valueLine, verbOf } from './decision';
 
 const open = {
   tool: 'front.bridge_open',
@@ -65,6 +66,8 @@ describe('planOf', () => {
         { key: 'draft', value: 'false' },
         { key: 'a', value: '1' },
       ],
+      texts: [],
+      files: [],
       more: 1,
     });
     expect(planOf({ tool: 'clock', input: {} })).toEqual({ kind: 'none' });
@@ -99,5 +102,64 @@ describe('briefOf', () => {
     expect(briefOf(planOf(open))).toEqual({ text: 'Runbooks for the new roles', code: false });
     expect(briefOf(planOf({ tool: 'front.pages_write', input: { path: 'a.md', text: '' } }))).toEqual({ text: 'a.md', code: true });
     expect(briefOf(planOf({ tool: 'x', input: { a: 1 } }))).toBeNull();
+  });
+});
+
+/** The call of the homelab: a playbook with check false, its text, and a map of role files, about 8 KB. */
+const tasks = '- name: harden sshd\n  ansible.builtin.lineinfile:\n    path: /etc/ssh/sshd_config\n    line: PermitRootLogin no\n'.repeat(4);
+const playbook = {
+  tool: 'ansible.playbook',
+  input: {
+    playbook: '- hosts: lab\n  roles: [sshd, ntp]\n' + tasks,
+    hosts: 'lab',
+    check: false,
+    become: true,
+    files: { 'roles/sshd/tasks/main.yml': tasks, 'roles/ntp/tasks/main.yml': '- name: ntp\n  ansible.builtin.apt: {name: chrony}\n' },
+  },
+};
+
+describe('the plan of a large call', () => {
+  it('puts the short facts first, a text of several lines as a block, and a map of files by name', () => {
+    const plan = planOf(playbook);
+    if (plan.kind !== 'fields') throw new Error(plan.kind);
+    expect(plan.fields).toEqual([
+      { key: 'hosts', value: 'lab' },
+      { key: 'check', value: 'false' },
+      { key: 'become', value: 'true' },
+    ]);
+    expect(plan.texts.map((t) => t.key)).toEqual(['playbook']);
+    expect(plan.texts[0].text.startsWith('- hosts: lab\n  roles: [sshd, ntp]')).toBe(true);
+    expect(plan.files).toEqual([{ key: 'files', files: [{ name: 'roles/sshd/tasks/main.yml', text: tasks }, { name: 'roles/ntp/tasks/main.yml', text: '- name: ntp\n  ansible.builtin.apt: {name: chrony}\n' }] }]);
+    expect(plan.more).toBe(0);
+  });
+
+  it('keeps a short text of two lines on one line, and a map of words that are no files as a field', () => {
+    expect(isText('Flaky\ncheck')).toBe(false);
+    expect(isText('a\nb\nc')).toBe(true);
+    expect(isText('x'.repeat(130) + '\ny')).toBe(true);
+    expect(filesOf('body', { text: 'x' })).toBeNull();
+    expect(filesOf('files', { a: 'x' })).toEqual({ key: 'files', files: [{ name: 'a', text: 'x' }] });
+    expect(filesOf('templates', { 'motd.j2': 'Hello' })).not.toBeNull();
+    expect(filesOf('files', { a: 1 })).toBeNull();
+  });
+});
+
+describe('Always allow', () => {
+  it('follows the rule of the front: one tool on a worker, by the default or a rule that names the tool, never a flag or a pattern', () => {
+    expect(alwaysByRule({ tool: 'bash', reason: 'default' })).toBe(true);
+    expect(alwaysByRule({ tool: 'bash', reason: 'rule: ask bash' })).toBe(true);
+    expect(alwaysByRule({ tool: 'bash', reason: 'rule: ask bash: git push*' })).toBe(false);
+    expect(alwaysByRule({ tool: 'ansible.playbook', reason: 'rule: ask ansible.playbook: check=false' })).toBe(false);
+    expect(alwaysByRule({ tool: 'files', reason: 'rule: ask destructive' })).toBe(false);
+    expect(alwaysByRule({ tool: 'ask_user', reason: 'default', question: true })).toBe(false);
+    expect(alwaysByRule({ tool: 'bash', reason: 'default' }, false)).toBe(false);
+  });
+
+  it('gives the decision of a run the keys of its card: the channel and Activity offer the same keys', () => {
+    const run = (reason: string, member = 'default/crew-0'): Run =>
+      ({ id: 'r1', agent: 'net-auditor', state: 'input-required', seq: 4, createdAt: '', updatedAt: '', member, pending: { id: 'ap1', tool: 'ansible.playbook', input: playbook.input, reason } }) as Run;
+    expect(decisionOf(run('rule: ask ansible.playbook: check=false'))!.always).toBe(false);
+    expect(decisionOf(run('rule: ask ansible.playbook'))!.always).toBe(true);
+    expect(decisionOf(run('rule: ask ansible.playbook', ''))!.always).toBe(false);
   });
 });
