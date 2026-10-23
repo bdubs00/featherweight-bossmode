@@ -21,7 +21,7 @@ import type {
   MessagePage,
   NewProfile,
   NewRun,
-  Orphan,
+  OrphanList,
   OrphanRemoval,
   Page,
   PageMeta,
@@ -153,10 +153,10 @@ export const api = {
   /** removeWorkers removes every worker of an agent. Only an owner can. */
   removeWorkers: (name: string) => call<null>(pool(name), { method: 'DELETE' }),
   /** orphans lists the child Tasks whose parent Task is gone, or null for a person who is no admin and for a front without the list. */
-  orphans: async (): Promise<Orphan[] | null> => {
+  orphans: async (): Promise<OrphanList | null> => {
     try {
-      const r = await call<{ orphans: Orphan[] }>('/v1/fleet/orphans');
-      return (r && r.orphans) || [];
+      const r = await call<OrphanList>('/v1/fleet/orphans');
+      return { orphans: (r && r.orphans) || [], removeAfter: (r && r.removeAfter) || 0 };
     } catch (e) {
       if (e instanceof ApiError && (e.status === 403 || e.status === 404)) return null;
       throw e;

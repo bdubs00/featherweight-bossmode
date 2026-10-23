@@ -1034,6 +1034,8 @@ Remove to an admin alone.
 | `GET /v1/pools/{name}` | The status of the workers of a pool: `name`, `source`, `template`, `atespace`, `agent`, `intake`, `wanted`, `actual`, `ready`, `hash`, `tasks`, `gaps`, and `checkedAt`. The page names the pool of an agent from the fleet view, else by the rule of the front for a new agent: the name in lower case, with a hyphen for each character that is not a letter or a digit. |
 | `PATCH /v1/pools/{name}` | `{"replicas": n}` changes Keep, for an owner. The answer is the status. |
 | `DELETE /v1/pools/{name}` | Removes every worker of the agent, for an owner, after Confirm. |
+| `GET /v1/fleet/orphans` | `{"orphans": [...], "removeAfter": n}`, for an admin: the child Tasks whose parent Task is gone, each with `member`, `parent`, `phase`, `pool`, `createdAt`, and `open`, the runs that have not ended. `removeAfter` is the seconds that an orphan sleeps before the front removes it, `0` when the front does not. Another caller gets 403, and the Fleet list then shows no note. |
+| `DELETE /v1/fleet/orphans` | Removes the orphans at once, for an admin, after Confirm: `{"removed": [...], "failed": [{"member", "error"}]}`. |
 | `GET /v1/bossmode/agents/{agent}/today` | `{"runs", "costUSD", "decisions", "partial"}` of the day of the agent. `partial` is true when a run reports no cost. A workbench without the route answers 404, and the profile then shows no Today. |
 
 The agents of the fleet are the agents that a person can seat, list, and
