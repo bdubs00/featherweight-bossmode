@@ -36,6 +36,27 @@ export interface BossConfig {
   templates?: Template[];
   /** The quick chat, or null when the configuration names no profile for it. */
   chat?: QuickChat | null;
+  /** False when the front keeps no routines, so the page shows no place Routines. An older front leaves it out. */
+  routines?: boolean;
+}
+
+/** A child Task whose parent Task is gone, from GET /v1/fleet/orphans. */
+export interface Orphan {
+  /** The Task, as <atespace>/<task>. */
+  member: string;
+  /** The parent that the Task names, as ax:<atespace>/<task>. */
+  parent: string;
+  phase: string;
+  pool?: string;
+  createdAt?: string;
+  /** The runs of the Task that have not ended. */
+  open: number;
+}
+
+/** The answer of DELETE /v1/fleet/orphans: the Tasks that went, and each Task whose delete failed. */
+export interface OrphanRemoval {
+  removed: string[];
+  failed: { member: string; error: string }[];
 }
 
 /** A worker template of the settings: its name, and whether a new agent gets it when the page names none. */

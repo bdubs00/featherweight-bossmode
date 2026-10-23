@@ -3,7 +3,7 @@ import { render, type ComponentChildren } from 'preact';
 import { act } from 'preact/test-utils';
 import type { Fleet } from '../api/types';
 import { store } from '../state/store';
-import { FleetFoot, GRACE_MS, RACK_LAMPS, Shell, captionOf, shownOf } from './Shell';
+import { FleetFoot, GRACE_MS, RACK_LAMPS, Shell, captionOf, placesOf, shownOf } from './Shell';
 
 let box: HTMLElement | null = null;
 
@@ -33,6 +33,17 @@ describe('shownOf', () => {
   });
 });
 
+describe('placesOf', () => {
+  const base = { manager: null, placement: 'queue' as const, maxMembers: 16 };
+  const ids = (c: Parameters<typeof placesOf>[0]) => placesOf(c).map((p) => p.id);
+  it('leaves out Routines for a front that keeps no routines, and keeps it for an older front that does not say', () => {
+    expect(ids({ ...base, routines: false })).not.toContain('routines');
+    expect(ids({ ...base, routines: true })).toContain('routines');
+    expect(ids(base)).toContain('routines');
+    expect(ids(null)).not.toContain('routines');
+  });
+});
+
 describe('Shell', () => {
   it('draws the app bar and the panes of a route, and marks the place', () => {
     act(() => store.dispatch({ type: 'bridges', bridges: [{ id: 'b1', title: 'One', goal: '', operator: '', state: 'open', placement: 'queue', createdAt: '', closedAt: null, delegation: { approve: false, budget: false, members: false, report: true }, caps: { maxMessages: 1, maxFanoutPerMinute: 1, maxPairMessages: 1 }, lastSeq: 0, read: 0, unread: 0, needsYou: 2 }] }));
@@ -45,8 +56,12 @@ describe('Shell', () => {
     expect(el.querySelector('aside.pane-details')!.textContent).toBe('details');
     const current = el.querySelector('.place[aria-current="page"]')!;
     expect(current.textContent).toContain('Bridges');
-    const labels = [...el.querySelectorAll('.place-label')].map((x) => x.textContent);
-    expect(labels).toEqual(['Activity', 'Chat', 'Bridges', 'Fleet', 'Skills', 'Routines', 'Wiki', 'Manager']);
+    const labels = () => [...el.querySelectorAll('.place-label')].map((x) => x.textContent);
+    // Routines shows once the settings say that the front keeps routines.
+    expect(labels()).toEqual(['Activity', 'Chat', 'Bridges', 'Fleet', 'Skills', 'Wiki', 'Manager']);
+    act(() => store.dispatch({ type: 'config', config: { manager: null, placement: 'queue', maxMembers: 16, routines: true } }));
+    expect(labels()).toEqual(['Activity', 'Chat', 'Bridges', 'Fleet', 'Skills', 'Routines', 'Wiki', 'Manager']);
+    act(() => store.dispatch({ type: 'config', config: null }));
     // The count of Activity is the number of members that need you.
     expect(el.querySelector('.place-count .sr')!.textContent).toBe('2 members need you');
   });
