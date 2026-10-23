@@ -111,6 +111,7 @@ Capacity shows where seating happens:
 | new | add | `<agent>, <worker>: <status>`, the tooltip of a lamp, such as `migrator, crew-0: working`, and `N <status>` for a share of a large fleet | done |
 | new | add | `Fleet: <caption>, <figures>`, the name of the readout for a screen reader, such as `Fleet: 9 workers, 2 working, 7 asleep` | done |
 | `<name>, home` (logo well) | keep | | done |
+| the dashed well with a picture where the deployment names no logo | change | the monogram of the name of the organization, such as `H` for Homelab, else a muted `B` for bossmode. The letters are hidden from a screen reader, which reads `<name>, home`. | done |
 
 ### src/ui/Signin.tsx
 

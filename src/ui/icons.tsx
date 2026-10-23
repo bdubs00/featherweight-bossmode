@@ -59,7 +59,7 @@ export function Icon({ name, class: cls }: { name: IconName; class?: string }) {
 }
 
 export type GlyphName =
-  | 'activity' | 'chat' | 'bridges' | 'fleet' | 'skills' | 'wiki' | 'manager' | 'logo' | 'thumb-up' | 'thumb-down' | 'heart'
+  | 'activity' | 'chat' | 'bridges' | 'fleet' | 'skills' | 'wiki' | 'manager' | 'thumb-up' | 'thumb-down' | 'heart'
   | 'search' | 'close' | 'more' | 'plus' | 'back' | 'reply' | 'question' | 'check' | 'gear' | 'board';
 
 const G: Record<GlyphName, JSX.Element> = {
@@ -71,7 +71,6 @@ const G: Record<GlyphName, JSX.Element> = {
   skills: <><path d="M12 3l9 5-9 5-9-5z" /><path d="M3 12.5l9 5 9-5" /><path d="M3 17l9 5 9-5" /></>,
   wiki: <><path d="M4 4h7a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H4z" /><path d="M20 4h-7a3 3 0 0 0-3 3v13a2 2 0 0 1 2-2h8z" /></>,
   manager: <><circle cx="12" cy="8" r="4" /><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1" /></>,
-  logo: <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 16l5-5 4 4 3-3 6 6" /><circle cx="16" cy="8" r="1.5" /></>,
   'thumb-up': <><path d="M7 11v9H3v-9z" /><path d="M7 11l4-8a2 2 0 0 1 2 2v4h6a2 2 0 0 1 2 2l-1.5 8a2 2 0 0 1-2 2H7" /></>,
   'thumb-down': <><path d="M7 13V4H3v9z" /><path d="M7 13l4 8a2 2 0 0 0 2-2v-4h6a2 2 0 0 0 2-2l-1.5-8a2 2 0 0 0-2-2H7" /></>,
   heart: <path d="M12 21s-7-4.6-9.5-9A5.5 5.5 0 0 1 12 6a5.5 5.5 0 0 1 9.5 6c-2.5 4.4-9.5 9-9.5 9z" />,

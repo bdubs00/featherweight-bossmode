@@ -370,7 +370,7 @@ color, radius, shadow, or type size of its own.
 | `Card` | A surface with a hard edge, a groove band, a title with an optional light, a body, and actions at the end | Settle: once, on arrival. Quiet: a line edge, no drop, no breath, for a card that waits for nothing, and for a card that waits for a decision that the person may not make, which shows `Waits for a decision` and who decides. The page never shows a key that the front refuses. |
 | `Tabs` | Tabs on a header line, each with an optional count chip | current (ink, bold, the accent bar), hover (ink) |
 | `ReactionChip` | A thumb up, a thumb down, or a heart with its count | mine (the line turns ink), the heart filled with the accent |
-| `LogoWell` | The 44-pixel square at the top of the app bar | empty (dashed edge, a neutral mark), a logo from the deployment |
+| `LogoWell` | The 44-pixel square at the top of the app bar, set in like a nameplate: paper, a line edge, and a sheen | a logo from the deployment; else the monogram of the name of the organization, such as H for Homelab, wide and heavy in ink; else the monogram of bossmode in muted ink. It never shows a dashed edge or a picture that stands in for a logo. |
 
 ## 7. Principles
 
@@ -416,9 +416,10 @@ The page reads it at boot, in `src/lib/theme.ts`:
 - `logo` must be a path on this origin under `/v1/`. The page reads it with
   the bearer token, as it reads a face, and shows it as a blob URL in an
   image inside the logo well. Any other value, a failed read, or no theme
-  keeps the empty well.
-- `name` labels the logo well and the sign-in. Without it, the page says
-  bossmode.
+  keeps the monogram.
+- `name` labels the logo well and the sign-in, and gives the monogram of
+  the well without a logo: the first letter of each of its first two
+  words. Without it, the page says bossmode, and the well shows a muted B.
 
 The person picks Match the system, Light, or Graphite in the account menu.
 The page keeps that choice in `localStorage` under `fw.bossmode.theme`, a

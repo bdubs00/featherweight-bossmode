@@ -1,7 +1,7 @@
 // The theme of the page: the accent and the logo of the deployment, from
 // GET /v1/bossmode, and the choice of the person between the light and the
 // graphite theme. Without a theme, or with a value that fails a check, the
-// page keeps its defaults: signal orange and an empty logo well.
+// page keeps its defaults: signal orange and the monogram in the logo well.
 
 import { useEffect, useState } from 'preact/hooks';
 import type { BossConfig } from '../api/types';

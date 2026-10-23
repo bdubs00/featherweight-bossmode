@@ -527,7 +527,7 @@ button.rchip:hover {
   border-bottom: 1px solid var(--line);
   background: var(--chrome);
   text-decoration: none;
-  color: var(--placeholder);
+  color: var(--ink);
 }
 .logo-well .well {
   display: inline-flex;
@@ -535,13 +535,25 @@ button.rchip:hover {
   justify-content: center;
   width: 44px;
   height: 44px;
-  border: 1px dashed var(--placeholder);
+  border: 1px solid var(--line);
   border-radius: var(--r);
   background: var(--paper);
+  box-shadow: var(--e-selected);
   overflow: hidden;
 }
-.logo-well .well.has-logo {
-  border: 1px solid var(--line);
+/* The monogram is set wide and heavy, as the lettering of a nameplate. */
+.logo-well .monogram {
+  font-size: var(--t-title);
+  line-height: 1;
+  font-weight: 800;
+  font-stretch: 125%;
+  letter-spacing: -0.02em;
+}
+.logo-well .monogram.two {
+  font-size: var(--t-heading);
+}
+.logo-well .monogram.quiet {
+  color: var(--muted);
 }
 .logo-well img {
   display: block;
