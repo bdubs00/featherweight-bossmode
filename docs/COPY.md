@@ -411,7 +411,7 @@ Capacity shows where seating happens:
 | new | add | `N skills`, the one line of the profile that counts them | done |
 | `Find a member` | add | the field above the people list | done |
 | `Not on a bridge` | add | the last group of the people list | done |
-| `N awake` (a chip with a green light), with `N workers awake` for a screen reader | add | | done |
+| `N awake` (a chip with a green light), with `N workers awake` for a screen reader | add | the chip shows only while a worker is awake. A green light never stands for zero, so `0 awake` never shows. | done |
 | `N free`, `Keep N` (a person who is not an owner reads Keep as a number) | add | | done |
 | `Keep 0` (the row of an agent with no worker in Not on a bridge) | remove | the row shows no words for an agent with no worker. The list holds the agents of the fleet, so a profile of the front with no pool and no run shows nowhere. | done |
 | `asks before <pattern>`, `asks first` (an amber word for a rule of the profile) | add | | done |

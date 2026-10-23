@@ -568,8 +568,9 @@ The work:
   link and a count chip. Each row: the mark at 32, the handle, its status,
   and its task. Then Not on a bridge, last: the agents with no seat, with
   the state of their workers. A Find a member field on top. The header has
-  the count chip, an `N awake` chip with a green light, and the key New
-  agent. The list loads the record of each open bridge, and the stream
+  the count chip, an `N awake` chip with a green light while a worker is
+  awake, and the key New agent. With no worker awake, the chip goes, because
+  a green light never stands for zero. The list loads the record of each open bridge, and the stream
   keeps it current. Every status of the list and of its header comes from
   `statusOf` (section 11.8).
 - The member conversation, at `#member/<bridge>/<handle>`. The header has

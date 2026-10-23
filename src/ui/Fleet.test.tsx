@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { act } from 'preact/test-utils';
 import { FleetList } from './Fleet';
 import { Board } from './Board';
-import { fakeFetch, mount, seedFleet, unmountAll } from './testkit-b';
+import { FLEET, fakeFetch, mount, seedFleet, unmountAll } from './testkit-b';
+import { store } from '../state/store';
 
 let restore = () => {};
 
@@ -26,6 +27,20 @@ describe('the people list', () => {
     const chips = [...head.querySelectorAll('.chip .sr')].map((x) => x.textContent);
     expect(chips).toEqual(['4 members', '2 workers awake']);
     expect(head.querySelector('a[href="#new-agent"]')!.getAttribute('aria-label')).toBe('New agent');
+  });
+
+  it('shows no awake chip, and no green light, while no worker is awake', () => {
+    act(() => {
+      store.dispatch({
+        type: 'fleet',
+        fleet: { ...FLEET, pools: FLEET.pools!.map((p) => ({ ...p, tasks: p.tasks!.map((t) => ({ ...t, phase: 'Suspended' })) })) },
+      });
+    });
+    const el = mount(<FleetList member="b1/migrator-1" />);
+    const head = el.querySelector('header.pane-head')!;
+    const chips = [...head.querySelectorAll('.chip .sr')].map((x) => x.textContent);
+    expect(chips).toEqual(['4 members']);
+    expect(head.querySelector('.led-green')).toBeNull();
   });
 
   it('groups the seats under the title of their bridge, then Not on a bridge', () => {

@@ -138,7 +138,8 @@ export function FleetList({ current, member }: { current?: string; member?: stri
           </>
         }
       >
-        {knowFleet && (
+        {/* A green light never stands for zero: with no worker awake, the chip goes. */}
+        {knowFleet && awake > 0 && (
           <Chip label={awake === 1 ? '1 worker awake' : awake + ' workers awake'}>
             <Led tone="green" word={awake + ' awake'} />
           </Chip>
