@@ -276,10 +276,16 @@ export function runHref(t: Pick<LikedEntry, 'run' | 'bridge' | 'handle'>): strin
   return '/ui#run/' + encodeURIComponent(t.run);
 }
 
-/** Liked is What people liked: the hearts of people from the page of the agent, newest first. Each shows what the agent did, what was asked, the note, and its run. */
+/**
+ * Liked is What people liked: the hearts of people from the page of the
+ * agent, newest first. Each shows what the agent did, what was asked, the
+ * note, and its run. An agent with no heart has no section: a heading over
+ * nothing says nothing.
+ */
 function Liked({ agent }: { agent: string }) {
   const { path, items } = useLiked(agent);
   const n = items ? items.length : 0;
+  if (n === 0) return null;
   return (
     <section class="prof-sec" aria-labelledby={'liked-' + agent}>
       <div class="prof-sec-head">
@@ -288,11 +294,9 @@ function Liked({ agent }: { agent: string }) {
         </h3>
         <Chip label={n === 1 ? '1 heart' : n + ' hearts'}>{n}</Chip>
         <span class="grow" />
-        {n > 0 && (
-          <a class="prof-link" href={hrefOf({ place: 'pages', path, mode: 'read' })}>
-            Open page
-          </a>
-        )}
+        <a class="prof-link" href={hrefOf({ place: 'pages', path, mode: 'read' })}>
+          Open page
+        </a>
       </div>
       {n > 0 && (
         <ul class="liked">

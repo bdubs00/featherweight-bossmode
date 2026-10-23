@@ -405,7 +405,7 @@ Capacity shows where seating happens:
 
 | Now | Verdict | New text | Who |
 |---|---|---|---|
-| `Activity` with the count chip | keep | `N members need you` also counts the seats whose messages ask you, once the page reads their channel | done |
+| `Activity` with the count chip | change | the chip counts the rows of the list, `1 item` and `N items` for a screen reader, so it never says 0 beside three rows. What needs you shows by its lights, and the count on the app bar, `N members need you`, counts it, also the seats whose messages ask you, once the page reads their channel | done |
 | `Thumb up: <label>`, `Thumb down: Deny`, `Always allow` (the keys of a decision in its row) | remove | a thumb means a reaction to a result elsewhere. The row of a decision has no key: a click shows its card, which says what the action does, with Deny and the verb of the action. a and d still decide from the list. | done |
 | the command of a decision under its row | change | the one line of its plan: the command or the path as code, the title of a bridge or the task of a hand-off as words | done |
 | `<handle> asks: <text>` | add | the row of a message of an agent to `operator`, or that starts with `@operator`, after the read mark: the status `needs you`, without the `@operator` that opens it. The main pane shows the message and the composer `Message <handle>`, which answers in the bridge, to that member, in reply to the message. The row leaves once you send a message to that handle or in reply to it. | done |
@@ -441,7 +441,7 @@ Capacity shows where seating happens:
 | `Only an owner of <agent> can change its face.` | remove | the Edit key does not show | B |
 | `Saved.`, `The new face is up.` | keep | | B |
 | new | add | the profile: `Workers` with its chip, `Keep`, and the question mark `What is a worker` with `A worker runs the work of one agent, one seat at a time. Keep is how many it keeps ready.` | B |
-| new | add | `What people liked` with its chip and `Open page` | B |
+| new | add | `What people liked` with its chip and `Open page`, only for an agent with a heart: an agent with none has no section | done |
 | one sentence per heart, from `agents/<agent>/learned.md` | change | the parts of the entry, newest first, as the front writes them. What the agent did is the main line, and what the person asked is a muted line. Then come the note of the person and the link `Open the run` to the run pane of the bridge. An entry without a note leaves it out. | done |
 | `Open the run` | add | the link of a heart to its run | done |
 | new | add | `Today` with runs, cost, and decisions | B |

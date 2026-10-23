@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'preact/test-utils';
 import { store } from '../state/store';
 import { ActivityList, ActivityMain, pick } from './Activity';
+import { selectAttention } from '../state/inbox';
 import { currentNotice } from './notice';
 import { at, fakeFetch, mount, run, seat, bridge, unmountAll, type Call } from './testkit-b';
 
@@ -40,7 +41,9 @@ describe('the inbox', () => {
     expect(rows(el).map((r) => r.querySelector('b')!.textContent)).toEqual(['early', 'late', 'broke']);
     expect(rows(el)[0].querySelector('.status-word')!.textContent).toBe('needs you');
     expect(rows(el)[2].querySelector('.status-word')!.textContent).toBe('error');
-    expect(el.querySelector('header .chip .sr')!.textContent).toBe('2 members need you');
+    // The chip counts what the list shows; the app bar counts what needs you.
+    expect(el.querySelector('header .chip .sr')!.textContent).toBe('3 items');
+    expect(selectAttention(store.get())).toBe(2);
   });
 
   it('offers no key in the row of a decision: the row names the action and its command, and its card decides', () => {
@@ -171,7 +174,8 @@ describe('a message that asks you', () => {
     expect(row.querySelector('.status-word')!.textContent).toBe('needs you');
     expect(row.querySelector('.inbox-text')!.textContent).toBe('migrator asks: The module keeps 52 copies in logrotate_rotate. Please say whether 14 is enough.');
     expect(row.querySelectorAll('button').length).toBe(0);
-    expect(el.querySelector('header .chip .sr')!.textContent).toBe('3 members need you');
+    expect(el.querySelector('header .chip .sr')!.textContent).toBe(rows(el).length + ' items');
+    expect(selectAttention(store.get())).toBe(3);
   });
 
   it('answers in the bridge, to that member, in reply to the message', async () => {

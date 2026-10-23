@@ -17,7 +17,7 @@ import { decisionTitle, excerpt, personName, plainText, senderName, since } from
 import { briefOf, planOf } from '../lib/decision';
 import { decide, sendMessage } from '../state/actions';
 import { ensureChannels, ensureResults, ensureRosters, ensureRuns, useResults } from '../state/fetchers';
-import { inboxRows, keyAction, selectAttention, sortInbox, type InboxRow } from '../state/inbox';
+import { inboxRows, keyAction, sortInbox, type InboxRow } from '../state/inbox';
 import { newestRun } from '../state/people';
 import { useSelect } from '../state/store';
 import { selectFacts } from '../state/reducer';
@@ -246,8 +246,6 @@ export function ActivityList({ item }: { item?: string }) {
   const chosen = usePicked();
   const picked = item || chosen;
   const shown = useShown(item, rows);
-  const needs = useSelect(selectAttention);
-  const bridgesLoaded = useSelect((s) => s.bridges.loaded);
   const rosters = useSelect((s) => s.rosters);
   const list = useRoving<HTMLDivElement>({
     onEnter: (el) => {
@@ -301,7 +299,8 @@ export function ActivityList({ item }: { item?: string }) {
   };
   return (
     <section class="screen activity" aria-labelledby="activity-title">
-      <PaneHeader id="activity-title" title="Activity" count={bridgesLoaded ? needs : undefined} countLabel={needs === 1 ? '1 member needs you' : needs + ' members need you'} />
+      {/* The chip counts what the list shows. What needs you shows by its lights and by the count on the app bar. */}
+      <PaneHeader id="activity-title" title="Activity" count={loaded ? rows.length : undefined} countLabel={rows.length === 1 ? '1 item' : rows.length + ' items'} />
       <div class="scroll" ref={list} onKeyDown={onKey}>
         <div class="inbox" role="list" aria-label="Activity">
           {rows.map((r) => (

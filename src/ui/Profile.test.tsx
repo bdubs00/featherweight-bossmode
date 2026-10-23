@@ -150,13 +150,14 @@ describe('the profile', () => {
     expect(el.querySelector('.keep-read, .keep input')).not.toBeNull();
   });
 
-  it('reads no page of hearts that the list of the wiki does not hold', async () => {
+  it('reads no page of hearts that the list of the wiki does not hold, and shows no section for an agent with no heart', async () => {
     act(() => store.dispatch({ type: 'pages', pages: [{ path: 'index.md', title: 'Index', hash: 'h', by: 'alice', at: '', size: 1 }] }));
     const el = mount(<Profile agent="migrator" />);
-    await vi.waitFor(() => expect(el.querySelector('.liked-sec, [aria-labelledby="liked-migrator"]')).not.toBeNull());
+    await vi.waitFor(() => expect(el.querySelector('.workers')).not.toBeNull());
     await new Promise((r) => setTimeout(r, 20));
     expect(calls.some((c) => c.path.startsWith('/v1/pages/agents/migrator/learned.md'))).toBe(false);
-    expect(el.querySelector('[aria-labelledby="liked-migrator"] .chip')!.textContent).toContain('0');
+    expect(el.querySelector('[aria-labelledby="liked-migrator"]')).toBeNull();
+    expect(el.textContent).not.toContain('What people liked');
   });
 
   it('words each worker from the phase of the stream, never from the read of the pool', async () => {
