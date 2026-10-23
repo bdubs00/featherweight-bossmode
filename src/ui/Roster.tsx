@@ -242,6 +242,8 @@ let draftIds = 0;
 
 export function Roster({ bridge, current }: { bridge: string; current?: string }) {
   const order = useSelect((s) => (s.rosters[bridge] ? s.rosters[bridge].order : undefined));
+  // A bridge that the list does not hold is not here, so its members never load.
+  const missing = useSelect((s) => s.bridges.loaded && !s.bridges.byId[bridge] && !s.rosters[bridge]);
   const isOpen = useSelect((s) => !!s.bridges.byId[bridge] && s.bridges.byId[bridge].state === 'open');
   const goal = useSelect((s) => (s.bridges.byId[bridge] ? s.bridges.byId[bridge].goal : ''));
   const title = useSelect((s) => (s.bridges.byId[bridge] ? s.bridges.byId[bridge].title : ''));
@@ -344,7 +346,7 @@ export function Roster({ bridge, current }: { bridge: string; current?: string }
             ))}
           </ul>
         )}
-        {!order && <Empty>Loading the members.</Empty>}
+        {!order && !missing && <Empty>Loading the members.</Empty>}
         {order && order.length === 0 && drafts.length === 0 && (
           <div class="empty">
             <p>No one has a seat yet.</p>

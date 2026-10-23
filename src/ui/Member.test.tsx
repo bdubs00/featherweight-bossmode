@@ -126,6 +126,10 @@ describe('the member conversation', () => {
     const el = mount(<MemberMain bridge="b1" handle="reviewer" tab="run" />);
     await vi.waitFor(() => expect(el.textContent).toContain('This run is gone.'));
     expect(currentNotice()).toBe('');
+    // Files says it too, instead of loading for good.
+    const files = mount(<MemberMain bridge="b1" handle="reviewer" tab="files" />);
+    await vi.waitFor(() => expect(files.textContent).toContain('This run is gone.'));
+    expect(files.textContent).not.toContain('Loading the conversation.');
     const chat = mount(<MemberMain bridge="b1" handle="reviewer" tab="chat" />);
     await vi.waitFor(() => expect(chat.textContent).toContain('Push the branch.'));
     expect(chat.textContent).not.toContain('This run is gone.');

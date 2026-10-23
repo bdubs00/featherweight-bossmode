@@ -6,6 +6,7 @@
 // that the person reads in its place.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { ApiError } from '../api/client';
 import type { BridgePage, Delegation, Entry } from '../api/types';
 import { store, useSelect } from '../state/store';
 import { loadAllCards, loadBridge, loadChannel, loadOlder, markRead, patchBridge, postMessage } from '../state/actions';
@@ -494,7 +495,10 @@ export function Channel({ id, tab: tabProp }: { id: string; tab?: BridgeTab }) {
           const ch = store.get().channels[id];
           markLoaded(id, ch && ch.seqs.length ? ch.seqs[ch.seqs.length - 1] : 0);
         }),
-      ]),
+      ]).catch((e) => {
+        // A bridge that is not here says so in place, so no notice repeats it.
+        if (!(e instanceof ApiError && e.status === 404)) throw e;
+      }),
     );
     return () => {
       live = false;

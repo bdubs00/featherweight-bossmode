@@ -43,6 +43,24 @@ a.people-title:hover {
   font-size: var(--t-meta);
   color: var(--muted);
 }
+/* The child Tasks that lost their parent, for an admin, under the find field. */
+.orphan-note {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin: var(--s-2) var(--s-2) 0;
+  padding: var(--s-1) var(--s-1) var(--s-1) var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--raised);
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+}
+.orphan-note p {
+  flex: 1;
+  min-width: 0;
+}
 .person {
   display: flex;
   align-items: center;

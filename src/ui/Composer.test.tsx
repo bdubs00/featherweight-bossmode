@@ -158,6 +158,7 @@ describe('the files of a message', () => {
     act(() => (el.querySelector('button[aria-label="Remove keep.txt"]') as HTMLButtonElement).click());
     expect(el.querySelector('.attached')).toBeNull();
     expect(el.querySelector('.attach-problem')).toBeNull();
+    expect(document.activeElement).toBe(el.querySelector('textarea'));
     expect(sendKey(el).disabled).toBe(true);
   });
 

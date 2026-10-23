@@ -320,6 +320,8 @@ export function Composer(p: ComposerProps) {
                   onClick={() => {
                     setProblem('');
                     keepFiles(p.draft, files.filter((_, n) => n !== i));
+                    // The key leaves with its file, so the focus goes back to the text.
+                    if (box.current) box.current.focus();
                   }}
                 >
                   <Glyph name="close" size={12} />

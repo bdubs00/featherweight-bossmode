@@ -312,7 +312,7 @@ export function MemberMain({ bridge, handle, tab }: { bridge: string; handle: st
           {runId ? <RunView runId={runId} result={res} bridge={bridge} member={m} who={handle} items={t.items} endSeq={end ? end.seq : undefined} gone={t.gone} wakes={wakes} /> : <p class="run-note">{handle + ' has no seat on this bridge, or no run yet.'}</p>}
         </div>
       )}
-      {tab === 'files' && <div class="scroll">{runId && <FilesView runId={runId} result={res} items={t.items} wakes={wakes} />}</div>}
+      {tab === 'files' && <div class="scroll">{runId && <FilesView runId={runId} result={res} items={t.items} wakes={wakes} gone={t.gone} />}</div>}
     </section>
   );
 }

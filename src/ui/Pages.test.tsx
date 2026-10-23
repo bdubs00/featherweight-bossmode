@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Bridge, PageMeta } from '../api/types';
-import { PageEditor, PageTree, PageView, foldersOf } from './Pages';
+import { PageEditor, PageHistory, PageTree, PageView, foldersOf } from './Pages';
 import { act } from 'preact/test-utils';
 import { store } from '../state/store';
 import { parseRoute } from '../lib/route';
@@ -54,6 +54,27 @@ describe('the tree of the wiki', () => {
     const heads = [...el.querySelectorAll('button.group-head')];
     expect(heads.map((h) => h.querySelector('.clip')!.textContent)).toEqual(['Harden the lab hosts', 'docs-scribe']);
     expect(heads.map((h) => h.getAttribute('title'))).toEqual(['bridges/01m5h96ejx8yh5fqkg', 'agents/docs-scribe']);
+  });
+});
+
+describe('the history of a page', () => {
+  it('names the page by its title, and by its file without one', async () => {
+    api = fakeApi({ 'GET /v1/pages/homelab/proxmox/blanks.md/history': { versions: [] }, 'GET /v1/pages/runbooks/deploy.md/history': { versions: [] } });
+    act(() => store.dispatch({ type: 'pages', pages: [{ ...meta('homelab/proxmox/blanks.md'), title: 'Blanks of the Proxmox pages' }, meta('runbooks/deploy.md')] }));
+    const titled = mount(<PageHistory path="homelab/proxmox/blanks.md" />);
+    const plain = mount(<PageHistory path="runbooks/deploy.md" />);
+    await settle();
+    expect(titled.querySelector('#history-title')!.textContent).toBe('History of Blanks of the Proxmox pages');
+    expect(plain.querySelector('#history-title')!.textContent).toBe('History of deploy');
+  });
+});
+
+describe('a path that meets another route', () => {
+  it('says the page is not here when the answer holds no page', async () => {
+    api = fakeApi({ 'GET /v1/pages/runbooks/deploy.md/history': { path: 'runbooks/deploy.md', versions: [] } });
+    const el = mount(<PageView path="runbooks/deploy.md/history" />);
+    await settle();
+    expect(el.textContent).toContain('No page runbooks/deploy.md/history is here.');
   });
 });
 

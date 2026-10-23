@@ -8,6 +8,7 @@
 import type { ComponentChildren, JSX } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
+import type { BossConfig } from '../api/types';
 import { useSelect } from '../state/store';
 import { columnOf, placeOf, type Column, type Place, type Route } from '../lib/route';
 import { themeOf, setChoice, useChoice, type ThemeChoice } from '../lib/theme';
@@ -55,7 +56,7 @@ export function useLogo(path: string): string {
 
 /* ---------- the app bar ---------- */
 
-interface PlaceItem {
+export interface PlaceItem {
   id: Exclude<Place, 'account'>;
   label: string;
   glyph: GlyphName;
@@ -174,7 +175,16 @@ function AccountMenu({ onSignOut }: { onSignOut: () => void }) {
   );
 }
 
-/** AppBar is the column of places: the logo well, the eight places, and the account. */
+/**
+ * placesOf gives the places of the app bar for the settings of the front.
+ * Routines shows once the settings say that the front keeps routines, and
+ * an older front that leaves the key out keeps the place.
+ */
+export function placesOf(config: BossConfig | null): PlaceItem[] {
+  return config && config.routines !== false ? PLACES : PLACES.filter((it) => it.id !== 'routines');
+}
+
+/** AppBar is the column of places: the logo well, the places, and the account. */
 export function AppBar({ route, onSignOut }: { route: Route; onSignOut: () => void }) {
   const place = placeOf(route);
   const config = useSelect((s) => s.config);
@@ -186,7 +196,7 @@ export function AppBar({ route, onSignOut }: { route: Route; onSignOut: () => vo
     <nav class="appbar" aria-label="Places">
       <LogoWell src={logo} name={theme.name} href="#" />
       <div class="places">
-        {PLACES.map((it) => {
+        {placesOf(config).map((it) => {
           const on = it.id === place;
           const count = it.id === 'activity' ? attention : 0;
           return (

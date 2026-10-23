@@ -43,3 +43,14 @@ export function pageName(p: string): string {
   const last = p.split('/').pop() || p;
   return last.endsWith('.md') ? last.slice(0, -3) : last;
 }
+
+/**
+ * byPagePath orders pages by their path without .md, so a page comes before
+ * its siblings that extend its name: role.md, then role-v2.md and role-v3.md.
+ * With .md the hyphen sorts first, and role.md would come last.
+ */
+export function byPagePath(a: { path: string }, b: { path: string }): number {
+  const x = a.path.endsWith('.md') ? a.path.slice(0, -3) : a.path;
+  const y = b.path.endsWith('.md') ? b.path.slice(0, -3) : b.path;
+  return x < y ? -1 : x > y ? 1 : a.path < b.path ? -1 : a.path > b.path ? 1 : 0;
+}

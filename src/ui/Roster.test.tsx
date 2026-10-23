@@ -223,3 +223,14 @@ describe('an empty bridge', () => {
     expect(el.querySelector('.empty button')!.textContent).toBe('Add');
   });
 });
+
+// Last in the file, because the list of bridges replaces the bridge above.
+describe('the members of a bridge that is not here', () => {
+  it('stop loading once the list of bridges holds no such bridge', async () => {
+    const el = mount(<Roster bridge="b-gone" />);
+    expect(el.textContent).toContain('Loading the members.');
+    act(() => store.dispatch({ type: 'bridges', bridges: [bridgeOf(B)] }));
+    await settle();
+    expect(el.textContent).not.toContain('Loading the members.');
+  });
+});

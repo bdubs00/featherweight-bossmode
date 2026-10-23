@@ -21,6 +21,8 @@ import type {
   MessagePage,
   NewProfile,
   NewRun,
+  Orphan,
+  OrphanRemoval,
   Page,
   PageMeta,
   PageVersion,
@@ -150,6 +152,18 @@ export const api = {
   setKeep: (name: string, replicas: number) => call<Pool>(pool(name), { method: 'PATCH', body: { replicas } }),
   /** removeWorkers removes every worker of an agent. Only an owner can. */
   removeWorkers: (name: string) => call<null>(pool(name), { method: 'DELETE' }),
+  /** orphans lists the child Tasks whose parent Task is gone, or null for a person who is no admin and for a front without the list. */
+  orphans: async (): Promise<Orphan[] | null> => {
+    try {
+      const r = await call<{ orphans: Orphan[] }>('/v1/fleet/orphans');
+      return (r && r.orphans) || [];
+    } catch (e) {
+      if (e instanceof ApiError && (e.status === 403 || e.status === 404)) return null;
+      throw e;
+    }
+  },
+  /** removeOrphans removes the child Tasks whose parent Task is gone. Only an admin can. */
+  removeOrphans: () => call<OrphanRemoval>('/v1/fleet/orphans', { method: 'DELETE' }),
   /** The counts of the day of an agent, or null where the workbench has no such route. */
   today: (agent: string) => orNull(call<Today>('/v1/bossmode/agents/' + enc(agent) + '/today')),
 

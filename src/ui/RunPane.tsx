@@ -158,13 +158,15 @@ function FileBox({ run, path, onClose }: { run: string; path: string; onClose: (
  * The pages of the wiki that the run wrote follow, as links to the Wiki,
  * because to a person they are files of the work too. items is the
  * transcript of the run, which holds the writes of the pages. wakes says
- * that the read wakes the worker of the run.
+ * that the read wakes the worker of the run. gone says that no worker
+ * holds the run now, so no result comes.
  */
-export function FilesView({ runId, result, items, wakes }: { runId: string; result: Result | null; items?: Item[]; wakes?: boolean }) {
+export function FilesView({ runId, result, items, wakes, gone }: { runId: string; result: Result | null; items?: Item[]; wakes?: boolean; gone?: boolean }) {
   const [file, setFile] = useState('');
   useEffect(() => setFile(''), [runId]);
   const files = (result && result.files) || [];
   const pages = useMemo(() => pagesWritten(items || []), [items]);
+  if (!result && gone) return <p class="run-note">This run is gone.</p>;
   if (!result)
     return wakes ? (
       <div class="files-view">

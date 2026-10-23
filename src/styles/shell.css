@@ -422,6 +422,18 @@
   .pane-head-title {
     padding: 0 var(--s-4);
   }
+  /* The keys of a header leave a phone little room, so a title takes the
+     heading size and up to two lines, and keeps more of its words. */
+  .pane-head-title > .t-title.clip {
+    font-size: var(--t-heading);
+    line-height: var(--t-heading-lh);
+    font-stretch: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
 }
 
 /* Eight places and the account share a phone. Under 380 pixels the labels

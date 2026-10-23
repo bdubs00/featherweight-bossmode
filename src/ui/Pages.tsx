@@ -12,7 +12,7 @@ import type { Page, PageMeta, PageVersion, SearchHit } from '../api/types';
 import { useSelect } from '../state/store';
 import { loadPages } from '../state/actions';
 import { stripFrontMatter } from '../lib/markdown';
-import { INDEX_PATH, pageName, pageReason, withSuffix } from '../lib/pagepath';
+import { INDEX_PATH, byPagePath, pageName, pageReason, withSuffix } from '../lib/pagepath';
 import { personName, since } from '../lib/words';
 import { go, hrefOf } from '../lib/route';
 import { useRoving } from './keys';
@@ -74,7 +74,7 @@ export function foldersOf(pages: PageMeta[], bridgeTitles: Record<string, string
   }
   const key = (f: Omit<Folder, 'pages'>) => (f.kind === 'people' ? f.path : f.title).toLocaleLowerCase();
   return [...by.keys()]
-    .map((path) => ({ ...folderOf(path, bridgeTitles), pages: by.get(path)!.sort((a, b) => (a.path < b.path ? -1 : 1)) }))
+    .map((path) => ({ ...folderOf(path, bridgeTitles), pages: by.get(path)!.sort(byPagePath) }))
     .sort((a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind) || (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : a.path < b.path ? -1 : 1));
 }
 
@@ -239,6 +239,12 @@ export function PageView({ path, version }: { path: string; version?: number }) 
     api
       .page(path, version)
       .then((p) => {
+        // A path such as a.md/history meets another route of the front, whose
+        // answer is no page; the page is not here.
+        if (!p || typeof p.text !== 'string') {
+          setMissing(true);
+          return;
+        }
         setPage(p);
         setMissing(false);
       })
@@ -327,6 +333,8 @@ export function PageView({ path, version }: { path: string; version?: number }) 
 export function PageHistory({ path }: { path: string }) {
   const [versions, setVersions] = useState<PageVersion[] | null>(null);
   const meta = useSelect((s) => s.pages.byPath[path]);
+  // The title that the tree and the page show, else the name of the file.
+  const name = (meta && meta.title) || pageName(path);
   const list = useRoving<HTMLOListElement>();
   useEffect(() => {
     setVersions(null);
@@ -334,7 +342,7 @@ export function PageHistory({ path }: { path: string }) {
   }, [path, meta && meta.hash]);
   return (
     <section class="screen pagehistory" aria-labelledby="history-title">
-      <PaneHeader id="history-title" title={'History of ' + pageName(path)} size="title" level={1} back={{ href: hrefOf({ place: 'pages', path, mode: 'read' }), label: pageName(path), to: 'here' }} />
+      <PaneHeader id="history-title" title={'History of ' + name} size="title" level={1} back={{ href: hrefOf({ place: 'pages', path, mode: 'read' }), label: name, to: 'here' }} />
       <div class="scroll pad">
         {!versions && <p class="t-meta">Loading the history.</p>}
         <ol class="versions" ref={list}>
