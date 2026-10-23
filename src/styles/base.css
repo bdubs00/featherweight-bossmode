@@ -189,6 +189,9 @@ h2[tabindex='-1']:focus {
   border: 1px solid var(--line-soft);
   padding: var(--s-1) var(--s-2);
   text-align: left;
+  /* anywhere would let a column shrink to one letter and cut its words;
+     a cell breaks a word only when the word alone is wider than the cell. */
+  overflow-wrap: break-word;
 }
 .md h1,
 .md h2,
