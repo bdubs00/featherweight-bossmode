@@ -142,6 +142,7 @@ export function lineWords(e: Pick<Entry, 'event' | 'text' | 'page'>, me: Me): Li
       return out('A member is muted');
     case 'task':
       if ((m = /^(.+?) seated (\S+) again\b/.exec(t))) return out(`${by(m[1])} seated ${handleOf(m[2])} again`);
+      if ((m = /^(.+?) continued (\S+?)\.?$/.exec(t))) return out(`${by(m[1])} continued ${handleOf(m[2])}`);
       if ((m = /^(\S+) has a new task\b/.exec(t))) return out(handleOf(m[1]) + ' has a new task');
       return out(firstWord(t) + ' has a new task');
     case 'changed': {
@@ -180,6 +181,7 @@ export function lineWords(e: Pick<Entry, 'event' | 'text' | 'page'>, me: Me): Li
       return out('Failed');
     case 'cap':
       if ((m = /^The bridge reached its cap of (\d+) messages\b/.exec(t))) return out(`The bridge reached its cap of ${m[1]} messages`);
+      if ((m = /^The bridge reached its cap of (\d+) turns\b/.exec(t))) return out(`The bridge reached its cap of ${m[1]} turns`);
       if ((m = /^The bridge reached its cap of (\d+) deliveries a minute\b/.exec(t))) return out(`The bridge reached its cap of ${m[1]} a minute`);
       if ((m = /^(\S+) cannot take messages: its run stopped at a limit\b/.exec(t))) return out(handleOf(m[1]) + ' stopped at a limit');
       if ((m = /^(\S+) cannot take messages\b/.exec(t))) return out(handleOf(m[1]) + ' cannot take messages');

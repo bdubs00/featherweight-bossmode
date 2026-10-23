@@ -2,9 +2,10 @@
 // status, the task, the phrase of the activity, and the plain line of an
 // error, with the message of the provider in its tooltip. A row that needs
 // you takes the wash of need. A row whose newest run failed or stopped
-// holds the key Seat again, so the way back is one click. A click on the
-// row opens the conversation of the member. The menu More holds Open
-// conversation, Mute, Seat again, Change task, and Fire. Add opens the
+// holds the key Seat again, so the way back is one click, and a row at its
+// limit holds Continue. A click on the row opens the conversation of the
+// member. The menu More holds Open conversation, Mute, Continue for a seat
+// at its limit, Seat again, Change task, and Fire. Add opens the
 // picker, and each pick puts a new seat row at the top. The foot sums the
 // usage of the bridge. A member dragged out of the pane asks to fire it.
 
@@ -24,7 +25,7 @@ import { attempt } from './notice';
 import { Confirm, Empty, Menu } from './common';
 import { Picker } from './Picker';
 import { draftOf, seatReason, type Draft } from './seats';
-import { SeatAgainKey, seatAgain } from './SeatAgain';
+import { SeatAgainKey, continueSeat, seatAgain } from './SeatAgain';
 import { Button, Chip, Field, Input, Led, Mark, PaneHeader, TextArea } from './primitives';
 
 const DRAG_TYPE = 'application/x-fw-member';
@@ -49,19 +50,21 @@ const MemberRow = memo(function MemberRow({ bridge, handle, onAsk, current }: { 
   // The status of the seat comes from the state of its worker on the page, as on every screen.
   const presence = useSelect((s) => (m ? seatPresence(selectFacts(s), m) : ''));
   const light = useSelect((s) => (m ? statusOf(selectFacts(s), { seat: m }) : null));
-  const error = useSelect((s) => (run && s.runs[run] && presence === 'error' ? s.runs[run].error || '' : ''));
+  // A stop at a limit is no fault, but its plain line says which limit.
+  const error = useSelect((s) => (run && s.runs[run] && (presence === 'error' || presence === 'limit') ? s.runs[run].error || '' : ''));
   const reason = plainError(error);
   const said = providerMessage(error);
   const quiet = m ? !m.activity : false;
   // A seat that works with no activity can wait in the queue, and a seat in
   // error has a reason: the row reads its run once to learn which.
   useEffect(() => {
-    if (run && (presence === 'error' || (presence === 'working' && quiet))) loadRunOnce(run);
+    if (run && (presence === 'error' || presence === 'limit' || (presence === 'working' && quiet))) loadRunOnce(run);
   }, [run, presence, quiet]);
   if (!m || !light) return null;
   // A seat whose newest run failed, stopped at a limit, or was canceled gets
-  // no message. Seat again starts a new run with its task.
-  const stopped = presence === 'error' || runState === 'failed' || runState === 'canceled';
+  // no message. Seat again starts a new run with its task, and Continue
+  // goes on with a run that stopped at a limit.
+  const stopped = presence === 'error' || presence === 'limit' || runState === 'failed' || runState === 'canceled';
   const href = hrefOf({ place: 'member', bridge, handle: m.handle, tab: 'chat' });
   const phrase = m.activity && m.activity.phrase && (presence === 'working' || presence === 'needs-you') && light.word !== 'waiting for a worker' ? m.activity.phrase : '';
   return (
@@ -104,6 +107,7 @@ const MemberRow = memo(function MemberRow({ bridge, handle, onAsk, current }: { 
           items={[
             { label: 'Open conversation', onSelect: () => go(href) },
             { label: m.muted ? 'Unmute' : 'Mute', onSelect: () => attempt(() => patchMember(bridge, m.handle, { muted: !m.muted })) },
+            ...(presence === 'limit' ? [{ label: 'Continue', onSelect: () => continueSeat(bridge, m) }] : []),
             ...(stopped ? [{ label: 'Seat again', onSelect: () => seatAgain(bridge, m) }] : []),
             { label: 'Change task', onSelect: () => onAsk({ kind: 'task', m }) },
             { label: 'Fire', danger: true, onSelect: () => onAsk({ kind: 'fire', m }) },

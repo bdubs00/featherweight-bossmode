@@ -52,9 +52,12 @@ marked done is in the code already.
 | A function that an agent can call | tool | function, capability |
 | The person who runs the page | you | the operator, the user |
 | A message that each delivery pins, so it survives every compaction of the runs | pinned, a quiet chip on the entry | sticky, starred, saved |
+| A seat whose newest run stopped at a limit of its budget | at its limit, with a grey light, and the key Continue | error, failed, out of budget |
+| Going on with the run of a seat at its limit, with more room | Continue, and the channel then says continued | resume, retry, top up |
+| Clearing a message of Activity for you | Done | archive, dismiss, mark as read |
 
 The statuses of a seat: `working`, `needs you`, `waiting for a worker`,
-`not started`, `idle`, `asleep`, `error`, and `fired`. The statuses of a
+`not started`, `idle`, `asleep`, `at its limit`, `error`, and `fired`. The statuses of a
 worker: `awake`, `asleep`, `starting`, `failed`, and `stopping`. The readout
 of the fleet also counts `working`, a worker that is awake and holds an open
 run. The statuses of a run: `waiting for a worker`, `working`, `needs you`,
@@ -168,6 +171,7 @@ Capacity shows where seating happens:
 | `Is queued, running, or paused.` | change | `waiting for a worker` for queued, and `Runs, or pauses between two steps.` for running | done |
 | new | add | `waiting for a worker`, with `Every worker of its agent is busy. It starts when one is free.` | done |
 | new | add | `waiting for a worker` for a seat with no run whose job or manager will seat it (presence `waiting`), with `It has no run yet. It starts when a worker takes it.` | done |
+| new | add | `at its limit` for a seat whose newest run stopped at a limit of its budget (presence `limit`, or a failed run whose error starts with `budget exceeded`), with a grey light and `Stopped at a limit of its budget. Continue gives it more room.` It is no error: the key is Continue, and a bridge does not count it as failed | Lead |
 | new | add | `not started` for a seat with no run that nothing will seat, because the manager of its spawn bridge stopped first (presence `not-started`), with `The manager stopped before it seated this member. A message starts it.` | done |
 | the word of a status from three sources: the presence of the bridge, the phases of the stream, and the read of the pool | change | one word for one status on every screen, from `statusOf` of `src/lib/status.ts`. The counts `N awake` and `N workers awake` take it, and so do the people list and the board. The halo of a conversation, a row of the members, the run pane, and the Workers of a profile take it too. The words stay the words of this section. | done |
 
@@ -230,6 +234,8 @@ Capacity shows where seating happens:
 | `Loading the bridges.` | keep | | A |
 | `Closed` with the count chip | keep | the chip counts the closed bridges | done |
 | `Find a bridge` | add | the field above a list of more than ten bridges | done |
+| `working` (a bridge where a seat works) | keep | the light and the word when a seat works and nothing needs you or failed, after them in the order of attention | done |
+| new | add | the freshness of the newest entry of the channel at the end of the meta line, from `since()`: `now`, `14 min`, `3 h`, `2 d`, with the full time in its tooltip. `last entry 14 minutes ago` for a screen reader, from `ago()`, and `working` there when a seat works. A bridge without an entry shows none | A |
 | `2000+` | add | the unread count past the bound of the backend | done |
 | `Manager` row and `Your conversation` | remove | Manager is a place of the app bar | done |
 | `Places`, `Fleet`, `Pages` rows | remove | places of the app bar | done |
@@ -306,11 +312,13 @@ Capacity shows where seating happens:
 | `<by> fired <handle>`, `<handle> is fired` | add | | done |
 | `<by> muted <handle>`, `<by> unmuted <handle>`, `A member is muted` | add | | done |
 | `<handle> has a new task`, `<by> seated <handle> again` (task) | add | | done |
+| `<by> continued <handle>` (task), such as `You continued reviewer` | add | the line of Continue | A |
 | `The report is in the wiki` with the link of the page, `<by> changed the settings`, `<who> changed a page` with the link of the page, `No report`, `The bridge changed` (changed) | add | | done |
 | `<handle> finished` | add | | done |
 | `<handle> stopped`, `<by> stopped <handle>` (canceled) | add | the word of the key Stop | done |
 | `<handle> needs you`, `<handle> asks you` (a line of needs-you or asked without its card) | add | | done |
 | `<handle> failed`, `<handle> did not take the seat`, `<handle> did not get a message`, `<handle> did not stop`, `<handle> did not start`, `<handle> stopped waiting for its decision`, `The report failed`, `Failed` (failed) | add | the tooltip of `<handle> failed` holds the plain line of `plainError` and the message of the provider, never the raw error | done |
+| `The bridge reached its cap of N turns` (cap) | add | the cap of the turns of every run of the bridge | A |
 | `The bridge reached its cap of N messages`, `The bridge reached its cap of N a minute`, `<handle> stopped at a limit`, `<handle> cannot take messages`, `<a> and <b> reached their cap`, `The bridge reached a cap` (cap) | add | | done |
 | `You` (the author line of a message of the person who reads the page, a person of a line, and a decided card) | add | the subject or the name of `/v1/whoami` matches the sender or the decider. A person who signs in with the token of the fleet thus never reads `token` for themself. | done |
 | `Someone`, `token` (a line whose sentence names nobody, or the token of the fleet for another person) | add | | done |
@@ -364,6 +372,7 @@ Capacity shows where seating happens:
 | `It gets the messages of the channel again.`, `It gets no broadcast, only a message to it.` | remove | | A |
 | `Seat again` | keep | a small secondary key on the row of a seat whose newest run failed or stopped, under its text, and the item of More. One click sends the task unchanged, with no dialog. Change task changes the task first | done |
 | new | add | `Seat <handle> again`, the screen-reader name of the key of a row | done |
+| `Continue` | add | the key in place of Seat again on the row of a seat at its limit, and an item of More before Seat again. One click goes on with the same run with more room, with no dialog, and the channel says `<by> continued <handle>`. `Continue <handle>` for a screen reader. The row shows `at its limit` with a grey light and the plain line of the limit, such as `Stopped at its turn limit`, in ink | A |
 | the reason of an error in red, such as the raw error cut to one line | change | the plain line of `plainError` in ink, with the message of the provider in its tooltip. The light and the word `error` carry the red | done |
 | `Its newest run stopped, so it gets no message. A new run starts with its task.` | remove | the status `error` says it | A |
 | `Change its task` | change | `Change task` | A |
@@ -414,6 +423,9 @@ Capacity shows where seating happens:
 | `New messages` (meta of a row) | change | the sender and an excerpt of the newest entry | B |
 | `Nothing needs you. New decisions and messages land here first.` | change | `Nothing needs you.` | B |
 | `Pick an item in the list to decide or to read it.` | change | `Pick an item to decide or to read it.` Where the main pane shows beside the list, it opens the item that needs you and waits longest, so the line shows only when nothing needs you | done |
+| the empty main pane after a decision | change | the next item that needs you opens. When none is left, the decided card stays, settled: quiet, with `You allowed this` or the answer, and no key | B |
+| `Done` | add | a small secondary key on the row of a message, under its text, and in the head of the main pane, and the key e. It clears the message for you: the read mark of its bridge moves to the message. `Done with <name>` for a screen reader on a row. A decision and a message that asks you have no Done | B |
+| `at its limit` (a seat whose newest run stopped at a limit) | add | its row, after the errors: the plain line of the limit, such as `Stopped at its turn limit`, and the key `Continue`, also in the main pane, and the key c. `Continue <handle>` for a screen reader on a row | B |
 
 ### src/ui/Fleet.tsx
 
@@ -509,6 +521,7 @@ Capacity shows where seating happens:
 | `Profile of <agent>, <status>` (the mark at the head of a conversation) | add | the name of the link to the profile, which a window narrower than three panes keeps out of sight | done |
 | `Profile` (the first item of the More menu of a seat) | add | a narrow window hides the mark, so the menu reaches the profile there | done |
 | `stopped` (a seat whose newest run was canceled) | add | the status beside `error`, with a grey light, and the key `Seat again` | done |
+| `at its limit` (a seat whose newest run stopped at a limit) | add | the status with a grey light over the composer, the plain line that names the limit, such as `Stopped at its turn limit`, and the key `Continue`. The More menu holds Continue before Seat again | B |
 | the reason of the bar over the composer of a stopped seat: a limit of the result, or the whole error, cut | change | the plain line of a failure, in ink, with the message of the provider in its tooltip, and the key `Seat again`, which acts at once. A stopped seat shows only its status and the key | done |
 
 ## 6. Screen C
@@ -579,6 +592,7 @@ Capacity shows where seating happens:
 | `Seats`, `Pick the seats`, `Let the manager split it` | add | if the settings name a manager, the choice of who seats the bridge | done |
 | `Add a seat` (the heading of the seats beside that choice), `Add` (the key that opens the picker of the members pane) | change | `Add a seat`, the key that opens the picker, under the choice `Seats`, with no heading of its own. Without a manager, the heading `Seats` stands above the rows and the key. | done |
 | `Placement`, `Title`, `Caps`, `Most messages`, `Most messages a minute`, `Most messages between two members` | add | Title, Placement, and Caps in Advanced | done |
+| `Most turns` | add | the cap of the turns of every run of the bridge together, after Most messages in Caps. Empty keeps the default of the workbench | C |
 | `Write a whole number.` | add | the error of a cap | done |
 | `The bridge needs a title.`, `The bridge needs a goal.` | change | `Write the goal of the bridge.` | C |
 | `Member N needs a handle of lower-case letters, digits, dots, dashes, or underscores.` | change | the reason of `handleReason()` | C |

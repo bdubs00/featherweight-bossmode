@@ -5,6 +5,10 @@
 // of a decision offers no key: a click shows its card, which says what the
 // action does, with Deny and the verb of the action. j and k move, Enter
 // opens, a allows, d denies, r replies, and s seats a stopped seat again.
+// c continues a seat at its limit, and e is Done on a message, which clears
+// it for you through the read mark of its bridge. After a decision the main
+// pane opens the next item that needs you, else it shows the decided card
+// settled.
 // The main pane shows the row that has the focus: a decision as its card.
 // Where the main pane shows beside the list and no row is picked, it shows
 // the row that needs you and waits longest. The address names a picked
@@ -17,7 +21,7 @@ import { decisionTitle, excerpt, personName, plainText, senderName, since } from
 import { briefOf, planOf } from '../lib/decision';
 import { decide, sendMessage } from '../state/actions';
 import { ensureChannels, ensureResults, ensureRosters, ensureRuns, useResults } from '../state/fetchers';
-import { inboxRows, keyAction, sortInbox, type InboxRow } from '../state/inbox';
+import { cardOf, inboxRows, keyAction, sortInbox, type InboxRow } from '../state/inbox';
 import { newestRun } from '../state/people';
 import { useSelect } from '../state/store';
 import { selectFacts } from '../state/reducer';
@@ -28,7 +32,8 @@ import { attempt } from './notice';
 import { Markdown, When } from './common';
 import { Composer } from './Composer';
 import { Msg } from './Thread';
-import { SeatAgainKey, seatAgain } from './SeatAgain';
+import { SeatAgainKey, continueSeat, seatAgain } from './SeatAgain';
+import { markDone, madeOf, settledOf, useMade } from '../state/done';
 import { EmptyPane } from './Shell';
 import { Avatar, Button, Led, Mark, PaneHeader } from './primitives';
 
@@ -76,6 +81,7 @@ const pickListeners = new Set<() => void>();
 
 /** pick shows a row of the inbox in the main pane, and names it in the address. */
 export function pick(key: string): void {
+  if (settledRow && settledRow.key !== key) settledRow = null;
   if (key === pickedKey) return;
   pickedKey = key;
   for (const f of [...pickListeners]) f();
@@ -94,6 +100,62 @@ function usePicked(): string {
     };
   }, []);
   return k;
+}
+
+/* ---------- a decision made, and a message done ---------- */
+
+/** The row whose decision the person made here when no other row needed them: the main pane keeps it, its card settled. */
+let settledRow: InboxRow | null = null;
+
+/**
+ * afterDecision moves the main pane on after a decision on its card: to the
+ * next row that needs the person, or, when none is left, it keeps the row,
+ * whose card shows the decision settled.
+ */
+function afterDecision(r: InboxRow, rows: InboxRow[]): void {
+  const next = rows.find((x) => x.key !== r.key && x.status === 'needs-you' && !(x.decision && madeOf(x.decision.run, x.decision.id)));
+  if (next) {
+    settledRow = null;
+    pick(next.key);
+    return;
+  }
+  settledRow = r;
+  if (pickedKey !== r.key) pick(r.key);
+  else for (const f of [...pickListeners]) f();
+}
+
+/** doneOf is the entry that Done clears for a row: a message. A decision and a message that asks you leave when you answer them. */
+const doneOf = (r: InboxRow) => (r.kind === 'message' && r.entry ? r.entry : undefined);
+
+/** done clears a message for the person: the read mark of its bridge moves to it. From the main pane, the next row takes its place. */
+async function done(r: InboxRow, rows: InboxRow[], fromMain: boolean): Promise<void> {
+  const e = doneOf(r);
+  if (!e) return;
+  const ok = await attempt(() => markDone(r.bridge, e.seq));
+  if (!ok || !fromMain) return;
+  const i = rows.findIndex((x) => x.key === r.key);
+  const next = rows.filter((x) => x.key !== r.key)[Math.max(0, i)] || rows.filter((x) => x.key !== r.key).slice(-1)[0];
+  if (next) pick(next.key);
+  else go({ place: 'activity' });
+}
+
+/** DoneKey clears a message for the person. */
+function DoneKey({ r, rows, fromMain, label }: { r: InboxRow; rows: InboxRow[]; fromMain?: boolean; label?: string }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <Button
+      size="s"
+      aria-label={label}
+      disabled={busy}
+      onClick={async () => {
+        setBusy(true);
+        await done(r, rows, !!fromMain);
+        setBusy(false);
+      }}
+    >
+      Done
+    </Button>
+  );
 }
 
 /* ---------- the rows ---------- */
@@ -170,6 +232,7 @@ function RowFace({ r }: { r: InboxRow }) {
 function RowStatus({ r }: { r: InboxRow }) {
   if (r.status === 'needs-you') return <Led tone="amber" word="needs you" />;
   if (r.kind === 'stopped') return <Led tone="grey" word="stopped" />;
+  if (r.kind === 'limit') return <Led tone="grey" word="at its limit" />;
   if (r.status === 'error') return <Led tone="red" word="error" />;
   return null;
 }
@@ -194,7 +257,7 @@ function rowName(r: InboxRow): string {
 }
 
 /** InboxItem is one row of the inbox. */
-function InboxItem({ r, on }: { r: InboxRow; on: boolean }) {
+function InboxItem({ r, on, rows }: { r: InboxRow; on: boolean; rows: InboxRow[] }) {
   const m = useSelect((s) => (r.handle && s.rosters[r.bridge] ? s.rosters[r.bridge].byHandle[r.handle] : undefined));
   const brief = r.decision && !r.decision.question ? briefOf(planOf(r.decision)) : null;
   return (
@@ -231,9 +294,14 @@ function InboxItem({ r, on }: { r: InboxRow; on: boolean }) {
         </div>
         {brief && (brief.code ? <code class="inbox-cmd clip">{brief.text}</code> : <div class="inbox-text clip">{brief.text}</div>)}
         <div class="inbox-where clip">{r.bridgeTitle}</div>
-        {(r.kind === 'failed' || r.kind === 'stopped') && m && (
+        {(r.kind === 'failed' || r.kind === 'stopped' || r.kind === 'limit') && m && (
           <div class="inbox-do">
             <SeatAgainKey bridge={r.bridge} m={m} label={'Seat ' + m.handle + ' again'} />
+          </div>
+        )}
+        {doneOf(r) && (
+          <div class="inbox-do">
+            <DoneKey r={r} rows={rows} label={'Done with ' + rowName(r)} />
           </div>
         )}
       </div>
@@ -263,7 +331,7 @@ export function ActivityList({ item }: { item?: string }) {
       lastIndex.current = i;
       return;
     }
-    if (!picked || rows.length === 0) return;
+    if (!picked || rows.length === 0 || (settledRow && settledRow.key === picked)) return;
     const next = rows[Math.min(lastIndex.current, rows.length - 1)];
     pick(next.key);
     const lost = !document.activeElement || document.activeElement === document.body;
@@ -295,7 +363,8 @@ export function ActivityList({ item }: { item?: string }) {
       // s seats again at once with the same task, as the key of the row does.
       const m = r.handle && rosters[r.bridge] ? rosters[r.bridge].byHandle[r.handle] : undefined;
       if (m) seatAgain(r.bridge, m);
-    }
+    } else if (act === 'continue' && r.handle) continueSeat(r.bridge, { handle: r.handle });
+    else if (act === 'done') done(r, rows, false);
   };
   return (
     <section class="screen activity" aria-labelledby="activity-title">
@@ -305,7 +374,7 @@ export function ActivityList({ item }: { item?: string }) {
         <div class="inbox" role="list" aria-label="Activity">
           {rows.map((r) => (
             <div role="listitem">
-              <InboxItem r={r} on={r.key === shown} />
+              <InboxItem r={r} on={r.key === shown} rows={rows} />
             </div>
           ))}
         </div>
@@ -322,8 +391,12 @@ export function ActivityList({ item }: { item?: string }) {
 export function ActivityMain({ item }: { item?: string }) {
   const { rows } = useInbox();
   const shown = useShown(item, rows);
-  const r = rows.find((x) => x.key === shown);
+  // A row whose decision the person made here stays, with its card settled, when no other row needs them.
+  const r = settledRow && settledRow.key === shown ? settledRow : rows.find((x) => x.key === shown);
   const m = useSelect((s) => (r && r.handle && s.rosters[r.bridge] ? s.rosters[r.bridge].byHandle[r.handle] : undefined));
+  const card = useSelect((s) => (r && r.decision ? cardOf(s.channels[r.bridge], r.decision.run, r.decision.id)?.decision || undefined : undefined));
+  const made = useMade(r && r.decision ? r.decision.run : '', r && r.decision ? r.decision.id : '');
+  const me = useSelect((s) => (s.me && s.me.principal ? s.me.principal.subject : ''));
   if (!r) {
     return (
       <EmptyPane back={{ href: '#activity', label: 'Activity' }}>
@@ -337,8 +410,12 @@ export function ActivityMain({ item }: { item?: string }) {
     </span>
   );
   const name = rowName(r);
-  const tone = r.status === 'needs-you' ? 'amber' : r.kind === 'stopped' ? 'grey' : r.status === 'error' ? 'red' : undefined;
-  const word = r.status === 'needs-you' ? 'needs you' : r.kind === 'stopped' ? 'stopped' : r.status === 'error' ? 'error' : '';
+  // The card shows the decision of the stream, and on the settled row the decision that the person just made.
+  const decision = r.decision ? settledOf(r.decision, card, settledRow === r ? made : undefined, me) : undefined;
+  // A decided card waits for nobody, so the head no longer says needs you.
+  const waits = r.status === 'needs-you' && !(decision && decision.state !== 'pending');
+  const tone = waits ? 'amber' : r.kind === 'stopped' || r.kind === 'limit' ? 'grey' : r.status === 'error' ? 'red' : undefined;
+  const word = waits ? 'needs you' : r.kind === 'stopped' ? 'stopped' : r.kind === 'limit' ? 'at its limit' : r.status === 'error' ? 'error' : '';
   const convo = r.handle && (r.kind !== 'message' || (r.entry && r.entry.from.kind === 'agent')) ? hrefOf({ place: 'member', bridge: r.bridge, handle: r.handle, tab: 'chat' }) : '';
   const asked = r.kind === 'asked' && r.entry && r.handle ? { entry: r.entry, handle: r.handle } : null;
   return (
@@ -351,10 +428,15 @@ export function ActivityMain({ item }: { item?: string }) {
         back={{ href: '#activity', label: 'Activity', to: 'list' }}
         lead={r.kind === 'message' && r.entry && r.entry.from.kind === 'person' ? <Avatar subject={r.entry.from.name || ''} display={r.entry.from.display} size={36} /> : <Mark agent={r.agent || name} size={36} label={name} halo={tone ? { tone, word } : undefined} />}
         actions={
-          convo ? (
-            <Button size="s" href={convo}>
-              Open conversation
-            </Button>
+          convo || doneOf(r) ? (
+            <>
+              {doneOf(r) && <DoneKey r={r} rows={rows} fromMain />}
+              {convo && (
+                <Button size="s" href={convo}>
+                  Open conversation
+                </Button>
+              )}
+            </>
           ) : undefined
         }
       >
@@ -371,11 +453,11 @@ export function ActivityMain({ item }: { item?: string }) {
         </div>
       ) : (
         <div class="scroll pad">
-          {r.decision && <DecisionCard d={r.decision} who={r.handle || name} />}
-          {(r.kind === 'failed' || r.kind === 'stopped') && (
+          {decision && <DecisionCard d={decision} who={r.handle || name} onDecide={() => afterDecision(r, rows)} />}
+          {(r.kind === 'failed' || r.kind === 'stopped' || r.kind === 'limit') && (
             <div class="inbox-stop">
               <p class="inbox-stop-line">
-                <Led tone={r.kind === 'stopped' ? 'grey' : 'red'} word={r.kind === 'stopped' ? 'stopped' : 'error'} />
+                <Led tone={r.kind === 'failed' ? 'red' : 'grey'} word={word} />
                 {r.reason && <span class="inbox-reason">{r.reason}</span>}
               </p>
               {r.said && <p class="inbox-said">{r.said}</p>}

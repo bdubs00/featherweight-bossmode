@@ -25,6 +25,7 @@ export const PRESENCE: Record<Presence, Light> = {
   'not-started': { word: 'not started', tone: 'grey', label: 'The manager stopped before it seated this member. A message starts it.' },
   idle: { word: 'idle', tone: 'grey', label: 'Finished its turn. A message starts the next one.' },
   asleep: { word: 'asleep', tone: 'grey', label: 'Its worker sleeps. A message wakes it.' },
+  limit: { word: 'at its limit', tone: 'grey', label: 'Stopped at a limit of its budget. Continue gives it more room.' },
   error: { word: 'error', tone: 'red', label: 'Its newest run failed, or its worker stopped.' },
   fired: { word: 'fired', tone: 'grey', struck: true, label: 'Fired. It gets no message.' },
 };
@@ -50,6 +51,14 @@ export function seatLight(presence: string | undefined | null, runState?: string
   return presenceOf(presence);
 }
 
+/**
+ * atLimit reports whether a run stopped at a limit of its budget: no fault,
+ * and Continue goes on with the same run with more room.
+ */
+export function atLimit(run: Pick<Run, 'state' | 'error'> | null | undefined): boolean {
+  return !!run && run.state === 'failed' && /^budget exceeded\b/.test(run.error || '');
+}
+
 /** The phases of an ax Task, as the fleet view reports them. */
 export type TaskPhase = 'Pending' | 'Running' | 'Suspended' | 'Failed' | 'Terminating' | string;
 
@@ -57,14 +66,17 @@ export type TaskPhase = 'Pending' | 'Running' | 'Suspended' | 'Failed' | 'Termin
  * derivePresence applies the table of section 6.5: the newest run of the
  * member in the bridge and the phase of the Task that holds it give the
  * presence, as the workbench derives it. A Task that sleeps or starts
- * counts as asleep, and a Task that fails or stops counts as an error.
+ * counts as asleep, and a Task that fails or stops counts as an error. A
+ * run that stopped at a limit of its budget is at its limit, not an error.
  * statusOf of src/lib/status.ts calls it for every seat whose facts the
  * page holds.
  */
-export function derivePresence(m: { fired?: boolean; run?: Pick<Run, 'state'> | null; taskPhase?: TaskPhase; blocked?: boolean }): Presence {
+export function derivePresence(m: { fired?: boolean; run?: Pick<Run, 'state' | 'error'> | null; taskPhase?: TaskPhase; blocked?: boolean }): Presence {
   if (m.fired) return 'fired';
   const state: RunState | undefined = m.run ? m.run.state : undefined;
-  if (state === 'failed' || m.blocked || m.taskPhase === 'Failed' || m.taskPhase === 'Terminating') return 'error';
+  if (m.blocked || m.taskPhase === 'Failed' || m.taskPhase === 'Terminating') return 'error';
+  if (atLimit(m.run)) return 'limit';
+  if (state === 'failed') return 'error';
   if (state === 'input-required') return 'needs-you';
   if (m.taskPhase === 'Suspended' || m.taskPhase === 'Pending') return 'asleep';
   if (state === 'queued' || state === 'running' || state === 'suspended') return 'working';
