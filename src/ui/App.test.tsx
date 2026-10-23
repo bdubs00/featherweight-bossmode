@@ -31,6 +31,25 @@ const LEARNED = `# What people liked from migrator
 - [Open the run](#run/01RUN)
 `;
 
+/** A routine that needs you, with the evidence of a rehearsal, a replay, and one disagreement. */
+const ROUTINE = {
+  agent: 'migrator',
+  routine: { name: 'ack', version: 1, questions: { team: { type: 'choice', criteria: { a: '', b: '' }, act: 0.8 } }, steps: [{ tool: 'gitea.issue_write', input: '{"method": "add_labels"}' }], after: [] },
+  standing: 'rehearsing',
+  ready: true,
+  history: [{ at: at(0), by: 'token', standing: 'rehearsing' }],
+  source: { runs: 3, from: '2026-10-01', to: '2026-10-10', proposedBy: 'fw routine propose' },
+  createdAt: at(0),
+  updatedAt: at(0),
+};
+const EVIDENCE = {
+  days: [{ day: '2026-10-22', decided: 3, acted: 2, agreed: 2, disagreed: 0, handed: 1, applied: 0, failed: 0 }],
+  questions: { team: { bands: [{ from: 0.8, to: 1, runs: 2, agreed: 2 }] } },
+  disagreements: [{ run: 'run-9', input: '#9 A ticket', answers: { team: { said: 'a', observed: 'b' } } }],
+  sentBack: { applied: 0, agreed: 0 },
+  replay: { matched: 3, total: 3, at: at(0), runs: [{ run: 'run-8', input: '#8 A past ticket', same: true }] },
+};
+
 const stream = () => new Response(new ReadableStream({ start() {} }), { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
 
 let restore = () => {};
@@ -55,6 +74,9 @@ beforeAll(() => {
     ['GET', /^\/v1\/pages\/agents\/migrator\/learned\.md$/, () => ({ path: 'agents/migrator/learned.md', title: 'Liked', hash: 'l', size: 1, by: 'bossmode', at: at(0), text: LEARNED })],
     ['GET', /^\/v1\/pools\//, () => FLEET.pools![0]],
     ['GET', /^\/v1\/fleet\/runs/, () => ({ runs: [] })],
+    ['GET', /^\/v1\/routines$/, () => ({ routines: [ROUTINE] })],
+    ['GET', /^\/v1\/routines\/summary/, () => ({ runs: 3, byRoutine: 1, byAgent: 1, withPerson: 1, costUSD: { routine: 0.001, agent: 0.02 }, sentBack: 0 })],
+    ['GET', /^\/v1\/routines\/migrator\/ack$/, () => ({ ...ROUTINE, evidence: EVIDENCE })],
   ]);
   restore = f.restore;
 });
@@ -80,7 +102,7 @@ describe('the links of the page', () => {
     const el = mount(<App />);
     await vi.waitFor(() => expect(el.querySelector('.appbar, nav')).not.toBeNull());
     const seen: string[] = [];
-    for (const hash of ['#bridge/b1', '#bridge/b1/wiki', '#fleet', '#member/b1/migrator-1', '#member/b1/migrator-1/profile', '#skills', '#skills/add', '#pages/bridges/b1/plan.md', '#chat', '#chat/new', '#manager', '#activity', '#new', '#new-agent', '#board']) {
+    for (const hash of ['#bridge/b1', '#bridge/b1/wiki', '#fleet', '#member/b1/migrator-1', '#member/b1/migrator-1/profile', '#skills', '#skills/add', '#pages/bridges/b1/plan.md', '#chat', '#chat/new', '#manager', '#activity', '#new', '#new-agent', '#board', '#routines', '#routines/migrator/ack', '#routines/migrator/ack/evidence', '#routines/migrator/ack/runbook', '#routines/migrator/ack/agent']) {
       await visit(hash);
       for (const a of document.querySelectorAll('a[href]')) seen.push(hash + ' ' + a.getAttribute('href'));
     }

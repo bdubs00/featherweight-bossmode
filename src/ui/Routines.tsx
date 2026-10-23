@@ -198,7 +198,7 @@ function RoutineHome() {
   }, [order, byKey]);
   const href = first ? routineHref(first) : '';
   useEffect(() => {
-    if (href && window.matchMedia(TWO_PANES).matches) go(href, true);
+    if (href && typeof window.matchMedia === 'function' && window.matchMedia(TWO_PANES).matches) go(href, true);
   }, [href]);
   return (
     <EmptyPane back={{ href: '#routines', label: 'Routines' }}>
@@ -463,7 +463,7 @@ function TopCard({ rec, owner, busy, shift, onRetire }: { rec: RoutineRecord; ow
     const m = [...(rec.history || [])].reverse().find((x) => x.standing === 'live');
     return (
       <Card class="rt-card" title="Signed off" tone="green" quiet label="Signed off">
-        <ByLine by={rec.signedOff.by} at={rec.signedOff.at} note={m && m.at === rec.signedOff.at ? m.note : undefined} />
+        <ByLine by={rec.signedOff.by} at={rec.signedOff.at} note={m ? m.note : undefined} />
       </Card>
     );
   }
