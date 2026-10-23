@@ -57,6 +57,9 @@ describe('presence', () => {
     expect(phaseOf('Odd').word).toBe('odd');
     expect(runStatus({ state: 'completed', output: 'done' }).word).toBe('ready');
     expect(runStatus({ state: 'completed', output: '' }).word).toBe('ended');
+    // A run that the front knows without its texts, such as from its index after a restart, cannot say whether it answered.
+    expect(runStatus({ state: 'completed', input: '', output: '' }).word).toBe('finished');
+    expect(runStatus({ state: 'completed', input: '', title: 'What is the time?' }).word).toBe('ended');
     expect(runStatus({ state: 'input-required' })).toMatchObject({ word: 'needs you', tone: 'amber' });
     expect(runStatus({ state: 'queued' }).word).toBe('waiting for a worker');
   });
