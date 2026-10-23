@@ -156,7 +156,7 @@ export function openStream(opts: StreamOptions): StreamHandle {
       } catch {
         p = null;
       }
-      const err = new SigninNeeded(p);
+      const err = new SigninNeeded(p, '/v1/bossmode/stream');
       if (opts.onUnauthorized) opts.onUnauthorized(err);
       return false;
     }

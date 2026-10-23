@@ -42,6 +42,12 @@ type Auth = { kind: 'loading' } | { kind: 'ready' } | { kind: 'signin'; signinUr
 
 let leaving = false;
 let tokenTry = false;
+// confirming is true while the page asks GET /v1/whoami whether a 401 of
+// another route means that the session ended (unauthorized).
+let confirming = false;
+// streamAgainAt is when the page last started the stream again after such a
+// 401, so a stream that refuses again and again starts at most once in 30 s.
+let streamAgainAt = 0;
 /** The bridge that the person read last, so Bridges opens it again. */
 let lastBridge = '';
 
@@ -183,6 +189,28 @@ export function App() {
 
   const unauthorized = (e: SigninNeeded) => {
     if (leaving) return;
+    // A 401 of one route, while the page holds a token and has not just
+    // tried a new one, ends the session only when GET /v1/whoami says so
+    // too: its own 401 comes back here and signs out. Until then the
+    // person keeps the screen and an unsent draft.
+    if (e.path && e.path !== '/v1/whoami' && getToken() && !tokenTry) {
+      if (confirming) return;
+      confirming = true;
+      api
+        .whoami()
+        .then(() => {
+          // A 401 stopped the stream, and the session holds, so it starts again.
+          if (e.path === '/v1/bossmode/stream' && Date.now() - streamAgainAt > 30_000) {
+            streamAgainAt = Date.now();
+            startStream(unauthorized);
+          } else showError(new Error('The workbench refused one request. You are still signed in. Try again.'));
+        })
+        .catch(() => {})
+        .finally(() => {
+          confirming = false;
+        });
+      return;
+    }
     const step = afterUnauthorized({ signinUrl: e.signinUrl, here: here(), hadToken: !!getToken(), now: Date.now(), store: sessionStore });
     const error = tokenTry ? 'That access token did not work. Check it, or sign in.' : '';
     tokenTry = false;

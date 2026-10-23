@@ -62,12 +62,15 @@ export class ApiError extends Error {
  */
 export class SigninNeeded extends ApiError {
   readonly signinUrl: string;
+  /** The path of the request that answered 401, or "" when unknown. */
+  readonly path: string;
 
-  constructor(problem: Problem | null) {
+  constructor(problem: Problem | null, path = '') {
     super(401, problem);
     this.name = 'SigninNeeded';
     this.message = 'Your access token did not work.';
     this.signinUrl = safeSignin(problem && problem.signin);
+    this.path = path;
   }
 }
 
@@ -181,7 +184,7 @@ export async function send(path: string, opts: CallOptions = {}): Promise<Respon
     throw new ApiError(0, null);
   }
   if (res.status === 401) {
-    const err = new SigninNeeded(await readProblem(res));
+    const err = new SigninNeeded(await readProblem(res), path);
     onUnauthorized(err);
     throw err;
   }
