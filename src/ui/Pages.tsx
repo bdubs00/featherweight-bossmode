@@ -239,6 +239,12 @@ export function PageView({ path, version }: { path: string; version?: number }) 
     api
       .page(path, version)
       .then((p) => {
+        // A path such as a.md/history meets another route of the front, whose
+        // answer is no page; the page is not here.
+        if (!p || typeof p.text !== 'string') {
+          setMissing(true);
+          return;
+        }
         setPage(p);
         setMissing(false);
       })

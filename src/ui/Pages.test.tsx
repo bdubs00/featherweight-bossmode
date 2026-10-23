@@ -69,6 +69,15 @@ describe('the history of a page', () => {
   });
 });
 
+describe('a path that meets another route', () => {
+  it('says the page is not here when the answer holds no page', async () => {
+    api = fakeApi({ 'GET /v1/pages/runbooks/deploy.md/history': { path: 'runbooks/deploy.md', versions: [] } });
+    const el = mount(<PageView path="runbooks/deploy.md/history" />);
+    await settle();
+    expect(el.textContent).toContain('No page runbooks/deploy.md/history is here.');
+  });
+});
+
 describe('a page', () => {
   it('offers no Edit on _index.md, which the wiki writes', async () => {
     api = fakeApi({ 'GET /v1/pages/_index.md': { ...page('# Every page', 'h1', 'bossmode'), path: '_index.md', title: 'Every page' } });
