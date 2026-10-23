@@ -666,7 +666,7 @@ of `chat.agent` on `chat.member`.
 
 | Route | Answer |
 |---|---|
-| `GET /v1/pages` | `{"pages": [<info>]}` |
+| `GET /v1/pages` | `{"pages": [<info>]}`. `?prefix=` keeps the pages whose path starts with that text, such as `agents/reviewer/`. |
 | `GET /v1/pages/{path}` | `<info>` plus `"text"`, with `ETag: "<hash>"` |
 | `GET /v1/pages/{path}?version=<version>` | The same for an older version |
 | `PUT /v1/pages/{path}` | 200 with the page, or 201 for a new page |

@@ -1199,7 +1199,12 @@ on('POST', '/v1/runs/([^/]+)/reactions', async (c, id) => {
   return run;
 });
 
-on('GET', '/v1/pages', () => ({ pages: [...S.pages.values()].filter(live).map((p) => pageMeta(p)).sort((a, b) => (a.path < b.path ? -1 : 1)) }));
+// prefix keeps the pages whose path starts with it, as the workbench does.
+on('GET', '/v1/pages', (c) => {
+  const prefix = String(c.url.searchParams.get('prefix') || '');
+  const pages = [...S.pages.values()].filter((p) => live(p) && p.path.startsWith(prefix));
+  return { pages: pages.map((p) => pageMeta(p)).sort((a, b) => (a.path < b.path ? -1 : 1)) };
+});
 on('GET', '/v1/pages/search', (c) => {
   const q = String(c.url.searchParams.get('q') || '').trim().toLowerCase();
   if (!q) return { q, results: [], read: 0, unread: 0, cut: false };
