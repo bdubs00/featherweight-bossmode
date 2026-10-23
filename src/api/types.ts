@@ -850,4 +850,8 @@ export interface AgentSaved {
   /** True on a dry run when an agent of that name exists. */
   exists?: boolean;
   pool?: Pool | null;
+  /** On a dry run for workers: their tools for a profile that names none, a server as <server>.*. */
+  workerTools?: string[];
+  /** On a dry run for workers: their rules, which the rules of the profile can only tighten. */
+  workerPolicy?: Rules | null;
 }

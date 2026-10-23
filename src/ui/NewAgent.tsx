@@ -23,6 +23,10 @@ import { useCatalog } from './Skills';
 import { SkillPicker } from './SkillPicker';
 import { attempt } from './notice';
 import { Advanced, Button, Chip, Field, Input, Led, Mark, PaneHeader, TextArea } from './primitives';
+import { Abilities } from './Abilities';
+import { abilitiesOf, rulesWords } from '../lib/tools';
+import { policyRules } from '../state/people';
+import { useToolCatalog } from '../state/tools';
 
 /** The default number of workers of a new agent, as fleet.DefaultWorkers of the backend. */
 export const DEFAULT_WORKERS = 2;
@@ -135,8 +139,30 @@ export function requestOf(f: AgentForm, templates: Template[]): { profile: NewPr
   return { profile, workers };
 }
 
-/** Workers shows the workers of the answer, never the word pool. */
-function Workers({ saved, dry }: { saved: AgentSaved; dry: boolean }) {
+/**
+ * Can shows what the new agent can do, as the profile words it: the tools
+ * that its workers give a profile that names none, and the rules that ask
+ * first, those of the workers and those of the form. The answer of a
+ * Preview carries the tools and the rules of the workers.
+ */
+function Can({ saved, ask }: { saved: AgentSaved; ask: string[] }) {
+  const catalog = useToolCatalog();
+  const tools = saved.workerTools || [];
+  const abilities = useMemo(() => abilitiesOf(tools, catalog), [tools.join('\n'), catalog]);
+  const rules = useMemo(() => rulesWords([...new Set([...policyRules(saved.workerPolicy), ...ask])].sort(), catalog), [saved.workerPolicy, ask.join('\n'), catalog]);
+  if (abilities.length === 0 && rules.length === 0) return null;
+  return (
+    <section class="workers-out" aria-labelledby="can-out">
+      <h2 class="sec-head t-sub" id="can-out">
+        What it can do
+      </h2>
+      <Abilities abilities={abilities} rules={rules} label="Tools and rules" />
+    </section>
+  );
+}
+
+/** Workers shows the workers of the answer, never the word pool. named shows the template, when the settings offer a choice. */
+function Workers({ saved, dry, named }: { saved: AgentSaved; dry: boolean; named: boolean }) {
   const pool = saved.pool;
   if (!pool) return null;
   const tasks = pool.tasks || [];
@@ -144,7 +170,7 @@ function Workers({ saved, dry }: { saved: AgentSaved; dry: boolean }) {
     <section class="workers-out" aria-labelledby="workers-out">
       <h2 class="sec-head t-sub" id="workers-out">
         Workers <Chip>{pool.wanted}</Chip>
-        {pool.template && <span class="t-meta">{pool.template}</span>}
+        {named && pool.template && <span class="t-meta">{pool.template}</span>}
       </h2>
       {dry || tasks.length === 0 ? (
         <p class="t-meta">{pool.wanted === 1 ? '1 worker starts when you create the agent.' : pool.wanted + ' workers start when you create the agent.'}</p>
@@ -339,7 +365,8 @@ export function NewAgent() {
               <a href={hrefOf({ place: 'fleet', agent: out!.saved.name })}>Open {out!.saved.name}</a>
             </p>
           )}
-          {shown && <Workers saved={shown.saved} dry={shown.dry} />}
+          {shown && shown.dry && <Can saved={shown.saved} ask={listOf(f.ask)} />}
+          {shown && <Workers saved={shown.saved} dry={shown.dry} named={templates.length > 1} />}
           <div class="form-end">
             <Button href="#fleet">Cancel</Button>
             <Button disabled={busy || saved} onClick={() => send(true)}>
