@@ -361,6 +361,13 @@ Capacity shows where seating happens:
 | `Members` (list label) | keep | and `Commands` for the slash menu | done |
 | the argument hint of a command, such as `<module>` | add | in a slot of its own: beside the name in the slash menu, and as `/<name> <hint>` in the address line while the person types the arguments | done |
 | `Message <who>` (placeholder of a reply) | keep | | done |
+| `Attach files` (the key with the paper clip, in a bridge and in the manager) | add | the name of the key for a screen reader and its tooltip. The composer takes files from the key, a drop, and a paste, and says no limit until the person hits it | done |
+| `Files to send`, `Remove <name>` | add | the list of the files of the draft, each by its name and its size, such as `team.csv 25 B`, with its key | done |
+| `A message holds at most 20 files. Pick fewer.`, `<name> is empty. Pick another file.`, `The files of a message hold at most 32 MB together. Pick smaller files.` | add | in the composer, at the moment of the pick that passes the limit. The pick then adds nothing | done |
+| `The page cannot read <name>. Pick it again.` | add | in the composer, when the browser cannot read a file at the send | done |
+| `The files are too large to send. Remove some, and send again.` | add | the notice of a 413 for a message with files. The draft and its files stay | done |
+| the sentence of a 409 for files, such as `Files go only to a member with a run, and reviewer has none yet: send them once it works, or address another member.` | add | the notice, in the words of the front. The draft and its files stay | done |
+| `A command takes no files. Send the files in a message of their own.` | add | the notice of a slash command with files in the manager. Nothing goes out | done |
 
 ### src/ui/Roster.tsx
 
@@ -580,6 +587,7 @@ Capacity shows where seating happens:
 | `The manager works: <phrase>.`, `The manager works on an answer.` | change | the status `working` with the phrase beside it | C |
 | `This conversation stopped. Your next message starts a new one.` | change | `Stopped. Your next message starts a new conversation.` | C |
 | `Ask the manager` (placeholder) | keep | | C |
+| `Attached files` (a list) | add | the files of a sent message, each by its name and its size, under the text of an entry, a message of a thread, and a message of a conversation. A file opens nothing, because the workspace of the run holds the bytes | done |
 | `Message to the manager` (label) | keep | | C |
 
 ### src/ui/NewBridge.tsx

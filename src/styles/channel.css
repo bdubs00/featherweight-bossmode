@@ -783,6 +783,62 @@
 .chip-x:hover {
   background: var(--raised);
 }
+/* The files of a draft: one chip each, with the name, the size, and Remove. */
+.attached {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 30vh;
+  margin: 0;
+  padding: var(--s-2) 14px 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.attached li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  height: 26px;
+  padding: 0 var(--s-1) 0 var(--s-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--paper);
+  font-size: var(--t-caption);
+  line-height: var(--t-caption-lh);
+}
+.attached-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.attached-size {
+  flex: none;
+  color: var(--muted);
+}
+.attached.sent {
+  max-height: none;
+  margin-top: var(--s-1);
+  padding: 0;
+}
+.attached.sent li {
+  padding-right: var(--s-2);
+}
+.attach-problem {
+  margin: 0;
+  padding: var(--s-2) 14px 0;
+}
+.composer .tools .attach {
+  margin-left: -6px;
+}
+/* Files over the composer land on drop: the box takes the outline of its focus. */
+.composer .box.drop {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
 .complete {
   position: absolute;
   z-index: var(--z-menu);
@@ -1209,6 +1265,13 @@
 
 /* ---------- touch and narrow widths ---------- */
 @media (pointer: coarse) {
+  .attached:not(.sent) li {
+    height: var(--h-row);
+  }
+  .attached .chip-x {
+    width: var(--h-row);
+    height: var(--h-row);
+  }
   .reply-chip,
   .complete li,
   .fold-key,

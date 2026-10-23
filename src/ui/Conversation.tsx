@@ -18,6 +18,7 @@ import { decisionOf } from '../lib/decision';
 import { whoName } from '../lib/lines';
 import { showError } from './notice';
 import { Markdown } from './common';
+import { AttachedFiles } from './AttachedFiles';
 import { DecisionCard } from './Decision';
 import { Avatar, Button, Mark } from './primitives';
 import { Msg, Quiet, StepText, StepsFold } from './Thread';
@@ -319,7 +320,8 @@ export function Conversation(props: ConversationProps) {
             const who = it.who || me;
             return (
               <Msg face={<Avatar subject={who} display={who === me ? meName : undefined} size={32} />} name={whoName(who, principal)} at={it.time} compact={compact}>
-                <p class="tmsg-plain">{it.text}</p>
+                {it.text && <p class="tmsg-plain">{it.text}</p>}
+                <AttachedFiles files={it.files} />
               </Msg>
             );
           }

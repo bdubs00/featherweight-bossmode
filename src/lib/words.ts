@@ -202,6 +202,14 @@ export function excerpt(text: string, n = 80): string {
   return s.length > n ? s.slice(0, n - 1).trimEnd() + '…' : s;
 }
 
+/** sizeText writes a size in bytes for a person. */
+export function sizeText(n: number): string {
+  if (!Number.isFinite(n) || n < 0) return '';
+  if (n < 1024) return n + ' B';
+  if (n < 1024 * 1024) return (n / 1024).toFixed(n < 10 * 1024 ? 1 : 0) + ' KB';
+  return (n / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
 /** unreadText writes the unread count of a bridge: 2000+ past the bound of the backend, else 99+ above 99. */
 export function unreadText(b: Pick<Bridge, 'unread' | 'unreadMore'>): string {
   if (b.unreadMore) return '2000+';

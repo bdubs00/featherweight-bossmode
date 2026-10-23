@@ -16,6 +16,8 @@ import { decide, react } from '../state/actions';
 import { attempt } from './notice';
 import { useWhole } from '../state/whole';
 import { CutEnd } from './Whole';
+import { AttachedFiles } from './AttachedFiles';
+import { filesWords } from '../lib/attachments';
 import { InlineMarkdown, Markdown, When } from './common';
 import { AskCard, DecisionCard } from './Decision';
 import { questionWaits } from '../state/inbox';
@@ -180,7 +182,7 @@ function ReplyChip({ bridge, seq }: { bridge: string; seq: number }) {
   return (
     <button type="button" class="reply-chip" onClick={() => jumpTo(bridge, seq)} disabled={!target} title={target ? 'Go to the message' : 'Earlier messages hold it'}>
       <span class="reply-who">{target ? senderName(target.from) : 'An earlier message'}</span>
-      {target && <span class="reply-text">{excerpt(plainText(target.text), 70)}</span>}
+      {target && <span class="reply-text">{excerpt(plainText(target.text) || filesWords(target.files), 70)}</span>}
     </button>
   );
 }
@@ -307,6 +309,7 @@ export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, fresh, li
     <>
       <Markdown text={whole && !whole.cut ? whole.text : e.text} handles={handles} refs />
       {e.cut && <CutEnd bridge={bridge} seq={e.seq} whole={whole} runHref={e.from.kind === 'agent' && e.from.handle ? hrefOf({ place: 'member', bridge, handle: e.from.handle, tab: 'chat' }) : undefined} class="cut" />}
+      <AttachedFiles files={e.files} />
     </>
   );
   if (asking) {
@@ -350,7 +353,7 @@ export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, fresh, li
   return (
     <>
       {dayLine}
-      <article class={'msg' + (sameAsPrev ? ' compact' : '') + (mine ? ' by-person' : ' by-agent') + (chips ? ' has-rx' : '')} id={id} data-item data-seq={seq} data-reply="1" aria-label={author + ', ' + excerpt(plainText(e.text), 60)}>
+      <article class={'msg' + (sameAsPrev ? ' compact' : '') + (mine ? ' by-person' : ' by-agent') + (chips ? ' has-rx' : '')} id={id} data-item data-seq={seq} data-reply="1" aria-label={author + ', ' + excerpt(plainText(e.text) || filesWords(e.files), 60)}>
         {sameAsPrev ? (
           <span class="gutter" />
         ) : e.from.kind === 'agent' ? (

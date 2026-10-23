@@ -9,17 +9,21 @@
 // screens show too. A / at the start of a message opens the menu of the
 // skills that the manager can load, and a slash command goes to POST
 // /v1/bossmode/runs/{id}/skill. The conversation is one-on-one, so the
-// answer streams in from the live route while the run works.
+// answer streams in from the live route while the run works. Files go with
+// a message to the workspace of the manager run, and a slash command takes
+// none.
 
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { api } from '../api/routes';
-import type { Result } from '../api/types';
+import type { AttachedFile, Attachment, Result } from '../api/types';
 import { store, useSelect } from '../state/store';
 import { askManager, ended, loadAgentSkills, setManagerRun } from '../state/actions';
 import { managerRunOf } from '../state/reducer';
 import { slashCommands } from '../state/people';
 import { parseSlash } from '../lib/mention';
-import { attempt } from './notice';
+import { attempt, showError } from './notice';
+import { describeFiles, refusalOf } from '../lib/attachments';
+import { AttachedFiles } from './AttachedFiles';
 import { Avatar } from './common';
 import { Button, Help, Led, Mark, PaneHeader } from './primitives';
 import { Composer } from './Composer';
@@ -56,7 +60,7 @@ export function Manager() {
   const run = useSelect((s) => (runId ? s.runs[runId] : undefined));
   const skills = useSelect((s) => (s.skills ? s.skills.skills : null));
   const loadable = useSelect((s) => (agent ? s.agentSkills[agent] : undefined));
-  const [sent, setSent] = useState<{ text: string; run: string; users: number } | null>(null);
+  const [sent, setSent] = useState<{ text: string; run: string; users: number; files: AttachedFile[] } | null>(null);
   const [res, setRes] = useState<Result | null>(null);
 
   useEffect(() => {
@@ -97,15 +101,21 @@ export function Manager() {
   // The Task of the manager sleeps between messages, so the first answer waits for it to wake.
   const waking = waiting && (!run || run.state === 'queued' || run.state === 'suspended') && !t.items.some((x) => x.kind === 'assistant');
 
-  const send = async (text: string): Promise<boolean> => {
-    setSent({ text, run: runId, users: userCount });
+  const send = async (text: string, files: Attachment[]): Promise<boolean> => {
     const slash = runId && !stopped ? parseSlash(text, commands.map((c) => c.name)) : null;
+    if (slash && files.length) {
+      showError(new Error('A command takes no files. Send the files in a message of their own.'));
+      return false;
+    }
+    setSent({ text, run: runId, users: userCount, files: describeFiles(files) });
     const ok = await attempt(async () => {
       if (slash) {
         const r = await api.runSkill(runId, slash);
         if (r && r.id) store.dispatch({ type: 'run', run: r });
       } else {
-        await askManager(text);
+        await askManager(text, files).catch((e) => {
+          throw refusalOf(e, files.length);
+        });
       }
     });
     if (!ok) setSent(null);
@@ -116,7 +126,8 @@ export function Manager() {
     <>
       {sent && (
         <Msg face={<Avatar subject={me} display={meName} size={32} />} name="You">
-          <p class="tmsg-plain sending">{sent.text}</p>
+          {sent.text && <p class="tmsg-plain sending">{sent.text}</p>}
+          <AttachedFiles files={sent.files} />
         </Msg>
       )}
       {waiting && !live.text && !live.tool && (
@@ -151,7 +162,7 @@ export function Manager() {
       <FollowBox end={end}>
         {!runId && !sent ? <p class="thread-empty">Ask about the fleet, or ask for a bridge.</p> : <Conversation run={run} result={res} t={t} agentLabel={agent} tail={tail} live={live} />}
       </FollowBox>
-      <Composer draft="manager" label="Message to the manager" placeholder="Ask the manager" commands={commands} onSend={(text) => send(text)} />
+      <Composer draft="manager" label="Message to the manager" placeholder="Ask the manager" commands={commands} attach onSend={(text, _to, files) => send(text, files)} />
     </section>
   );
 }

@@ -225,6 +225,19 @@ export interface Decision {
   always?: boolean;
 }
 
+/** A file that the person sends with a message: its name and its bytes in base64, as the native run API takes them. */
+export interface Attachment {
+  name: string;
+  data: string;
+}
+
+/** A file of a message as the channel names it. The workspace of each run that got the message holds the bytes. */
+export interface AttachedFile {
+  name: string;
+  size: number;
+  mediaType?: string;
+}
+
 /** One channel entry. */
 export interface Entry {
   seq: number;
@@ -234,6 +247,8 @@ export interface Entry {
   replyTo?: number | null;
   text: string;
   cut?: boolean;
+  /** The files of a message of a person. */
+  files?: AttachedFile[];
   /** For a system line: what happened, such as opened, closed, or fired. */
   event?: string;
   mirrors?: Mirror | null;
@@ -362,6 +377,7 @@ export interface NewRun {
   title?: string;
   profile?: InlineProfile;
   metadata?: Record<string, string>;
+  files?: Attachment[];
 }
 
 /** The decision of a result (dashboard.Decision). */
@@ -426,6 +442,8 @@ export interface Item {
   size?: number;
   isError?: boolean;
   cut?: boolean;
+  /** The files of a user message, as the workspace of the run keeps them under attachments/. */
+  files?: (AttachedFile & { path?: string })[];
 }
 
 /** The answer of GET /v1/runs/{id}/transcript. */

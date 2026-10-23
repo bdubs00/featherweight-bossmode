@@ -6,6 +6,7 @@ import type {
   Agent,
   AgentSaved,
   AgentSkills,
+  Attachment,
   BossConfig,
   Bridge,
   BridgePages,
@@ -74,6 +75,7 @@ export interface NewMessage {
   replyTo?: number;
   pinned?: boolean;
   skill?: SkillCall;
+  files?: Attachment[];
 }
 
 /** orNull answers null for a 404, so a missing thing is an empty state and not an error. */
@@ -118,6 +120,7 @@ export const api = {
     if (m.replyTo) body.replyTo = m.replyTo;
     if (m.pinned) body.pinned = true;
     if (m.skill) body.skill = m.skill.args ? { name: m.skill.name, args: m.skill.args } : { name: m.skill.name };
+    if (m.files && m.files.length) body.files = m.files;
     return call<Entry>(bridge(id) + '/messages', { method: 'POST', body });
   },
   /** entry reads one entry with its whole text, up to 64 KB. cut stays true for an old entry whose start alone was kept. */
@@ -166,7 +169,8 @@ export const api = {
    */
   fleetRuns: (q: { agent?: string; principal?: string; state?: string; limit?: number }) =>
     call<{ runs: Run[]; total?: number }>('/v1/fleet/runs' + query({ agent: q.agent, principal: q.principal, state: q.state, limit: q.limit })).then((r) => (r && r.runs) || []),
-  sendRun: (id: string, content: string) => call<unknown>(run(id) + '/messages', { method: 'POST', body: { content } }),
+  sendRun: (id: string, content: string, files?: Attachment[]) =>
+    call<unknown>(run(id) + '/messages', { method: 'POST', body: files && files.length ? { content, files } : { content } }),
   decide: (id: string, approval: string, decision: 'allow' | 'deny', note?: string, content?: unknown) => {
     const body: Record<string, unknown> = { decision };
     if (note) body.note = note;

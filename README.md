@@ -82,7 +82,10 @@ pools, a wiki of eight pages, and a face for every agent. The Routines place
 has nine routines of three agents: one needs your sign-off, four are live,
 one rehearses, one is proposed, and two are retired. Timers move members between
 presences, with their runs and their workers, and post messages every few
-seconds.
+seconds. It takes the files of a message with the limits of the front,
+refuses them with 409 when a member that the message reaches has no run or a
+failed run, and names them in the entry and in the transcript of each run
+that got them. It keeps no bytes.
 
 1. Start the fake server: `npm run fake`. It listens on
    http://127.0.0.1:8787.

@@ -60,7 +60,7 @@ export function Icon({ name, class: cls }: { name: IconName; class?: string }) {
 
 export type GlyphName =
   | 'activity' | 'chat' | 'bridges' | 'fleet' | 'skills' | 'routines' | 'wiki' | 'manager' | 'thumb-up' | 'thumb-down' | 'heart'
-  | 'search' | 'close' | 'more' | 'plus' | 'back' | 'reply' | 'question' | 'check' | 'gear' | 'board';
+  | 'search' | 'close' | 'more' | 'plus' | 'back' | 'reply' | 'question' | 'check' | 'gear' | 'board' | 'clip';
 
 const G: Record<GlyphName, JSX.Element> = {
   activity: <><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10 21h4" /></>,
@@ -84,6 +84,8 @@ const G: Record<GlyphName, JSX.Element> = {
   reply: <><path d="M10 6L4 12l6 6" /><path d="M4.5 12H14a6 6 0 0 1 6 6v1" /></>,
   question: <><path d="M9.2 9a3 3 0 0 1 5.8 1c0 2-3 2.5-3 4.5" /><path d="M12 18.5v.1" /></>,
   check: <path d="M4.5 12.5l5 5L19.5 7" />,
+  // A paper clip, for the key that attaches files to a message.
+  clip: <path d="M20 11.5l-8.2 8.2a5 5 0 0 1-7.1-7.1l8.6-8.6a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.6 1.6 0 0 1-2.3-2.3l7.8-7.8" />,
   gear: <><circle cx="12" cy="12" r="3" /><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" /></>,
   // A panel of nine lights, for the board of the Fleet place.
   board: <><rect x="4" y="4" width="4" height="4" rx="1" /><rect x="10" y="4" width="4" height="4" rx="1" /><rect x="16" y="4" width="4" height="4" rx="1" /><rect x="4" y="10" width="4" height="4" rx="1" /><rect x="10" y="10" width="4" height="4" rx="1" /><rect x="16" y="10" width="4" height="4" rx="1" /><rect x="4" y="16" width="4" height="4" rx="1" /><rect x="10" y="16" width="4" height="4" rx="1" /><rect x="16" y="16" width="4" height="4" rx="1" /></>,

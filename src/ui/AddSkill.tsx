@@ -12,6 +12,7 @@ import type { Marketplace, SkillSource } from '../api/types';
 import { loadSkills } from '../state/actions';
 import { previewOf, type Preview } from '../lib/catalog';
 import { go, parseRoute } from '../lib/route';
+import { sizeText } from '../lib/words';
 import { Markdown } from './common';
 import { Button, Chip, Field, Help, IconButton, Input, Led, PaneHeader, Tabs, TextArea } from './primitives';
 
@@ -60,14 +61,6 @@ export function useAddSkillOpen(): boolean {
 }
 
 /* ---------- words ---------- */
-
-/** sizeText writes a size in bytes for a person. */
-export function sizeText(n: number): string {
-  if (!Number.isFinite(n) || n < 0) return '';
-  if (n < 1024) return n + ' B';
-  if (n < 1024 * 1024) return (n / 1024).toFixed(n < 10 * 1024 ? 1 : 0) + ' KB';
-  return (n / (1024 * 1024)).toFixed(1) + ' MB';
-}
 
 export type Avenue = 'marketplace' | 'url' | 'text' | 'files';
 

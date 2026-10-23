@@ -4,6 +4,9 @@ import { store } from '../state/store';
 import type { Entry, Fleet } from '../api/types';
 import { Channel, cardOrder } from './Channel';
 import { bridgeOf, entryOf, fakeFetch, memberOf, mount, settle, unmountAll } from './testkit-a';
+import { typeIn } from './testkit-c';
+import { setFetch } from '../api/client';
+import { clearNotice, currentNotice } from './notice';
 
 const B = 'b-chan';
 const sys = (seq: number, event: string, text: string) => entryOf(seq, { from: { kind: 'system' }, event, text });
@@ -235,5 +238,80 @@ describe('the channel', () => {
     const el = mount(<Channel id="b-gone" />);
     expect(el.querySelector('.empty p')!.textContent).toBe('This bridge is not here. It was removed, or you cannot see it.');
     expect(el.querySelector('.empty a')!.textContent).toBe('Bridges');
+  });
+});
+
+describe('the files of a message in the channel', () => {
+  const pick = (el: HTMLElement, files: File[]) => {
+    const input = el.querySelector('.composer input[type=file]') as HTMLInputElement;
+    Object.defineProperty(input, 'files', { value: files, configurable: true });
+    act(() => {
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  };
+  const submit = async (el: HTMLElement) => {
+    await act(async () => {
+      (el.querySelector('.composer form, form.composer') as HTMLFormElement).dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+    await settle();
+  };
+
+  it('keeps the draft and its files when the front refuses them, and says what to do', async () => {
+    const answers = [
+      { status: 409, detail: 'files go only to a member with a run, and reviewer has none yet: send them once it works, or address another member' },
+      { status: 413, detail: '' },
+    ];
+    const posts: unknown[] = [];
+    const old = setFetch(async (input, init) => {
+      if (init && init.method === 'POST' && String(input).endsWith('/v1/bridges/b-chan/messages')) {
+        posts.push(JSON.parse(String(init.body)));
+        const a = answers.shift()!;
+        return new Response(a.detail ? JSON.stringify({ detail: a.detail }) : '<html>Request Entity Too Large</html>', { status: a.status, headers: { 'Content-Type': a.detail ? 'application/problem+json' : 'text/html' } });
+      }
+      return old(input, init);
+    });
+    try {
+      const el = mount(<Channel id={B} />);
+      await settle();
+      typeIn(el.querySelector('.composer textarea'), 'The schedule');
+      pick(el, [new File(['name,role'], 'team.csv')]);
+      await submit(el);
+      expect(posts[0]).toEqual({ text: 'The schedule', files: [{ name: 'team.csv', data: 'bmFtZSxyb2xl' }] });
+      expect(currentNotice()).toBe('Files go only to a member with a run, and reviewer has none yet: send them once it works, or address another member.');
+      expect((el.querySelector('.composer textarea') as HTMLTextAreaElement).value).toBe('The schedule');
+      expect([...el.querySelectorAll('.composer .attached li')].map((li) => li.textContent)).toEqual(['team.csv9 B']);
+      await submit(el);
+      expect(posts).toHaveLength(2);
+      expect(currentNotice()).toBe('The files are too large to send. Remove some, and send again.');
+      expect([...el.querySelectorAll('.composer .attached li')].map((li) => li.textContent)).toEqual(['team.csv9 B']);
+    } finally {
+      setFetch(old);
+      clearNotice();
+    }
+  });
+
+  it('names the files of an entry with their sizes, also of an entry without text', async () => {
+    const withFiles = [
+      ...messages,
+      entryOf(10, { from: { kind: 'person', name: 'alice@example.com', display: 'Alice' }, text: '', files: [{ name: 'team.csv', size: 25, mediaType: 'text/plain' }, { name: 'plan.pdf', size: 2_200_000, mediaType: 'application/pdf' }] }),
+    ];
+    const old = setFetch(async (input, init) => {
+      if ((!init || !init.method || init.method === 'GET') && /\/v1\/bridges\/b-chan\/messages/.test(String(input))) {
+        return new Response(JSON.stringify({ bridge: B, messages: withFiles, next: 0, prev: 0 }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      return old(input, init);
+    });
+    try {
+      act(() => store.dispatch({ type: 'bridges', bridges: [bridgeOf(B, { title: 'Migrate the remaining Puppet modules', lastSeq: 10, read: 10 })] }));
+      const el = mount(<Channel id={B} />);
+      await settle();
+      const row = el.querySelector('article[data-seq="10"]')!;
+      expect([...row.querySelectorAll('.attached li')].map((li) => li.textContent)).toEqual(['team.csv25 B', 'plan.pdf2.1 MB']);
+      expect(row.querySelector('.attached')!.getAttribute('aria-label')).toBe('Attached files');
+      expect(row.querySelector('.attached button')).toBeNull();
+      expect(row.getAttribute('aria-label')).toBe('Alice, team.csv and plan.pdf');
+    } finally {
+      setFetch(old);
+    }
   });
 });

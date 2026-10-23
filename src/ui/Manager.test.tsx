@@ -7,6 +7,7 @@ import { Manager, POLL_MS } from './Manager';
 import { blocksOf } from './Conversation';
 import { parseSlash } from '../lib/mention';
 import { click, fakeApi, keyNamed, mount, problem, settle, typeIn, unmountAll } from './testkit-c';
+import { clearNotice, currentNotice } from './notice';
 
 const CONFIG: BossConfig = { manager: { agent: 'manager', member: 'default/manager-0', run: 'run-m' }, placement: 'queue', maxMembers: 16 };
 const run = (state: Run['state'], seq: number): Run => ({ id: 'run-m', agent: 'manager', state, seq, createdAt: '', updatedAt: '' });
@@ -143,6 +144,60 @@ describe('the manager', () => {
     expect(start.path).toBe('/v1/runs?member=default%2Fmanager-0');
     expect(start.body).toEqual({ agent: 'manager', input: 'Hello' });
     expect(el.querySelector('[role="status"] .status')!.textContent).toBe('waking');
+  });
+
+  it('sends files with a message, starts a new conversation with them, and names them until the transcript holds them', async () => {
+    const pick = (el: HTMLElement, files: File[]) => {
+      const input = el.querySelector('.composer input[type=file]') as HTMLInputElement;
+      Object.defineProperty(input, 'files', { value: files, configurable: true });
+      act(() => {
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    };
+    api = fakeApi({
+      'GET /v1/runs/run-m/transcript': { run: run('completed', 3), items: [ASK, ...ANSWER], next: 0, prev: 0 },
+      'POST /v1/runs/run-m/messages': () => ({ status: 202, body: run('running', 4) }),
+      'POST /v1/runs': () => ({ status: 201, body: { ...run('queued', 1), id: 'run-f' } }),
+      'GET /v1/runs/run-f/transcript': { run: { ...run('queued', 1), id: 'run-f' }, items: [], next: 0, prev: 0 },
+      'GET /v1/tools': { tools: [] },
+    });
+    const el = mount(<Manager />);
+    await settle();
+    typeIn(el.querySelector('#composer'), 'Read this');
+    pick(el, [new File(['hello'], 'note.txt')]);
+    click(keyNamed(el, 'Send'));
+    await settle();
+    const follow = api.calls.find((c) => c.method === 'POST' && c.path === '/v1/runs/run-m/messages')!;
+    expect(follow.body).toEqual({ content: 'Read this', files: [{ name: 'note.txt', data: 'aGVsbG8=' }] });
+    click(keyNamed(el, 'New conversation'));
+    pick(el, [new File(['name,role'], 'team.csv')]);
+    click(keyNamed(el, 'Send'));
+    await settle();
+    const start = api.calls.find((c) => c.method === 'POST' && c.path.startsWith('/v1/runs?'))!;
+    expect(start.body).toEqual({ agent: 'manager', input: '', files: [{ name: 'team.csv', data: 'bmFtZSxyb2xl' }] });
+    // The files that went out show while the transcript does not hold the message yet.
+    expect([...el.querySelectorAll('.tmsg .attached li')].map((li) => li.textContent)).toEqual(['team.csv9 B']);
+  });
+
+  it('sends no files with a slash command, and says so', async () => {
+    api = fakeApi({
+      'GET /v1/runs/run-m/transcript': { run: run('completed', 3), items: [ASK, ...ANSWER], next: 0, prev: 0 },
+      'GET /v1/tools': { tools: [] },
+    });
+    const el = mount(<Manager />);
+    await settle();
+    typeIn(el.querySelector('#composer'), '/ansible-style roles/nginx');
+    const input = el.querySelector('.composer input[type=file]') as HTMLInputElement;
+    Object.defineProperty(input, 'files', { value: [new File(['a'], 'a.txt')], configurable: true });
+    act(() => {
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    click(keyNamed(el, 'Send'));
+    await settle();
+    expect(currentNotice()).toBe('A command takes no files. Send the files in a message of their own.');
+    expect(api.calls.some((c) => c.method === 'POST')).toBe(false);
+    expect([...el.querySelectorAll('.composer .attached li')].map((li) => li.textContent)).toEqual(['a.txt1 B']);
+    clearNotice();
   });
 
   it('says that no manager is set up, with the setting behind the question mark', () => {
