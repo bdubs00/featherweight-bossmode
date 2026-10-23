@@ -8,7 +8,7 @@ import { memo } from 'preact/compat';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { Entry, Member, ReactionKind } from '../api/types';
 import { useSelect } from '../state/store';
-import { dayWords, excerpt, list, personName, senderName } from '../lib/words';
+import { dayWords, excerpt, list, personName, plainText, senderName } from '../lib/words';
 import { hrefOf } from '../lib/route';
 import { lineWords, napWords, whoName } from '../lib/lines';
 import type { Tone } from '../lib/presence';
@@ -17,9 +17,6 @@ import { attempt } from './notice';
 import { InlineMarkdown, Markdown, When } from './common';
 import { DecisionCard } from './Decision';
 import { Avatar, Button, Chip, IconButton, LineLed, Mark, ReactionChip, TextArea } from './primitives';
-
-/** plain drops the marks of Markdown from a text, for a label. */
-const plain = (t: string) => t.replace(/```[\s\S]*?```/g, ' code ').replace(/[*_`#>|[\]]/g, '');
 
 /** agentOf finds the agent behind a handle, from the roster or the handle itself. */
 export function agentOf(roster: Record<string, Member> | undefined, handle: string): string {
@@ -180,7 +177,7 @@ function ReplyChip({ bridge, seq }: { bridge: string; seq: number }) {
   return (
     <button type="button" class="reply-chip" onClick={() => jumpTo(bridge, seq)} disabled={!target} title={target ? 'Go to the message' : 'Earlier messages hold it'}>
       <span class="reply-who">{target ? senderName(target.from) : 'An earlier message'}</span>
-      {target && <span class="reply-text">{excerpt(plain(target.text), 70)}</span>}
+      {target && <span class="reply-text">{excerpt(plainText(target.text), 70)}</span>}
     </button>
   );
 }
@@ -320,7 +317,7 @@ export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, fresh, li
   return (
     <>
       {dayLine}
-      <article class={'msg' + (sameAsPrev ? ' compact' : '') + (mine ? ' by-person' : ' by-agent') + (chips ? ' has-rx' : '')} id={id} data-item data-seq={seq} data-reply="1" aria-label={author + ', ' + excerpt(plain(e.text), 60)}>
+      <article class={'msg' + (sameAsPrev ? ' compact' : '') + (mine ? ' by-person' : ' by-agent') + (chips ? ' has-rx' : '')} id={id} data-item data-seq={seq} data-reply="1" aria-label={author + ', ' + excerpt(plainText(e.text), 60)}>
         {sameAsPrev ? (
           <span class="gutter" />
         ) : e.from.kind === 'agent' ? (

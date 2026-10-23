@@ -145,6 +145,12 @@ function logrotate(S) {
   });
   // A seat with no run yet: its job waits on the queue of its agent.
   members.push({ handle: 'reviewer', agent: 'reviewer', pool: 'review', task: 'Review the logrotate role against its manifest', runs: [], fired: false, muted: false, presence: 'waiting', activity: null });
+  // A seat whose run failed on a request that the model provider refused, with the raw error of the kernel.
+  const raw =
+    'model: anthropic: stream claude-haiku-5-5: POST "http://llm-proxy.fw.svc:8080/v1/messages": 400 Bad Request (Request-ID req_011CUQx8m2K7f3) ' +
+    '{"type":"error","error":{"type":"invalid_request_error","message":"prompt is too long: 214388 tokens > 200000 maximum"},"request_id":"req_011CUQx8m2K7f3"}';
+  addRun(S, { id: 'run-lr-linter', agentName: 'tester', handle: 'linter', bridge: id, task: 'Lint the logrotate role', state: 'failed', minutes: 35, error: raw });
+  members.push({ handle: 'linter', agent: 'tester', pool: 'crew', task: 'Lint the logrotate role', runs: ['run-lr-linter'], fired: false, muted: false, presence: 'error', activity: null });
   S.bridges.set(id, {
     id, title: 'Migrate logrotate', goal: 'Migrate the logrotate module to an Ansible role and test it with molecule.', operator: ALICE, state: 'open', placement: 'queue',
     createdAt: ago(52), closedAt: null, manager: null,
@@ -160,6 +166,8 @@ function logrotate(S) {
       entry(ago(41), system, 'tester started: Run molecule for the logrotate role.', { event: 'started', mirrors: { run: 'run-lr-tester', seq: 1, type: 'fw.run.queued' } }),
       entry(ago(30), agent('migrator', 'run-lr-migrator'), 'logrotate has one class and one template. I keep the handler style of nginx.'),
       entry(ago(20), agent('tester', 'run-lr-tester'), 'molecule converge passed on Debian 12. I wait for the role to settle before idempotence.'),
+      // A message to the operator: it asks the person, so Activity shows it among what needs you.
+      entry(ago(12), agent('migrator', 'run-lr-migrator'), '@operator, the module keeps 52 copies in `logrotate_rotate`, and the role keeps 14, as `runbooks/ansible-style.md` says. Please say whether 14 is enough for this host.', { to: ['operator', 'tester'] }),
     ]),
   );
   S.reads.set(id + '|' + ALICE, 3);

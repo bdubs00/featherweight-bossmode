@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Bridge, Entry, Member, Result, Run } from '../api/types';
 import type { Channel, Roster } from './reducer';
-import { inboxRows, keyAction, sortInbox, type InboxInput, type InboxRow } from './inbox';
+import { asksOf, asksYou, inboxRows, keyAction, reasonOf, sortInbox, type InboxInput, type InboxRow } from './inbox';
 import { decisionOf } from '../lib/decision';
 
 const at = (min: number) => new Date(Date.UTC(2026, 9, 21, 20, min)).toISOString();
@@ -100,6 +100,39 @@ describe('the inbox', () => {
     const row = inboxRows(input()).find((r) => r.kind === 'message')!;
     expect(row.entry!.seq).toBe(2);
     expect(row.status).toBe('working');
+  });
+
+  it('says why a seat stopped in one plain line, without the raw error of a provider', () => {
+    const raw = 'model: anthropic: POST "http://x/v1/messages": 400 Bad Request (Request-ID req_1) {"type":"error","error":{"message":"prompt is too long"}}';
+    expect(reasonOf(run('r', 'failed', { error: raw }), undefined)).toBe('Prompt is too long.');
+  });
+
+  it('makes a row that needs you of a message that asks you, after your read mark, until you answer it', () => {
+    const s = input();
+    const ask = (seq: number, min: number, handle: string, text: string, to: string[] = []): Entry => ({ seq, at: at(min), from: { kind: 'agent', handle }, text, to });
+    s.bridges[1] = { ...s.bridges[1], unread: 3, read: 1 };
+    s.channels.b2 = channel([
+      ask(1, 1, 'sleepy', '@operator, an old question.'),
+      ask(2, 50, 'sleepy', 'Please say whether the rule should be lifted.', ['operator', 'asker']),
+      ask(3, 51, 'asker', '@operator which branch?'),
+      ask(4, 52, 'asker', 'A note to the team.'),
+    ]);
+    const rows = sortInbox(inboxRows(s));
+    expect(rows.filter((r) => r.kind === 'asked').map((r) => [r.key, r.handle, r.status, r.entry!.seq])).toEqual([
+      ['q:b2/2', 'sleepy', 'needs-you', 2],
+      ['q:b2/3', 'asker', 'needs-you', 3],
+    ]);
+    // The newest message that does not ask you keeps its row of a message.
+    expect(rows.find((r) => r.kind === 'message' && r.bridge === 'b2')!.entry!.seq).toBe(4);
+    expect(['r', 'a', 'Enter'].map((k) => keyAction(k, rows.find((r) => r.kind === 'asked')!))).toEqual(['answer', null, 'open']);
+    // A message of yours to that handle, or in reply to the message, answers it.
+    const answered = channel([...s.channels.b2.seqs.map((q) => s.channels.b2.bySeq[q]), { seq: 5, at: at(53), from: { kind: 'person', name: 'me@example.com' }, text: 'main', to: ['asker'] }, { seq: 6, at: at(54), from: { kind: 'person', name: 'me@example.com' }, text: 'Lift it.', to: [], replyTo: 2 }]);
+    expect(asksOf(s.bridges[1], answered, 'me@example.com')).toEqual([]);
+  });
+
+  it('reads a message as asking you when its to holds operator or its text starts with @operator', () => {
+    const e = (text: string, to: string[] = [], kind: 'agent' | 'person' = 'agent'): Entry => ({ seq: 1, at: at(1), from: kind === 'agent' ? { kind, handle: 'a' } : { kind, name: 'p' }, text, to });
+    expect([e('x', ['operator']), e(' @operator, x'), e('@operators x'), e('ask @operator'), e('@operator x', [], 'person')].map(asksYou)).toEqual([true, true, false, false, false]);
   });
 
   it('maps the keys to actions: a allows, d denies, r replies, Enter opens', () => {

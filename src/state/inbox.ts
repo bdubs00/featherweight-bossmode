@@ -1,15 +1,21 @@
 // The inbox of the Activity place: one row per decision, question, failed
-// seat, stopped seat, and new message, across every open bridge, in the
-// order of attention. The functions here are pure, so the tests read them
+// seat, stopped seat, message that asks you, and new message, across every
+// open bridge, in the order of attention. The functions here are pure, so the tests read them
 // without a page.
 
 import type { Bridge, Decision, Entry, Member, Result, Run } from '../api/types';
-import type { Channel, Roster } from './reducer';
+import type { Channel, Roster, State } from './reducer';
 import { newestRun } from './people';
 import { decisionOf } from '../lib/decision';
+import { plainError } from '../lib/runerror';
 import { seatPresence, type Facts } from '../lib/status';
 
-export type InboxKind = 'decision' | 'question' | 'failed' | 'stopped' | 'message';
+/**
+ * The kinds of a row. asked is a message of an agent that asks you, in
+ * the channel: it needs you, and it is no card, so you answer it in the
+ * bridge.
+ */
+export type InboxKind = 'decision' | 'question' | 'asked' | 'failed' | 'stopped' | 'message';
 
 /** The statuses of the inbox, in the order of attention. */
 export const INBOX_ORDER = ['needs-you', 'error', 'working', 'idle', 'asleep'] as const;
@@ -59,22 +65,74 @@ function cardOf(ch: Channel | undefined, run: string, id: string): Entry | undef
   return undefined;
 }
 
-/** reasonOf says why the newest run of a seat stopped, in one line. */
+/** reasonOf says why the newest run of a seat stopped, in one plain line, without the addresses, the ids, and the JSON of a provider. */
 export function reasonOf(run: Run | undefined, res: Result | undefined): string {
-  if (res && res.limits && res.limits.length) return res.limits[0];
-  if (res && res.error) return res.error;
-  return run && run.error ? run.error : '';
+  if (res && res.limits && res.limits.length) return plainError(res.limits[0]);
+  if (res && res.error) return plainError(res.error);
+  return run && run.error ? plainError(run.error) : '';
+}
+
+/** The handle that an agent writes to address the person who runs the page. */
+export const OPERATOR = 'operator';
+
+/** asksYou reports whether an entry of an agent addresses you: its to holds operator, or its text starts with @operator. */
+export function asksYou(e: Entry): boolean {
+  if (e.from.kind !== 'agent') return false;
+  if (e.to && e.to.includes(OPERATOR)) return true;
+  return new RegExp('^\\s*@' + OPERATOR + '\\b', 'i').test(e.text || '');
+}
+
+/**
+ * asksOf finds the messages of the agents that ask you and wait for your
+ * answer: after your read mark, and with no later message of yours to
+ * that handle or in reply to it. Each seat gives its newest one.
+ */
+export function asksOf(b: Bridge, ch: Channel | undefined, me: string): Entry[] {
+  if (!ch) return [];
+  const out = new Map<string, Entry>();
+  const answered = new Set<string>();
+  for (let i = ch.seqs.length - 1; i >= 0; i--) {
+    const e = ch.bySeq[ch.seqs[i]];
+    if (!e || e.seq <= b.read) break;
+    if (e.from.kind === 'person' && (!me || e.from.name === me)) {
+      for (const h of e.to || []) answered.add(h);
+      if (e.replyTo) answered.add('#' + e.replyTo);
+      continue;
+    }
+    const h = e.from.kind === 'agent' ? e.from.handle || '' : '';
+    if (!h || out.has(h) || answered.has(h) || answered.has('#' + e.seq) || !asksYou(e)) continue;
+    out.set(h, e);
+  }
+  return [...out.values()].reverse();
 }
 
 const statusOfPresence = (p: string | undefined): InboxStatus => (p === 'working' || p === 'needs-you' ? 'working' : p === 'asleep' ? 'asleep' : 'idle');
 
-/** messageOf is the newest entry of a bridge that counts as new: a message of a person or an agent after the read mark, not of the person. */
+/**
+ * selectAttention counts the members that need you, over the open bridges:
+ * the seats that wait for a decision, from the bridges, and the seats whose
+ * messages ask you, from the channels that the page holds. The list of the
+ * bridges carries no count of the messages that ask you, so those count
+ * once the page reads the channel.
+ */
+export function selectAttention(s: State): number {
+  const me = s.me && s.me.principal ? s.me.principal.subject : '';
+  let n = 0;
+  for (const id of s.bridges.order) {
+    const b = s.bridges.byId[id];
+    if (!b || b.state !== 'open') continue;
+    n += (b.needsYou || 0) + asksOf(b, s.channels[id], me).length;
+  }
+  return n;
+}
+
+/** messageOf is the newest entry of a bridge that counts as new: a message of a person or an agent after the read mark, not of the person, and not one that asks you, which has a row of its own. */
 function messageOf(b: Bridge, ch: Channel | undefined, me: string): Entry | undefined {
   if (!ch || !b.unread) return undefined;
   for (let i = ch.seqs.length - 1; i >= 0; i--) {
     const e = ch.bySeq[ch.seqs[i]];
     if (!e || e.seq <= b.read) break;
-    if (e.from.kind === 'system') continue;
+    if (e.from.kind === 'system' || asksYou(e)) continue;
     if (e.from.kind === 'person' && e.from.name === me) continue;
     return e;
   }
@@ -105,6 +163,10 @@ export function inboxRows(s: InboxInput): InboxRow[] {
         const kind: InboxKind = run && run.state === 'canceled' ? 'stopped' : 'failed';
         rows.push({ ...base, key: 's:' + b.id + '/' + m.handle, kind, status: 'error', reason: reasonOf(run, s.results[id]), at: run ? run.updatedAt : '' });
       }
+    }
+    for (const a of asksOf(b, s.channels[b.id], s.me)) {
+      const m = a.from.kind === 'agent' && a.from.handle && roster ? roster.byHandle[a.from.handle] : undefined;
+      rows.push({ key: 'q:' + b.id + '/' + a.seq, kind: 'asked', status: 'needs-you', bridge: b.id, bridgeTitle: b.title, handle: a.from.kind === 'agent' ? a.from.handle : undefined, agent: m ? m.agent : undefined, entry: a, at: a.at, toYou: true });
     }
     const e = messageOf(b, s.channels[b.id], s.me);
     if (e) {
@@ -156,11 +218,11 @@ export type InboxAction = 'allow' | 'deny' | 'always' | 'answer' | 'reply' | 'op
 /**
  * keyAction maps a key on a row of the inbox to an action: a allows, d
  * denies, r replies, and Enter opens. On a question, a opens the answer and
- * d declines. A failed or a stopped seat takes s to seat it again.
+ * d declines. On a message that asks you, r opens the answer in place. A failed or a stopped seat takes s to seat it again.
  */
 export function keyAction(key: string, row: InboxRow): InboxAction | null {
   if (key === 'Enter') return 'open';
-  if (key === 'r') return 'reply';
+  if (key === 'r') return row.kind === 'asked' ? 'answer' : 'reply';
   if (row.kind === 'decision') return key === 'a' ? 'allow' : key === 'd' ? 'deny' : null;
   if (row.kind === 'question') return key === 'a' ? 'answer' : key === 'd' ? 'deny' : null;
   if (row.kind === 'failed' || row.kind === 'stopped') return key === 's' ? 'seat' : null;
