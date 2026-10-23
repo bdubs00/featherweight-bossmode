@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { errorReason, since, unreadText, whyWords } from './words';
+import type { Decision } from '../api/types';
+import { commandOf, decisionTitle, errorReason, plainText, since, unreadText, whyWords } from './words';
 
 describe('since', () => {
   const now = Date.parse('2026-10-21T20:00:00Z');
@@ -21,6 +22,41 @@ describe('whyWords', () => {
     expect(whyWords('default')).toBe('Rule: ask first');
     expect(whyWords('')).toBe('');
     expect(whyWords('the budget is low')).toBe('The budget is low');
+  });
+
+  it('names a tool of the front without its prefix, also a pattern of tools', () => {
+    expect(whyWords('rule: ask front.bridge_open')).toBe('Rule: ask before bridge_open');
+    expect(whyWords('rule: ask front.pages_*')).toBe('Rule: ask before pages_*');
+  });
+});
+
+describe('decisionTitle', () => {
+  const d = (tool: string | undefined, input?: unknown, label = 'Allow'): Decision => ({ run: 'r', id: 'a', tool, input, label, state: 'pending' });
+  it('says what the call does, without a tool name where the page knows the tool', () => {
+    expect(decisionTitle('manager', d('front.bridge_open', { title: 'T' }))).toBe('manager wants to open a bridge');
+    expect(decisionTitle('manager', d('front.pages_write', { path: 'a.md', text: '' }))).toBe('manager wants to write a page');
+    expect(decisionTitle('manager', d('spawn_task', { agent: 'tester', input: 'x' }))).toBe('manager wants to hand off a task to tester');
+    expect(decisionTitle('manager', d('spawn_task', { input: 'x' }))).toBe('manager wants to hand off a task');
+    expect(decisionTitle('m', d('files', { command: 'create', path: 'a.yml' }))).toBe('m wants to create a.yml');
+    expect(decisionTitle('m', d('bash', { command: 'ls' }, 'Run command'))).toBe('m wants to run a command');
+    expect(decisionTitle('m', d('github.create_issue', { title: 'x' }))).toBe('m wants to use github.create_issue');
+    expect(decisionTitle('m', d(undefined))).toBe('m asks for your decision');
+  });
+
+  it('reads no shell command in the input of the files tool, which names its operation in command', () => {
+    expect(commandOf({ command: 'str_replace', path: 'a.yml' })).toBe('');
+    expect(commandOf({ command: 'ls -la' })).toBe('ls -la');
+  });
+});
+
+describe('plainText', () => {
+  it('drops the marks of Markdown and keeps an underscore inside a word', () => {
+    expect(plainText('my toolset has no bridge_read or bridge_post')).toBe('my toolset has no bridge_read or bridge_post');
+    expect(plainText('**Bold**, _em_, and `__init__.py`')).toBe('Bold, em, and __init__.py');
+    expect(plainText('# Head\n\n- one\n- **two**\n\n> quote')).toBe('Head one two quote');
+    expect(plainText('See [the page](a.md) and ![a map](x.png).')).toBe('See the page and a map.');
+    expect(plainText('| a | b |\n|---|---|\n| 1 | 2 |')).toBe('a b 1 2');
+    expect(plainText('snake_case_name and 2*3*4')).toBe('snake_case_name and 2*3*4');
   });
 });
 

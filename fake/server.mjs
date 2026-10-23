@@ -21,6 +21,7 @@
 //   FAKE_LIVE_MS=120   the time between two pieces of a live answer, in milliseconds
 //   FAKE_LIVE_HOLD=1   a live answer stops near its middle and waits there, for a screenshot
 //   FAKE_ASLEEP=1      every worker of the fleet sleeps, as a fleet at night with no worker awake
+//   FAKE_ASK=<tool>    the manager waits for a decision on one call: bridge_open, pages_write, spawn_task, or create_issue
 
 import http from 'node:http';
 import fs from 'node:fs';
@@ -45,7 +46,7 @@ const LIVE = process.env.FAKE_LIVE === '1';
 const LIVE_MS = Number(process.env.FAKE_LIVE_MS || 120);
 const LIVE_HOLD = process.env.FAKE_LIVE_HOLD === '1';
 
-const S = seed();
+const S = seed(process.env.FAKE_ASK || '');
 
 // A fleet at night: every worker sleeps, so the page shows no worker awake.
 if (process.env.FAKE_ASLEEP === '1') {
@@ -427,7 +428,7 @@ function decide(runId, approvalId, body, person) {
       setTimeout(() => finish(bid, m, run, decision, question, words), 5000);
     }
   }
-  if (run.agent === 'manager') setTimeout(() => managerAnswer(run, decision === 'allow' ? 'Done. The plan runs now.' : 'I stopped, as you asked. Tell me what to change.'), 2000);
+  if (run.agent === 'manager') setTimeout(() => managerAfter(run, pending, decision, person), 2000);
   return { run };
 }
 
@@ -501,6 +502,37 @@ function liveText(run, turn, text, then) {
 }
 
 /* ---------- the manager ---------- */
+
+/**
+ * managerAfter ends the call of the manager that waited for a decision: it
+ * writes the result of the call, as the front words it, and the answer of
+ * the manager. An allowed bridge_open opens the bridge, and the answer
+ * names it by its id, as a model does.
+ */
+function managerAfter(run, pending, decision, person) {
+  const items = S.transcripts.get(run.id);
+  const callId = (items.find((x) => x.kind === 'ask' && x.id === pending.id) || {}).callId;
+  let result = { text: 'Done.' };
+  let answer = 'Done. The plan runs now.';
+  if (decision !== 'allow') {
+    result = { text: 'The person denied the call.', isError: true };
+    answer = 'I stopped, as you asked. Tell me what to change.';
+  } else if (/bridge_open$/.test(pending.tool || '')) {
+    const b = openBridge(pending.input || {}, person);
+    const p = `bridges/${b.id}/plan.md`;
+    writePage(p, `# ${b.title}\n\n${b.goal}\n\n${b.members.map((m) => `- **${m.handle}**: ${m.task}`).join('\n')}\n`, 'agent:manager', 'The plan of the bridge', run.id);
+    result = { text: `Opened the bridge ${b.id} "${b.title}" for ${person.subject} with ${b.members.length} members, placement ${b.placement}. Follow it with bridge_read (bridge ${b.id}).` };
+    answer = `The bridge is open: \`${b.id}\`. Each seat has its task, and the plan is in \`${p}\`.`;
+  } else if (/pages_write$/.test(pending.tool || '') && pending.input && pending.input.path) {
+    writePage(pending.input.path, String(pending.input.text || ''), 'agent:manager', String(pending.input.summary || ''), run.id);
+    result = { text: `Wrote ${pending.input.path}.` };
+    answer = `The page is in the wiki: ${pending.input.path}.`;
+  }
+  const seq = items[items.length - 1].seq + 1;
+  items.push({ seq, time: now(), kind: 'result', tool: pending.tool, callId, ...result });
+  Object.assign(run, { seq, updatedAt: now() });
+  managerAnswer(run, answer);
+}
 
 function managerAnswer(run, text) {
   const items = S.transcripts.get(run.id);
@@ -730,8 +762,8 @@ on('GET', '/v1/bossmode/stream', (c) => {
 });
 
 on('GET', '/v1/bridges', (c) => ({ bridges: [...S.bridges.values()].map((b) => listItem(b, c.person.subject)) }));
-on('POST', '/v1/bridges', async (c) => {
-  const body = await readJson(c.req);
+/** openBridge opens a bridge from a plan of title, goal, placement, and members, as a person, and seats its members. */
+function openBridge(body, person) {
   const title = String(body.title || '').trim();
   if (!title) refuse(400, 'a bridge needs a title');
   const members = Array.isArray(body.members) ? body.members : [];
@@ -744,16 +776,16 @@ on('POST', '/v1/bridges', async (c) => {
   }
   const id = 'br-' + Date.now().toString(36);
   const b = {
-    id, title, goal: String(body.goal || ''), operator: c.person.subject, state: 'open', placement: body.placement === 'spawn' ? 'spawn' : 'queue', createdAt: now(), closedAt: null, manager: null,
+    id, title, goal: String(body.goal || ''), operator: person.subject, state: 'open', placement: body.placement === 'spawn' ? 'spawn' : 'queue', createdAt: now(), closedAt: null, manager: null,
     delegation: { approve: false, budget: false, members: false, report: true, ...(body.delegation || {}) },
     caps: { maxMessages: 2000, maxFanoutPerMinute: 30, maxPairMessages: 6, ...(body.caps || {}) },
     members: [],
   };
   if (b.placement === 'spawn') refuse(400, 'a spawn bridge needs a manager, and the fake server seats queue bridges only');
-  b.members = members.map((m) => seat(id, m, c.person.subject));
+  b.members = members.map((m) => seat(id, m, person.subject));
   S.bridges.set(id, b);
   S.channels.set(id, []);
-  system(id, 'opened', `${c.person.name.toLowerCase()} opened the bridge with ${b.members.length} member${b.members.length === 1 ? '' : 's'}.`);
+  system(id, 'opened', `${person.name.toLowerCase()} opened the bridge with ${b.members.length} member${b.members.length === 1 ? '' : 's'}.`);
   for (const m of b.members) {
     publish('bridge.member', { bridge: id, member: m });
     system(id, 'started', `${m.handle} started: ${m.task}`, { mirrors: { run: m.runs[0], seq: 1, type: 'fw.run.queued' } });
@@ -764,6 +796,11 @@ on('POST', '/v1/bridges', async (c) => {
       setMember(id, m, { presence: 'idle', activity: null });
     }
   }, 4000);
+  return b;
+}
+
+on('POST', '/v1/bridges', async (c) => {
+  const b = openBridge(await readJson(c.req), c.person);
   c.status = 201;
   return record(b, c.person.subject);
 });

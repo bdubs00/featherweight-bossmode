@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Entry, Item } from '../api/types';
-import { directEntries, foldNaps, sameSender, stepsOf, threadOf, withLive } from './thread';
+import { directEntries, foldNaps, openedBridge, placedSteps, sameSender, stepsOf, threadOf, withLive } from './thread';
 
 const at = (min: number) => new Date(Date.UTC(2026, 9, 21, 20, min)).toISOString();
 
@@ -56,16 +56,62 @@ describe('the direct thread', () => {
       { seq: 4, time: at(4), kind: 'file', tool: 'files', callId: 'c2', path: 'roles/a.yml', text: 'created' },
       { seq: 5, time: at(5), kind: 'tool', tool: 'front.fleet', callId: 'c3', input: {} },
       { seq: 6, time: at(5), kind: 'tool', tool: 'front.pages_write', callId: 'c4', input: { path: 'notes/cron.md', text: '# Cron' } },
-      { seq: 7, time: at(5), kind: 'tool', tool: 'front.bridge_post', callId: 'c5', input: { text: 'Done.' } },
-      { seq: 8, time: at(5), kind: 'assistant', text: 'Done.' },
+      { seq: 7, time: at(5), kind: 'result', tool: 'front.pages_write', callId: 'c4' },
+      { seq: 8, time: at(5), kind: 'tool', tool: 'front.bridge_post', callId: 'c5', input: { text: 'Done.' } },
+      { seq: 9, time: at(5), kind: 'tool', tool: 'front.pages_search', callId: 'c6', input: { query: 'cron' } },
+      { seq: 10, time: at(5), kind: 'assistant', text: 'Done.' },
     ];
-    expect(stepsOf(items).map((s) => [s.text, s.cmd || '', !!s.isError])).toEqual([
+    expect(stepsOf(items).map((s) => [s.text, s.cmd || s.path || '', !!s.isError])).toEqual([
       ['Ran', 'ansible-lint roles/cron', true],
       ['Created roles/a.yml', '', false],
-      ['Used fleet', '', false],
-      ['Wrote notes/cron.md', '', false],
-      ['Posted to the bridge', '', false],
+      ['Reading the fleet', '', false],
+      ['Wrote', 'notes/cron.md', false],
+      ['Posting to the bridge', '', false],
+      ['Searched the wiki for "cron"', '', false],
     ]);
+  });
+
+  it('says nothing of a call that waits for its decision, and says what happened after the decision, at its result', () => {
+    const input = { title: 'Release notes for 2.4', members: [] };
+    const waiting: Item[] = [
+      { seq: 1, time: at(1), kind: 'tool', tool: 'front.bridge_open', callId: 'm2', input },
+      { seq: 2, time: at(1), kind: 'ask', id: 'ap', tool: 'front.bridge_open', callId: 'm2' },
+    ];
+    expect(stepsOf(waiting)).toEqual([]);
+    const done: Item[] = [
+      ...waiting,
+      { seq: 3, time: at(2), kind: 'decided', id: 'ap', text: 'allow' },
+      { seq: 4, time: at(3), kind: 'result', tool: 'front.bridge_open', callId: 'm2', text: 'Opened the bridge 01m5kpw79kyq9j8nbpnhvtwm95 "Release notes for 2.4" for alice with 2 members.' },
+    ];
+    const placed = placedSteps(done);
+    expect([...placed.keys()]).toEqual([4]);
+    expect(placed.get(4)).toMatchObject({ text: 'Opened the bridge', bridge: '01m5kpw79kyq9j8nbpnhvtwm95', target: 'Release notes for 2.4', at: at(3) });
+    const denied: Item[] = [...waiting, { seq: 3, time: at(2), kind: 'decided', id: 'ap', text: 'deny' }, { seq: 4, time: at(3), kind: 'result', callId: 'm2', isError: true, text: 'denied' }];
+    expect(stepsOf(denied)[0]).toMatchObject({ text: 'Did not open the bridge', target: 'Release notes for 2.4', isError: true, worded: true });
+    expect(stepsOf(denied)[0].bridge).toBeUndefined();
+  });
+
+  it('words the tools of the front, and links a page that a call wrote', () => {
+    const items: Item[] = [
+      { seq: 1, time: at(1), kind: 'tool', tool: 'front.pages_write', callId: 'p', input: { path: 'k3s/runbook.md', text: '# R' } },
+      { seq: 2, time: at(1), kind: 'result', callId: 'p', text: 'Wrote k3s/runbook.md.' },
+      { seq: 3, time: at(2), kind: 'tool', tool: 'spawn_task', callId: 's', input: { agent: 'tester', input: 'x' } },
+      { seq: 4, time: at(3), kind: 'tool', tool: 'front.fleet', callId: 'f', input: {} },
+      { seq: 5, time: at(3), kind: 'result', callId: 'f', text: '2 pools' },
+      { seq: 6, time: at(3), kind: 'tool', tool: 'recall', callId: 'r', input: {} },
+    ];
+    expect(stepsOf(items).map((x) => [x.text, x.path || '', x.href || ''])).toEqual([
+      ['Wrote', 'k3s/runbook.md', '#pages/k3s/runbook.md'],
+      ['Handing off a task to tester', '', ''],
+      ['Read the fleet', '', ''],
+      ['Used recall', '', ''],
+    ]);
+  });
+
+  it('reads the id of the bridge that bridge_open opened, in the words of the front and of the fake', () => {
+    expect(openedBridge('Opened the bridge 01m5kpw79kyq9j8nbpnhvtwm95 "T" for a with 2 members.')).toBe('01m5kpw79kyq9j8nbpnhvtwm95');
+    expect(openedBridge('Opened br-notes.')).toBe('br-notes');
+    expect(openedBridge('Forbidden.')).toBe('');
   });
 
   it('merges the entries and the steps in the order of time, and folds three steps or more', () => {

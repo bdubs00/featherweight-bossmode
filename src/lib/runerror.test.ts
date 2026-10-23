@@ -65,6 +65,24 @@ describe('plainError', () => {
     expect(plainError('{"error":{}}')).toBe('The run failed');
   });
 
+  // The cases of the Activity place, where a seat of a bridge failed.
+  it('words the errors that a seat of a bridge meets, with no address, id, or JSON left', () => {
+    const tooLong =
+      'model: anthropic: stream claude-haiku-5-5: POST "http://llm-proxy.fw.svc:8080/v1/messages": 400 Bad Request (Request-ID req_011CUQx8m2K7f3) ' +
+      '{"type":"error","error":{"type":"invalid_request_error","message":"prompt is too long: 214388 tokens > 200000 maximum"},"request_id":"req_011CUQx8m2K7f3"}';
+    expect(plainError(tooLong)).toBe('The conversation is too long for the model');
+    expect(providerMessage(tooLong)).toBe('prompt is too long: 214388 tokens > 200000 maximum');
+    expect(plainError('model: openai: POST "https://x/v1": 429 Too Many Requests {"error":{"message":"slow down"}}')).toBe('The model was busy');
+    expect(plainError('model: anthropic: POST "https://x": 502 Bad Gateway')).toBe('The model provider had an error');
+    expect(plainError('model: context deadline exceeded')).toBe('The model did not answer in time');
+    expect(plainError('budget exceeded: cost 2.10 of 2.00 USD')).toBe('Stopped at its budget');
+    expect(plainError('Stopped at the limit of 40 turns.')).toBe('Stopped at 40 turns');
+    expect(plainError('budget: the run reached its limit of 2.00 USD. Raise it to go on.')).toBe('Stopped at 2.00 USD');
+    expect(plainError('tool bash: dial tcp "http://10.0.0.4:9000/x": connection refused. Retried 3 times. {"a":1}')).toBe('Tool bash: dial tcp: connection refused');
+    expect(plainError('run 01m5kpw79kyq9j8nbpnhvtwm95 lost its worker')).toBe('Lost its worker');
+    expect(plainError('the bridge 01m5kpw79kyq9j8nbpnhvtwm95 refused the post')).toBe('The bridge refused the post');
+  });
+
   it('gives no provider message for an error without one', () => {
     expect(providerMessage('budget exceeded: maxTurns')).toBe('');
     expect(providerMessage('{"message":"Slow down."}')).toBe('Slow down.');

@@ -5,6 +5,10 @@
 import type { ComponentChildren, JSX } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { renderInline, renderMarkdown } from '../lib/markdown';
+import { pageReason } from '../lib/pagepath';
+import { refCandidates, type Refs } from '../lib/refs';
+import { loadPages } from '../state/actions';
+import { useSelect } from '../state/store';
 import type { Light as LightT } from '../lib/presence';
 import { clock, dayWords } from '../lib/words';
 import { Glyph } from './icons';
@@ -32,10 +36,60 @@ export function Light({ light, short }: { light: LightT; short?: boolean }) {
   return <Led tone={light.tone} word={light.word} struck={light.struck} quiet={short} label={light.label} />;
 }
 
-/** Markdown shows a text of an agent or of the wiki, sanitized. */
-export function Markdown({ text, base, handles, class: cls }: { text: string; base?: string; handles?: string[]; class?: string }) {
-  const key = handles ? handles.join(',') : '';
-  const html = useMemo(() => renderMarkdown(text, { base, handles }), [text, base, key]);
+/** The read of the page list that a message started, once for the page. It answers false when the read failed. */
+let pagesRead: Promise<boolean> | null = null;
+const readPages = (): Promise<boolean> =>
+  (pagesRead ||= loadPages().then(
+    () => true,
+    () => false,
+  ));
+
+/**
+ * useRefs gives what a text of a message can name and the page knows: the
+ * titles of the bridges whose ids it holds, and the pages of the wiki
+ * whose paths it holds. The page reads the list of the wiki once, for the
+ * first message that holds a path, and the stream keeps it current. Until
+ * the list arrives, a path links nothing. If the read fails, a path that
+ * follows the rules of a page path links.
+ */
+function useRefs(text: string): { refs?: Refs; key: string } {
+  const cands = useMemo(() => (text ? refCandidates(text) : null), [text]);
+  const bridgeKey = useSelect((s) =>
+    cands && cands.words.length
+      ? cands.words
+          .filter((w) => s.bridges.byId[w])
+          .map((w) => w + '\u0001' + (s.bridges.byId[w].title || w))
+          .join('\u0002')
+      : '',
+  );
+  const loaded = useSelect((s) => s.pages.loaded);
+  const pageKey = useSelect((s) => (cands && cands.paths.length ? cands.paths.filter((p) => !!s.pages.byPath[p]).join('\n') : ''));
+  const [failed, setFailed] = useState(false);
+  const wants = !!cands && cands.paths.length > 0 && !loaded;
+  useEffect(() => {
+    if (wants) readPages().then((ok) => !ok && setFailed(true));
+  }, [wants]);
+  return useMemo(() => {
+    if (!cands) return { key: '' };
+    const bridges: Record<string, string> = {};
+    for (const line of bridgeKey ? bridgeKey.split('\u0002') : []) {
+      const [id, title] = line.split('\u0001');
+      bridges[id] = title;
+    }
+    const held = new Set(pageKey ? pageKey.split('\n') : []);
+    const page = loaded ? (p: string) => held.has(p) : failed ? (p: string) => pageReason(p) === '' : () => false;
+    return { refs: { bridges, page }, key: bridgeKey + '\u0003' + pageKey + (loaded ? 'L' : failed ? 'F' : '') };
+  }, [cands, bridgeKey, pageKey, loaded, failed]);
+}
+
+/**
+ * Markdown shows a text of an agent or of the wiki, sanitized. With refs,
+ * the text of a message links the bridges and the pages that it names.
+ */
+export function Markdown({ text, base, handles, class: cls, refs }: { text: string; base?: string; handles?: string[]; class?: string; refs?: boolean }) {
+  const r = useRefs(refs ? text : '');
+  const key = (handles ? handles.join(',') : '') + '\n' + r.key;
+  const html = useMemo(() => renderMarkdown(text, { base, handles, refs: r.refs }), [text, base, key]);
   return <div class={'md' + (cls ? ' ' + cls : '')} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 

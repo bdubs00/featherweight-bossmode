@@ -4,11 +4,12 @@
 // The functions here are pure, so the tests read them without a page.
 
 import type { Entry, Item } from '../api/types';
-import { commandOf } from '../lib/words';
+import { commandOf, inputFields, toolBase } from '../lib/words';
 import { stepWords } from '../lib/steps';
+import { hrefOf } from '../lib/route';
 import { decidedRuns, hiddenLine, napOf, napRuns } from '../lib/lines';
 
-/** One quiet line for one tool call of a run, such as Ran "ls" or Created a/b.yml. */
+/** One quiet line for one tool call of a run, such as Ran "ls", Created a/b.yml, or Opened the bridge Release notes. */
 export interface Step {
   key: string;
   at: string;
@@ -16,7 +17,17 @@ export interface Step {
   text: string;
   /** The command of a shell call, shown as code after the text. */
   cmd?: string;
+  /** The bridge that the call acted on, by its id, so the line links it with its title. */
+  bridge?: string;
+  /** The path of a page that the call acted on, shown as code after the text. */
+  path?: string;
+  /** The link of the path, for a call that reached its page. */
+  href?: string;
+  /** Words after the text, such as the title of a bridge that the call names. */
+  target?: string;
   isError?: boolean;
+  /** True when the text already says that the call failed, so the line adds no Error. */
+  worded?: boolean;
 }
 
 export type ThreadRow =
@@ -55,27 +66,119 @@ export function directEntries(entries: Entry[], handle: string, runs: string[]):
   return kept.filter((e) => !hiddenLine(e, decided));
 }
 
-/** stepOf words one tool call as a quiet line, without a tool name where it can, such as Wrote notes/plan.md for a page of the wiki. */
-export function stepOf(it: Item, file?: Item): Step {
-  const base = { key: 'step-' + it.seq, at: it.time };
+/**
+ * The words of a step of a tool of the front: done, still at work, and
+ * failed. The done words are the words of stepWords, which What it did of a
+ * run uses, so a step reads the same in a thread and in its run. A page
+ * with its path takes the short verb, such as Wrote notes/plan.md.
+ */
+const FRONT_WORDS: Record<string, [string, string, string]> = {
+  fleet: ['Read the fleet', 'Reading the fleet', 'Did not read the fleet'],
+  bridge_open: ['Opened the bridge', 'Opening the bridge', 'Did not open the bridge'],
+  bridge_close: ['Closed the bridge', 'Closing the bridge', 'Did not close the bridge'],
+  bridge_post: ['Posted to the bridge', 'Posting to the bridge', 'Did not post to the bridge'],
+  bridge_read: ['Read the channel', 'Reading the channel', 'Did not read the channel'],
+  pages_write: ['Wrote a page', 'Writing a page', 'Did not write a page'],
+  pages_read: ['Read a page', 'Reading a page', 'Did not read a page'],
+  spawn_task: ['Handed off a task', 'Handing off a task', 'Did not hand off a task'],
+};
+
+/** The words of a step of a page whose path the line shows after them. */
+const PAGE_WORDS: Record<string, [string, string, string]> = {
+  pages_write: ['Wrote', 'Writing', 'Did not write'],
+  pages_read: ['Read', 'Reading', 'Did not read'],
+};
+
+const text = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
+
+/** openedBridge reads the id of the bridge that bridge_open opened from its result: "Opened the bridge <id> ...". */
+export function openedBridge(result: string | undefined): string {
+  const m = /\bOpened (?:the bridge )?([a-z0-9][a-z0-9_-]*)/i.exec(String(result || ''));
+  return m ? m[1] : '';
+}
+
+/**
+ * stepOf words one tool call as a quiet line, without a tool name where it
+ * can. A tool of the front says what happened in plain words, such as
+ * Opened the bridge with its title, and links the bridge or the page once
+ * the call reached it. A call with no result yet says what it does now.
+ */
+export function stepOf(it: Item, file?: Item, result?: Item): Step {
+  const base = { key: 'step-' + it.seq, at: it.time, ...(result && result.isError ? { isError: true } : {}) };
   const f = file || (it.kind === 'file' ? it : undefined);
   if (f) return { ...base, text: (f.text === 'created' ? 'Created ' : f.text === 'deleted' ? 'Removed ' : 'Edited ') + (f.path || 'a file') };
   const cmd = commandOf(it.input);
   if (cmd) return { ...base, text: 'Ran', cmd: cmd.length > 80 ? cmd.slice(0, 79) + '…' : cmd };
-  return { ...base, text: stepWords(it.tool, it.input) };
+  const words = FRONT_WORDS[toolBase(it.tool)];
+  if (!words) return { ...base, text: stepWords(it.tool, it.input) };
+  const v = inputFields(it.input) || {};
+  const done = !!result && !result.isError;
+  const step: Step = { ...base, text: !result ? words[1] : result.isError ? words[2] : words[0], worded: true };
+  switch (toolBase(it.tool)) {
+    case 'bridge_open': {
+      const id = done ? openedBridge(result!.text) : '';
+      if (id) step.bridge = id;
+      if (text(v.title)) step.target = text(v.title);
+      break;
+    }
+    case 'bridge_close':
+    case 'bridge_post':
+      if (text(v.bridge)) step.bridge = text(v.bridge);
+      break;
+    case 'pages_write':
+    case 'pages_read':
+      if (text(v.path)) {
+        const page = PAGE_WORDS[toolBase(it.tool)];
+        step.text = !result ? page[1] : result.isError ? page[2] : page[0];
+        step.path = text(v.path).replace(/^\/+/, '');
+        if (done) step.href = hrefOf({ place: 'pages', path: step.path, mode: 'read' });
+      }
+      break;
+    case 'spawn_task':
+      if (text(v.agent)) step.text += ' to ' + text(v.agent);
+      break;
+  }
+  return step;
 }
 
-/** stepsOf turns the tool calls of a transcript into step lines, with the error of a failed call. */
+/**
+ * placedSteps words the tool calls of a transcript, each at the item where
+ * its line belongs, by the seq of that item. A call goes at its own item.
+ * A call that asked for a decision goes at its result, after the decision,
+ * and makes no line while it waits: the card or the line of the decision
+ * says what it asks, and a line before the decision would say that the
+ * call already ran.
+ */
+export function placedSteps(items: Item[]): Map<number, Step> {
+  const results = new Map<string, Item>();
+  const files = new Map<string, Item>();
+  const asked = new Set<string>();
+  for (const x of items) {
+    if (!x.callId) continue;
+    if (x.kind === 'result') results.set(x.callId, x);
+    else if (x.kind === 'file') files.set(x.callId, x);
+    else if (x.kind === 'ask') asked.add(x.callId);
+  }
+  const placed: [number, Step][] = [];
+  for (const c of items) {
+    if (c.kind !== 'tool') continue;
+    const r = c.callId ? results.get(c.callId) : undefined;
+    const f = c.callId ? files.get(c.callId) : undefined;
+    let at: Item = c;
+    if (c.callId && asked.has(c.callId)) {
+      const after = [r, f].filter((x): x is Item => !!x).sort((a, b) => a.seq - b.seq)[0];
+      if (!after) continue;
+      at = after;
+    }
+    placed.push([at.seq, { ...stepOf(c, f, r), at: at.time }]);
+  }
+  placed.sort((a, b) => a[0] - b[0]);
+  return new Map(placed);
+}
+
+/** stepsOf turns the tool calls of a transcript into step lines, in the order of their places, with the error of a failed call. */
 export function stepsOf(items: Item[]): Step[] {
-  const results = new Map(items.filter((x) => x.kind === 'result').map((x) => [x.callId, x]));
-  const files = new Map(items.filter((x) => x.kind === 'file').map((x) => [x.callId, x]));
-  return items
-    .filter((x) => x.kind === 'tool')
-    .map((c) => {
-      const r = results.get(c.callId);
-      const s = stepOf(c, files.get(c.callId));
-      return r && r.isError ? { ...s, isError: true } : s;
-    });
+  return [...placedSteps(items).values()];
 }
 
 const time = (iso: string): number => {

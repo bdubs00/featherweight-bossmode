@@ -39,14 +39,15 @@ describe('the card that waits', () => {
     expect([...card.querySelectorAll('button')].find((b) => b.textContent === 'Always allow')!.getAttribute('title')).toBe('Allow bash for migrator-2 from now on');
   });
 
-  it('opens Details with the tool, the reason, and the input', () => {
+  it('opens Details with the tool and the input, and never the rule id of the backend', () => {
     const el = mount(<DecisionCard d={push} who="migrator-2" />);
     const key = el.querySelector('.details-key') as HTMLButtonElement;
     expect(el.querySelector('.details')).toBeNull();
     act(() => key.click());
     expect(key.getAttribute('aria-expanded')).toBe('true');
     expect(el.querySelector('.details')!.textContent).toContain('Tool: bash');
-    expect(el.querySelector('.details')!.textContent).toContain('Reason: rule: ask bash: git push*');
+    expect(el.querySelector('.details')!.textContent).toContain('"command": "git push origin migrate/nginx"');
+    expect(el.textContent).not.toContain('rule: ask');
   });
 
   it('allows with the note, and denies', async () => {
@@ -79,6 +80,70 @@ describe('the card that waits', () => {
     expect(mount(<DecisionCard d={push} who="migrator-2" settle />).querySelector('.card.settle')).not.toBeNull();
     expect(mount(<DecisionCard d={push} who="migrator-2" />).querySelector('.card.settle')).toBeNull();
     expect(mount(<DecisionCard d={{ ...push, state: 'allow', decidedBy: 'alice@example.com' }} who="migrator-2" settle />).querySelector('.card.settle')).toBeNull();
+  });
+});
+
+describe('the plan of a call that is not a shell command', () => {
+  const open: Decision = {
+    run: 'run-mgr',
+    id: 'ap-open',
+    tool: 'front.bridge_open',
+    label: 'Allow',
+    reason: 'rule: ask destructive',
+    input: {
+      title: 'Runbooks for the new roles',
+      goal: 'Write a runbook for each role.',
+      members: [
+        { handle: 'writer-3', agent: 'writer', task: 'Write runbooks/cron.md and runbooks/nginx.md' },
+        { handle: 'checker', agent: 'reviewer', task: 'Review each runbook' },
+      ],
+    },
+    state: 'pending',
+  };
+
+  it('says what Open bridge opens before Details: the title, the goal, and each seat, and never the rule id', () => {
+    const el = mount(<DecisionCard d={open} who="manager" />);
+    const card = el.querySelector('section.card')!;
+    expect(card.textContent).toContain('manager wants to open a bridge.');
+    expect(card.querySelector('.plan-title')!.textContent).toBe('Runbooks for the new roles');
+    expect(card.querySelector('.plan-goal')!.textContent).toBe('Write a runbook for each role.');
+    const seats = [...card.querySelectorAll('.plan-seats li')].map((li) => [li.querySelector('.plan-handle')!.textContent, li.querySelector('.plan-agent')?.textContent || '', li.querySelector('.plan-task')!.textContent]);
+    expect(seats).toEqual([
+      ['writer-3', '', 'Write runbooks/cron.md and runbooks/nginx.md'],
+      ['checker', 'reviewer', 'Review each runbook'],
+    ]);
+    expect(keys(el)).toEqual(['Deny', 'Open bridge']);
+    expect(card.querySelector('.rule')!.textContent).toBe('Rule: ask before a tool that changes things');
+    expect(card.textContent).not.toContain('rule: ask');
+    expect(card.querySelector('pre')).toBeNull();
+    act(() => (el.querySelector('.details-key') as HTMLButtonElement).click());
+    expect(el.querySelector('.details')!.textContent).toContain('Tool: front.bridge_open');
+    expect(el.querySelector('.details pre')!.textContent).toContain('"title": "Runbooks for the new roles"');
+    expect(el.querySelector('.details')!.textContent).not.toContain('Reason');
+  });
+
+  it('shows the path and the first lines of a page that Write page writes', () => {
+    const el = mount(<DecisionCard d={{ ...open, tool: 'front.pages_write', reason: 'rule: ask front.pages_write', input: { path: 'releases/freeze.md', text: '# Freeze\n\nFriday at noon.' } }} who="manager" />);
+    expect(el.textContent).toContain('manager wants to write a page.');
+    expect(el.querySelector('.plan-path code')!.textContent).toBe('releases/freeze.md');
+    expect(el.querySelector('pre.plan-text')!.textContent).toBe('# Freeze\nFriday at noon.');
+    expect(el.querySelector('.rule')!.textContent).toBe('Rule: ask before pages_write');
+    expect(keys(el)).toEqual(['Deny', 'Always allow', 'Write page']);
+  });
+
+  it('says to whom Hand off hands the task, and the task', () => {
+    const el = mount(<DecisionCard d={{ ...open, tool: 'spawn_task', input: { agent: 'tester', input: 'Time the molecule run.' } }} who="manager" />);
+    expect(el.textContent).toContain('manager wants to hand off a task to tester.');
+    expect(el.querySelector('.plan-handoff')!.textContent).toBe('Time the molecule run.');
+    expect(keys(el)).toEqual(['Deny', 'Hand off']);
+  });
+
+  it('lists the top-level fields of any other call, each on one line, and keeps Allow', () => {
+    const el = mount(<DecisionCard d={{ ...open, tool: 'github.create_issue', input: { repo: 'a/b', labels: ['x', 'y'], body: { text: 'x' } } }} who="manager" />);
+    expect(el.textContent).toContain('manager wants to use github.create_issue.');
+    expect([...el.querySelectorAll('.plan-field')].map((f) => f.querySelector('dt')!.textContent + '=' + f.querySelector('dd')!.textContent)).toEqual(['repo=a/b', 'labels=2 items', 'body=1 field']);
+    expect(el.querySelector('pre')).toBeNull();
+    expect(keys(el)).toEqual(['Deny', 'Allow']);
   });
 });
 

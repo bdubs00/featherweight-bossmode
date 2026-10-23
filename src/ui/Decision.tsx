@@ -1,8 +1,10 @@
 // The cards of a decision. A card that waits has the only hard black edge
 // in the channel, the only light that breathes, and the only orange key:
-// the title Needs your decision, the sentence of the action, the command,
-// the rule, Details, the Note field, and the keys Deny, Always allow, and
-// the label of the decision. A question shows the form of its schema,
+// the title Needs your decision, the sentence of the action, the plan of
+// the call in plain form, the rule, Details, the Note field, and the keys
+// Deny, Always allow, and the verb of the action, such as Run command or
+// Open bridge. The plan says what a click does before Details, which
+// holds the tool and the raw input. A question shows the form of its schema,
 // because an answer is not a thumb. A decided card turns quiet. A card in
 // the state unknown shows its note and no key, and it can change in place.
 // A card that the person may not decide shows no key either: it says who
@@ -11,7 +13,8 @@
 import { useState } from 'preact/hooks';
 import type { Decision, Run } from '../api/types';
 import { formOf, type Field as SchemaField } from '../lib/schema';
-import { commandOf, decisionTitle, rawInput, whyWords } from '../lib/words';
+import { planOf, verbOf } from '../lib/decision';
+import { commandOf, decisionTitle, editOf, rawInput, toolName, whyWords } from '../lib/words';
 import { whoName } from '../lib/lines';
 import { useSelect } from '../state/store';
 import { alwaysAllow, decide } from '../state/actions';
@@ -35,11 +38,15 @@ function RuleWords({ reason }: { reason?: string }) {
   return <span class="rule">{pattern ? <>Rule: ask before <code>{pattern}</code></> : why}</span>;
 }
 
-/** Details shows the tool, the reason, and the raw input of a call behind a key. */
+/**
+ * Details shows the tool and the raw input of a call behind a key. The
+ * rule line of the card already words the reason, so Details never shows
+ * the rule id of the backend.
+ */
 function Details({ d, id }: { d: Decision; id: string }) {
   const [open, setOpen] = useState(false);
   const raw = rawInput(d.input);
-  if (!d.tool && !d.reason && !raw) return null;
+  if (!d.tool && !raw) return null;
   return (
     <>
       <Button kind="quiet" size="s" class="details-key" aria-expanded={open} aria-controls={id} onClick={() => setOpen(!open)}>
@@ -52,12 +59,85 @@ function Details({ d, id }: { d: Decision; id: string }) {
               Tool: <code>{d.tool}</code>
             </p>
           )}
-          {d.reason && <p>Reason: {d.reason}</p>}
           {raw && <Command>{raw}</Command>}
         </div>
       )}
     </>
   );
+}
+
+/**
+ * What says in plain form what a click on the primary key does: the command
+ * of a shell call; the title, the goal, and the seats of a bridge; the path
+ * and the first lines of a page; the task of a hand-off; or the top-level
+ * fields of any other call, each cut to one line. JSON shows only in
+ * Details.
+ */
+export function What({ d }: { d: Pick<Decision, 'tool' | 'input'> }) {
+  const plan = planOf(d);
+  switch (plan.kind) {
+    case 'command':
+      return <Command>{plan.command}</Command>;
+    case 'bridge':
+      return (
+        <div class="plan">
+          {plan.title && <p class="plan-title">{plan.title}</p>}
+          {plan.goal && <p class="plan-goal">{plan.goal}</p>}
+          {plan.spawn && <p class="plan-meta">Fresh sandbox per seat</p>}
+          {plan.seats.length > 0 && (
+            <ul class="plan-seats" aria-label="Seats">
+              {plan.seats.map((s) => (
+                <li>
+                  <b class="plan-handle">{s.handle}</b>
+                  {s.agent && <span class="plan-agent">{s.agent}</span>}
+                  {s.task && (
+                    <span class="plan-task" title={s.task}>
+                      {s.task}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      );
+    case 'page':
+      return (
+        <div class="plan">
+          <p class="plan-path">
+            <code>{plan.path}</code>
+          </p>
+          {plan.summary && <p class="plan-goal">{plan.summary}</p>}
+          {plan.lines.length > 0 && <Command class="plan-text">{plan.lines.join('\n') + (plan.more ? '\n…' : '')}</Command>}
+        </div>
+      );
+    case 'handoff':
+      return plan.task ? <p class="plan-goal plan-handoff">{plan.task}</p> : null;
+    case 'fields':
+      return (
+        <div class="plan">
+          <dl class="plan-fields">
+            {plan.fields.map((f) => (
+              <div class="plan-field">
+                <dt>{f.key}</dt>
+                <dd title={f.value}>{f.value}</dd>
+              </div>
+            ))}
+          </dl>
+          {plan.more > 0 && <p class="plan-meta">{plan.more === 1 ? '1 more field' : plan.more + ' more fields'}</p>}
+        </div>
+      );
+  }
+  return null;
+}
+
+/** effectLine is the effect of the backend when it adds to the plan: it does not repeat the command or the path of the call. */
+function effectLine(d: Decision): string {
+  if (!d.effect) return '';
+  const cmd = commandOf(d.input);
+  const edit = editOf(d.input);
+  if ((cmd && d.effect.includes(cmd)) || (edit && d.effect.includes(edit.path))) return '';
+  return d.effect;
 }
 
 /**
@@ -113,8 +193,7 @@ export function ApprovalCard({ d, who, onDecide, settle }: { d: Decision; who: s
   const [note, setNote] = useState('');
   const [id] = useState(() => 'details-' + ++ids);
   const pending = d.state === 'pending';
-  const cmd = commandOf(d.input);
-  const effect = d.effect && !(cmd && d.effect.includes(cmd)) ? d.effect : '';
+  const effect = effectLine(d);
   const go = async (kind: 'allow' | 'deny' | 'always') => {
     setBusy(true);
     const ok = await attempt(() => (kind === 'always' ? alwaysAllow(d.run, d.id, note || undefined) : decide(d.run, d.id, kind, note || undefined)));
@@ -137,19 +216,19 @@ export function ApprovalCard({ d, who, onDecide, settle }: { d: Decision; who: s
               Deny
             </Button>
             {canAlways(d) && (
-              <Button disabled={busy} onClick={() => go('always')} title={`Allow ${d.tool} for ${who} from now on`}>
+              <Button disabled={busy} onClick={() => go('always')} title={`Allow ${toolName(d.tool)} for ${who} from now on`}>
                 Always allow
               </Button>
             )}
             <Button kind="primary" disabled={busy} onClick={() => go('allow')}>
-              {d.label || 'Allow'}
+              {verbOf(d)}
             </Button>
           </>
         ) : undefined
       }
     >
       {pending && <p>{title}.</p>}
-      {cmd && <Command>{cmd}</Command>}
+      <What d={d} />
       {effect && <p class="effect">{effect}</p>}
       <div class="rule-row">
         <RuleWords reason={d.reason} />
@@ -295,11 +374,10 @@ export function mayDecide(run: Pick<Run, 'can'> | undefined): boolean {
  */
 function WatchCard({ d, who, agent }: { d: Decision; who: string; agent: string }) {
   const title = d.question ? d.reason || 'A question' : decisionTitle(who, d as Decision);
-  const cmd = commandOf(d.input);
   return (
     <Card class="decide watch" title="Waits for a decision" tone="amber" quiet label={'Waits for a decision: ' + title}>
       <p>{title}.</p>
-      {cmd && <Command>{cmd}</Command>}
+      {!d.question && <What d={d} />}
       <p class="note">{'An operator of ' + (agent || 'this agent') + ' decides it.'}</p>
     </Card>
   );
@@ -308,10 +386,9 @@ function WatchCard({ d, who, agent }: { d: Decision; who: string; agent: string 
 /** UnknownCard is a card whose decision the page cannot confirm: no key, and the note of the backend. */
 function UnknownCard({ d, who }: { d: Decision; who: string }) {
   const title = d.question ? d.reason || 'A question for you' : decisionTitle(who, d as Decision);
-  const cmd = commandOf(d.input);
   return (
     <Card class="decide done unknown" title={title} quiet label={title}>
-      {cmd && <Command>{cmd}</Command>}
+      {!d.question && <What d={d} />}
       <DecidedLine d={d} />
     </Card>
   );

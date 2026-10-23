@@ -181,6 +181,9 @@ Capacity shows where seating happens:
 | `3 minutes ago` (ago) | change | `since()` gives `14 min`, `3 h`, and `2 d` | done, and the screens move to it |
 | `<who> wants to run a command` | keep | | Lead |
 | `<who> asks for your permission` | change | `<who> asks for your decision` | done |
+| `<who> asks for your decision` (any call that is not a shell command) | change | the action of the tool: `<who> wants to open a bridge`, `<who> wants to write a page`, `<who> wants to hand off a task to <agent>` (or `a task` with no agent), `<who> wants to <label>` for a label of the backend, and `<who> wants to use <tool>` for any other tool. `<who> asks for your decision` stays only for a call whose tool the page does not know. | done |
+| `Rule: ask before front.bridge_open` | change | `Rule: ask before bridge_open`: a rule that names a tool of the front names it without `front.` | done |
+| the preview of a message, which dropped every underscore, so `bridge_read` read `bridgeread` | change | `plainText()` drops the marks of Markdown at the edges of words and keeps an underscore inside a word | done |
 | `Today`, `Yesterday` | keep | | Lead |
 | `someone`, `bossmode` (sender of a system line) | keep | | Lead |
 
@@ -189,10 +192,10 @@ Capacity shows where seating happens:
 | Now | Verdict | New text | Who |
 |---|---|---|---|
 | the whole error of a run, such as `model: anthropic: stream claude-haiku-5-5: POST "http://...": 400 Bad Request (Request-ID: ...) {"type":"error",...}`, cut to one red line in a row and in full in the run | change | one plain line from `plainError`, without an end mark: `The model refused the request` (a 4xx), `The model provider refused the key` (401), `The model provider refused access` (403), `The model provider does not know this model` (404), `The conversation is too long for the model`, `The model was busy` (429, or overloaded), `The model provider had an error` (5xx), and `The model did not answer in time`. An error of another service says `A service` in place of the model and its provider, and `A step did not finish in time` | done |
-| `budget exceeded: maxTurns` and the other limits of the budget | change | `Stopped at its turn limit`, `Stopped at its token limit`, `Stopped at its cost limit`, `Stopped at its time limit`, `Stopped at its tool call limit`, `Stopped: it kept repeating one step`, and `Stopped at its budget` for another limit. The older words keep the number: `The run reached its limit of 40 turns.` gives `Stopped at 40 turns`, and so does a limit of the result, such as `Stopped at the limit of 40 turns.` | done |
+| `budget exceeded: maxTurns` and the other limits of the budget | change | `Stopped at its turn limit`, `Stopped at its token limit`, `Stopped at its cost limit`, `Stopped at its time limit`, `Stopped at its tool call limit`, `Stopped: it kept repeating one step`, and `Stopped at its budget` for another limit. The older words keep the number: `The run reached its limit of 40 turns.` gives `Stopped at 40 turns`, and so does a limit of the result, such as `Stopped at the limit of 40 turns.`, or `Stopped at 2.00 USD` | done |
 | `canceled`, `context canceled` | change | `Stopped before it finished`, where the status does not say stopped already | done |
 | `<handle> lost its run <id>: no worker of the fleet holds it` | change | `Lost its worker` | done |
-| any other error | change | its first sentence, without addresses, request ids, JSON, the package names in front, or an end mark, at most 100 characters. `The run failed` when nothing is left | done |
+| any other error | change | its first sentence, without addresses, request ids, long ids of runs and bridges, JSON, the package names in front, or an end mark, at most 100 characters. `The run failed` when nothing is left | done |
 | the message of the provider inside its JSON, such as `This model does not support assistant message prefill. The conversation must end with a user message.` | add | `providerMessage` gives it: the tooltip of the plain line, and a muted line under it in the run | done |
 
 ### src/lib/steps.ts
@@ -282,6 +285,8 @@ Capacity shows where seating happens:
 | `The channel holds the first 4 KB. The run holds the whole text.` | change | `Cut at 4 KB.` with the link `Whole text` to the run | A |
 | `to @a, @b` (address line) | change | `to a and b` | A |
 | new | add | `pinned`, a quiet chip after the clock time of a pinned message, which keeps its header after a message of the same sender | done |
+| the id of a bridge in a message, such as `The bridge is open: 01m5kpw79kyq9j8nbpnhvtwm95` | change | a link with the title of the bridge, open or closed, that opens the bridge, in a code span and in plain text, in a channel, a thread, a conversation, and Activity | done |
+| the path of a page of the wiki in a message, such as `k3s/monitoring/runbook-memory-pressure.md` | change | a link that opens the page in the Wiki place. A path in a code span keeps its code look inside the link. The page links a path that the wiki holds, from the list of the wiki that it reads once. If that read fails, a path that follows the rules of a page path links. | done |
 | `Question from <who>`, `Permission for <who>` (labels) | change | `Question from <who>`, `Decision for <who>` | A |
 | system lines: the icon before the line | change | the light of the event: green for started, amber for needs you, red for failed, grey for the rest | A |
 | the sentence of the backend on a system line, such as `migrator-2 went to sleep. A message wakes its Task.` | change | the words of the page for the event of the line, in the channel and in the thread of a seat. `lineWords` of `src/lib/lines.ts` gives them. The sentence sits in a tooltip where the words leave part of it out. A line of an event that the page does not know keeps the sentence. | done |
@@ -313,12 +318,14 @@ Capacity shows where seating happens:
 |---|---|---|---|
 | `Permission` (kicker) | remove | `Needs your decision` with the amber light | done |
 | `<who> wants to run a command` (title) | change | the first line of the card, as a sentence | done |
-| `Details`, `Tool:`, `Reason:` | keep | | A |
+| `Details`, `Tool:` | keep | Details holds the tool and the raw input | done |
+| `Reason: rule: ask destructive` | remove | the rule line says it in words, such as `Rule: ask before a tool that changes things`. No rule id of the backend shows. | done |
+| the raw JSON of the input as the only account of a call that is not a shell command | change | the plan of the call, before Details. `bridge_open`: the title, the goal, `Fresh sandbox per seat` for a spawn bridge, and one line per seat: the handle, the agent where the handle does not name it, and the task cut to one line. `pages_write`: the path, the summary, and the first four lines of the text after its front matter. `spawn_task`: the task. Any other tool: its top-level fields, each value cut to one line, `N items` for a list, `N fields` for an object, `none`, `empty`, and `N more fields` past six. JSON shows only in Details. | done |
 | `Note for <who>, if you want` | change | `Note` with the placeholder `Optional` | done |
-| `Deny`, `Always allow`, `<label>` or `Allow` | keep | | done |
+| `Deny`, `Always allow`, `<label>` or `Allow` | change | the primary key names the action in a verb: `Open bridge`, `Write page`, `Hand off`, else the label of the backend, such as `Run command`, and `Allow` only as the last fallback | done |
 | `Always allow needs an owner of the agent. Allow once instead.` | new | the notice when the backend refuses the rule with 403, in place of its sentence with the subject of the caller | done |
 | new | add | `Waits for a decision` with a still amber light, and `An operator of <agent> decides it.`, the quiet card of a decision that the person may not make. It offers no key and no Note. | done |
-| `Allow this call, and let <who> use <tool> from now on without asking` | change | `Allow <tool> for <who> from now on` | A |
+| `Allow this call, and let <who> use <tool> from now on without asking` | change | `Allow <tool> for <who> from now on`, the tool without `front.` | done |
 | `No decision: <note>` | keep | | A |
 | `<who> answered: <answer>`, `<who> declined the question`, `<who> allowed this`, `<who> denied this` | keep | | A |
 | `. Note: <note>` | change | the note on a line of its own | A |
@@ -394,10 +401,14 @@ Capacity shows where seating happens:
 
 | Now | Verdict | New text | Who |
 |---|---|---|---|
-| `Activity` with the count chip | keep | | done |
+| `Activity` with the count chip | keep | `N members need you` also counts the seats whose messages ask you, once the page reads their channel | done |
+| `Thumb up: <label>`, `Thumb down: Deny`, `Always allow` (the keys of a decision in its row) | remove | a thumb means a reaction to a result elsewhere. The row of a decision has no key: a click shows its card, which says what the action does, with Deny and the verb of the action. a and d still decide from the list. | done |
+| the command of a decision under its row | change | the one line of its plan: the command or the path as code, the title of a bridge or the task of a hand-off as words | done |
+| `<handle> asks: <text>` | add | the row of a message of an agent to `operator`, or that starts with `@operator`, after the read mark: the status `needs you`, without the `@operator` that opens it. The main pane shows the message and the composer `Message <handle>`, which answers in the bridge, to that member, in reply to the message. The row leaves once you send a message to that handle or in reply to it. | done |
+| the raw error of a failed seat, such as `model: anthropic: stream ...: POST "http://...": 400 Bad Request (Request-ID ...) {json}` | change | the plain line of `plainError()`, the words of `src/lib/runerror.ts` above, with the message of the provider in its tooltip | done |
 | `New messages` (meta of a row) | change | the sender and an excerpt of the newest entry | B |
 | `Nothing needs you. New decisions and messages land here first.` | change | `Nothing needs you.` | B |
-| `Pick an item in the list to decide or to read it.` | change | `Pick an item to decide or to read it.` | B |
+| `Pick an item in the list to decide or to read it.` | change | `Pick an item to decide or to read it.` Where the main pane shows beside the list, it opens the item that needs you and waits longest, so the line shows only when nothing needs you | done |
 
 ### src/ui/Fleet.tsx
 
@@ -468,6 +479,8 @@ Capacity shows where seating happens:
 | `Your heart is recorded.`, `Your thumb is recorded.` | change | `Heart recorded.`, `Thumb recorded.` | B |
 | `Took N steps` | keep | | B |
 | `Ran "<command>"`, `Created`, `Edited`, `Removed`, `Used <tool>` | keep | | B |
+| `Used bridge_open` and the other tools of the front | change | what happened, in plain words: `Opened the bridge <title>`, a link to the bridge with its title, `Closed the bridge <title>`, `Posted to the bridge <title>`, `Read the channel`, `Wrote <path>` and `Read <path>`, the path a link once the call reached it, `Handed off a task to <agent>`, and `Read the fleet`, the words of `stepWords` that What it did of the run also shows. While the call runs: `Opening the bridge`, `Writing <path>`, and so on. A call that failed: `Did not open the bridge`, `Did not write <path>`, with no `Error` after it. Any other tool takes the words of `stepWords`, such as `Searched the wiki for "<words>"` | done |
+| a step line before the card of its decision, such as `Used bridge_open` | change | a call that waits for a decision makes no step line: the card, or `Asked for a decision`, says what it asks. Its step line follows the decision, at the time of its result. | done |
 | `Asked you a question`, `Asked for permission` | change | `Asked you`, `Asked for a decision` | done |
 | `<who> allowed it`, `<who> denied it` | keep | | done |
 | `The turn failed` | keep | | done |

@@ -115,6 +115,12 @@
   flex-direction: column;
   padding: 0 0 var(--s-2);
 }
+/* The channel keeps the column of a conversation: the reading measure, with the face and the padding of the pane. */
+.msgs > .entries,
+.msgs > .earlier {
+  width: 100%;
+  max-width: calc(var(--measure) + 92px);
+}
 .entries {
   margin-top: auto;
 }
@@ -123,6 +129,7 @@
 }
 /* The goal opens the channel, right above its first entry. */
 .start {
+  max-width: calc(var(--measure) + 44px);
   margin: auto var(--s-5) var(--s-2);
   padding-top: var(--s-4);
   font-size: var(--t-meta);
@@ -396,7 +403,8 @@
 .fresh {
   position: absolute;
   z-index: 3;
-  left: 50%;
+  /* The middle of the column of the channel, or of the pane where the pane is narrower. */
+  left: min(50%, calc((var(--measure) + 92px) / 2));
   bottom: 132px;
   transform: translateX(-50%);
   min-height: var(--h-small);
@@ -416,6 +424,93 @@
 }
 .decide .effect {
   margin: 0;
+}
+/* The plan of a call: what a click on the primary key does, in plain form. */
+.plan {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  min-width: 0;
+}
+.plan-title {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+/* A goal, a summary, or the task of a hand-off: three lines at most, and Details holds the rest. */
+.plan-goal {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.plan-handoff {
+  -webkit-line-clamp: 4;
+}
+.plan-meta {
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+  color: var(--muted);
+}
+.plan-seats {
+  margin: var(--s-1) 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line-soft);
+}
+/* A seat: its handle, its agent where the handle does not name it, and its task on one line. */
+.plan-seats li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  min-width: 0;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: var(--t-control);
+  line-height: var(--t-control-lh);
+}
+.plan-handle,
+.plan-agent {
+  flex: none;
+}
+.plan-agent,
+.plan-task {
+  color: var(--muted);
+}
+.plan-task {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.plan-path {
+  overflow-wrap: anywhere;
+}
+.plan-text {
+  max-height: none;
+  color: var(--muted);
+}
+/* The top-level fields of any other call: the name, and the value cut to one line. */
+.plan-fields {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: var(--s-3);
+  margin: 0;
+  font-size: var(--t-control);
+  line-height: var(--t-control-lh);
+}
+.plan-field {
+  display: contents;
+}
+.plan-fields dt {
+  color: var(--muted);
+}
+.plan-fields dd {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .rule-row {
   display: flex;
@@ -495,9 +590,16 @@
 }
 
 /* ---------- the composer ---------- */
+/* The composer takes the column of the conversation above it. */
 .composer {
   flex: none;
+  width: 100%;
+  max-width: calc(var(--measure) + 92px);
   padding: 0 var(--s-5) var(--s-5);
+}
+/* The picks of a new chat are no conversation, so the composer under them takes their width. */
+.chat-picks-scroll + .composer {
+  max-width: none;
 }
 .composer .box {
   position: relative;

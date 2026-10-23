@@ -64,10 +64,14 @@ function budgetLine(s: string): string {
   return '';
 }
 
-/** limitOfLine keeps the number of the older words of a limit: "The run reached its limit of 40 turns." gives "Stopped at 40 turns". */
+/**
+ * limitOfLine keeps the number of the older words of a limit: "The run
+ * reached its limit of 40 turns." and "Stopped at the limit of 40 turns."
+ * give "Stopped at 40 turns", and a limit of 2.00 USD keeps its decimals.
+ */
 function limitOfLine(s: string): string {
-  const of = /\breached its limit of (\d[^.;:(]*)/i.exec(s);
-  return of ? 'Stopped at ' + of[1].trim() : '';
+  const of = /\b(?:reached its|at the|at its) limit of (\$?\d[\d,.]*(?: [A-Za-z]+){0,3})/i.exec(s);
+  return of ? 'Stopped at ' + of[1].replace(/[.,]+$/, '').trim() : '';
 }
 
 /** isModel tells an error of a model call from the error of another service. */
@@ -80,11 +84,15 @@ function firstSentence(s: string, json: Answer | null): string {
     .replace(/\((?:request|workspace)[- _]id:[^)]*\)/gi, ' ')
     .replace(/\b(?:request[-_ ]?id|trace[-_ ]?id)\s*[:=]\s*[^\s),;]+/gi, ' ')
     .replace(/\breq_[A-Za-z0-9]+/g, ' ')
+    // A long id, such as the id of a run or a bridge, or a UUID, says nothing to a person.
+    .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, ' ')
+    .replace(/\b(?:run-)?[0-9a-hjkmnp-tv-z]{26}\b/gi, ' ')
     .replace(/"?\b(?:https?|wss?):\/\/[^\s"]*"?/g, ' ')
     .replace(/\b(?:GET|POST|PUT|PATCH|DELETE|HEAD)\s+(?=:|$)/g, ' ')
     .replace(/\(\s*\)/g, ' ')
     .replace(/\s+/g, ' ')
     .replace(/(?:\s*:)+(?=\s*:|\s*$)/g, '')
+    .replace(/\s+([:,])/g, '$1')
     .trim();
   // The package names in front, such as "harness: " or "fw: ", say nothing to a person.
   t = t.replace(/^(?:[a-z][a-z0-9_-]*: )+/, '');

@@ -67,6 +67,9 @@ the plan does instead, and why.
 | A decided card with the same hard edge as a waiting one | A decided card turns quiet: a line edge, no drop, no light | Only what waits keeps the hard edge. |
 | The usage of a bridge at the foot of the members (the mockup), against the contract, which showed none | The foot shows turns, cost, and pages from `usage`, for runs that report it | The owner approved the mockup, and `GET /v1/bridges/{id}` carries `usage`. |
 | One flat list of bridges | Open bridges, then a Closed group behind a toggle, and a filter field once the list grows | Collapsed sections and a filter keep hundreds of bridges in reach. |
+| Messages as wide as the pane, about 170 characters a line at 1440 pixels | A column with the reading measure `--measure`, about 72 characters, left in the pane. The cards and the composer share the column. | The eye loses the next line past about 75 characters, and a composer under the text keeps the hand where the eye is. |
+| A decision that says only "asks for your decision", with the input as JSON | The plan of the call in plain form before Details, and the primary key names the action, such as Open bridge | A person allows what the card says. JSON is for the person who wants to check. |
+| Thumbs in a row to allow and to deny | No key in the row of a decision. Its card decides. | A thumb is a reaction to a result. A key that allows must say what it does. |
 
 The groove band deserves one more word, because repeating stripes are a
 known tell of generated pages. The band here is 8 pixels tall. It sits only at
@@ -200,6 +203,7 @@ Everything sits on an 8-pixel rhythm, with 4 pixels as the half step.
 | `--w-appbar` | 76px | The app bar |
 | `--w-list` | 300px | The list pane |
 | `--w-details` | 340px | The details pane |
+| `--measure` | 34em, 510px at the body size | The reading measure of a message: about 72 characters of Archivo at 15 pixels. A conversation adds the face, its gap, and the padding of the pane, 92px, and the composer takes that width too. |
 | `--r` | 4px | Every corner |
 | `--r-led` | 2px | The status light |
 
@@ -325,7 +329,7 @@ at the top right of the icon.
 
 | Place | List pane | Main pane | Details pane |
 |---|---|---|---|
-| Activity | The inbox: what needs you first, then what is new | The item you picked | none |
+| Activity | The inbox: what needs you first, then what is new | The item you picked, else the item that needs you and waits longest | none |
 | Chat | The history of the quick chat, newest first, grouped by day | The conversation of a chat, or the picks of a new chat | This chat: the tools and the skills in use, the model, and the usage |
 | Bridges | Bridges, open first, each with its count and its light | The channel, with the tabs Posts, Wiki, and Decisions | The members, with Add |
 | Fleet | People: the seats grouped by bridge, then Not on a bridge | A direct conversation with a member, with the tabs Chat, Run, and Files, or the board | The profile of the agent |
@@ -535,11 +539,26 @@ The work:
   Messages that agents send only to agents fold into one line, such as
   `migrator-1 and reviewer: 4 messages`. A decision card never folds.
 - The decision card. `Card` with the title Needs your decision and the amber
-  light. Its body holds the sentence of `decisionTitle`, the command in
-  `Command`, the rule label of `whyWords`, Details, and the Note field. Its
-  keys are Deny, Always allow, and the label of the decision. A card that
-  arrives on the stream after the channel loaded settles once. A card on
-  load never moves.
+  light. Its body holds the sentence of `decisionTitle`, the plan of
+  `planOf` in `src/lib/decision.ts`, the rule label of `whyWords`, Details,
+  and the Note field. The plan says what a click does before Details: the
+  command in `Command`; the title, the goal, and the seats of a bridge, one
+  line per seat; the path and the first lines of a page; the task of a
+  hand-off; or the top-level fields of any other call, each cut to one
+  line. Details holds the tool and the raw input, and never a rule id. Its
+  keys are Deny, Always allow, and the verb of `verbOf`: Open bridge, Write
+  page, Hand off, the label of the backend, such as Run command, and Allow
+  only as the fallback. A card that arrives on the stream after the channel
+  loaded settles once. A card on load never moves.
+- The links of a message. The id of a bridge that the page knows, open or
+  closed, shows as a link with the title of the bridge, and the path of a
+  page of the wiki shows as a link to the page, in a code span or in plain
+  text (`src/lib/refs.ts`). A path in a code span keeps its code look. The
+  channel, a thread, a conversation, and Activity link them. A page of the
+  wiki does not.
+- The step lines of a run. A tool of the front says what happened, such as
+  `Opened the bridge` with the bridge as a link. A call that waits for a
+  decision makes no step line, and its line follows the decision.
 - The composer. The words of COPY.md for the address line.
 - The capacity line. A bridge whose seats outnumber the workers of their
   agents gets one line in its channel: `Runs in waves: N seats share M
@@ -614,10 +633,16 @@ The work:
   it. The workers and their statuses come from the stream (section 11.8).
   The read of the pool every 10 seconds gives only Keep and the gaps. The one line `N skills`, and the picker of skills of C. Today: runs,
   cost, and decisions.
-- Activity. The inbox in the order of attention: the decisions that wait,
-  then the errors, then the messages to you, then the rest. j and k move,
-  Enter opens, a allows, d denies, and r replies. A decision shows as the
-  card of A.
+- Activity. The inbox in the order of attention: the decisions that wait
+  and the messages that ask you, then the errors, then the messages to you,
+  then the rest. j and k move, Enter opens, a allows, d denies, and r
+  replies. A decision shows as the card of A. The row of a decision has no
+  key, because only the card says what the action does. Where the main pane
+  shows beside the list, it opens the item that needs you and waits
+  longest, and the route and the focus stay. A message of an agent to
+  `operator` shows as the end of a conversation, with the composer that
+  answers it in its bridge. The error of a failed seat is one plain line
+  of `plainError`.
 - The board, at `#board`. One light per member, grouped by bridge, as small
   tiles of a mark, a handle, and a light with its word for a screen reader,
   for a fleet too large for a list. A key on the header of the people list
@@ -833,7 +858,8 @@ reads them only while the worker is awake, or on an action of the person.
   While the worker sleeps, they say `This read wakes the worker.` in place.
 - The run pane of a bridge does the same, because a person opens it.
 - A conversation polls `GET /v1/runs/{id}` only while its run works, or
-  while an answer to a message of the person is on its way.
+  while an answer to a message of the person is on its way, and never a
+  run that the fleet lost. A poll that answers 404 marks the run lost.
 - The inbox never reads the result of a run whose worker sleeps.
 
 The wakes that the person causes still show as lines in the channel. A

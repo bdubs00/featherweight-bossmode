@@ -48,7 +48,11 @@ export function stepWords(tool: string | undefined, input?: unknown, said?: stri
     case 'bridge_list':
       return 'Listed the bridges';
     case 'bridge_open':
-      return 'Opened a bridge';
+      return str('title') ? 'Opened the bridge ' + str('title') : 'Opened a bridge';
+    case 'fleet':
+      return 'Read the fleet';
+    case 'spawn_task':
+      return str('agent') ? 'Handed off a task to ' + str('agent') : 'Handed off a task';
     case 'bridge_add_member':
       return str('handle') ? 'Seated ' + str('handle') : 'Seated a member';
     case 'bridge_remove_member':

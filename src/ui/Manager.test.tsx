@@ -6,7 +6,7 @@ import type { BossConfig, Item, Run } from '../api/types';
 import { Manager, POLL_MS } from './Manager';
 import { blocksOf } from './Conversation';
 import { parseSlash } from '../lib/mention';
-import { click, fakeApi, keyNamed, mount, settle, typeIn, unmountAll } from './testkit-c';
+import { click, fakeApi, keyNamed, mount, problem, settle, typeIn, unmountAll } from './testkit-c';
 
 const CONFIG: BossConfig = { manager: { agent: 'manager', member: 'default/manager-0', run: 'run-m' }, placement: 'queue', maxMembers: 16 };
 const run = (state: Run['state'], seq: number): Run => ({ id: 'run-m', agent: 'manager', state, seq, createdAt: '', updatedAt: '' });
@@ -66,6 +66,25 @@ describe('the manager', () => {
       await vi.advanceTimersByTimeAsync(POLL_MS * 3);
     });
     expect(runReads()).toBe(2);
+  });
+
+  it('stops the poll of a run that the fleet lost: a read that answers 404 marks it lost', async () => {
+    const g = { ...run('running', 1), id: 'run-g' };
+    act(() => store.dispatch({ type: 'config', config: { ...CONFIG, manager: { ...CONFIG.manager!, run: 'run-g' } } }));
+    api = fakeApi({ 'GET /v1/runs/run-g/transcript': { run: g, items: [ASK], next: 0, prev: 0 }, 'GET /v1/runs/run-g': () => problem(404, 'no run run-g'), 'GET /v1/tools': { tools: [] } });
+    mount(<Manager />);
+    await settle();
+    const reads = () => api.calls.filter((c) => c.method === 'GET' && c.path === '/v1/runs/run-g').length;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(POLL_MS);
+    });
+    await settle();
+    expect(reads()).toBe(1);
+    await vi.waitFor(() => expect(store.get().lost['run-g']).toBe(true));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(POLL_MS * 3);
+    });
+    expect(reads()).toBe(1);
   });
 
   it('says waking while the first answer waits for the Task of the manager', async () => {
@@ -147,7 +166,20 @@ describe('the thread', () => {
     ];
     const blocks = blocksOf(items);
     expect(blocks.map((b) => b.kind)).toEqual(['item', 'steps', 'item']);
-    expect(blocks[1].kind === 'steps' && blocks[1].steps.map((x) => x.cmd || x.text)).toEqual(['ls', 'Used fleet']);
+    expect(blocks[1].kind === 'steps' && blocks[1].steps.map((x) => x.cmd || x.text)).toEqual(['ls', 'Reading the fleet']);
+  });
+
+  it('puts the step of a call that asked for a decision after the decision, and none while it waits', () => {
+    const call: Item[] = [
+      ASK,
+      { seq: 2, time: T, kind: 'tool', tool: 'front.bridge_open', callId: 'c1', input: { title: 'Notes' } },
+      { seq: 3, time: T, kind: 'ask', id: 'ap', tool: 'front.bridge_open', callId: 'c1' },
+    ];
+    expect(blocksOf(call).map((b) => (b.kind === 'item' ? b.it.kind : 'steps'))).toEqual(['user', 'ask']);
+    const after: Item[] = [...call, { seq: 4, time: T, kind: 'decided', id: 'ap', text: 'allow' }, { seq: 5, time: T, kind: 'result', callId: 'c1', text: 'Opened the bridge br-n "Notes".' }, { seq: 6, time: T, kind: 'assistant', text: 'Open.' }];
+    const blocks = blocksOf(after);
+    expect(blocks.map((b) => (b.kind === 'item' ? b.it.kind : 'steps'))).toEqual(['user', 'ask', 'decided', 'steps', 'assistant']);
+    expect(blocks[3].kind === 'steps' && blocks[3].steps[0]).toMatchObject({ text: 'Opened the bridge', bridge: 'br-n', target: 'Notes' });
   });
 
   it('reads a slash command of a known skill, also the skill of a server', () => {

@@ -21,7 +21,9 @@ describe('stepWords', () => {
     expect(stepWords('bash', { command: 'ls' }, 'Ran "ls"')).toBe('Ran "ls"');
     expect(stepWords('files', { command: 'create', path: 'a.yml' }, 'Wrote a.yml')).toBe('Wrote a.yml');
     expect(stepWords('github.create_issue', {}, 'github.create_issue')).toBe('Used github.create_issue');
-    expect(stepWords('front.fleet', {})).toBe('Used fleet');
+    expect(stepWords('front.fleet', {})).toBe('Read the fleet');
+    expect(stepWords('front.bridge_open', { title: 'Release notes' })).toBe('Opened the bridge Release notes');
+    expect(stepWords('spawn_task', { agent: 'tester' })).toBe('Handed off a task to tester');
     expect(stepWords(undefined)).toBe('Used a tool');
   });
 });

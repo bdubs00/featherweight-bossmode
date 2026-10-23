@@ -327,7 +327,7 @@ export function RunView({ runId, result, bridge, member, who, items, endSeq, gon
         {phrase && <span class="clip">{phrase}</span>}
       </p>
       {fail && (fail.line || again) && <FailureView id={runId} f={fail} again={again} />}
-      {res && res.summary && <Markdown text={res.summary} class="run-summary" />}
+      {res && res.summary && <Markdown text={res.summary} class="run-summary" refs />}
       {res && res.steps && res.steps.length > 0 && (
         <section class="run-sec" aria-labelledby={'did-' + runId}>
           <div class="run-sec-head">

@@ -14,6 +14,7 @@ import { themeOf, setChoice, useChoice, type ThemeChoice } from '../lib/theme';
 import { personName } from '../lib/words';
 import { LAMP_ORDER, readoutOf, type Lamp, type LampKind, type Readout } from '../lib/status';
 import { selectFacts } from '../state/reducer';
+import { selectAttention } from '../state/inbox';
 import { Glyph, type GlyphName } from './icons';
 import { Avatar, Chip, LogoWell, Led, countText } from './primitives';
 
@@ -177,7 +178,7 @@ export function AppBar({ route, onSignOut }: { route: Route; onSignOut: () => vo
   const place = placeOf(route);
   const config = useSelect((s) => s.config);
   // The count on Activity is the number of members that need you, over the open bridges.
-  const attention = useSelect((s) => s.bridges.order.reduce((n, id) => n + (s.bridges.byId[id].state === 'open' ? s.bridges.byId[id].needsYou || 0 : 0), 0));
+  const attention = useSelect(selectAttention);
   const theme = themeOf(config);
   const logo = useLogo(theme.logo);
   return (

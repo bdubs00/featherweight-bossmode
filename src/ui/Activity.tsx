@@ -1,32 +1,73 @@
 // The Activity place: the inbox of what needs you, across every open
 // bridge. One row per decision, question, failed seat, stopped seat, and
 // new message, in the order of attention: needs you first, the oldest wait
-// first, then the errors, then the rest by the status of the sender. The
-// thumbs decide in the row. j and k move, Enter opens, a allows, d denies,
-// r replies, and s seats a stopped seat again. The main pane shows the row
-// that has the focus: a decision as its card. The address names that row,
-// #activity/<key>, so a narrow window opens it and a link reaches it.
+// first, then the errors, then the rest by the status of the sender. A row
+// of a decision offers no key: a click shows its card, which says what the
+// action does, with Deny and the verb of the action. j and k move, Enter
+// opens, a allows, d denies, r replies, and s seats a stopped seat again.
+// The main pane shows the row that has the focus: a decision as its card.
+// Where the main pane shows beside the list and no row is picked, it shows
+// the row that needs you and waits longest. The address names a picked
+// row, #activity/<key>, so a narrow window opens it and a link reaches it.
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import type { Decision, Member } from '../api/types';
+import type { Member } from '../api/types';
 import { go, hrefOf, parseRoute } from '../lib/route';
-import { decisionTitle, excerpt, personName, senderName, since, commandOf } from '../lib/words';
-import { alwaysAllow, decide } from '../state/actions';
+import { decisionTitle, excerpt, personName, plainText, senderName, since } from '../lib/words';
+import { briefOf, planOf } from '../lib/decision';
+import { decide, sendMessage } from '../state/actions';
 import { ensureChannels, ensureResults, ensureRosters, ensureRuns, useResults } from '../state/fetchers';
-import { inboxRows, keyAction, sortInbox, type InboxRow } from '../state/inbox';
+import { inboxRows, keyAction, selectAttention, sortInbox, type InboxRow } from '../state/inbox';
 import { newestRun } from '../state/people';
 import { useSelect } from '../state/store';
 import { selectFacts } from '../state/reducer';
 import { awakeFor, seatPresence } from '../lib/status';
-import { canAlways, DecisionCard } from './Decision';
+import { DecisionCard } from './Decision';
 import { useRoving } from './keys';
 import { attempt } from './notice';
 import { Markdown, When } from './common';
+import { Composer } from './Composer';
+import { Msg } from './Thread';
 import { TaskDialog } from './Member';
 import { EmptyPane } from './Shell';
-import { Avatar, Button, IconButton, Led, Mark, PaneHeader } from './primitives';
+import { Avatar, Button, Led, Mark, PaneHeader } from './primitives';
 
 const TWO_PANES = '(min-width: 800px)';
+
+/** useTwoPanes reports whether the window shows the main pane beside the list, and follows a change of its width. */
+function useTwoPanes(): boolean {
+  const q = typeof window !== 'undefined' && window.matchMedia ? window.matchMedia(TWO_PANES) : null;
+  const [wide, setWide] = useState(() => !!q && q.matches);
+  useEffect(() => {
+    if (!q) return;
+    const f = () => setWide(q.matches);
+    f();
+    q.addEventListener('change', f);
+    return () => q.removeEventListener('change', f);
+  }, []);
+  return wide;
+}
+
+/**
+ * firstNeed is the row that the main pane shows when nothing is picked: the
+ * row that needs you and waits longest, the first row of the order of
+ * attention. It answers "" when no row needs you.
+ */
+export function firstNeed(rows: InboxRow[]): string {
+  return rows.length && rows[0].status === 'needs-you' ? rows[0].key : '';
+}
+
+/**
+ * useShown names the row that the main pane shows: the row of the address
+ * or the one that the person picked. Else, where the main pane shows beside
+ * the list, the row that needs you and waits longest. A narrow window shows
+ * one pane, so there the list stays, and the route and the focus stay too.
+ */
+function useShown(item: string | undefined, rows: InboxRow[]): string {
+  const chosen = usePicked();
+  const wide = useTwoPanes();
+  return item || chosen || (wide ? firstNeed(rows) : '');
+}
 
 /* ---------- the row that the main pane shows ---------- */
 
@@ -120,27 +161,6 @@ function openRow(r: InboxRow, focusComposer = false): void {
   }
 }
 
-/** Thumbs decide a decision in its row: thumb up allows with the label of the decision, thumb down denies, and Always allow as on a card. */
-function Thumbs({ d, who }: { d: Decision; who: string }) {
-  const [busy, setBusy] = useState(false);
-  const run = async (f: () => Promise<void>) => {
-    setBusy(true);
-    await attempt(f);
-    setBusy(false);
-  };
-  return (
-    <div class="inbox-do" role="group" aria-label={'Decide for ' + who}>
-      <IconButton kind="secondary" icon="thumb-up" label={'Thumb up: ' + (d.label || 'Allow')} disabled={busy} onClick={() => run(() => decide(d.run, d.id, 'allow'))} />
-      <IconButton kind="secondary" icon="thumb-down" label="Thumb down: Deny" disabled={busy} onClick={() => run(() => decide(d.run, d.id, 'deny'))} />
-      {canAlways(d) && (
-        <Button size="s" disabled={busy} title={'Allow ' + d.tool + ' for ' + who + ' from now on'} onClick={() => run(() => alwaysAllow(d.run, d.id))}>
-          Always allow
-        </Button>
-      )}
-    </div>
-  );
-}
-
 function RowFace({ r }: { r: InboxRow }) {
   if (r.kind === 'message' && r.entry && r.entry.from.kind === 'person') return <Avatar subject={r.entry.from.name || ''} display={r.entry.from.display} size={32} />;
   return <Mark agent={r.agent || (r.handle || '').replace(/-\d+$/, '')} size={32} />;
@@ -154,10 +174,17 @@ function RowStatus({ r }: { r: InboxRow }) {
   return null;
 }
 
+/** askedText is the words of a message that asks you, without the @operator that opens it. */
+const askedText = (text: string): string => {
+  const t = plainText(text).replace(/^@operator\b[,:]?\s*/i, '');
+  return t ? t[0].toUpperCase() + t.slice(1) : t;
+};
+
 function rowText(r: InboxRow): string {
   if (r.decision && r.kind === 'question') return (r.handle || '') + ' asks: ' + (r.decision.reason || 'A question for you');
   if (r.decision) return decisionTitle(r.handle || '', r.decision);
-  if (r.entry) return excerpt(r.entry.text.replace(/[*_`#>|\[\]]/g, ''), 90);
+  if (r.kind === 'asked' && r.entry) return excerpt((r.handle || '') + ' asks: ' + askedText(r.entry.text), 120);
+  if (r.entry) return excerpt(plainText(r.entry.text), 90);
   return r.reason || '';
 }
 
@@ -170,7 +197,7 @@ function rowName(r: InboxRow): string {
 function InboxItem({ r, on }: { r: InboxRow; on: boolean }) {
   const [seat, setSeat] = useState(false);
   const m = useSelect((s) => (r.handle && s.rosters[r.bridge] ? s.rosters[r.bridge].byHandle[r.handle] : undefined));
-  const cmd = r.decision ? commandOf(r.decision.input) : '';
+  const brief = r.decision && !r.decision.question ? briefOf(planOf(r.decision)) : null;
   return (
     <div
       class={'inbox-row' + (r.status === 'needs-you' ? ' need' : '') + (on ? ' sel' : '')}
@@ -201,9 +228,8 @@ function InboxItem({ r, on }: { r: InboxRow; on: boolean }) {
           )}
         </div>
         <div class="inbox-text clip">{rowText(r)}</div>
-        {cmd && <code class="inbox-cmd clip">{cmd}</code>}
+        {brief && (brief.code ? <code class="inbox-cmd clip">{brief.text}</code> : <div class="inbox-text clip">{brief.text}</div>)}
         <div class="inbox-where clip">{r.bridgeTitle}</div>
-        {r.kind === 'decision' && r.decision && <Thumbs d={r.decision} who={r.handle || ''} />}
         {(r.kind === 'failed' || r.kind === 'stopped') && m && (
           <div class="inbox-do">
             <Button size="s" onClick={() => setSeat(true)}>
@@ -221,7 +247,8 @@ export function ActivityList({ item }: { item?: string }) {
   const { rows, loaded } = useInbox();
   const chosen = usePicked();
   const picked = item || chosen;
-  const needs = useSelect((s) => s.bridges.order.reduce((n, id) => n + (s.bridges.byId[id].state === 'open' ? s.bridges.byId[id].needsYou || 0 : 0), 0));
+  const shown = useShown(item, rows);
+  const needs = useSelect(selectAttention);
   const bridgesLoaded = useSelect((s) => s.bridges.loaded);
   const [seatKey, setSeatKey] = useState('');
   const seatRow = rows.find((r) => r.key === seatKey);
@@ -265,7 +292,7 @@ export function ActivityList({ item }: { item?: string }) {
       pick(r.key);
       if (window.matchMedia(TWO_PANES).matches) {
         setTimeout(() => {
-          const f = document.querySelector('.inbox-main-pane .card input, .inbox-main-pane .card textarea, .inbox-main-pane .card select, .inbox-main-pane .card button') as HTMLElement | null;
+          const f = document.querySelector('.inbox-main-pane .card input, .inbox-main-pane .card textarea, .inbox-main-pane .card select, .inbox-main-pane .card button, .inbox-main-pane #composer') as HTMLElement | null;
           if (f) f.focus();
         }, 40);
       } else go({ place: 'activity', item: r.key });
@@ -279,7 +306,7 @@ export function ActivityList({ item }: { item?: string }) {
         <div class="inbox" role="list" aria-label="Activity">
           {rows.map((r) => (
             <div role="listitem">
-              <InboxItem r={r} on={r.key === picked} />
+              <InboxItem r={r} on={r.key === shown} />
             </div>
           ))}
         </div>
@@ -295,10 +322,9 @@ export function ActivityList({ item }: { item?: string }) {
 }
 
 export function ActivityMain({ item }: { item?: string }) {
-  const chosen = usePicked();
-  const picked = item || chosen;
   const { rows } = useInbox();
-  const r = rows.find((x) => x.key === picked);
+  const shown = useShown(item, rows);
+  const r = rows.find((x) => x.key === shown);
   const m = useSelect((s) => (r && r.handle && s.rosters[r.bridge] ? s.rosters[r.bridge].byHandle[r.handle] : undefined));
   const [seat, setSeat] = useState(false);
   if (!r) {
@@ -317,6 +343,7 @@ export function ActivityMain({ item }: { item?: string }) {
   const tone = r.status === 'needs-you' ? 'amber' : r.kind === 'stopped' ? 'grey' : r.status === 'error' ? 'red' : undefined;
   const word = r.status === 'needs-you' ? 'needs you' : r.kind === 'stopped' ? 'stopped' : r.status === 'error' ? 'error' : '';
   const convo = r.handle && (r.kind !== 'message' || (r.entry && r.entry.from.kind === 'agent')) ? hrefOf({ place: 'member', bridge: r.bridge, handle: r.handle, tab: 'chat' }) : '';
+  const asked = r.kind === 'asked' && r.entry && r.handle ? { entry: r.entry, handle: r.handle } : null;
   return (
     <section class="screen inbox-main-pane" aria-labelledby="inbox-title">
       <PaneHeader
@@ -336,36 +363,56 @@ export function ActivityMain({ item }: { item?: string }) {
       >
         {where}
       </PaneHeader>
-      <div class="scroll pad">
-        {r.decision && <DecisionCard d={r.decision} who={r.handle || name} />}
-        {(r.kind === 'failed' || r.kind === 'stopped') && (
-          <div class="inbox-stop">
-            <p class="inbox-stop-line">
-              <Led tone={r.kind === 'stopped' ? 'grey' : 'red'} word={r.kind === 'stopped' ? 'stopped' : 'error'} />
-              {r.reason && <span>{r.reason}</span>}
-            </p>
-            {m && <p class="inbox-task">{m.task}</p>}
-            {m && (
-              <Button onClick={() => setSeat(true)} kind="primary">
-                Seat again
-              </Button>
-            )}
-            {seat && m && <TaskDialog bridge={r.bridge} m={m} again onClose={() => setSeat(false)} />}
+      {asked ? (
+        // A message that asks you reads as the end of a conversation: the message, and the composer that answers it in the bridge.
+        <div class="scroll thread-scroll">
+          <div class="thread" role="log" aria-label={'Messages with ' + asked.handle}>
+            <Msg face={<Mark agent={r.agent || asked.handle} size={32} />} name={asked.handle} at={asked.entry.at}>
+              <Markdown text={asked.entry.text} refs />
+            </Msg>
           </div>
-        )}
-        {r.kind === 'message' && r.entry && (
-          <article class="inbox-msg">
-            <p class="inbox-msg-head">
-              <b>{r.entry.from.kind === 'person' ? personName(r.entry.from.name, r.entry.from.display) : name}</b>
-              <When at={r.entry.at} />
-            </p>
-            <Markdown text={r.entry.text} />
-            <Button size="s" onClick={() => openRow(r, true)}>
-              Reply
-            </Button>
-          </article>
-        )}
-      </div>
+        </div>
+      ) : (
+        <div class="scroll pad">
+          {r.decision && <DecisionCard d={r.decision} who={r.handle || name} />}
+          {(r.kind === 'failed' || r.kind === 'stopped') && (
+            <div class="inbox-stop">
+              <p class="inbox-stop-line">
+                <Led tone={r.kind === 'stopped' ? 'grey' : 'red'} word={r.kind === 'stopped' ? 'stopped' : 'error'} />
+                {r.reason && <span>{r.reason}</span>}
+              </p>
+              {m && <p class="inbox-task">{m.task}</p>}
+              {m && (
+                <Button onClick={() => setSeat(true)} kind="primary">
+                  Seat again
+                </Button>
+              )}
+              {seat && m && <TaskDialog bridge={r.bridge} m={m} again onClose={() => setSeat(false)} />}
+            </div>
+          )}
+          {r.kind === 'message' && r.entry && (
+            <article class="inbox-msg">
+              <p class="inbox-msg-head">
+                <b>{r.entry.from.kind === 'person' ? personName(r.entry.from.name, r.entry.from.display) : name}</b>
+                <When at={r.entry.at} />
+              </p>
+              <Markdown text={r.entry.text} refs />
+              <Button size="s" onClick={() => openRow(r, true)}>
+                Reply
+              </Button>
+            </article>
+          )}
+        </div>
+      )}
+      {asked && (
+        <Composer
+          key={r.key}
+          draft={'answer:' + r.bridge + '/' + asked.handle}
+          label={'Message to ' + asked.handle}
+          placeholder={'Message ' + asked.handle}
+          onSend={(text) => attempt(() => sendMessage(r.bridge, { text, to: [asked.handle], replyTo: asked.entry.seq }))}
+        />
+      )}
     </section>
   );
 }

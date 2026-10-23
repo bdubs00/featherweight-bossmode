@@ -107,10 +107,11 @@ Variables of the fake server:
 | `FAKE_LOGO=1` | The theme names a logo, served at `/v1/bossmode/logo` |
 | `FAKE_PARTIAL=1` | A card goes out on the stream without its input and its schema, as the backend can send it, so the page reads it again |
 | `FAKE_ADMIN=1` | `whoami` says that the person is an admin, who adds and removes skills |
-| `FAKE_A=1` | The sample data shows each state of the bridges screen: a seat that waits for a worker, a fired seat, folds, a card in the state unknown, a second open bridge, and a closed one |
+| `FAKE_A=1` | The sample data shows each state of the bridges screen: a seat that waits for a worker, a fired seat, folds, a card in the state unknown, a second open bridge, and a closed one. The second open bridge also holds a message that asks the operator, and a seat that failed with the raw error of a model provider. |
 | `FAKE_LIVE=1` | `GET /v1/runs/{id}/live` streams each answer outside a bridge in pieces, as the model writes it. The quick chat calls one tool first. Without it, the route sends no piece. It sends `idle` once the run stops working. |
 | `FAKE_LIVE_MS` | The time between two pieces of a live answer in milliseconds, 120 by default |
 | `FAKE_LIVE_HOLD=1` | A live answer stops near its middle and waits there, for a screenshot of an answer that streams in |
+| `FAKE_ASK=<tool>` | The manager waits for a decision on one call: `bridge_open`, `pages_write`, `spawn_task`, or `create_issue`. An allowed `bridge_open` opens the bridge, and the manager names it by its id. |
 
 A sign-in at `/ui/signin?as=bob` signs you in as bob@example.com.
 

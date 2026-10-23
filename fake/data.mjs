@@ -174,7 +174,58 @@ function memberRun({ id, agent, handle, bridge, task, shape, start }) {
 }
 
 /** seed builds the whole state of the fake server. */
-export function seed() {
+/**
+ * The calls that the manager can wait on with FAKE_ASK, one per kind of
+ * plan of a decision card: a bridge to open, a page to write, a task to
+ * hand off, and a tool that the page does not know.
+ */
+export const MANAGER_ASKS = {
+  bridge_open: {
+    text: 'Split the runbooks of the new roles across two writers and a reviewer.',
+    tool: 'front.bridge_open',
+    reason: 'rule: ask destructive',
+    input: {
+      title: 'Runbooks for the new roles',
+      goal: 'Write a runbook in the wiki for each Ansible role of the migration: cron, nginx, and logrotate. Each runbook says how to deploy the role, how to check it, and how to roll it back.',
+      placement: 'queue',
+      members: [
+        { handle: 'writer-3', agent: 'writer', task: 'Write runbooks/cron.md and runbooks/nginx.md from the roles and the notes of the migration' },
+        { handle: 'writer-4', agent: 'writer', task: 'Write runbooks/logrotate.md from the role and its molecule tests' },
+        { handle: 'checker', agent: 'reviewer', task: 'Review each runbook against its role, and ask for a fix where a step is missing' },
+      ],
+    },
+  },
+  pages_write: {
+    text: 'Write down the plan for the freeze in the wiki.',
+    tool: 'front.pages_write',
+    reason: 'rule: ask front.pages_write',
+    input: {
+      path: 'releases/2.4/freeze.md',
+      summary: 'The plan of the freeze of 2.4',
+      text: '---\ntitle: The freeze of 2.4\n---\n# The freeze of 2.4\n\nThe freeze starts on Friday at noon.\nMerge what is green by Thursday.\nTag the release on Monday, after the checks pass again.\nA change after noon on Friday needs a second reviewer.\nThe writer keeps the notes of each exception.\n',
+    },
+  },
+  spawn_task: {
+    text: 'Find out why the molecule run of nginx is slow.',
+    tool: 'spawn_task',
+    reason: 'rule: ask spawn_task',
+    input: { agent: 'tester', input: 'Time each step of the molecule run of roles/nginx on Debian 12, find the three slowest, and say how to make each faster. Return a short table and the commands that you ran.', max_turns: 20 },
+  },
+  create_issue: {
+    text: 'File an issue for the flaky idempotence check.',
+    tool: 'github.create_issue',
+    reason: 'rule: ask destructive',
+    input: {
+      repo: 'bdubs00/govuk-puppet-migration',
+      title: 'The idempotence check of roles/nginx fails one run in five',
+      body: 'The second converge of molecule changes /etc/nginx/sites-available/default when the template sorts its keys in another order.',
+      labels: ['flaky', 'nginx'],
+      milestone: { title: '2.4', due: '2026-10-30' },
+    },
+  },
+};
+
+export function seed(ask = '') {
   const runs = new Map();
   const transcripts = new Map();
   const results = new Map();
@@ -251,17 +302,38 @@ export function seed() {
     item(4, 39, 'assistant', { text: 'The fleet has **2 pools** and **4 Tasks**:\n\n- `crew` runs migrator, with 3 Tasks. Two are up and one sleeps.\n- `manager` runs me, on one Task.\n\nOne bridge is open: *Migrate the remaining Puppet modules*. **migrator-2** waits for you to allow a `git push`.' }),
     item(5, 39, 'end', { text: 'completed' }),
     item(6, 30, 'user', { text: 'Open a bridge for the release notes of 2.4, with scribe and a reviewer.', who: ALICE }),
-    item(7, 30, 'tool', { tool: 'front.bridge_open', callId: 'm2', input: { title: 'Release notes for 2.4', members: [{ handle: 'scribe', agent: 'scribe' }, { handle: 'reviewer-2', agent: 'reviewer' }] } }),
+    item(7, 30, 'tool', {
+      tool: 'front.bridge_open',
+      callId: 'm2',
+      input: {
+        title: 'Release notes for 2.4',
+        goal: 'Draft the release notes of 2.4 for the people who run the fleet.',
+        members: [
+          { handle: 'scribe', agent: 'scribe', task: 'Draft the release notes of 2.4 from the merged changes' },
+          { handle: 'reviewer-2', agent: 'reviewer', task: 'Check each note against its pull request' },
+        ],
+      },
+    }),
     item(8, 30, 'ask', { id: 'ap-m2', tool: 'front.bridge_open', callId: 'm2', detail: 'rule: ask front.bridge_open' }),
     item(9, 29, 'decided', { id: 'ap-m2', text: 'allow', who: ALICE }),
-    item(10, 29, 'result', { tool: 'front.bridge_open', callId: 'm2', text: 'Opened br-notes.' }),
-    item(11, 29, 'assistant', { text: 'I opened the bridge **Release notes for 2.4** with `scribe` and `reviewer-2`. Each has its task, and the bridge links the plan in the wiki.' }),
+    item(10, 29, 'result', { tool: 'front.bridge_open', callId: 'm2', text: `Opened the bridge br-notes "Release notes for 2.4" for ${ALICE} with 2 members, placement queue. Follow it with bridge_read (bridge br-notes).` }),
+    item(11, 29, 'assistant', { text: 'The bridge is open: `br-notes`. **scribe** drafts the notes, and **reviewer-2** checks each one against its pull request. Both read `index.md` first.' }),
     item(12, 29, 'end', { text: 'completed' }),
   ];
+  // With FAKE_ASK, the conversation goes on and waits for a decision on one call of the manager.
+  const asked = MANAGER_ASKS[ask];
+  if (asked) {
+    mItems.push(
+      item(13, 3, 'user', { text: asked.text, who: ALICE }),
+      item(14, 2, 'tool', { tool: asked.tool, callId: 'm3', input: asked.input }),
+      item(15, 2, 'ask', { id: 'ap-m3', tool: asked.tool, callId: 'm3', input: asked.input, detail: asked.reason }),
+    );
+  }
   const mRun = {
     id: 'run-manager-1', agent: 'manager', title: 'What is the fleet doing right now?', state: 'completed', input: 'What is the fleet doing right now?',
     output: mItems[10].text, seq: 12, origin: 'http', principal: ALICE, createdAt: minutesAgo(40), updatedAt: minutesAgo(29), member: 'default/manager-0', usage: { turns: 4, costUSD: 0.08 },
   };
+  if (asked) Object.assign(mRun, { state: 'input-required', seq: 15, updatedAt: minutesAgo(2), pending: { id: 'ap-m3', tool: asked.tool, input: asked.input, reason: asked.reason, requestedAt: minutesAgo(2) } });
   runs.set(mRun.id, mRun);
   transcripts.set(mRun.id, mItems);
 
@@ -274,6 +346,7 @@ export function seed() {
   transcripts.set(style.id, [item(1, 6, 'user', { text: style.input, who: ALICE })]);
   results.set(style.id, { runId: style.id, title: style.title, agent: 'reviewer', status: 'working', started: style.createdAt, changed: style.updatedAt, next: [] });
   results.set(mRun.id, { runId: mRun.id, title: mRun.title, agent: 'manager', status: 'ready', summary: mRun.output, started: mRun.createdAt, changed: mRun.updatedAt, next: [{ kind: 'reply', label: 'Reply' }] });
+  if (asked) Object.assign(results.get(mRun.id), { status: 'needs-you', pending: { id: 'ap-m3', tool: asked.tool, label: 'Allow', reason: asked.reason, input: asked.input }, next: [{ kind: 'decide', label: 'Allow' }] });
 
   return { bridges, channels, reads, runs, transcripts, results, files, pages: seedPages(), faces: seedFaces(), rules: [] };
 }

@@ -13,7 +13,7 @@ import { ApiError } from '../api/client';
 import { api } from '../api/routes';
 import type { Item, Result, Run } from '../api/types';
 import { store, useSelect } from '../state/store';
-import { stepsOf, type Step } from '../state/thread';
+import { placedSteps, type Step } from '../state/thread';
 import { decisionOf } from '../lib/decision';
 import { whoName } from '../lib/lines';
 import { showError } from './notice';
@@ -157,12 +157,15 @@ export const POLL_MS = 3000;
  * is true, such as while an answer to a message is on its way. A run of the
  * front itself, such as a manager on the front, sends no run event on the
  * stream, so its conversation polls it while it is open. A run that does
- * not work gets no poll, because a read of it can wake its worker. A
- * hidden tab skips a read.
+ * not work gets no poll, because a read of it can wake its worker. A run
+ * that the fleet lost gets no poll either: its last state can still say
+ * running, and a read of it answers 404, which marks it lost. A hidden tab
+ * skips a read.
  */
 export function usePoll(runId: string, also = false): void {
   const state = useSelect((s) => (runId && s.runs[runId] ? s.runs[runId].state : ''));
-  const active = !!runId && (also || state === 'queued' || state === 'running');
+  const lost = useSelect((s) => !!runId && !!s.lost[runId]);
+  const active = !!runId && !lost && (also || state === 'queued' || state === 'running');
   useEffect(() => {
     if (!active) return;
     const t = setInterval(() => {
@@ -170,8 +173,9 @@ export function usePoll(runId: string, also = false): void {
       api
         .run(runId)
         .then((r) => store.dispatch({ type: 'run', run: r }))
-        .catch(() => {
-          // A missed poll waits for the next one.
+        .catch((e) => {
+          // A run that the fleet does not hold is lost, and the poll stops. Any other miss waits for the next read.
+          if (e instanceof ApiError && e.status === 404) store.dispatch({ type: 'run-lost', id: runId });
         });
     }, POLL_MS);
     return () => clearInterval(t);
@@ -180,25 +184,32 @@ export function usePoll(runId: string, also = false): void {
 
 type Block = { kind: 'item'; it: Item } | { kind: 'steps'; steps: Step[] };
 
-/** blocksOf folds the tool calls between two messages into one block of steps. */
+/**
+ * blocksOf folds the step lines between two messages into one block of
+ * steps. A step goes where placedSteps puts it: a call that asked for a
+ * decision shows after the decision, at its result, and not at all while
+ * it waits.
+ */
 export function blocksOf(items: Item[]): Block[] {
+  const placed = placedSteps(items);
   const out: Block[] = [];
-  let calls: Item[] = [];
+  let steps: Step[] = [];
   const flush = () => {
-    if (calls.length) out.push({ kind: 'steps', steps: stepsOf(calls) });
-    calls = [];
+    if (steps.length) out.push({ kind: 'steps', steps });
+    steps = [];
   };
   for (const it of items) {
     if (it.kind === 'tools') continue;
     if (it.kind === 'tool' || it.kind === 'result' || it.kind === 'file') {
-      calls.push(it);
+      const s = placed.get(it.seq);
+      if (s) steps.push(s);
       continue;
     }
     flush();
     out.push({ kind: 'item', it });
   }
   flush();
-  return out.filter((b) => b.kind === 'item' || b.steps.length > 0);
+  return out;
 }
 
 /** within5 reports whether two items of one sender are close enough to share a header. */
@@ -268,7 +279,7 @@ export function Conversation(props: ConversationProps) {
           case 'assistant':
             return (
               <Msg face={face} name={props.agentLabel} at={it.time} compact={compact}>
-                <Markdown text={it.text || ''} />
+                <Markdown text={it.text || ''} refs />
               </Msg>
             );
           case 'ask':
@@ -314,7 +325,7 @@ export function Conversation(props: ConversationProps) {
       {props.tail}
       {live && live.text && (
         <Msg face={face} name={props.agentLabel} pending>
-          <Markdown text={live.text} />
+          <Markdown text={live.text} refs />
         </Msg>
       )}
       {live && <LiveLines live={live} />}
