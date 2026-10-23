@@ -475,8 +475,10 @@ export function applyStream(state: State, ev: StreamEvent): State {
       next = { ...state, resets: state.resets + 1, bridgePages: {} };
       break;
     // An event that the page read and dropped, such as a partial entry that
-    // it could not read again. Only its id moves.
+    // it could not read again. Only its id moves. A routine event moves only
+    // its id too: src/state/routines.ts reads the routine again.
     case 'skipped':
+    case 'routine':
       break;
     default:
       return state;

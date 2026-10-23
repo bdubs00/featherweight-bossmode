@@ -1,0 +1,497 @@
+/* The Routines place: the list of routines, a routine with its tabs, and
+   the week of its agent. docs/DESIGN.md, section 11.9. The screen lays out
+   the primitives and adds no color, radius, shadow, type size, or motion:
+   every value is a token. */
+
+/* ---------- the list ---------- */
+.rt-group {
+  padding-top: var(--s-2);
+}
+.rt-group-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: var(--h-small);
+  margin: var(--s-2) var(--s-4) 0;
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+  font-weight: 700;
+}
+.rt-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  padding: var(--s-1) var(--s-2) 0;
+}
+.rt-row {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: var(--h-row);
+  /* The text of a row lines up with the heads of the groups. */
+  padding: var(--s-2);
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  color: var(--ink);
+  text-decoration: none;
+}
+/* A routine that needs you sits on the wash of what needs you. */
+.rt-row.need {
+  background: var(--wash-need);
+}
+.rt-row:hover {
+  background: var(--raised);
+}
+.rt-row.sel {
+  background: var(--raised);
+  border-color: var(--raised-line);
+  box-shadow: var(--e-row);
+}
+.rt-row-top {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+/* A long title wraps, and the status follows its last word, so no title is cut. */
+.rt-row-title {
+  font-weight: 700;
+  margin-right: var(--s-2);
+}
+.rt-row-top .status {
+  vertical-align: 1px;
+}
+.rt-toggle {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  width: calc(100% - 2 * var(--s-2));
+  min-height: var(--h-row);
+  margin: var(--s-2) var(--s-2) 0;
+  padding: 0 var(--s-2);
+  border: 0;
+  border-radius: var(--r);
+  background: none;
+  color: var(--muted);
+  font-size: var(--t-meta);
+  font-weight: 700;
+  cursor: pointer;
+}
+.rt-toggle:hover {
+  color: var(--ink);
+}
+.rt-turn-right {
+  transform: rotate(180deg);
+}
+.rt-turn-down {
+  transform: rotate(-90deg);
+}
+.rt-list .scroll {
+  padding-bottom: var(--s-4);
+}
+
+/* ---------- the header of a routine ---------- */
+/* The title takes the width that the status, the tabs, and More leave. */
+.routine .pane-head > h1 {
+  flex: 0 1 auto;
+}
+.routine .pane-head > .status {
+  flex: none;
+}
+.rt-tabs {
+  display: flex;
+  align-self: stretch;
+}
+/* A title that lacks the room beside Back and More takes the heading role. */
+.routine.rt-tight .pane-head > h1 {
+  font-size: var(--t-heading);
+  line-height: var(--t-heading-lh);
+  font-stretch: 108%;
+  letter-spacing: -0.02em;
+}
+/* The hidden copy of the title that gives its width at the title size. */
+.rt-measure {
+  position: absolute;
+  visibility: hidden;
+  white-space: nowrap;
+  pointer-events: none;
+}
+/* Where the header lacks the room, the tabs and the status take a strip. */
+.rt-strip {
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  gap: var(--s-3);
+  height: var(--h-row);
+  padding: 0 var(--s-5);
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+}
+.rt-strip > .status {
+  align-self: center;
+  margin-left: auto;
+}
+
+/* ---------- the body of a routine ---------- */
+.rt-body {
+  container-type: inline-size;
+}
+.rt-body > :not(.card) {
+  max-width: 760px;
+}
+.rt-sec {
+  margin-top: var(--s-6);
+}
+.rt-body > .rt-sec:first-child {
+  margin-top: 0;
+}
+.rt-sec-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-width: 0;
+  margin-bottom: var(--s-2);
+}
+
+/* The card on top: the sign-off, the proposal, or the quiet word of a move. */
+.rt-figs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2) var(--s-4);
+  margin: 0;
+}
+.rt-figs > div {
+  display: flex;
+  flex-direction: column-reverse;
+}
+.rt-figs dt {
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+  color: var(--muted);
+}
+.rt-figs dd {
+  margin: 0;
+}
+.rt-card .field {
+  margin-top: var(--s-1);
+}
+
+/* The steps and the checks: a number, the words, and the tool. */
+.rt-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rt-steps > li {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--s-3);
+  padding: var(--s-2) 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.rt-steps > li:last-child {
+  border-bottom: 0;
+}
+.rt-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  font-size: var(--t-caption);
+  font-weight: 700;
+  color: var(--muted);
+}
+.rt-words {
+  overflow-wrap: anywhere;
+}
+.rt-tool {
+  padding-top: 2px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* The tables: what it decides, how sure it was, and where it disagreed. */
+.rt-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.rt-table th,
+.rt-table td {
+  padding: var(--s-2) var(--s-3) var(--s-2) 0;
+  border-bottom: 1px solid var(--line-soft);
+  text-align: left;
+  vertical-align: top;
+  font-weight: 400;
+}
+.rt-table thead th {
+  padding-top: 0;
+  border-bottom-color: var(--line);
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+  font-weight: 600;
+  color: var(--muted);
+}
+.rt-table .rt-qrow th {
+  padding-top: var(--s-4);
+  font-weight: 700;
+}
+.rt-table tbody:first-of-type .rt-qrow th {
+  padding-top: var(--s-2);
+}
+.rt-answers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-1) 6px;
+}
+.rt-said {
+  display: block;
+  white-space: nowrap;
+}
+/* The short form of a question, with the question mark of the whole one beside it. */
+.rt-question {
+  margin-right: var(--s-2);
+}
+.rt-decides tbody th .help {
+  vertical-align: middle;
+}
+.rt-table thead th,
+.rt-disagreed td:last-child {
+  white-space: nowrap;
+}
+.rt-disagreed tbody th {
+  width: 50%;
+}
+.rt-decides tbody th {
+  width: 40%;
+}
+.rt-decides td:last-child {
+  white-space: nowrap;
+}
+.rt-disagreed tbody th a {
+  color: var(--ink);
+}
+
+/* The quiet line after a move that met a newer version. */
+.rt-changed {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin-bottom: var(--s-4);
+  color: var(--muted);
+}
+.rt-keys {
+  display: flex;
+  gap: var(--s-2);
+  margin-top: var(--s-2);
+}
+
+/* The rehearsal: one stacked bar per day. A gap of the paper parts the fills. */
+.rt-chart-box {
+  margin-top: var(--s-3);
+}
+.rt-chart {
+  display: flex;
+  align-items: stretch;
+  gap: var(--s-2);
+  height: 144px;
+  border-bottom: 1px solid var(--line);
+}
+/* A month of days keeps its bars apart by the gap of the fills. */
+.rt-chart-dense {
+  gap: 2px;
+}
+.rt-bar {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 2px;
+}
+.rt-bar > :first-child {
+  border-radius: var(--r) var(--r) 0 0;
+}
+.rt-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: var(--s-1);
+}
+.rt-fill {
+  display: block;
+  flex: none;
+  min-height: 2px;
+}
+.rt-fill-ink {
+  background: var(--ink);
+}
+.rt-fill-grey {
+  background: var(--led-grey);
+}
+.rt-fill-hatch {
+  background: repeating-linear-gradient(135deg, var(--muted) 0 2px, var(--paper) 2px 5px);
+}
+.rt-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2) var(--s-5);
+  margin: var(--s-3) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.rt-legend li {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+.rt-legend b {
+  font-weight: 700;
+}
+.rt-swatch {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-led);
+}
+.rt-legend-col {
+  flex-direction: column;
+}
+.rt-legend-col b {
+  margin-left: auto;
+}
+
+/* A value and its words, such as $0.02 by the agent. */
+.rt-per {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-auto-flow: row dense;
+  align-items: baseline;
+  gap: var(--s-1) var(--s-3);
+  margin: 0;
+}
+.rt-per > div {
+  display: contents;
+}
+.rt-per dt {
+  grid-column: 2;
+  color: var(--muted);
+}
+.rt-per dd {
+  grid-column: 1;
+  margin: 0;
+  font-weight: 700;
+}
+
+/* The runbook. */
+.rt-runbook {
+  max-width: 72ch;
+}
+.rt-unsigned {
+  margin-bottom: var(--s-3);
+}
+.rt-note {
+  overflow-wrap: anywhere;
+}
+
+/* ---------- the week of the agent ---------- */
+.rt-ident {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-4);
+  padding: var(--s-4);
+  border-bottom: 1px solid var(--line-soft);
+}
+.rt-ident p {
+  min-width: 0;
+  padding-top: var(--s-1);
+}
+.rt-dsec {
+  padding: var(--s-4);
+  border-bottom: 1px solid var(--line-soft);
+}
+.rt-dsec .rt-sec-head {
+  margin-bottom: var(--s-3);
+}
+.rt-dsec:last-child .rt-sec-head {
+  margin-bottom: 0;
+}
+.rt-share {
+  display: flex;
+  gap: 2px;
+  height: 12px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--paper);
+}
+
+/* ---------- narrow bodies ---------- */
+/* A body narrower than its tables shows each row as a block, each cell under its header. */
+@container (max-width: 560px) {
+  .rt-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .rt-table,
+  .rt-table tbody,
+  .rt-table tr,
+  .rt-table th,
+  .rt-table td {
+    display: block;
+  }
+  .rt-table tr {
+    padding: var(--s-2) 0;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .rt-table th,
+  .rt-table td {
+    padding: 2px 0;
+    border: 0;
+  }
+  .rt-table tbody th {
+    width: auto;
+    font-weight: 700;
+  }
+  .rt-table td:last-child {
+    white-space: normal;
+  }
+  /* The cells of a row follow its header on one line where they fit, each after its label. */
+  .rt-table td {
+    display: inline-block;
+    margin-right: var(--s-4);
+  }
+  .rt-table td[data-label]::before {
+    content: attr(data-label);
+    margin-right: var(--s-1);
+    font-size: var(--t-meta);
+    line-height: var(--t-meta-lh);
+    color: var(--muted);
+  }
+  .rt-table .rt-answers,
+  .rt-table .rt-said {
+    display: inline-flex;
+  }
+  .rt-steps > li {
+    grid-template-columns: 22px minmax(0, 1fr);
+  }
+  .rt-tool {
+    grid-column: 2;
+    padding-top: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (max-width: 799px) {
+  .rt-strip {
+    padding: 0 var(--s-4);
+  }
+}

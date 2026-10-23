@@ -1474,9 +1474,11 @@ function tick() {
 // The routes of the next stage. Each screen of docs/DESIGN.md, section 11,
 // adds its routes in its own file, so two screens never edit one file.
 // skills.mjs serves the Skills place.
-for (const name of ['skills.mjs', 'routes-a.mjs', 'routes-b.mjs', 'routes-c.mjs', 'routes-chat.mjs']) {
+// routes-d.mjs serves the Routines place, and writes the runbook of a
+// routine on a sign-off with writePage.
+for (const name of ['skills.mjs', 'routes-a.mjs', 'routes-b.mjs', 'routes-c.mjs', 'routes-chat.mjs', 'routes-d.mjs']) {
   const mod = await import('./' + name);
-  mod.register({ on, refuse, readJson, readBody, publish, S, now, AGENTS, FLEET, admin: () => ADMIN });
+  mod.register({ on, refuse, readJson, readBody, publish, S, now, AGENTS, FLEET, admin: () => ADMIN, writePage });
 }
 
 server.listen(PORT, '127.0.0.1', () => {

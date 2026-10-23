@@ -252,6 +252,17 @@ cursor, and no fade, so reduced motion changes nothing there.
 | `--z-notice` | 40 | The notice of a failed action |
 | `--z-dialog` | 50 | The dialog that asks before a destructive action |
 
+### 4.7 Scrollbars
+
+A scrollbar is part of the instrument. Every pane that scrolls has the same
+one, in both themes: 8 pixels thin, a thumb of `--line` with the radius
+`--r`, and no track. Under the pointer the thumb turns `--muted`.
+`src/styles/base.css` draws it with the WebKit pseudo-elements, so the thumb
+can change under the pointer. A browser without them, such as Firefox,
+takes `scrollbar-width: thin` and `scrollbar-color`. The standard properties
+sit behind `@supports not selector(::-webkit-scrollbar)`, because since
+Chrome 121 they turn the pseudo-elements off.
+
 ## 5. The layout
 
 The page has four columns: the app bar, the list pane, the main pane, and the
@@ -322,8 +333,11 @@ centered, because they are not anyone's voice. Numbers in chips are centered
 in the chip. Nothing is justified.
 
 The places of the app bar, top to bottom: the logo well, Activity, Chat,
-Bridges, Fleet, Skills, Wiki, Manager, and the account at the foot. Each place has a 22-pixel
-icon over a 12-pixel label. The active place sits on paper with a line edge
+Bridges, Fleet, Skills, Routines, Wiki, Manager, and the account at the foot. Each place has a 22-pixel
+icon over a 12-pixel label. A narrow window puts the places in a bar at the
+bottom. There each place takes the width of its label, and the account key
+is 44 pixels wide. Under 380 pixels the labels take the condensed width of
+the typeface (`font-stretch: 75%`), so the eight places stay in sight. The active place sits on paper with a line edge
 and a sheen, as a key that is pressed in. A count on Activity is a black chip
 at the top right of the icon.
 
@@ -334,6 +348,7 @@ at the top right of the icon.
 | Bridges | Bridges, open first, each with its count and its light | The channel, with the tabs Posts, Wiki, and Decisions | The members, with Add |
 | Fleet | People: the seats grouped by bridge, then Not on a bridge | A direct conversation with a member, with the tabs Chat, Run, and Files, or the board | The profile of the agent |
 | Skills | The skills by origin (Imported, Local, one group per server), then the tools (Built in, one group per server) | The text of a skill or the description of a tool, and the agents that can load it | Add skill, and the actions on the item |
+| Routines | The routines in the order of attention: Needs you, Live, Rehearsing, Proposed, Paused, then Retired behind a toggle | A routine with the tabs Steps, Evidence, and Runbook | The agent of the routine and its week |
 | Wiki | The tree and the search | A page, its history, or the editor | none |
 | Manager | none at first | The conversation | none at first |
 
@@ -343,7 +358,9 @@ the mark at the head of a conversation links there. `#chat/<run>` focuses
 a chat, `#chat/new` a new chat, and `/details` after a chat its details:
 the mark at the head of a chat links there. `#activity/<key>` names
 the item of the inbox that the main pane shows, so a narrow window opens it.
-`#skills/add` opens the chooser of Add skill.
+`#skills/add` opens the chooser of Add skill. `#routines/<agent>/<name>`
+focuses a routine, `/evidence` and `/runbook` after it focus a tab, and
+`/agent` focuses the week of its agent.
 
 A pane with nothing picked keeps its header row and its groove band. Thus
 the bands of the three panes stay in one line. The invitation to act sits in
@@ -827,6 +844,9 @@ the page before the walk.
 | `theme` | A deployment with a logo and a green accent | 1440, light |
 | `chat` | The quick chat: the history by day, a chat whose answer streams in after a tool call, and This chat with a tool for this chat | 1440 in both themes, and 390 in light |
 | `chat-new` | A new chat with the picks of tools and skills and a question in the composer | 1440, light |
+| `routines` | The first board of the routines: a routine that needs your sign-off, the list, and the week of triage | 1440 in both themes, 800 in graphite, and 390 in light |
+| `routines-evidence` | The second board: the evidence of that routine | 1440, both |
+| `routines-signed` | The third board: the routine after Sign off, on the tab Runbook | 1440, light |
 
 ### 11.7 The shared files of the lead
 
@@ -906,3 +926,108 @@ reads them only while the worker is awake, or on an action of the person.
 The wakes that the person causes still show as lines in the channel. A
 sleep line and a wake line of one seat with nothing between them fold into
 one quiet line, as section 11.2 says.
+
+### 11.9 The Routines place
+
+A routine is a vetted sequence of tool calls that the kernel can run again
+without a model. The place shows the routines of every agent, the evidence
+for each one, and its runbook. A routine that is ready waits for a person to
+sign it off. `docs/ROUTINES.md` of the kernel holds the contract, and
+section 15 of `docs/CONTRACT.md` names the routes. The owner approved the
+design from three boards: a routine that needs your sign-off, its evidence,
+and the routine after Sign off.
+
+Files: `src/ui/Routines.tsx`, `src/ui/RoutineEvidence.tsx`,
+`src/lib/routines.ts`, `src/state/routines.ts`, `src/api/routines.ts`,
+`src/styles/routines.css`, and `fake/routes-d.mjs`, each with its tests.
+The shell wires the place with small edits. `src/lib/route.ts` gains the
+route, `src/ui/App.tsx` the panes, `src/ui/Shell.tsx` the place, and
+`src/ui/icons.tsx` the glyph. `src/state/reducer.ts` moves the id of a
+routine event, `src/state/actions.ts` hands the event on, and
+`fake/server.mjs` registers the fake routes.
+
+The work:
+
+- The place. Routines sits in the app bar between Skills and Wiki. Its
+  glyph is two arrows that turn back into each other. The routes are
+  `#routines` and `#routines/<agent>/<name>`. `/evidence` and `/runbook`
+  after a routine name its tab, and `/agent` names the week of its agent
+  for a window that hides the details pane.
+- The list pane. `Routines` with its count chip and an `N live` chip with a
+  green light. `Find a routine` narrows the list by the title and the
+  agent. The groups come in the order of attention: Needs you with an amber
+  count, Live, Rehearsing, Proposed, and Paused. Retired waits behind a
+  toggle. A row holds the title, the status as a light with its word, and
+  one meta line. A long title wraps, and the status follows its last word,
+  so no title is cut. A row that needs you sits on `--wash-need`.
+- The main pane. The header holds the title, the status, the tabs Steps,
+  Evidence, and Runbook, and More. Where the header lacks the room, the
+  tabs and the status take a strip under it. Where the title still lacks
+  the room beside Back and More, it takes the heading role. More holds
+  Pause, Resume, and Retire, as the moves of the routine allow. Retire asks
+  first with `Confirm`. A window that hides the details pane adds the name
+  of the agent to More, which opens its week.
+- Steps. A routine that needs you opens on the card of its sign-off. The
+  card has the amber light, three figures, the Note field of the decision
+  card, and two keys: Not yet and Sign off. A proposed routine opens on a
+  card with the number of tickets that it comes from, and the keys Retire
+  and Rehearse. After a sign-off, the card turns quiet and says Signed off,
+  with who and when. Not yet sends nothing. The card turns into the quiet
+  line Kept for later for this visit of the routine, and the row keeps
+  needs you. Then come
+  the steps, numbered, each with the tool as meta, the answers that a step
+  uses as slots, What it decides, and Afterward. What it decides is a table:
+  each question, its answers, and the mark at which the routine acts. A
+  question mark beside it holds the words for an answer under its mark. A
+  question shows its first sentence, and a question mark in its row holds
+  the whole one. The choices come first by name, then the yes or no
+  questions.
+- A move names the version that the person read. When the routine
+  changed in the meantime, the page reads it again and shows it under the
+  quiet line `This routine changed. Read it again.`, with no notice.
+- Evidence. It says what happened, not why. Rehearsal draws one stacked bar
+  per day out of placed elements: agreed in ink, disagreed in a hatch of
+  `--muted` on `--paper`, and handed to the agent in `--led-grey`. A gap of
+  paper parts the fills. The legend gives the three totals, and a table
+  gives each day to a screen reader. Then Past tickets, How sure it was in
+  words, Where it disagreed with what happened afterward, Sent back, and
+  Made from. Made from lives on this tab only. How sure it was joins the
+  bands under the mark of a question in one row, handed to the agent.
+- Runbook. A routine that was signed off shows its page of the wiki,
+  `agents/<agent>/routines/<name>.md`, which the front writes, with the key
+  Open in wiki. Before a sign-off, the page renders the routine the same
+  way, under the line `Not yet signed off`.
+- The details pane. The agent with its chip and the key Profile, its mark,
+  its tagline, and its week. This week is a bar of the runs by routines, by
+  the agent, and with a person, with the three counts. Per ticket gives the
+  cost of a run by a routine and by the agent. Sent back counts the week.
+  The pane never repeats a figure of the routine, and never says who signed
+  it off.
+- The stream. A `routine` event reads that routine again while a pane of
+  the place shows. A reset reads the list again.
+
+The rules of the owner for this screen, and how the screen keeps them:
+
+| Rule | How |
+|---|---|
+| Every element is purposeful, and a fact appears once on the screen | The card holds the three figures, the list row holds the size of the rehearsal, and the details pane holds the week of the agent. No two of them show the same number. Made from sits on the Evidence tab alone. |
+| The person has little time | A routine that needs you opens on its card, and the card has two keys. |
+| No explanation in the chrome | The card has no sentence. The definitions sit behind the question marks of What it decides and How sure it was. |
+| One name through the flow | The key says Sign off, the quiet card says Signed off, and the row says live. |
+| No word matched | Past tickets reads `212 of 212 past tickets, handled the same way`. |
+| Attractive scrollbars | Section 4.7, for every pane of the page. |
+
+Left out, and why:
+
+- Confluence. The third board shows a section of Confluence pages and a card
+  of a runbook that disagrees. Section 4.4 of `docs/ROUTINES.md` names
+  Confluence a later change, so the Runbook tab shows the page of the wiki
+  alone.
+- A sign-off before a routine is ready. The moves allow it, but the page
+  offers Sign off only on the card of a routine that needs you.
+- Open the tickets. The replay of the workbench keeps no list of the past
+  tickets, so the line of Past tickets has no key until a later change
+  adds the list.
+- New routine. A routine comes from `fw routine propose` or from an agent,
+  and the page has no editor of its body. An empty place says `No routine
+  yet.` with no key.

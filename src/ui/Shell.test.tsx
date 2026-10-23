@@ -46,7 +46,7 @@ describe('Shell', () => {
     const current = el.querySelector('.place[aria-current="page"]')!;
     expect(current.textContent).toContain('Bridges');
     const labels = [...el.querySelectorAll('.place-label')].map((x) => x.textContent);
-    expect(labels).toEqual(['Activity', 'Chat', 'Bridges', 'Fleet', 'Skills', 'Wiki', 'Manager']);
+    expect(labels).toEqual(['Activity', 'Chat', 'Bridges', 'Fleet', 'Skills', 'Routines', 'Wiki', 'Manager']);
     // The count of Activity is the number of members that need you.
     expect(el.querySelector('.place-count .sr')!.textContent).toBe('2 members need you');
   });

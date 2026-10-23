@@ -781,6 +781,7 @@ stream route takes the same `Authorization` header as every route.
 | `face` | The entry of `GET /v1/faces` for that agent |
 | `member` | `{"kind": "member", "member": "default/crew-2", "state": "live", "time"}`, or `"gone": true` in place of `state` for a member that left the view |
 | `task` | `{"kind": "task", "member": "default/crew-2", "phase": "Running", "time"}`, or `"gone": true` |
+| `routine` | `{"kind": "routine", "agent": "triage", "name": "acknowledge-a-new-ticket"}`, on every change of a routine or its evidence, at most one per routine in 2 seconds. Section 15. |
 
 The `activity` of a `run` event carries `phrase`. The `activity` of
 `GET /v1/runs/{id}` has no `phrase`, so a screen takes the phrase from the
@@ -1004,3 +1005,137 @@ never from that read.
 - A run to start a new agent from. The new-agent screen takes no run,
   such as `#new-agent?fromRun=<id>`, so the Chat place has no Save as
   agent.
+
+## 15. Routines
+
+The Routines place reads the routes of the branch `routines/workbench`,
+after section 4.4 of `docs/ROUTINES.md` of the kernel. `src/api/routines.ts`
+holds the calls and the types, and `fake/routes-d.mjs` serves the same
+shapes. The page never calls `PUT /v1/routines/{agent}/{name}`, which is
+for the lab and the manager.
+
+| Route | What the page does with it |
+|---|---|
+| `GET /v1/routines` | `{"routines": [<record>]}`, newest change first, without `evidence`. The list pane calls it without `agent`, and the workbench answers the routines of every agent that the person can view. `?agent=<name>` narrows it to one agent. |
+| `GET /v1/routines/{agent}/{name}` | The record with `evidence`, always present and empty for a new version. The list leaves out evidence, and a row needs it for its meta line, so the page reads each routine that is not retired. A 404 says in place that the routine is gone. |
+| `POST /v1/routines/{agent}/{name}/standing` | `{"standing", "note", "version"}`. `version` is `routine.version` of the record that the person read, on every move. The page leaves out an empty note. The answer is the record, and the page reads the record again with its evidence. A 409 means that the routine changed: a newer version, or another standing. The page then reads the record again and shows it under the quiet line `This routine changed. Read it again.`, with no notice. A sign-off by the static token answers 403, and the notice shows its sentence. |
+| `GET /v1/routines/summary?agent=<name>&days=7` | The week of the agent in the details pane. A 404 leaves the week out. |
+| `GET /v1/pages/agents/{agent}/routines/{name}.md` | The tab Runbook of a routine with `signedOff`. The front writes the page on a sign-off. A 404 shows the runbook that the page renders. |
+
+Reading needs the right to view the agent, else 404. A move needs the
+right to edit it, else 403. The page offers the moves where `roles` of
+`GET /v1/whoami` names the person `owner` of the agent. A ticket links to
+its run on the page at `/ui`, as `/ui#run/<id>`, as a heart does.
+
+A record. Only a routine that was signed off has `signedOff`. `source` and
+`routine.canary` show only with a value. The routine never carries a
+standing.
+
+```json
+{
+  "agent": "triage",
+  "standing": "rehearsing",
+  "ready": true,
+  "signedOff": { "by": "ada@example.org", "at": "2026-10-23T09:12:00Z" },
+  "history": [{ "at": "2026-10-12T09:12:00Z", "by": "alice", "standing": "rehearsing", "note": "", "version": 1 }],
+  "source": { "runs": 212, "from": "2026-09-14", "to": "2026-10-21", "proposedBy": "fw routine propose" },
+  "createdAt": "2026-10-11T16:12:00Z",
+  "updatedAt": "2026-10-23T09:00:00Z",
+  "routine": {
+    "name": "acknowledge", "version": 1, "decider": "clef", "canary": 0.05,
+    "questions": {
+      "type": { "type": "choice", "instructions": "...", "criteria": { "bug": "...", "access": "...", "other": "..." }, "act": 0.85, "expect": ["bug", "access"], "observe": { "answer": "..." } },
+      "beyond": { "type": "noul", "instructions": "...", "act": 0.95, "expect": "no" }
+    },
+    "steps": [{ "tool": "gitea.label_read", "input": "{...}", "as": "labels" }],
+    "after": [{ "tool": "gitea.issue_read", "input": "{...}", "contains": ["status/triaged"], "lacks": ["status/new"] }],
+    "answer": "..."
+  }
+}
+```
+
+`ready` true on a rehearsing routine is what the page shows as needs you.
+
+The evidence of the current version:
+
+```json
+{
+  "version": 1,
+  "totals": { "decided": 1480, "acted": 1432, "agreed": 1397, "disagreed": 35, "handed": 48, "applied": 0, "failed": 0 },
+  "days": [{ "day": "2026-10-23", "decided": 125, "acted": 121, "agreed": 119, "disagreed": 2, "handed": 4, "applied": 0, "failed": 0 }],
+  "questions": { "type": [{ "from": 0, "to": 0.5, "runs": 0, "agreed": 0 }, { "from": 0.85, "to": 0.95, "runs": 231, "agreed": 215 }, { "from": 0.95, "to": 1, "runs": 1201, "agreed": 1182 }] },
+  "disagreements": [{ "run": "01K...", "at": "2026-10-23T08:40:00Z", "input": "#4821 VPN drops",
+    "answers": [{ "question": "type", "said": "bug", "observed": "access", "agree": false, "probability": 0.91 }], "verification": "accepted" }],
+  "sentBack": { "applied": 0, "agreed": 0 },
+  "replay": { "matched": 212, "total": 212, "at": "2026-10-11T16:12:00Z" },
+  "updatedAt": "2026-10-23T09:00:00Z"
+}
+```
+
+- `totals` counts the version, and `days` holds the last 90 days in UTC.
+  On a rehearsing routine `decided` is `acted` plus `handed`. `agreed` and
+  `disagreed` count only the runs on which the routine was sure enough to
+  act.
+  `handed` counts every decision that did not apply, and `applied` and
+  `failed` count the live runs. The card of a sign-off and the meta lines
+  take their figures from `totals`, and the bars of the rehearsal from
+  `days`.
+- `questions` holds only the compared questions. Each is the array of its
+  bands, cut at 0, 0.5, 0.7, 0.85, and 0.95, and at the `act` of the
+  question where it differs. How sure it was shows each band at or above
+  the mark that holds a run. It joins the bands under the mark in one row,
+  handed to the agent.
+- The page orders the questions of a routine: the choices and the scores
+  by name, then the yes or no questions by name. The map of the JSON has
+  no order. A question shows its first sentence, cut at a word past 80
+  characters. A question mark beside it holds the whole question.
+- A disagreement lists its answers. The page shows those with `agree`
+  false. A run without a receipt has no `verification`.
+- Without a replay, the evidence has no `replay`. A replay has no list of
+  runs, so the line of Past tickets has no key to open them.
+- `costUSD` of the summary is the average cost of one run by a routine and
+  of one run by the agent. Per ticket shows them as they come. The page
+  does not show `partial`.
+
+The moves: proposed to rehearsing or retired, rehearsing to live,
+paused, or retired, live to paused or retired, paused to rehearsing or
+live, and retired to nothing. A move to the current standing changes
+nothing. The keys of the page follow them: Rehearse and Retire on a
+proposed routine, Sign off and Not yet on a ready one, and Pause, Resume,
+and Retire in More. Not yet sends no request. The card of the sign-off
+turns into the quiet line `Kept for later` for this visit of the routine,
+and the row keeps needs you. The page keeps nothing of it.
+
+A move names the version that the person read, so nobody signs off a
+version that they did not read:
+
+```json
+{ "standing": "live", "note": "Rehearsal is clean.", "version": 3 }
+```
+
+A forbidden move answers:
+
+```json
+{ "type": "about:blank", "title": "Conflict", "status": 409,
+  "detail": "a proposed routine cannot move to live. It can move to rehearsing or retired",
+  "instance": "/v1/routines/triage/acknowledge/standing", "standing": "proposed", "allowed": ["rehearsing", "retired"] }
+```
+
+The summary:
+
+```json
+{ "agent": "triage", "days": 7, "zone": "UTC", "since": "2026-10-17T00:00:00Z", "runs": 1912, "byRoutine": 1358, "byAgent": 459,
+  "withPerson": 95, "costUSD": { "routine": 0.001, "agent": 0.02 }, "sentBack": 7, "partial": false }
+```
+
+The page keys a routine by `agent` and `routine.name`, and gives it the
+title of its name: `acknowledge-a-new-ticket` is `Acknowledge a new
+ticket`. It calls a run of a routine a ticket, as the words of section 5
+of `docs/ROUTINES.md` do. A field for a title can give a routine the words
+that its name cannot hold. A field for the noun of the work of an agent
+can give each agent its own word.
+
+The stream sends `routine` events (section 10), coalesced within 2
+seconds. While a pane of the place shows, an event reads that routine
+again. It also reads the week of the agent that the details pane shows. A
+`reset` reads the list again.
