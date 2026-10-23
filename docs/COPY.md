@@ -224,7 +224,7 @@ Capacity shows where seating happens:
 | `New` | keep | | done |
 | `N members` | keep | | done |
 | `closed`, `1 needs you`, `N need you` | keep | | done |
-| `working` for a bridge with a failed seat | change | `1 failed`, `N failed` with a red light, after needs you and before working, the order of attention, for a bridge whose members the page holds. `1 member failed`, `N members failed` for a screen reader | done |
+| `working` for a bridge with a failed seat | change | `1 failed`, `N failed` with a red light, after needs you and before working, the order of attention. The list reads the members of each open bridge for it, as Activity does. `1 member failed`, `N members failed` for a screen reader | done |
 | the unread count of a closed bridge | remove | a closed bridge did its work, so its row shows no count chip | done |
 | `No bridge is open.` | keep | with the key `Open a bridge` | done |
 | `Loading the bridges.` | keep | | A |

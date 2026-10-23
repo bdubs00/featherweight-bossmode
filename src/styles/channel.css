@@ -605,10 +605,6 @@
   margin-inline: auto;
   padding: 0 var(--s-5) var(--s-5);
 }
-/* The picks of a new chat are no conversation, so the composer under them takes their width. */
-.chat-picks-scroll + .composer {
-  max-width: none;
-}
 .composer .box {
   position: relative;
   display: flex;
@@ -869,9 +865,10 @@
   background: none;
   padding: 0;
 }
-/* The plain line of a failure reads in ink, apart from the muted task: the light and the word of the status already say error. */
+/* The plain line of a failure reads in ink, apart from the muted task: the light and the word of the status already say error. It is the one line of the row that says why, so it wraps rather than cut. */
 .member .act.fail {
   color: var(--ink);
+  white-space: normal;
 }
 /* The keys of a row sit under its text, past the mark, as the keys of a new seat do. */
 .member.has-keys {

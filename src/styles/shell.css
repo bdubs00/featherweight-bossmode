@@ -134,6 +134,9 @@
   overflow-y: auto;
   overflow-wrap: break-word;
   overscroll-behavior: contain;
+  /* A thin scrollbar in the color of the pane edges, so a scrolling pane shows no gutter of the system with arrows. */
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
 }
 .pad {
   padding: var(--s-4) var(--s-5) var(--s-6);

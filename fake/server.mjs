@@ -264,7 +264,7 @@ function post(bridgeId, from, text, more = {}) {
   // The channel keeps the whole text of a cut entry, up to 64 KB, for GET /v1/bridges/{id}/messages/{seq}.
   if (String(text).length > 4096) {
     e.cut = true;
-    WHOLE.set(bridgeId + '.' + seq, String(text).slice(0, 65536));
+    WHOLE.set(e, String(text).slice(0, 65536));
   }
   ch.push(e);
   publish('bridge.message', { bridge: bridgeId, message: e });
@@ -887,7 +887,7 @@ on('GET', '/v1/bridges/([^/]+)/messages/([^/]+)', (c, id, seqText) => {
   if (!Number.isInteger(seq) || seq < 1) refuse(400, 'the seq of an entry is a positive whole number');
   const e = (S.channels.get(id) || []).find((x) => x.seq === seq);
   if (!e) refuse(404, `no entry ${seq} in the bridge ${id}`);
-  const whole = WHOLE.get(id + '.' + seq);
+  const whole = WHOLE.get(e);
   return whole ? { ...e, text: whole, cut: false } : e;
 });
 /**

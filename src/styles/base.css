@@ -120,10 +120,14 @@ h2[tabindex='-1']:focus {
 }
 
 /* A text only for a screen reader. */
+/* Words for a screen reader alone. The negative margin keeps the 1-pixel box from growing the page by a pixel at the foot of a pane. */
 .sr {
   position: absolute;
   width: 1px;
   height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;

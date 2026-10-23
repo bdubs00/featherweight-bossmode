@@ -406,7 +406,7 @@ function channelOne(b) {
   // A long answer: the channel keeps its first 4 KB, and the whole text waits for Show all.
   const log = longLog();
   const cut = push(agent('tester'), log.slice(0, 4096), { cut: true });
-  WHOLE.set(b + '.' + cut.seq, log);
+  WHOLE.set(cut, log);
   push(sys('asleep'), 'tester went to sleep.', { mirrors: { run: 'run-tester', seq: 9, type: 'fw.run.finished' } });
   const done = push(agent('reviewer'), 'I reviewed **roles/cron**. It matches the manifest, with two notes:\n\n1. The role keeps `root` as the default user, as hiera does.\n2. `minute` defaults to `0` now, as Bob asked.\n\nI approve the role.', { mirrors: { run: 'run-reviewer', seq: 12, type: 'fw.run.finished' } });
   done.reactions.up = [ALICE];
@@ -458,10 +458,11 @@ function channelTwo(b) {
 }
 
 /**
- * The whole text of each entry that the channel cut at 4 KB, by
- * <bridge>.<seq>, as the channel of the front keeps it, up to 64 KB.
+ * The whole text of each entry that the channel cut at 4 KB, by the entry,
+ * as the channel of the front keeps it, up to 64 KB. The key is the entry
+ * itself, because the sample data renumbers its channels.
  */
-export const WHOLE = new Map();
+export const WHOLE = new WeakMap();
 
 /** longLog is the summary of a molecule run of every scenario of a role, long enough that the channel cuts it. */
 function longLog() {

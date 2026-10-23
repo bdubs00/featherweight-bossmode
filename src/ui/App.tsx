@@ -235,9 +235,16 @@ export function App() {
       leaving = false;
       boot();
     };
+    // A page that leaves, also into the cache of the browser, closes its
+    // stream, so it holds no connection while nobody reads it. A browser
+    // keeps six connections per host, and the streams of a few reloads in a
+    // row starved the reads of the next page.
+    const onHide = () => stopStream();
     addEventListener('pageshow', onShow);
+    addEventListener('pagehide', onHide);
     return () => {
       removeEventListener('pageshow', onShow);
+      removeEventListener('pagehide', onHide);
       stopStream();
     };
   }, []);

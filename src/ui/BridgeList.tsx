@@ -6,7 +6,8 @@
 // The foot holds the readout of the fleet.
 
 import { memo } from 'preact/compat';
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
+import { ensureRosters } from '../state/fetchers';
 import { useSelect } from '../state/store';
 import { selectFacts } from '../state/reducer';
 import { seatPresence } from '../lib/status';
@@ -32,7 +33,7 @@ export function matches(title: string, filter: string): boolean {
 
 const BridgeRow = memo(function BridgeRow({ id, current }: { id: string; current: boolean }) {
   const b = useSelect((s) => s.bridges.byId[id]);
-  // A roster that the page holds shows whether a seat failed or works, in the status of every screen. The list loads no roster for it.
+  // The roster of the bridge shows whether a seat failed or works, in the status of every screen. The list reads the rosters of the open bridges.
   const failed = useSelect((s) => {
     const r = s.rosters[id];
     if (!r) return 0;
@@ -98,6 +99,10 @@ export function BridgeList({ current }: { current: string }) {
   const openIds = useSelect((s) => s.bridges.order.filter((id) => s.bridges.byId[id].state === 'open').join('\n'));
   const closedIds = useSelect((s) => s.bridges.order.filter((id) => s.bridges.byId[id].state === 'closed').join('\n'));
   const loaded = useSelect((s) => s.bridges.loaded);
+  // A seat that failed shows on the row of its bridge, so the list reads the record of each open bridge once, as Activity does.
+  useEffect(() => {
+    if (loaded && openIds) ensureRosters();
+  }, [loaded, openIds]);
   const [showClosed, setShowClosed] = useState(false);
   const [filter, setFilter] = useState('');
   const list = useRoving<HTMLDivElement>();
