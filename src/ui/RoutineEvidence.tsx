@@ -6,9 +6,9 @@
 
 import { useState } from 'preact/hooks';
 import type { RoutineRecord } from '../api/routines';
-import { barsOf, bandRows, dayLabel, disagreedOf, num, pct0, questionWords, totalsOf, units, verificationWords } from '../lib/routines';
+import { barsOf, bandRows, countsOf, dayLabel, disagreedOf, num, pct0, questionWords, units, verificationWords } from '../lib/routines';
 import { runHref } from './Profile';
-import { Button, Chip, Help, Led } from './primitives';
+import { Button, Chip, Help } from './primitives';
 
 /** The disagreements that the tab shows before Show all. */
 export const FIRST_DISAGREEMENTS = 5;
@@ -17,7 +17,7 @@ export const FIRST_DISAGREEMENTS = 5;
 function Rehearsal({ rec }: { rec: RoutineRecord }) {
   const days = (rec.evidence && rec.evidence.days) || [];
   const { bars, max, axis } = barsOf(days);
-  const t = totalsOf(days);
+  const t = countsOf(rec.evidence);
   if (bars.length === 0) return null;
   const h = (n: number) => (max > 0 ? (n / max) * 100 + '%' : '0');
   const parts: { key: 'agreed' | 'disagreed' | 'handed'; words: string }[] = [
@@ -80,36 +80,22 @@ function Rehearsal({ rec }: { rec: RoutineRecord }) {
   );
 }
 
-/** PastTickets is the replay over past runs: how many the routine handled the same way, and the tickets behind a key. */
+/**
+ * PastTickets is the replay over past runs: how many the routine handled
+ * the same way. The workbench keeps no list of those runs yet, so the line
+ * has no key to open them.
+ */
 function PastTickets({ rec }: { rec: RoutineRecord }) {
-  const [open, setOpen] = useState(false);
   const r = rec.evidence && rec.evidence.replay;
   if (!r || !r.total) return null;
-  const runs = r.runs || [];
-  const words = `${num(r.matched)} of ${r.total === 1 ? '1 past ticket' : num(r.total) + ' past tickets'}, handled the same way`;
   return (
     <section class="rt-sec" aria-labelledby="rt-past">
       <h2 class="t-sub rt-sec-head" id="rt-past">
         Past tickets
       </h2>
-      <div class="rt-line">
-        <p>{words}</p>
-        {runs.length > 0 && (
-          <Button kind="quiet" size="s" aria-expanded={open} aria-controls="rt-past-list" onClick={() => setOpen(!open)}>
-            {open ? 'Hide the tickets' : 'Open the tickets'}
-          </Button>
-        )}
-      </div>
-      {open && (
-        <ul class="rt-tickets" id="rt-past-list">
-          {runs.map((t) => (
-            <li>
-              <a href={runHref({ run: t.run })}>{t.input}</a>
-              {!t.same && <Led tone="grey" word="handled another way" />}
-            </li>
-          ))}
-        </ul>
-      )}
+      <p>
+        {num(r.matched)} of {r.total === 1 ? '1 past ticket' : num(r.total) + ' past tickets'}, handled the same way
+      </p>
     </section>
   );
 }
@@ -118,7 +104,7 @@ function PastTickets({ rec }: { rec: RoutineRecord }) {
 function HowSure({ rec }: { rec: RoutineRecord }) {
   const qs = rec.routine.questions || {};
   const per = (rec.evidence && rec.evidence.questions) || {};
-  const keys = Object.keys(qs).filter((k) => per[k] && (per[k].bands || []).some((b) => b.runs > 0));
+  const keys = Object.keys(qs).filter((k) => (per[k] || []).some((b) => b.runs > 0));
   if (keys.length === 0) return null;
   return (
     <section class="rt-sec" aria-labelledby="rt-sure">
@@ -143,7 +129,7 @@ function HowSure({ rec }: { rec: RoutineRecord }) {
                 </th>
               </tr>
             )}
-            {bandRows(per[k].bands, qs[k].act).map((b) => (
+            {bandRows(per[k], qs[k].act).map((b) => (
               <tr>
                 <th scope="row" data-label="It said">
                   {b.words}
@@ -166,7 +152,7 @@ function Disagreed({ rec }: { rec: RoutineRecord }) {
   const [all, setAll] = useState(false);
   const ev = rec.evidence;
   const list = (ev && ev.disagreements) || [];
-  const total = Math.max(totalsOf(ev ? ev.days : []).disagreed, list.length);
+  const total = Math.max(countsOf(ev).disagreed, list.length);
   if (list.length === 0) return null;
   const shown = all ? list : list.slice(0, FIRST_DISAGREEMENTS);
   return (
@@ -192,7 +178,7 @@ function Disagreed({ rec }: { rec: RoutineRecord }) {
                   <a href={runHref({ run: d.run })}>{d.input}</a>
                 </th>
                 <td data-label="The routine said">
-                  {diff.map(([, a]) => (
+                  {diff.map((a) => (
                     <span class="rt-said">
                       <code>{a.said}</code>
                       {typeof a.probability === 'number' && <span class="t-meta"> {pct0(a.probability)} sure</span>}
@@ -200,7 +186,7 @@ function Disagreed({ rec }: { rec: RoutineRecord }) {
                   ))}
                 </td>
                 <td data-label="The agent chose">
-                  {diff.map(([, a]) => (
+                  {diff.map((a) => (
                     <span class="rt-said">{a.observed ? <code>{a.observed}</code> : <span class="t-meta">none</span>}</span>
                   ))}
                 </td>

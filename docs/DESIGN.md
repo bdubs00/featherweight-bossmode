@@ -862,7 +862,9 @@ The work:
   card, and two keys: Not yet and Sign off. A proposed routine opens on a
   card with the number of tickets that it comes from, and the keys Retire
   and Rehearse. After a sign-off, the card turns quiet and says Signed off,
-  with who and when. After Not yet, a quiet card says Not yet. Then come
+  with who and when. Not yet sends nothing. The card turns into the quiet
+  line Kept for later for this visit of the routine, and the row keeps
+  needs you. Then come
   the steps, numbered, each with the tool as meta, the answers that a step
   uses as slots, What it decides, and Afterward. What it decides is a table:
   each question, its answers, and the mark at which the routine acts. A
@@ -873,7 +875,8 @@ The work:
   paper parts the fills. The legend gives the three totals, and a table
   gives each day to a screen reader. Then Past tickets, How sure it was in
   words, Where it disagreed with what happened afterward, Sent back, and
-  Made from. Made from lives on this tab only.
+  Made from. Made from lives on this tab only. How sure it was joins the
+  bands under the mark of a question in one row, handed to the agent.
 - Runbook. A routine that was signed off shows its page of the wiki,
   `agents/<agent>/routines/<name>.md`, which the front writes, with the key
   Open in wiki. Before a sign-off, the page renders the routine the same
@@ -906,6 +909,9 @@ Left out, and why:
   alone.
 - A sign-off before a routine is ready. The moves allow it, but the page
   offers Sign off only on the card of a routine that needs you.
+- Open the tickets. The replay of the workbench keeps no list of the past
+  tickets, so the line of Past tickets has no key until a later change
+  adds the list.
 - New routine. A routine comes from `fw routine propose` or from an agent,
   and the page has no editor of its body. An empty place says `No routine
   yet.` with no key.

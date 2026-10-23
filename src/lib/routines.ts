@@ -4,7 +4,7 @@
 // rows of the evidence, and the runbook that the page renders before the
 // front writes one. docs/DESIGN.md, section 11.9, names the screen.
 
-import type { Band, Disagreement, EvidenceDay, Move, RoutineCheck, RoutineQuestion, RoutineRecord, RoutineStep, Said, Standing } from '../api/routines';
+import type { Band, Counts, Disagreement, Evidence, EvidenceDay, Move, RoutineCheck, RoutineQuestion, RoutineRecord, RoutineStep, Said, Standing } from '../api/routines';
 import type { Tone } from './presence';
 import { cap, since } from './words';
 
@@ -91,16 +91,9 @@ export const titleOf = (name: string): string =>
 
 /* ---------- the evidence ---------- */
 
-export interface Totals {
-  decided: number;
-  acted: number;
-  agreed: number;
-  disagreed: number;
-  handed: number;
-  applied: number;
-  failed: number;
-}
+export type Totals = Counts;
 
+/** totalsOf adds up days of the evidence. */
 export function totalsOf(days: EvidenceDay[] | undefined): Totals {
   const t: Totals = { decided: 0, acted: 0, agreed: 0, disagreed: 0, handed: 0, applied: 0, failed: 0 };
   for (const d of days || []) {
@@ -115,7 +108,13 @@ export function totalsOf(days: EvidenceDay[] | undefined): Totals {
   return t;
 }
 
-/** dayStart is the UTC day of a moment, as the evidence writes it. */
+/** countsOf is the counts over the version of a routine: the totals of the workbench, else the sum of its days. */
+export function countsOf(ev: Pick<Evidence, 'totals' | 'days'> | null | undefined): Totals {
+  if (ev && ev.totals) return ev.totals;
+  return totalsOf(ev ? ev.days : []);
+}
+
+/** dayOf is the UTC day of a moment, as the evidence writes it. */
 const dayOf = (t: number): string => new Date(t).toISOString().slice(0, 10);
 
 /** weekOf counts the runs that a live routine handled over the last seven UTC days. */
@@ -130,23 +129,11 @@ export function lastMove(r: Pick<RoutineRecord, 'history'>): Move | undefined {
   return h.length ? h[h.length - 1] : undefined;
 }
 
-/**
- * notYetOf is the move that kept a ready routine in rehearsal: a move to
- * rehearsing from rehearsing, when it is the newest move.
- */
-export function notYetOf(r: Pick<RoutineRecord, 'history' | 'standing'>): Move | null {
-  const h = r.history || [];
-  if (r.standing !== 'rehearsing' || h.length < 2) return null;
-  const a = h[h.length - 2];
-  const b = h[h.length - 1];
-  return a.standing === 'rehearsing' && b.standing === 'rehearsing' ? b : null;
-}
-
 /** metaOf is the one meta line of a row: the agent and the figure of its status. */
 export function metaOf(r: RoutineRecord, now = Date.now()): string {
   const s = statusOf(r);
   const ev = r.evidence;
-  const t = ev ? totalsOf(ev.days) : null;
+  const t = ev ? countsOf(ev) : null;
   if (s === 'needs-you') return t ? `${r.agent}, rehearsed ${units(t.decided)}` : r.agent;
   if (s === 'live') return ev ? `${r.agent}, ${num(weekOf(ev.days, now))} this week` : r.agent;
   if (s === 'rehearsing') return t && t.acted > 0 ? `${r.agent}, ${pct(t.agreed / t.acted)} agreed over ${units(t.acted)}` : r.agent;
@@ -165,7 +152,7 @@ export interface Figures {
 export function figuresOf(r: RoutineRecord): Figures | null {
   const ev = r.evidence;
   if (!ev) return null;
-  const t = totalsOf(ev.days);
+  const t = countsOf(ev);
   const sb = ev.sentBack || { applied: 0, agreed: 0 };
   return { agreed: t.acted > 0 ? pct(t.agreed / t.acted) : '0%', handed: t.handed, sentBack: (sb.agreed || 0) + (sb.applied || 0) };
 }
@@ -211,7 +198,7 @@ export function bandWords(b: Pick<Band, 'from' | 'to'>): string {
   return `${pct0(b.from)} to ${pct0(b.to)} sure`;
 }
 
-/** A row of How sure it was: the band, its runs, and how often it was right, or handed for a band under the mark of the question. */
+/** A row of How sure it was: the band, its runs, and how often it was right, or handed for the runs under the mark of the question. */
 export interface BandRow {
   words: string;
   runs: number;
@@ -219,19 +206,27 @@ export interface BandRow {
   handed: boolean;
 }
 
+/**
+ * bandRows words the bands of a question, the surest first. A band at or
+ * above the mark shows when it holds a run. The bands under the mark join
+ * in one row, handed to the agent, because the routine does not act there.
+ */
 export function bandRows(bands: Band[] | undefined, act?: number): BandRow[] {
-  return (bands || [])
-    .filter((b) => b.to > b.from)
+  const list = (bands || []).filter((b) => b.to > b.from);
+  const mark = typeof act === 'number' ? act : 0;
+  const under = list.filter((b) => b.to <= mark + 1e-9);
+  const rows: BandRow[] = list
+    .filter((b) => b.to > mark + 1e-9 && b.runs > 0)
     .sort((a, b) => b.from - a.from)
-    .map((b) => {
-      const handed = act !== undefined && b.to <= act + 1e-9 && b.to < 1;
-      return { words: bandWords(b), runs: b.runs, right: b.runs > 0 ? pct(b.agreed / b.runs) : '', handed };
-    });
+    .map((b) => ({ words: bandWords(b), runs: b.runs, right: pct(b.agreed / b.runs), handed: false }));
+  const runs = under.reduce((n, b) => n + b.runs, 0);
+  if (runs > 0) rows.push({ words: bandWords({ from: 0, to: mark }), runs, right: pct(under.reduce((n, b) => n + b.agreed, 0) / runs), handed: true });
+  return rows;
 }
 
 /** disagreedOf keeps the answers of a run where the routine and the agent differ. */
-export function disagreedOf(d: Disagreement): [string, Said][] {
-  return Object.entries(d.answers || {}).filter(([, a]) => a.said !== a.observed);
+export function disagreedOf(d: Disagreement): Said[] {
+  return (d.answers || []).filter((a) => !a.agree);
 }
 
 /** verificationWords says what happened after a run, from the verification of its receipt. */

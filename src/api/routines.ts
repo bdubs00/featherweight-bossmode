@@ -1,7 +1,7 @@
 // The routes and the shapes of routines: the store of the workbench, the
-// evidence of each routine, and the week of an agent. docs/CONTRACT.md,
-// section 15, names them, after section 4 of docs/ROUTINES.md of the
-// kernel. The lead folds these into routes.ts and types.ts after the merge.
+// evidence of each routine, and the week of an agent, as the branch
+// routines/workbench serves them. docs/CONTRACT.md, section 15, names
+// them. The lead folds these into routes.ts and types.ts after the merge.
 
 import { call, enc, query, ApiError } from './client';
 
@@ -49,12 +49,13 @@ export interface Routine {
   answer?: string;
 }
 
-/** One move of a routine: who moved it, when, to which standing, and why. */
+/** One move of a routine: who moved it, when, to which standing, why, and the version it moved. */
 export interface Move {
   at: string;
   by: string;
   standing: Standing;
   note?: string;
+  version?: number;
 }
 
 /** Where a routine comes from: the runs that it was made from. */
@@ -66,11 +67,12 @@ export interface RoutineSource {
 }
 
 /**
- * One day of the evidence, in UTC. agreed and disagreed count the runs that
- * the routine would have acted on, so agreed + disagreed + handed is decided.
+ * The counts of the evidence. agreed and disagreed count only the runs that
+ * the routine would have acted on, handed every decision that did not
+ * apply, and applied and failed the live runs. On a rehearsing routine,
+ * decided is acted plus handed.
  */
-export interface EvidenceDay {
-  day: string;
+export interface Counts {
   decided: number;
   acted: number;
   agreed: number;
@@ -78,6 +80,11 @@ export interface EvidenceDay {
   handed: number;
   applied: number;
   failed: number;
+}
+
+/** One day of the evidence, in UTC, with the counts of that day. */
+export interface EvidenceDay extends Counts {
+  day: string;
 }
 
 /** One band of how sure the routine was: the compared runs in it, and how many agreed. */
@@ -90,38 +97,39 @@ export interface Band {
 
 /** What the routine said and what the agent chose, for one question of a run. */
 export interface Said {
+  question: string;
   said: string;
   observed: string;
-  /** How sure the routine was of its answer, where the workbench keeps it. */
+  agree: boolean;
+  /** How sure the routine was of its answer. */
   probability?: number;
 }
 
 /** One of the last disagreements: the run, the first line of its input, the answers, and the verification of its receipt. */
 export interface Disagreement {
   run: string;
-  input: string;
   at?: string;
-  answers: Record<string, Said>;
-  /** accepted, satisfied, rejected, or unknown, from the quality receipt of the run. */
+  input: string;
+  answers: Said[];
+  /** accepted, satisfied, rejected, or unknown, from the quality receipt of the run. Absent when the run has none. */
   verification?: string;
 }
 
-/** A past run of the last replay, and whether the routine handled it the same way. */
-export interface ReplayRun {
-  run: string;
-  input: string;
-  same: boolean;
-}
-
+/** The evidence of the current version of a routine. A new version starts empty. */
 export interface Evidence {
+  version?: number;
+  /** The counts over the version. */
+  totals?: Counts;
+  /** The days of the last 90, in UTC. */
   days: EvidenceDay[];
-  /** Per question, the bands of how sure it was. */
-  questions: Record<string, { bands: Band[] }>;
+  /** Per compared question, the bands of how sure it was: from 0, 0.5, 0.7, 0.85, and 0.95, and the mark of the question where it differs. */
+  questions: Record<string, Band[]>;
   disagreements: Disagreement[];
   /** The runs that came back rejected: where the routine acted, and where it agreed with the agent. */
   sentBack: { applied: number; agreed: number };
-  /** The last replay over past runs, when the workbench ran one. runs is a shape that the page assumed. */
-  replay?: { matched: number; total: number; at: string; runs?: ReplayRun[] } | null;
+  /** The last replay over past runs, when the workbench ran one. */
+  replay?: { matched: number; total: number; at: string } | null;
+  updatedAt?: string;
 }
 
 /** A record of the store of the workbench. The list leaves out evidence. */
@@ -138,15 +146,20 @@ export interface RoutineRecord {
   evidence?: Evidence | null;
 }
 
-/** The week of an agent: its runs, by a routine, by the agent, and with a person, the cost of each, and what came back. */
+/** The week of an agent: its runs, by a routine, by the agent, and with a person, the cost of a run of each, and what came back. */
 export interface RoutineSummary {
+  agent?: string;
+  days?: number;
+  zone?: string;
+  since?: string;
   runs: number;
   byRoutine: number;
   byAgent: number;
   withPerson: number;
-  /** The cost of the runs of the window, by a routine and by the agent. */
+  /** The average cost of one run by a routine and of one run by the agent. */
   costUSD: { routine: number; agent: number };
   sentBack: number;
+  partial?: boolean;
 }
 
 /** The event of the bossmode stream on every change of a record or its evidence. */
@@ -163,7 +176,7 @@ export const routinesApi = {
   list: (agent?: string) => call<{ routines: RoutineRecord[] }>('/v1/routines' + query({ agent })).then((r) => (r && r.routines) || []),
   /** get reads one routine with its evidence. */
   get: (agent: string, name: string) => call<RoutineRecord>(one(agent, name)),
-  /** move changes the standing of a routine. A move that the table forbids answers 409 with the allowed moves. */
+  /** move changes the standing of a routine and answers the record. A move that the table forbids answers 409 with the allowed moves, and a sign-off by the static token answers 403. */
   move: (agent: string, name: string, standing: Standing, note?: string) =>
     call<unknown>(one(agent, name) + '/standing', { method: 'POST', body: note ? { standing, note } : { standing } }),
   /** summary reads the week of an agent, or null where the workbench has no such route. */

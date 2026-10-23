@@ -263,31 +263,10 @@
   color: var(--ink);
 }
 
-/* A line of words with a key at its end. */
-.rt-line {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--s-2) var(--s-3);
-}
 .rt-keys {
   display: flex;
   gap: var(--s-2);
   margin-top: var(--s-2);
-}
-.rt-tickets {
-  margin: var(--s-2) 0 0;
-  padding: 0;
-  list-style: none;
-}
-.rt-tickets li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--s-1) var(--s-3);
-  padding: var(--s-1) 0;
-  border-bottom: 1px solid var(--line-soft);
 }
 
 /* The rehearsal: one stacked bar per day. A gap of the paper parts the fills. */

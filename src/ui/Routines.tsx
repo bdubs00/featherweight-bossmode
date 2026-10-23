@@ -25,7 +25,6 @@ import {
   matchesRoutine,
   metaOf,
   money,
-  notYetOf,
   num,
   questionWords,
   resumeTo,
@@ -260,6 +259,8 @@ function RoutineView({ agent, name, tab }: { agent: string; name: string; tab: R
   const agentName = useAgentName(agent);
   const [failed, setFailed] = useState('');
   const [retire, setRetire] = useState(false);
+  // Not yet puts the card of a sign-off away for this visit of the routine. It sends nothing.
+  const [later, setLater] = useState(false);
   useRoutinesView();
   const [busy, setBusy] = useState(false);
   const narrow = useMedia(NARROW);
@@ -271,6 +272,7 @@ function RoutineView({ agent, name, tab }: { agent: string; name: string; tab: R
   const strip = narrow || room.cramped;
   useEffect(() => {
     setFailed('');
+    setLater(false);
     loadRoutine(agent, name).catch((e) => setFailed(e instanceof Error ? e.message : 'The action failed. Try it again.'));
   }, [key]);
   const back = { href: '#routines', label: 'Routines', to: 'list' as const };
@@ -339,7 +341,7 @@ function RoutineView({ agent, name, tab }: { agent: string; name: string; tab: R
         </div>
       )}
       <div class="scroll pad rt-body">
-        {tab === 'steps' && <StepsTab rec={rec} owner={owner} busy={busy} shift={shift} onRetire={() => setRetire(true)} />}
+        {tab === 'steps' && <StepsTab rec={rec} owner={owner} busy={busy} shift={shift} onRetire={() => setRetire(true)} later={later} onLater={() => setLater(true)} />}
         {tab === 'evidence' && <RoutineEvidence rec={rec} />}
         {tab === 'runbook' && <RunbookTab rec={rec} />}
       </div>
@@ -383,12 +385,29 @@ function ByLine({ by, at, note }: { by: string; at: string; note?: string }) {
   );
 }
 
-/** SignOff is the card of a routine that needs you: three figures, the note, and the keys Not yet and Sign off. */
-function SignOff({ rec, owner, busy, shift }: { rec: RoutineRecord; owner: boolean; busy: boolean; shift: (s: Standing, note?: string) => Promise<boolean> }) {
+/** The props of the card on top of the Steps tab. */
+interface CardProps {
+  rec: RoutineRecord;
+  owner: boolean;
+  busy: boolean;
+  shift: (s: Standing, note?: string) => Promise<boolean>;
+  onRetire: () => void;
+  /** True after Not yet, for this visit of the routine. */
+  later: boolean;
+  onLater: () => void;
+}
+
+/**
+ * SignOff is the card of a routine that needs you: three figures, the note,
+ * and the keys Not yet and Sign off. Not yet sends nothing: the routine
+ * keeps rehearsing and keeps needing you, and the card goes away for this
+ * visit.
+ */
+function SignOff({ rec, owner, busy, shift, onLater }: Pick<CardProps, 'rec' | 'owner' | 'busy' | 'shift' | 'onLater'>) {
   const [note, setNote] = useState('');
   const f = figuresOf(rec);
-  const act = async (s: Standing) => {
-    if (await shift(s, note.trim() || undefined)) setNote('');
+  const signOff = async () => {
+    if (await shift('live', note.trim() || undefined)) setNote('');
   };
   const title = owner ? 'Needs your sign-off' : 'Needs a sign-off';
   return (
@@ -400,10 +419,10 @@ function SignOff({ rec, owner, busy, shift }: { rec: RoutineRecord; owner: boole
       actions={
         owner ? (
           <>
-            <Button disabled={busy} onClick={() => act('rehearsing')}>
+            <Button disabled={busy} onClick={onLater}>
               Not yet
             </Button>
-            <Button kind="primary" disabled={busy} onClick={() => act('live')}>
+            <Button kind="primary" disabled={busy} onClick={signOff}>
               Sign off
             </Button>
           </>
@@ -435,9 +454,10 @@ function SignOff({ rec, owner, busy, shift }: { rec: RoutineRecord; owner: boole
   );
 }
 
-function TopCard({ rec, owner, busy, shift, onRetire }: { rec: RoutineRecord; owner: boolean; busy: boolean; shift: (s: Standing, note?: string) => Promise<boolean>; onRetire: () => void }) {
+function TopCard({ rec, owner, busy, shift, onRetire, later, onLater }: CardProps) {
   const s = statusOf(rec);
-  if (s === 'needs-you') return <SignOff rec={rec} owner={owner} busy={busy} shift={shift} />;
+  if (s === 'needs-you' && later) return <Card class="rt-card" title="Kept for later" tone="grey" quiet label="Kept for later" />;
+  if (s === 'needs-you') return <SignOff rec={rec} owner={owner} busy={busy} shift={shift} onLater={onLater} />;
   if (s === 'proposed') {
     const title = rec.source && rec.source.runs ? 'Proposed from ' + units(rec.source.runs) : 'Proposed';
     return (
@@ -469,24 +489,17 @@ function TopCard({ rec, owner, busy, shift, onRetire }: { rec: RoutineRecord; ow
       </Card>
     );
   }
-  const later = notYetOf(rec);
-  if (s === 'rehearsing' && later) {
-    return (
-      <Card class="rt-card" title="Not yet" tone="grey" quiet label="Not yet">
-        <ByLine by={later.by} at={later.at} note={later.note} />
-      </Card>
-    );
-  }
   return null;
 }
 
-function StepsTab({ rec, owner, busy, shift, onRetire }: { rec: RoutineRecord; owner: boolean; busy: boolean; shift: (s: Standing, note?: string) => Promise<boolean>; onRetire: () => void }) {
+function StepsTab(p: CardProps) {
+  const { rec } = p;
   const qs = rec.routine.questions || {};
   const keys = Object.keys(qs);
   const after = rec.routine.after || [];
   return (
     <>
-      <TopCard rec={rec} owner={owner} busy={busy} shift={shift} onRetire={onRetire} />
+      <TopCard {...p} />
       <section class="rt-sec" aria-labelledby="rt-steps">
         <h2 class="t-sub rt-sec-head" id="rt-steps">
           Steps
@@ -682,8 +695,9 @@ function Week({ w }: { w: RoutineSummary }) {
     { key: 'hatch', words: 'with a person', n: w.withPerson || 0 },
   ];
   const sum = parts.reduce((n, p) => n + p.n, 0);
-  const perRoutine = w.byRoutine > 0 && w.costUSD ? w.costUSD.routine / w.byRoutine : null;
-  const perAgent = w.byAgent > 0 && w.costUSD ? w.costUSD.agent / w.byAgent : null;
+  // The summary gives the average cost of one run of each kind.
+  const perRoutine = w.byRoutine > 0 && w.costUSD ? w.costUSD.routine : null;
+  const perAgent = w.byAgent > 0 && w.costUSD ? w.costUSD.agent : null;
   return (
     <>
       <section class="rt-dsec" aria-labelledby="rt-week">

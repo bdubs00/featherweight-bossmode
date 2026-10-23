@@ -44,10 +44,10 @@ const ROUTINE = {
 };
 const EVIDENCE = {
   days: [{ day: '2026-10-22', decided: 3, acted: 2, agreed: 2, disagreed: 0, handed: 1, applied: 0, failed: 0 }],
-  questions: { team: { bands: [{ from: 0.8, to: 1, runs: 2, agreed: 2 }] } },
-  disagreements: [{ run: 'run-9', input: '#9 A ticket', answers: { team: { said: 'a', observed: 'b' } } }],
+  questions: { team: [{ from: 0, to: 0.8, runs: 1, agreed: 0 }, { from: 0.8, to: 1, runs: 2, agreed: 2 }] },
+  disagreements: [{ run: 'run-9', at: at(0), input: '#9 A ticket', answers: [{ question: 'team', said: 'a', observed: 'b', agree: false }] }],
   sentBack: { applied: 0, agreed: 0 },
-  replay: { matched: 3, total: 3, at: at(0), runs: [{ run: 'run-8', input: '#8 A past ticket', same: true }] },
+  replay: { matched: 3, total: 3, at: at(0) },
 };
 
 const stream = () => new Response(new ReadableStream({ start() {} }), { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
@@ -75,7 +75,7 @@ beforeAll(() => {
     ['GET', /^\/v1\/pools\//, () => FLEET.pools![0]],
     ['GET', /^\/v1\/fleet\/runs/, () => ({ runs: [] })],
     ['GET', /^\/v1\/routines$/, () => ({ routines: [ROUTINE] })],
-    ['GET', /^\/v1\/routines\/summary/, () => ({ runs: 3, byRoutine: 1, byAgent: 1, withPerson: 1, costUSD: { routine: 0.001, agent: 0.02 }, sentBack: 0 })],
+    ['GET', /^\/v1\/routines\/summary/, () => ({ agent: 'migrator', days: 7, zone: 'UTC', since: at(0), runs: 3, byRoutine: 1, byAgent: 1, withPerson: 1, costUSD: { routine: 0.001, agent: 0.02 }, sentBack: 0, partial: false })],
     ['GET', /^\/v1\/routines\/migrator\/ack$/, () => ({ ...ROUTINE, evidence: EVIDENCE })],
   ]);
   restore = f.restore;

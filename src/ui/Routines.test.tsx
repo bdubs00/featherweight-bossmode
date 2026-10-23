@@ -42,10 +42,23 @@ const ACK = rec('acknowledge-a-new-ticket', 'rehearsing', {
   updatedAt: '2026-10-23T09:00:00Z',
   evidence: {
     days: [...days(1, { decided: 740, acted: 716, agreed: 699, disagreed: 17, handed: 24 }), ...days(1, { decided: 740, acted: 716, agreed: 698, disagreed: 18, handed: 24 })].map((d, i) => ({ ...d, day: day(1 - i) })),
-    questions: { team: { bands: [{ from: 0.95, to: 1, runs: 1201, agreed: 1182 }, { from: 0.85, to: 0.95, runs: 231, agreed: 215 }, { from: 0, to: 0.85, runs: 48, agreed: 31 }] } },
-    disagreements: Array.from({ length: 7 }, (_, i) => ({ run: 'run-' + i, input: '#48' + i + ' VPN drops', answers: { team: { said: 'network', observed: 'identity', probability: 0.91 } }, verification: i === 0 ? 'accepted' : undefined })),
+    questions: {
+      team: [
+        { from: 0, to: 0.5, runs: 0, agreed: 0 },
+        { from: 0.5, to: 0.7, runs: 0, agreed: 0 },
+        { from: 0.7, to: 0.85, runs: 48, agreed: 31 },
+        { from: 0.85, to: 0.95, runs: 231, agreed: 215 },
+        { from: 0.95, to: 1, runs: 1201, agreed: 1182 },
+      ],
+    },
+    disagreements: Array.from({ length: 7 }, (_, i) => ({
+      run: 'run-' + i,
+      input: '#48' + i + ' VPN drops',
+      answers: [{ question: 'team', said: 'network', observed: 'identity', agree: false, probability: 0.91 }],
+      verification: i === 0 ? 'accepted' : undefined,
+    })),
     sentBack: { applied: 0, agreed: 0 },
-    replay: { matched: 212, total: 212, at: '2026-10-11T09:00:00Z', runs: [{ run: 'run-p1', input: '#4410 Cannot open the calendar', same: true }] },
+    replay: { matched: 212, total: 212, at: '2026-10-11T09:00:00Z' },
   },
 });
 const LIVE = rec('reset-a-password', 'live', {
@@ -75,7 +88,7 @@ const ALL = [ACK, LIVE, REHEARSING, PROPOSED, PAUSED, RETIRED, CERT];
 const bare = ({ evidence: _e, ...r }: RoutineRecord) => r;
 const path = (r: RoutineRecord) => '/v1/routines/' + r.agent + '/' + r.routine.name;
 
-const WEEK = { runs: 1912, byRoutine: 41, byAgent: 1776, withPerson: 95, costUSD: { routine: 0.041, agent: 35.52 }, sentBack: 7 };
+const WEEK = { agent: 'triage', days: 7, zone: 'UTC', since: '2026-10-17T00:00:00Z', runs: 1912, byRoutine: 41, byAgent: 1776, withPerson: 95, costUSD: { routine: 0.001, agent: 0.02 }, sentBack: 7, partial: false };
 
 /** routes answers the list, each routine with its evidence, and the week of triage. after replaces a record once a move landed. */
 function routes(after: Record<string, RoutineRecord> = {}) {
@@ -202,15 +215,22 @@ describe('a routine that needs you', () => {
     expect(text(el.querySelector('.rt-status'))).toBe('live');
   });
 
-  it('keeps the routine in rehearsal with Not yet', async () => {
-    const table = routes() as Record<string, unknown>;
-    table['POST /v1/routines/triage/acknowledge-a-new-ticket/standing'] = { ok: true };
-    api = fakeApi(table as never);
+  it('puts the card away with Not yet for this visit only, sends nothing, and keeps needs you', async () => {
+    api = fakeApi(routes() as never);
     const el = mount(<RoutineMain agent="triage" name="acknowledge-a-new-ticket" tab="steps" />);
     await settle();
     click(keyNamed(el, 'Not yet'));
     await settle();
-    expect(api.calls.find((c) => c.method === 'POST')!.body).toEqual({ standing: 'rehearsing' });
+    expect(api.calls.some((c) => c.method === 'POST')).toBe(false);
+    const card = el.querySelector('.rt-body')!.firstElementChild!;
+    expect(card.classList.contains('quiet')).toBe(true);
+    expect(text(card)).toBe('Kept for later');
+    expect(text(el.querySelector('.rt-status'))).toBe('needs you');
+    // Another visit of the routine shows the card of the sign-off again.
+    unmountAll();
+    const again = mount(<RoutineMain agent="triage" name="acknowledge-a-new-ticket" tab="steps" />);
+    await settle();
+    expect(text(again.querySelector('.rt-card h3'))).toBe('Needs your sign-off');
   });
 
   it('shows the figures and no key to a person who does not own the agent', async () => {
@@ -311,16 +331,14 @@ describe('the evidence', () => {
     // The chart is placed elements, with a table for a screen reader.
     expect(el.querySelector('.rt-chart')!.getAttribute('aria-hidden')).toBe('true');
     expect(el.querySelectorAll('table.sr tbody tr')).toHaveLength(2);
-    expect(text(el.querySelector('.rt-line p'))).toBe('212 of 212 past tickets, handled the same way');
+    expect(text(el.querySelector('#rt-past')!.nextElementSibling)).toBe('212 of 212 past tickets, handled the same way');
     expect(el.textContent).not.toMatch(/matched/i);
-    const open = keyNamed(el, 'Open the tickets')!;
-    expect(open.getAttribute('aria-expanded')).toBe('false');
-    click(open);
-    expect(el.querySelector('#rt-past-list a')!.getAttribute('href')).toBe('/ui#run/run-p1');
-    expect(keyNamed(el, 'Hide the tickets')).toBeDefined();
+    // The workbench keeps no list of the past tickets yet, so the line has no key.
+    expect(keyNamed(el, 'Open the tickets')).toBeUndefined();
     expect([...el.querySelectorAll('.rt-sure tbody tr')].map(text)).toEqual(['95% sure or more 1,201 98.4% of the time', '85% to 95% sure 231 93.1% of the time', 'under 85% sure 48 handed to the agent']);
     expect(el.querySelectorAll('.rt-disagreed tbody tr')).toHaveLength(5);
     expect(text(el.querySelector('.rt-disagreed tbody tr'))).toBe('#480 VPN drops network 91% sure identity accepted');
+    expect(el.querySelector('.rt-disagreed tbody a')!.getAttribute('href')).toBe('/ui#run/run-0');
     click(keyNamed(el, 'Show all'));
     expect(el.querySelectorAll('.rt-disagreed tbody tr')).toHaveLength(7);
     expect(text(el.querySelector('#rt-made')!.parentElement)).toContain('212 tickets of triage');

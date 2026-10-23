@@ -6,13 +6,14 @@ import {
   bandRows,
   barsOf,
   checkWords,
+  countsOf,
+  disagreedOf,
   figuresOf,
   groupsOf,
   holeless,
   matchesRoutine,
   metaOf,
   money,
-  notYetOf,
   pct,
   resumeTo,
   runbookOf,
@@ -123,12 +124,14 @@ describe('the figures and the evidence', () => {
     expect(barsOf([]).axis).toEqual([]);
   });
 
-  it('words the bands of how sure it was, and hands a band under the mark to the agent', () => {
+  it('words the bands of how sure it was, joins the bands under the mark, and leaves out an empty band', () => {
     const rows = bandRows(
       [
-        { from: 0, to: 0.85, runs: 48, agreed: 31 },
-        { from: 0.95, to: 1, runs: 1201, agreed: 1182 },
+        { from: 0, to: 0.5, runs: 0, agreed: 0 },
+        { from: 0.5, to: 0.7, runs: 8, agreed: 3 },
+        { from: 0.7, to: 0.85, runs: 40, agreed: 28 },
         { from: 0.85, to: 0.95, runs: 231, agreed: 215 },
+        { from: 0.95, to: 1, runs: 1201, agreed: 1182 },
       ],
       0.85,
     );
@@ -137,6 +140,18 @@ describe('the figures and the evidence', () => {
       { words: '85% to 95% sure', runs: 231, right: '93.1%', handed: false },
       { words: 'under 85% sure', runs: 48, right: '64.6%', handed: true },
     ]);
+    expect(bandRows([{ from: 0.8, to: 0.85, runs: 0, agreed: 0 }, { from: 0.85, to: 1, runs: 2, agreed: 2 }], 0.8)).toEqual([{ words: '85% sure or more', runs: 2, right: '100%', handed: false }]);
+  });
+
+  it('keeps the answers of a disagreement where the routine and the agent differ', () => {
+    const d = { run: 'r', input: '#1', answers: [{ question: 'team', said: 'a', observed: 'a', agree: true }, { question: 'urgency', said: 'p3', observed: 'p2', agree: false }] };
+    expect(disagreedOf(d).map((a) => a.question)).toEqual(['urgency']);
+  });
+
+  it('takes the counts of the version from the totals of the workbench', () => {
+    const totals = { decided: 9, acted: 8, agreed: 6, disagreed: 2, handed: 1, applied: 0, failed: 0 };
+    expect(countsOf({ totals, days: [d(0, { decided: 1 })] })).toBe(totals);
+    expect(countsOf({ days: [d(0, { decided: 1 }), d(1, { decided: 2 })] }).decided).toBe(3);
   });
 
   it('says what happened afterward from the verification of the receipt', () => {
@@ -201,11 +216,5 @@ describe('the moves', () => {
   it('resumes a paused routine to the standing before the pause', () => {
     expect(resumeTo({ history: [{ at: at(1), by: 'a', standing: 'live' }, { at: at(2), by: 'a', standing: 'paused' }] })).toBe('live');
     expect(resumeTo({ history: [{ at: at(1), by: 'a', standing: 'rehearsing' }, { at: at(2), by: 'a', standing: 'paused' }] })).toBe('rehearsing');
-  });
-
-  it('finds Not yet: a move of a rehearsing routine to rehearsing, as its newest move', () => {
-    const notYet = { at: at(3), by: 'alice@example.com', standing: 'rehearsing' as const, note: 'More tickets first.' };
-    expect(notYetOf(rec('rehearsing', { history: [{ at: at(1), by: 'p', standing: 'proposed' }, { at: at(2), by: 'a', standing: 'rehearsing' }, notYet] }))).toEqual(notYet);
-    expect(notYetOf(rec('rehearsing', { history: [{ at: at(1), by: 'p', standing: 'proposed' }, { at: at(2), by: 'a', standing: 'rehearsing' }] }))).toBeNull();
   });
 });

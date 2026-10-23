@@ -648,7 +648,7 @@ column Now names the string of the approved boards where one changed.
 | `Signed off, it handles these tickets on its own. The agent still checks 1 in 20.` | remove | the chrome never explains | done |
 | `Note` | keep | the field of the decision card, with the placeholder `Optional` | done |
 | `Not yet`, `Sign off` | keep | the two keys of the card. Sign off is the primary key. | done |
-| `Kept for later` and `It stays under Needs you, and triage keeps rehearsing.` | change | `Not yet`, a quiet card with who and when, such as `By you, today.`, and the note. The routine goes back to Rehearsing until it is ready again. | done |
+| `Kept for later` and `It stays under Needs you, and triage keeps rehearsing.` | change | `Kept for later` alone, the quiet line that the card turns into after Not yet, for this visit of the routine. Not yet sends nothing, and the row keeps `needs you`. | done |
 | `Signed off` and `By you, just now. Live from the next ticket, with the agent checking 1 in 20.` | change | `Signed off`, a quiet card with `By you, today.` or `By grace, Oct 2.`, and the note of the sign-off | done |
 | new | add | `Proposed from N tickets`, the card of a proposed routine, with the keys `Retire` and `Rehearse` | done |
 | `Steps` with a count chip | change | `Steps` alone. The numbers of the steps give the count. | done |
@@ -669,14 +669,14 @@ column Now names the string of the approved boards where one changed.
 | `Of the 1,432 tickets it would have acted on, it agreed on 97.6%.` | remove | the figure is on the card of the Steps tab | done |
 | new | add | `Rehearsal per day` with `Day` and the three words, the table of the chart for a screen reader | done |
 | `Past tickets` with a count chip, and `212 of 212 past tickets matched` | change | `Past tickets` alone, and `212 of 212 past tickets, handled the same way` | done |
-| `Open the tickets` | keep | it opens the list of the past tickets in place, and says `Hide the tickets` while open. A ticket that the routine handled another way says `handled another way`. | done |
+| `Open the tickets` | remove | the replay of the workbench keeps no list of the past tickets. The key comes back with a later change that adds the list. | done |
 | `How sure it was` with the question mark `How sureness is measured` | change | the question mark `How it counts` with `Each answer of the routine comes with how sure it was. Each row counts the tickets at that level, and how often the agent chose the same answer.` | done |
-| `It said`, `Tickets`, `It was right`, `90% sure or more`, `85 to 90% sure`, `under 85% sure`, `98.4% of the time`, `handed to the agent` | change | `95% sure or more`, `85% to 95% sure`, and `under 85% sure`, with a percent at each end of a band. The question heads its rows where the routine has more than one. | done |
+| `It said`, `Tickets`, `It was right`, `90% sure or more`, `85 to 90% sure`, `under 85% sure`, `98.4% of the time`, `handed to the agent` | change | `95% sure or more`, `85% to 95% sure`, and `under 85% sure`, with a percent at each end of a band. A band without a ticket stays out, and the bands under the mark join in the row `handed to the agent`. The question heads its rows where the routine has more than one. | done |
 | `Where it disagreed` with its count chip, and `Ticket`, `The routine said`, `The agent chose`, `Afterward` | keep | `91% sure` beside what it said, and `none` where the agent chose nothing | done |
 | `requester accepted`, `a person relabeled it identity` | change | the verification of the receipt of the run: `accepted`, `checked`, `sent back`, or `no answer yet` | done |
 | `Open all 35` | change | `Show all`, then `Show fewer`, after the five newest | done |
 | `None of the 1,397 tickets where both agreed came back from a requester.` | change | `Sent back` with its count chip. A count above zero adds `N where it acted` and `N where it agreed with the agent`. A routine that never ran beside the agent shows no Sent back. | done |
-| `Tickets that triage handled between 14 Sep and 21 Oct, each accepted by its requester.` with `Open the tickets` | change | `Made from` with `212 tickets of triage, Sep 14 to Oct 10` and `Proposed by fw routine propose`. Past tickets holds the key. | done |
+| `Tickets that triage handled between 14 Sep and 21 Oct, each accepted by its requester.` with `Open the tickets` | change | `Made from` with `212 tickets of triage, Sep 14 to Oct 10` and `Proposed by fw routine propose` | done |
 | new | add | `Loading the evidence.` | done |
 
 ### src/ui/Routines.tsx: the runbook
@@ -700,6 +700,7 @@ column Now names the string of the approved boards where one changed.
 | `by routines`, `by the agent`, `by a person` | change | `by routines`, `by the agent`, `with a person`, the words of the summary | done |
 | `Per ticket` with `by a routine`, `by the agent`, and `7 min by a person, on average` | change | `Per ticket` with `by a routine` and `by the agent`. The summary has no time of a person. | done |
 | `Sent back` with its chip and `7 of 1,912 tickets came back from a requester this week, all handled by the agent or a person.` | change | `Sent back` with its chip | done |
+| `$0.001` `by a routine`, `$0.02` `by the agent` | keep | the averages of the summary as they come, two decimals from a cent and the first digit that counts below it | done |
 | `Signed off by` with the names of people | remove | who signed a routine off lives on the routine | done |
 | `Proposed by agents` and `Open in Confluence` | remove | Confluence is a later change | done |
 | new | add | `Loading the week.` | done |
