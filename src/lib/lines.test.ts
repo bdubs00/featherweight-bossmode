@@ -27,7 +27,6 @@ describe('lineWords', () => {
 
   it('keeps a short line of the page for the other events, with the sentence of the backend in a tooltip', () => {
     const cases: [string, string, string][] = [
-      ['failed', 'migrator-1 failed: the model answered 529 three times', 'migrator-1 failed'],
       ['failed', 'The front failed to seat reviewer-2: no queue for the agent', 'reviewer-2 did not take the seat'],
       ['failed', 'tester did not get message 41: the run is gone.', 'tester did not get a message'],
       ['cap', 'The bridge reached its cap of 2000 messages, so the front delivers no more messages to the members. Raise caps.maxMessages to go on; the channel keeps every message.', 'The bridge reached its cap of 2000 messages'],
@@ -46,6 +45,12 @@ describe('lineWords', () => {
       ['asked', 'reviewer asks: Which manifest is the source?', 'reviewer asks you'],
     ];
     for (const [event, text, words] of cases) expect(line(event, text)).toEqual({ text: words, title: text });
+    // A failed run keeps no raw error in its tooltip: the plain line, and the message of the provider.
+    expect(line('failed', 'migrator-1 failed: the model answered 529 three times')).toEqual({ text: 'migrator-1 failed', title: 'The model answered 529 three times.' });
+    const raw =
+      'writer failed: model: anthropic: stream claude-haiku-5-5: POST "http://ax-anthropic:8080/v1/messages?beta=true": 400 Bad Request (Request-ID: req_1) {"type":"error","error":{"type":"invalid_request_error","message":"This model does not support assistant message prefill."}}';
+    expect(line('failed', raw)).toEqual({ text: 'writer failed', title: 'The model refused the request. This model does not support assistant message prefill.' });
+    expect(line('failed', 'writer failed')).toEqual({ text: 'writer failed' });
     // A sentence that says no more than the words gets no tooltip.
     expect(line('muted', 'alice muted tester.')).toEqual({ text: 'alice muted tester' });
   });

@@ -117,7 +117,7 @@ describe('the system lines', () => {
     expect(text(2).firstChild!.textContent).toBe('tester woke up');
     expect(text(2).getAttribute('title')).toBeNull();
     expect(text(3).firstChild!.textContent).toBe('writer failed');
-    expect(text(3).getAttribute('title')).toBe('writer failed: The run reached its limit of 40 turns.');
+    expect(text(3).getAttribute('title')).toBe('Stopped at 40 turns.');
     expect(text(5).firstChild!.textContent).toBe('migrator-1 changed a page');
   });
 });

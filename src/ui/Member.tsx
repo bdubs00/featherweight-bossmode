@@ -73,18 +73,17 @@ function useStopped(m: MemberT | undefined): '' | 'failed' | 'stopped' | 'not-st
 }
 
 /**
- * TaskDialog changes the task of a seat, and a new run starts with it. With
- * again, its title and its key say Seat again. The page seats again in one
- * click with SeatAgainKey, and the dialog stays for a screen that asks
- * first.
+ * TaskDialog changes the task of a seat, and a new run starts with it.
+ * Seat again needs no dialog: SeatAgainKey sends the task unchanged in one
+ * click.
  */
-export function TaskDialog({ bridge, m, again, onClose }: { bridge: string; m: MemberT; again: boolean; onClose: () => void }) {
+export function TaskDialog({ bridge, m, onClose }: { bridge: string; m: MemberT; onClose: () => void }) {
   const [task, setTask] = useState(m.task);
   const [busy, setBusy] = useState(false);
   return (
     <Confirm
-      title={again ? 'Seat ' + m.handle + ' again' : 'Change the task of ' + m.handle}
-      confirm={again ? 'Seat again' : 'Change task'}
+      title={'Change the task of ' + m.handle}
+      confirm="Change task"
       busy={busy || !task.trim()}
       onCancel={onClose}
       onConfirm={async () => {
@@ -119,7 +118,7 @@ function SeatMenu({ bridge, m, stopped }: { bridge: string; m: MemberT; stopped:
   return (
     <>
       <Menu label={'More for ' + m.handle} kind="secondary" items={items} />
-      {dialog === 'task' && <TaskDialog bridge={bridge} m={m} again={false} onClose={() => setDialog('')} />}
+      {dialog === 'task' && <TaskDialog bridge={bridge} m={m} onClose={() => setDialog('')} />}
       {dialog === 'fire' && (
         <Confirm
           title={'Fire ' + m.handle + '?'}

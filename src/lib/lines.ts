@@ -9,6 +9,7 @@
 
 import type { Entry, Principal } from '../api/types';
 import { cap, personName } from './words';
+import { plainError, providerMessage } from './runerror';
 
 /** The person who reads the page, as GET /v1/whoami names them. */
 export type Me = Pick<Principal, 'subject' | 'name' | 'kind'> | null | undefined;
@@ -65,6 +66,14 @@ function reportOf(text: string, page?: string): string {
   if (page && /report\.md$/i.test(page)) return page;
   const m = /(bridges\/[^\s)\]]+?\/report\.md)/i.exec(text);
   return m ? m[1] : '';
+}
+
+/** failureTip is the plain line of the error of a run, and the message of its provider when it gives one, for the tooltip of a failed line. */
+function failureTip(error: string): string {
+  const plain = plainError(error);
+  const said = providerMessage(error);
+  if (!said || SAME(said, plain)) return plain ? plain + '.' : '';
+  return plain + '. ' + said;
 }
 
 const SAME = (a: string, b: string) => a.replace(/[.\s]+$/, '').trim().toLowerCase() === b.replace(/[.\s]+$/, '').trim().toLowerCase();
@@ -161,7 +170,13 @@ export function lineWords(e: Pick<Entry, 'event' | 'text' | 'page'>, me: Me): Li
       if ((m = /failed to put the job of (\S+?) on\b/.exec(t))) return out(handleOf(m[1]) + ' did not start');
       if ((m = /^(\S+) no longer waits for its decision\b/.exec(t))) return out(handleOf(m[1]) + ' stopped waiting for its decision');
       if (/\breport\b/i.test(t)) return out('The report failed');
-      if ((m = /^(\S+) failed\b/.exec(t))) return out(handleOf(m[1]) + ' failed');
+      if ((m = /^(\S+) failed\b:?\s*(.*)$/.exec(t))) {
+        // The error of the run comes raw, with the address, the request id, and the JSON of a provider. The tooltip holds its plain line and the message of the provider.
+        const w = out(handleOf(m[1]) + ' failed', false);
+        const tip = failureTip(m[2]);
+        if (tip) w.title = tip;
+        return w;
+      }
       return out('Failed');
     case 'cap':
       if ((m = /^The bridge reached its cap of (\d+) messages\b/.exec(t))) return out(`The bridge reached its cap of ${m[1]} messages`);

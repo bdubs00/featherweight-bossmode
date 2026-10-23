@@ -16,12 +16,18 @@ export function seatAgain(bridge: string, m: Pick<Member, 'handle' | 'task'>): P
   return attempt(() => patchMember(bridge, m.handle, { task: m.task }));
 }
 
-/** SeatAgainKey is the small secondary key Seat again. label names the seat for a screen reader where many keys share the screen, as in a list. */
-export function SeatAgainKey({ bridge, m, label }: { bridge: string; m: Pick<Member, 'handle' | 'task'>; label?: string }) {
+/**
+ * SeatAgainKey is the key Seat again: small and secondary in a row, and
+ * primary where the failure is the whole view, as in the main pane of
+ * Activity. label names the seat for a screen reader where many keys share
+ * the screen, as in a list.
+ */
+export function SeatAgainKey({ bridge, m, label, primary }: { bridge: string; m: Pick<Member, 'handle' | 'task'>; label?: string; primary?: boolean }) {
   const [busy, setBusy] = useState(false);
   return (
     <Button
-      size="s"
+      size={primary ? 'm' : 's'}
+      kind={primary ? 'primary' : 'secondary'}
       class="seat-again"
       aria-label={label}
       disabled={busy}

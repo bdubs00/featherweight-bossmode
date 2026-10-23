@@ -7,7 +7,7 @@ import type { Bridge, Decision, Entry, Member, Result, Run } from '../api/types'
 import type { Channel, Roster, State } from './reducer';
 import { newestRun } from './people';
 import { decisionOf } from '../lib/decision';
-import { plainError } from '../lib/runerror';
+import { plainError, providerMessage } from '../lib/runerror';
 import { seatPresence, type Facts } from '../lib/status';
 
 /**
@@ -33,8 +33,10 @@ export interface InboxRow {
   run?: string;
   decision?: Decision;
   entry?: Entry;
-  /** Why a seat stopped, such as the error of its run. */
+  /** Why a seat stopped, in one plain line. */
   reason?: string;
+  /** The message of the model provider inside the error of the run, for a tooltip, or "". */
+  said?: string;
   /** The moment of the row: when the wait started, the run stopped, or the message came. */
   at: string;
   /** True for a message that an agent addressed to you. */
@@ -70,6 +72,11 @@ export function reasonOf(run: Run | undefined, res: Result | undefined): string 
   if (res && res.limits && res.limits.length) return plainError(res.limits[0]);
   if (res && res.error) return plainError(res.error);
   return run && run.error ? plainError(run.error) : '';
+}
+
+/** saidOf is the message of the model provider inside the error of the newest run of a seat, or "". */
+export function saidOf(run: Run | undefined, res: Result | undefined): string {
+  return providerMessage((res && res.error) || (run && run.error) || '');
 }
 
 /** The handle that an agent writes to address the person who runs the page. */
@@ -161,7 +168,7 @@ export function inboxRows(s: InboxInput): InboxRow[] {
       }
       if (p === 'error' || (run && (run.state === 'failed' || run.state === 'canceled'))) {
         const kind: InboxKind = run && run.state === 'canceled' ? 'stopped' : 'failed';
-        rows.push({ ...base, key: 's:' + b.id + '/' + m.handle, kind, status: 'error', reason: reasonOf(run, s.results[id]), at: run ? run.updatedAt : '' });
+        rows.push({ ...base, key: 's:' + b.id + '/' + m.handle, kind, status: 'error', reason: reasonOf(run, s.results[id]), said: saidOf(run, s.results[id]), at: run ? run.updatedAt : '' });
       }
     }
     for (const a of asksOf(b, s.channels[b.id], s.me)) {

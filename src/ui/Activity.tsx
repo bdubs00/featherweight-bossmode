@@ -28,7 +28,7 @@ import { attempt } from './notice';
 import { Markdown, When } from './common';
 import { Composer } from './Composer';
 import { Msg } from './Thread';
-import { TaskDialog } from './Member';
+import { SeatAgainKey, seatAgain } from './SeatAgain';
 import { EmptyPane } from './Shell';
 import { Avatar, Button, Led, Mark, PaneHeader } from './primitives';
 
@@ -195,7 +195,6 @@ function rowName(r: InboxRow): string {
 
 /** InboxItem is one row of the inbox. */
 function InboxItem({ r, on }: { r: InboxRow; on: boolean }) {
-  const [seat, setSeat] = useState(false);
   const m = useSelect((s) => (r.handle && s.rosters[r.bridge] ? s.rosters[r.bridge].byHandle[r.handle] : undefined));
   const brief = r.decision && !r.decision.question ? briefOf(planOf(r.decision)) : null;
   return (
@@ -227,18 +226,17 @@ function InboxItem({ r, on }: { r: InboxRow; on: boolean }) {
             </time>
           )}
         </div>
-        <div class="inbox-text clip">{rowText(r)}</div>
+        <div class="inbox-text clip" title={r.said || undefined}>
+          {rowText(r)}
+        </div>
         {brief && (brief.code ? <code class="inbox-cmd clip">{brief.text}</code> : <div class="inbox-text clip">{brief.text}</div>)}
         <div class="inbox-where clip">{r.bridgeTitle}</div>
         {(r.kind === 'failed' || r.kind === 'stopped') && m && (
           <div class="inbox-do">
-            <Button size="s" onClick={() => setSeat(true)}>
-              Seat again
-            </Button>
+            <SeatAgainKey bridge={r.bridge} m={m} label={'Seat ' + m.handle + ' again'} />
           </div>
         )}
       </div>
-      {seat && m && <TaskDialog bridge={r.bridge} m={m} again onClose={() => setSeat(false)} />}
     </div>
   );
 }
@@ -250,9 +248,7 @@ export function ActivityList({ item }: { item?: string }) {
   const shown = useShown(item, rows);
   const needs = useSelect(selectAttention);
   const bridgesLoaded = useSelect((s) => s.bridges.loaded);
-  const [seatKey, setSeatKey] = useState('');
-  const seatRow = rows.find((r) => r.key === seatKey);
-  const seatMember = useSelect((s) => (seatRow && seatRow.handle && s.rosters[seatRow.bridge] ? s.rosters[seatRow.bridge].byHandle[seatRow.handle] : undefined));
+  const rosters = useSelect((s) => s.rosters);
   const list = useRoving<HTMLDivElement>({
     onEnter: (el) => {
       const r = rows.find((x) => x.key === el.getAttribute('data-key'));
@@ -297,7 +293,11 @@ export function ActivityList({ item }: { item?: string }) {
         }, 40);
       } else go({ place: 'activity', item: r.key });
     } else if (act === 'reply') openRow(r, true);
-    else if (act === 'seat') setSeatKey(r.key);
+    else if (act === 'seat') {
+      // s seats again at once with the same task, as the key of the row does.
+      const m = r.handle && rosters[r.bridge] ? rosters[r.bridge].byHandle[r.handle] : undefined;
+      if (m) seatAgain(r.bridge, m);
+    }
   };
   return (
     <section class="screen activity" aria-labelledby="activity-title">
@@ -316,7 +316,6 @@ export function ActivityList({ item }: { item?: string }) {
           </div>
         )}
       </div>
-      {seatRow && seatMember && <TaskDialog bridge={seatRow.bridge} m={seatMember} again onClose={() => setSeatKey('')} />}
     </section>
   );
 }
@@ -326,7 +325,6 @@ export function ActivityMain({ item }: { item?: string }) {
   const shown = useShown(item, rows);
   const r = rows.find((x) => x.key === shown);
   const m = useSelect((s) => (r && r.handle && s.rosters[r.bridge] ? s.rosters[r.bridge].byHandle[r.handle] : undefined));
-  const [seat, setSeat] = useState(false);
   if (!r) {
     return (
       <EmptyPane back={{ href: '#activity', label: 'Activity' }}>
@@ -379,15 +377,11 @@ export function ActivityMain({ item }: { item?: string }) {
             <div class="inbox-stop">
               <p class="inbox-stop-line">
                 <Led tone={r.kind === 'stopped' ? 'grey' : 'red'} word={r.kind === 'stopped' ? 'stopped' : 'error'} />
-                {r.reason && <span>{r.reason}</span>}
+                {r.reason && <span class="inbox-reason">{r.reason}</span>}
               </p>
+              {r.said && <p class="inbox-said">{r.said}</p>}
               {m && <p class="inbox-task">{m.task}</p>}
-              {m && (
-                <Button onClick={() => setSeat(true)} kind="primary">
-                  Seat again
-                </Button>
-              )}
-              {seat && m && <TaskDialog bridge={r.bridge} m={m} again onClose={() => setSeat(false)} />}
+              {m && <SeatAgainKey bridge={r.bridge} m={m} primary />}
             </div>
           )}
           {r.kind === 'message' && r.entry && (

@@ -115,6 +115,29 @@ describe('the inbox', () => {
     }
   });
 
+  it('seats a failed seat again in one click, on its row, in the main pane, and with s, each with its task unchanged', async () => {
+    const f = fakeFetch([['PATCH', /\/members\/broke$/, (b) => ({ ...seat('broke', 'writer', 'working'), ...(b as object) })]]);
+    try {
+      const el = mount(<ActivityList />);
+      const row = rows(el)[2];
+      const keyOf = row.querySelector('.seat-again') as HTMLButtonElement;
+      expect(keyOf.getAttribute('aria-label')).toBe('Seat broke again');
+      act(() => keyOf.click());
+      await vi.waitFor(() => expect(f.calls.filter((c) => c.method === 'PATCH').length).toBe(1));
+      expect(document.querySelector('[role="dialog"]')).toBeNull();
+      act(() => row.focus());
+      key(row, 's');
+      await vi.waitFor(() => expect(f.calls.filter((c) => c.method === 'PATCH').length).toBe(2));
+      const main = mount(<ActivityMain item={'s:b1/broke'} />);
+      expect(main.querySelector('.inbox-reason')!.textContent).toBe('Stopped at 40 turns');
+      act(() => (main.querySelector('.seat-again') as HTMLButtonElement).click());
+      await vi.waitFor(() => expect(f.calls.filter((c) => c.method === 'PATCH').length).toBe(3));
+      expect(f.calls.filter((c) => c.method === 'PATCH').map((c) => c.body)).toEqual([{ task: 'The task of broke' }, { task: 'The task of broke' }, { task: 'The task of broke' }]);
+    } finally {
+      f.restore();
+    }
+  });
+
   it('says that nothing needs you when nothing does', () => {
     act(() => {
       store.dispatch({ type: 'bridge', bridge: bridge('b1', 'Migrate Puppet', [seat('fine', 'migrator', 'working')], { needsYou: 0 }) });
