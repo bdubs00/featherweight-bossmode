@@ -418,6 +418,10 @@ a.vrow:hover {
   color: var(--muted);
   font-weight: 600;
 }
+/* How a person calls a skill: its slash command and the hint of its arguments. */
+.skill-call {
+  margin: 0 0 var(--s-5);
+}
 .loaders {
   display: flex;
   flex-wrap: wrap;

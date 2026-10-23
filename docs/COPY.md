@@ -556,7 +556,9 @@ Capacity shows where seating happens:
 | `<name> sets the accent <hex>.`, `The accent is <hex>.` | remove | Appearance holds the theme of the person only, and the accent belongs to the deployment | done |
 | `Skills` with the count chip, `Imported`, `Local`, `<server>`, `Tools`, `Built in` | keep | | done |
 | `Agents that can load it` with the count chip | keep | | done |
-| `Pick a skill or a tool in the list.` | keep | | done |
+| `Pick a skill or a tool in the list.` | keep | where two panes show, the place opens the first skill of the list, else its first tool, so this line shows only while the catalog loads. With nothing in the list, the main pane stays empty, because the list says `No skill yet.` | done |
+| the front matter of a skill as chips, such as `user-invocable true`, `argument-hint [task]`, and `arguments task` | change | how a person calls the skill, as one line of code under its description, such as `/proxmox-ops [task]`, and nothing else of the front matter. A skill that only a model loads shows no such line. | done |
+| the details pane of Skills with nothing picked, the list of the imported skills | change | the details pane holds `Add skill` alone. It lists the imported skills only beside the chooser of Add skill, where an install can replace one. With a skill open, it holds its keys alone: `Copy /<name>` and `Remove`. | done |
 | `This skill is not here. It can be removed, or it was renamed.` | keep | | done |
 | `No skill yet. Add one from a marketplace, an address, or a SKILL.md.` | change | `No skill yet.` with the key `Add skill` | C |
 | `Copy /<name>`, `Copied /<name>` | keep | | done |

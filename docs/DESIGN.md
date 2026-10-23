@@ -651,8 +651,11 @@ The work:
   `workers` makes the agent and its workers (`docs/CONTRACT.md`, section
   13).
 - The Skills place, at `#skills`. The list of section 5, the text of a skill
-  as Markdown with its front matter keys as chips, the description of a
-  tool, and the agents that can load it. The details pane holds one key,
+  as Markdown with one line that says how to call it, such as
+  `/proxmox-ops [task]`, the description of a tool, and the agents that can
+  load it. The front matter is for the agent that loads the skill, so the
+  page shows no other key of it. Where two panes show, the place opens the
+  first skill of the list. The details pane holds one key,
   Add skill, which opens a small chooser of four avenues: from a marketplace
   that the admin configured, from an address, a pasted SKILL.md, and
   uploaded files. Each avenue ends in a preview that the admin reads before
