@@ -55,12 +55,16 @@ describe('the direct thread', () => {
       { seq: 3, time: at(4), kind: 'tool', tool: 'files', callId: 'c2', input: { op: 'create', path: 'a.yml' } },
       { seq: 4, time: at(4), kind: 'file', tool: 'files', callId: 'c2', path: 'roles/a.yml', text: 'created' },
       { seq: 5, time: at(5), kind: 'tool', tool: 'front.fleet', callId: 'c3', input: {} },
-      { seq: 6, time: at(5), kind: 'assistant', text: 'Done.' },
+      { seq: 6, time: at(5), kind: 'tool', tool: 'front.pages_write', callId: 'c4', input: { path: 'notes/cron.md', text: '# Cron' } },
+      { seq: 7, time: at(5), kind: 'tool', tool: 'front.bridge_post', callId: 'c5', input: { text: 'Done.' } },
+      { seq: 8, time: at(5), kind: 'assistant', text: 'Done.' },
     ];
     expect(stepsOf(items).map((s) => [s.text, s.cmd || '', !!s.isError])).toEqual([
       ['Ran', 'ansible-lint roles/cron', true],
       ['Created roles/a.yml', '', false],
       ['Used fleet', '', false],
+      ['Wrote notes/cron.md', '', false],
+      ['Posted to the bridge', '', false],
     ]);
   });
 

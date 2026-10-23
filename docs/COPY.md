@@ -183,6 +183,25 @@ Capacity shows where seating happens:
 | `Today`, `Yesterday` | keep | | Lead |
 | `someone`, `bossmode` (sender of a system line) | keep | | Lead |
 
+### src/lib/runerror.ts
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| the whole error of a run, such as `model: anthropic: stream claude-haiku-5-5: POST "http://...": 400 Bad Request (Request-ID: ...) {"type":"error",...}`, cut to one red line in a row and in full in the run | change | one plain line from `plainError`, without an end mark: `The model refused the request` (a 4xx), `The model provider refused the key` (401), `The model provider refused access` (403), `The model provider does not know this model` (404), `The conversation is too long for the model`, `The model was busy` (429, or overloaded), `The model provider had an error` (5xx), and `The model did not answer in time`. An error of another service says `A service` in place of the model and its provider, and `A step did not finish in time` | done |
+| `budget exceeded: maxTurns` and the other limits of the budget | change | `Stopped at its turn limit`, `Stopped at its token limit`, `Stopped at its cost limit`, `Stopped at its time limit`, `Stopped at its tool call limit`, `Stopped: it kept repeating one step`, and `Stopped at its budget` for another limit. The older words keep the number: `The run reached its limit of 40 turns.` gives `Stopped at 40 turns`, and so does a limit of the result, such as `Stopped at the limit of 40 turns.` | done |
+| `canceled`, `context canceled` | change | `Stopped before it finished`, where the status does not say stopped already | done |
+| `<handle> lost its run <id>: no worker of the fleet holds it` | change | `Lost its worker` | done |
+| any other error | change | its first sentence, without addresses, request ids, JSON, the package names in front, or an end mark, at most 100 characters. `The run failed` when nothing is left | done |
+| the message of the provider inside its JSON, such as `This model does not support assistant message prefill. The conversation must end with a user message.` | add | `providerMessage` gives it: the tooltip of the plain line, and a muted line under it in the run | done |
+
+### src/lib/steps.ts
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `front.pages_write` (a step of the run that the kernel names by its tool), `Used pages_write` (a step line of a thread) | change | the step as a person says it, with its target: `Wrote <path>`, `Read <path>`, `Read the history of <path>`, `Searched the wiki for "<words>"`, `Listed the pages`, `Listed the pages under <prefix>`, `Posted to the bridge`, `Posted to <a> and <b>`, `Read the channel`, `Listed the bridges`, `Opened a bridge`, `Seated <handle>`, `Fired <handle>`, `Closed the bridge`, and `Asked you`. Without a target: `Wrote a page`, `Read a page`, `Seated a member`, and the like | done |
+| `Ran "<command>"`, `Wrote <path>`, and the other words of the kernel for a step | keep | the command shows as code | done |
+| `Used <tool>` | keep | only for a tool that the page does not know and that the kernel names only by its name | done |
+
 ### src/lib/handles.ts, src/lib/pagepath.ts
 
 | Now | Verdict | New text | Who |

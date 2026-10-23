@@ -748,6 +748,8 @@ another:
 | Capacity | `workersOf` in `src/lib/workers.ts` |
 | Seats | `nextHandle` and `handleReason` in `src/lib/handles.ts` |
 | Times | `since` in `src/lib/words.ts` |
+| Failures | `plainError` and `providerMessage` in `src/lib/runerror.ts` |
+| Steps | `stepWords`, `stepInputs`, and `pagesWritten` in `src/lib/steps.ts` |
 | The slash menu | `slashAt` in `src/lib/mention.ts`, and the `commands` of `Composer` |
 | Skills | `loadSkills` and `state.skills` |
 | A cut card on the stream | `completeEvent` in `src/state/actions.ts`, already in the stream |
