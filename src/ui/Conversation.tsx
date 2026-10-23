@@ -157,12 +157,15 @@ export const POLL_MS = 3000;
  * is true, such as while an answer to a message is on its way. A run of the
  * front itself, such as a manager on the front, sends no run event on the
  * stream, so its conversation polls it while it is open. A run that does
- * not work gets no poll, because a read of it can wake its worker. A
- * hidden tab skips a read.
+ * not work gets no poll, because a read of it can wake its worker. A run
+ * that the fleet lost gets no poll either: its last state can still say
+ * running, and a read of it answers 404, which marks it lost. A hidden tab
+ * skips a read.
  */
 export function usePoll(runId: string, also = false): void {
   const state = useSelect((s) => (runId && s.runs[runId] ? s.runs[runId].state : ''));
-  const active = !!runId && (also || state === 'queued' || state === 'running');
+  const lost = useSelect((s) => !!runId && !!s.lost[runId]);
+  const active = !!runId && !lost && (also || state === 'queued' || state === 'running');
   useEffect(() => {
     if (!active) return;
     const t = setInterval(() => {
@@ -170,8 +173,9 @@ export function usePoll(runId: string, also = false): void {
       api
         .run(runId)
         .then((r) => store.dispatch({ type: 'run', run: r }))
-        .catch(() => {
-          // A missed poll waits for the next one.
+        .catch((e) => {
+          // A run that the fleet does not hold is lost, and the poll stops. Any other miss waits for the next read.
+          if (e instanceof ApiError && e.status === 404) store.dispatch({ type: 'run-lost', id: runId });
         });
     }, POLL_MS);
     return () => clearInterval(t);

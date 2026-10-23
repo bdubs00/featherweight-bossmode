@@ -6,7 +6,7 @@ import type { BossConfig, Item, Run } from '../api/types';
 import { Manager, POLL_MS } from './Manager';
 import { blocksOf } from './Conversation';
 import { parseSlash } from '../lib/mention';
-import { click, fakeApi, keyNamed, mount, settle, typeIn, unmountAll } from './testkit-c';
+import { click, fakeApi, keyNamed, mount, problem, settle, typeIn, unmountAll } from './testkit-c';
 
 const CONFIG: BossConfig = { manager: { agent: 'manager', member: 'default/manager-0', run: 'run-m' }, placement: 'queue', maxMembers: 16 };
 const run = (state: Run['state'], seq: number): Run => ({ id: 'run-m', agent: 'manager', state, seq, createdAt: '', updatedAt: '' });
@@ -66,6 +66,25 @@ describe('the manager', () => {
       await vi.advanceTimersByTimeAsync(POLL_MS * 3);
     });
     expect(runReads()).toBe(2);
+  });
+
+  it('stops the poll of a run that the fleet lost: a read that answers 404 marks it lost', async () => {
+    const g = { ...run('running', 1), id: 'run-g' };
+    act(() => store.dispatch({ type: 'config', config: { ...CONFIG, manager: { ...CONFIG.manager!, run: 'run-g' } } }));
+    api = fakeApi({ 'GET /v1/runs/run-g/transcript': { run: g, items: [ASK], next: 0, prev: 0 }, 'GET /v1/runs/run-g': () => problem(404, 'no run run-g'), 'GET /v1/tools': { tools: [] } });
+    mount(<Manager />);
+    await settle();
+    const reads = () => api.calls.filter((c) => c.method === 'GET' && c.path === '/v1/runs/run-g').length;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(POLL_MS);
+    });
+    await settle();
+    expect(reads()).toBe(1);
+    await vi.waitFor(() => expect(store.get().lost['run-g']).toBe(true));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(POLL_MS * 3);
+    });
+    expect(reads()).toBe(1);
   });
 
   it('says waking while the first answer waits for the Task of the manager', async () => {
