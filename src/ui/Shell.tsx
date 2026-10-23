@@ -43,7 +43,7 @@ export function useLogo(path: string): string {
         if (live) setUrl(u);
       })
       .catch(() => {
-        // A logo that fails to load leaves the empty well. The page needs no logo.
+        // A logo that fails to load leaves the monogram. The page needs no logo.
       });
     return () => {
       live = false;

@@ -26,28 +26,55 @@ import { attempt, showError } from './notice';
 import { Confirm, InlineMarkdown, Menu } from './common';
 import { Glyph } from './icons';
 import { Button, Chip, Field, Help, Input, Led, Mark, PaneHeader } from './primitives';
+import { Abilities } from './Abilities';
+import { abilitiesOf, rulesWords } from '../lib/tools';
+import { costParts } from '../lib/cost';
+import { useToolCatalog } from '../state/tools';
 
 const WORKER_HELP = 'A worker runs the work of one agent, one seat at a time. Keep is how many it keeps ready.';
 const POLL_MS = 10_000;
 
-/** usePool reads Keep and the gaps of the workers of an agent now and every 10 seconds while the profile is open, and the counts of today. */
+/**
+ * usePool reads Keep and the gaps of the workers of an agent now and every
+ * 10 seconds while the profile is open, and the counts of today. The page
+ * asks only what exists: it reads a pool only once the fleet names it, so a
+ * profile of the front costs no read, and it stops a read that answered
+ * 404, so a workbench without the route of today costs no request every 10
+ * seconds.
+ */
 function usePool(agent: string): [Pool | null | undefined, (p: Pool | null) => void, Today | null | undefined] {
   const [pool, setPool] = useState<Pool | null | undefined>(undefined);
   const [today, setToday] = useState<Today | null | undefined>(undefined);
   const name = useSelect((s) => poolNameOf(s.fleet, agent));
+  // The fleet names the pools, so the page waits for it before it reads one, and the read of the fleet after a new agent names its pool.
+  const pooled = useSelect((s) => (s.fleet ? (s.fleet.pools || []).some((p) => p.agent === agent) : undefined));
   useEffect(() => {
     let live = true;
-    setPool(undefined);
+    let askPool = pooled === true;
+    let askToday = true;
+    setPool(pooled === false ? null : undefined);
     setToday(undefined);
     const read = () => {
-      api
-        .pool(name)
-        .then((p) => live && setPool(p))
-        .catch(() => live && setPool((old) => (old === undefined ? null : old)));
-      api
-        .today(agent)
-        .then((t) => live && setToday(t))
-        .catch(() => live && setToday((old) => (old === undefined ? null : old)));
+      if (askPool) {
+        api
+          .pool(name)
+          .then((p) => {
+            if (!live) return;
+            if (!p) askPool = false;
+            setPool(p);
+          })
+          .catch(() => live && setPool((old) => (old === undefined ? null : old)));
+      }
+      if (askToday) {
+        api
+          .today(agent)
+          .then((t) => {
+            if (!live) return;
+            if (!t) askToday = false;
+            setToday(t);
+          })
+          .catch(() => live && setToday((old) => (old === undefined ? null : old)));
+      }
     };
     read();
     const t = setInterval(read, POLL_MS);
@@ -55,16 +82,25 @@ function usePool(agent: string): [Pool | null | undefined, (p: Pool | null) => v
       live = false;
       clearInterval(t);
     };
-  }, [agent, name]);
+  }, [agent, name, pooled]);
   return [pool, setPool, today];
 }
 
-/** useLiked reads the page of what people liked about an agent, again when the page changes. */
+/**
+ * useLiked reads the page of what people liked about an agent, again when
+ * the page changes. Once the page knows the list of the wiki, it reads no
+ * page that the list does not hold: an agent without a heart costs no read.
+ */
 function useLiked(agent: string): { path: string; items: LikedEntry[] | null } {
   const path = 'agents/' + agent + '/learned.md';
   const hash = useSelect((s) => (s.pages.byPath[path] ? s.pages.byPath[path].hash : ''));
+  const absent = useSelect((s) => s.pages.loaded && !s.pages.byPath[path]);
   const [items, setItems] = useState<LikedEntry[] | null>(null);
   useEffect(() => {
+    if (absent) {
+      setItems([]);
+      return;
+    }
     let live = true;
     api
       .page(path)
@@ -77,7 +113,7 @@ function useLiked(agent: string): { path: string; items: LikedEntry[] | null } {
     return () => {
       live = false;
     };
-  }, [path, hash]);
+  }, [path, hash, absent]);
   return { path, items };
 }
 
@@ -309,6 +345,7 @@ function Liked({ agent }: { agent: string }) {
 /** TodaySec is the count of runs, the cost, and the decisions of the day of the agent. */
 function TodaySec({ agent, today }: { agent: string; today: Today | null | undefined }) {
   if (!today) return null;
+  const cost = typeof today.costUSD === 'number' ? costParts(today.costUSD) : null;
   return (
     <section class="prof-sec" aria-labelledby={'today-' + agent}>
       <h3 class="t-sub" id={'today-' + agent}>
@@ -318,9 +355,10 @@ function TodaySec({ agent, today }: { agent: string; today: Today | null | undef
         <span>
           <b>{today.runs}</b> {today.runs === 1 ? 'run' : 'runs'}
         </span>
-        {typeof today.costUSD === 'number' && (
+        {cost && (
           <span>
-            <b>${today.costUSD.toFixed(2)}</b>
+            {cost.lead && cost.lead + ' '}
+            <b>{cost.n}</b>
             {today.partial && ' so far'}
           </span>
         )}
@@ -409,8 +447,11 @@ export function Profile({ agent, back }: { agent: string; back?: { href: string;
   const toolNames = (info && info.tools) || (started && started.tools) || [];
   const policy = (info && info.policy) || (started && started.policy) || null;
   const skillCount = loadable ? loadable.length : 0;
-  // The rules of the profile, and the rules that its decisions named.
-  const rules = useMemo(() => [...new Set([...policyRules(policy), ...rulesOf(agent, runs, channels)])].sort(), [policy, agent, runs, channels]);
+  const catalog = useToolCatalog();
+  // What the agent can do, in plain words: the tools of the profile, a glob as one ability.
+  const abilities = useMemo(() => abilitiesOf(toolNames, catalog), [toolNames.join('\n'), catalog]);
+  // The rules of the profile, and the rules that its decisions named, as a person reads them.
+  const rules = useMemo(() => rulesWords([...new Set([...policyRules(policy), ...rulesOf(agent, runs, channels)])].sort(), catalog), [policy, agent, runs, channels, catalog]);
   const upload = async () => {
     const f = file.current && file.current.files && file.current.files[0];
     if (!f) return;
@@ -460,25 +501,6 @@ export function Profile({ agent, back }: { agent: string; back?: { href: string;
             ) : (
               <>
                 {((face && face.tagline) || (info && info.description)) && <p class="prof-tagline">{(face && face.tagline) || (info && info.description)}</p>}
-                {(toolNames.length > 0 || rules.length > 0) && (
-                  <ul class="prof-chips" aria-label="Tools and rules">
-                    {toolNames.map((t) => (
-                      <li>
-                        <Chip class="prof-tool">{t}</Chip>
-                      </li>
-                    ))}
-                    {rules.map((r) => (
-                      <li>
-                        <Chip class="prof-rule">{r}</Chip>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {loadable && (
-                  <a class="prof-link prof-skills" href="#skills">
-                    {skillCount === 1 ? '1 skill' : skillCount + ' skills'}
-                  </a>
-                )}
                 {owner && (
                   <div class="prof-face">
                     <Button size="s" disabled={busy} onClick={() => file.current && file.current.click()}>
@@ -496,6 +518,22 @@ export function Profile({ agent, back }: { agent: string; back?: { href: string;
             )}
           </div>
         </section>
+        {(abilities.length > 0 || rules.length > 0 || loadable) && (
+          <section class="prof-sec" aria-labelledby={'can-' + agent}>
+            <div class="prof-sec-head">
+              <h3 class="t-sub" id={'can-' + agent}>
+                What it can do
+              </h3>
+              <span class="grow" />
+              {loadable && (
+                <a class="prof-link prof-skills" href="#skills">
+                  {skillCount === 1 ? '1 skill' : skillCount + ' skills'}
+                </a>
+              )}
+            </div>
+            <Abilities abilities={abilities} rules={rules} label="Tools and rules" />
+          </section>
+        )}
         <Liked agent={agent} />
         <Workers agent={agent} owner={owner} pool={pool} setPool={setPool} />
         <TodaySec agent={agent} today={today} />

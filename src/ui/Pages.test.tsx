@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { PageMeta } from '../api/types';
+import type { Bridge, PageMeta } from '../api/types';
 import { PageEditor, PageTree, PageView, foldersOf } from './Pages';
+import { act } from 'preact/test-utils';
+import { store } from '../state/store';
 import { parseRoute } from '../lib/route';
 import { click, fakeApi, fieldOf, keyNamed, mount, problem, settle, typeIn, unmountAll } from './testkit-c';
 
@@ -18,13 +20,21 @@ afterEach(() => {
 });
 
 describe('the tree of the wiki', () => {
-  it('groups the pages by folder, the root first', () => {
-    const f = foldersOf([meta('runbooks/b.md'), meta('index.md'), meta('agents/migrator/learned.md'), meta('runbooks/a.md')]);
+  it('groups the pages by folder: the root, the folders of people, then the work of bridges and agents', () => {
+    const f = foldersOf(
+      [meta('runbooks/b.md'), meta('index.md'), meta('agents/migrator/learned.md'), meta('bridges/01m5h96ejx8yh5fqkg/plan.md'), meta('k3s/runbooks/upgrade.md'), meta('runbooks/a.md'), meta('homelab.md'), meta('bridges/br-old/notes.md')],
+      { '01m5h96ejx8yh5fqkg': 'Harden the lab hosts' },
+    );
     expect(f.map((x) => [x.path, x.pages.map((p) => p.path)])).toEqual([
-      ['', ['index.md']],
-      ['agents/migrator', ['agents/migrator/learned.md']],
+      ['', ['homelab.md', 'index.md']],
+      ['k3s/runbooks', ['k3s/runbooks/upgrade.md']],
       ['runbooks', ['runbooks/a.md', 'runbooks/b.md']],
+      ['bridges/br-old', ['bridges/br-old/notes.md']],
+      ['bridges/01m5h96ejx8yh5fqkg', ['bridges/01m5h96ejx8yh5fqkg/plan.md']],
+      ['agents/migrator', ['agents/migrator/learned.md']],
     ]);
+    // A bridge is named by its title, an agent by its name, and a bridge that the page does not know keeps its path.
+    expect(f.map((x) => x.title)).toEqual(['', 'k3s/runbooks', 'runbooks', 'bridges/br-old', 'Harden the lab hosts', 'migrator']);
   });
 
   it('shows each name without .md, and the time as a short meta', async () => {
@@ -34,6 +44,16 @@ describe('the tree of the wiki', () => {
     expect(el.querySelector('.group-head')!.textContent).toBe('runbooks1');
     expect(el.querySelector('.wrow .meta')!.textContent).toBe('deploy14 min');
     expect(el.textContent).not.toContain('.md');
+  });
+  it('names the folder of a bridge by its title and keeps the path in the tooltip', async () => {
+    api = fakeApi({});
+    act(() => store.dispatch({ type: 'pages', pages: [meta('bridges/01m5h96ejx8yh5fqkg/plan.md'), meta('agents/docs-scribe/learned.md')] }));
+    act(() => store.dispatch({ type: 'bridges', bridges: [{ id: '01m5h96ejx8yh5fqkg', title: 'Harden the lab hosts', goal: '', operator: '', state: 'closed', placement: 'queue', createdAt: '', updatedAt: '', lastSeq: 0, read: 0, unread: 0, memberCount: 0, needsYou: 0 } as unknown as Bridge] }));
+    const el = mount(<PageTree />);
+    await settle();
+    const heads = [...el.querySelectorAll('button.group-head')];
+    expect(heads.map((h) => h.querySelector('.clip')!.textContent)).toEqual(['Harden the lab hosts', 'docs-scribe']);
+    expect(heads.map((h) => h.getAttribute('title'))).toEqual(['bridges/01m5h96ejx8yh5fqkg', 'agents/docs-scribe']);
   });
 });
 
@@ -67,6 +87,22 @@ describe('the links of a page', () => {
 });
 
 describe('the editor', () => {
+  it('names the page by its title, and opens the text at its top with the caret at its start', async () => {
+    const long = 'line\n'.repeat(400);
+    api = fakeApi({ 'GET /v1/pages/runbooks/deploy.md': { ...page(long, 'h1'), title: 'Upgrade k3s on jucs-k3s' }, 'GET /v1/pages': { pages: [] } });
+    const el = mount(<PageEditor path="runbooks/deploy.md" />);
+    await settle();
+    await act(async () => {
+      await new Promise((r) => requestAnimationFrame(() => r(null)));
+    });
+    expect(el.querySelector('#edit-title')!.textContent).toBe('Edit Upgrade k3s on jucs-k3s');
+    const box = fieldOf(el, 'Text') as unknown as HTMLTextAreaElement;
+    expect(document.activeElement).toBe(box);
+    expect(box.selectionStart).toBe(0);
+    expect(box.selectionEnd).toBe(0);
+    expect(box.scrollTop).toBe(0);
+  });
+
   it('meets a 412 with the conflict and keeps the text of the person', async () => {
     let reads = 0;
     api = fakeApi({

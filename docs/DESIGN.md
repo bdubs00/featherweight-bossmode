@@ -111,7 +111,6 @@ Derived values, each with one job:
 | `--card` | The ground of a card | `#F3F3EF` | `#3B3B38` |
 | `--card-groove` | The ground of the groove band of a card | `#DCDCD6` | `#2E2E2B` |
 | `--on-ink` | Text on an ink ground: a count, a person's initials | `#F3F3EF` | `#000000` |
-| `--placeholder` | The dashed edge and the mark of an empty logo well | `#8A8A82` | `#8A8A82` |
 | `--wash-need` | The ground of a row that needs you | `#FFF7E8` | `#3F3828` |
 
 Status lights. A light never stands alone: a word stands beside it, in the
@@ -311,6 +310,9 @@ a back link to the column before.
 +---------------------------+
 ```
 
+A pane scrolls down and never sideways. Long code and long words wrap,
+and only a block of code scrolls on its own.
+
 Alignment: text is left aligned everywhere. System lines in a channel are
 centered, because they are not anyone's voice. Numbers in chips are centered
 in the chip. Nothing is justified.
@@ -358,7 +360,7 @@ color, radius, shadow, or type size of its own.
 | `Led` | A 9-pixel square light and its word | Green, amber (breathes), red, and grey. Struck for fired. Quiet: no word on screen, the word in a tooltip and the accessible name. Still: the amber light holds, for a status that waits for nothing. |
 | `LineLed` | The bare light of a line whose text is its word: a system line, a decided line | The four tones. It never breathes. |
 | `FleetFoot` | The readout of the fleet at the foot of the Bridges list, in `Shell.tsx`: the caption `N workers`, a rack of 9-pixel square lamps in a recessed slot, one per worker in the order of attention, and the figures below. The whole foot is the key to the Fleet place. | A lit green lamp works, a green ring is awake and free, a grey ring starts, a dark lamp sleeps or stops, and a lit red lamp failed. Past 14 workers, each status takes its share of the rack. Once the stream has been down for 6 seconds, every lamp turns to an empty ring and `Connecting` takes the place of the figures, because the reads of the page are fresh before then. `Offline` shows at once. Nothing moves. |
-| `Mark` | The face of an agent: a 5 by 5 symmetric glyph from the hash of the name on a raised square, or the custom picture of the backend | Sizes 20, 32, 36, and 72. A halo of a status color in the header of a member conversation. Selected: the well turns paper. |
+| `Mark` | The face of an agent: a 5 by 5 symmetric glyph from the hash of the name on a raised square, or the custom picture of the backend. The lit rows sit in the middle of the well, one row off at most, so a glyph never sits at the foot of its well as a stray shape. | Sizes 20, 32, 36, and 72. Empty: the well with no glyph, where New agent waits for a name; once the person types one, the well draws the mark of that name. A halo of a status color in the header of a member conversation. Selected: the well turns paper. |
 | `Avatar` | A person: initials in on-ink on an ink square | sizes 20, 32, 36 |
 | `Chip` | A count or a short state on a heading line | plain (line edge, muted), ink (unread), amber (decisions), with an optional `Led` inside |
 | `Button` | A key | Primary: accent, 2px edge, raised 1px. Secondary: key ground, 1px edge, 1px drop. Quiet: no edge, no ground. Danger: a secondary key with the red word, for Fire and Remove. Sizes 36 and 32, and 44 on touch. Disabled, pressed, and a link with `href`. Its ref reaches the element, so a layer can give the focus back to it. `IconButton` is a key with one glyph and a name. |
@@ -370,7 +372,7 @@ color, radius, shadow, or type size of its own.
 | `Card` | A surface with a hard edge, a groove band, a title with an optional light, a body, and actions at the end | Settle: once, on arrival. Quiet: a line edge, no drop, no breath, for a card that waits for nothing, and for a card that waits for a decision that the person may not make, which shows `Waits for a decision` and who decides. The page never shows a key that the front refuses. |
 | `Tabs` | Tabs on a header line, each with an optional count chip | current (ink, bold, the accent bar), hover (ink) |
 | `ReactionChip` | A thumb up, a thumb down, or a heart with its count | mine (the line turns ink), the heart filled with the accent |
-| `LogoWell` | The 44-pixel square at the top of the app bar | empty (dashed edge, a neutral mark), a logo from the deployment |
+| `LogoWell` | The 44-pixel square at the top of the app bar, set in like a nameplate: paper, a line edge, and a sheen | a logo from the deployment; else the monogram of the name of the organization, such as H for Homelab, wide and heavy in ink; else the monogram of bossmode in muted ink. It never shows a dashed edge or a picture that stands in for a logo. |
 
 ## 7. Principles
 
@@ -420,9 +422,10 @@ The page reads it at boot, in `src/lib/theme.ts`:
 - `logo` must be a path on this origin under `/v1/`. The page reads it with
   the bearer token, as it reads a face, and shows it as a blob URL in an
   image inside the logo well. Any other value, a failed read, or no theme
-  keeps the empty well.
-- `name` labels the logo well and the sign-in. Without it, the page says
-  bossmode.
+  keeps the monogram.
+- `name` labels the logo well and the sign-in, and gives the monogram of
+  the well without a logo: the first letter of each of its first two
+  words. Without it, the page says bossmode, and the well shows a muted B.
 
 The person picks Match the system, Light, or Graphite in the account menu.
 The page keeps that choice in `localStorage` under `fw.bossmode.theme`, a
@@ -575,8 +578,9 @@ The work:
   link and a count chip. Each row: the mark at 32, the handle, its status,
   and its task. Then Not on a bridge, last: the agents with no seat, with
   the state of their workers. A Find a member field on top. The header has
-  the count chip, an `N awake` chip with a green light, and the key New
-  agent. The list loads the record of each open bridge, and the stream
+  the count chip, an `N awake` chip with a green light while a worker is
+  awake, and the key New agent. With no worker awake, the chip goes, because
+  a green light never stands for zero. The list loads the record of each open bridge, and the stream
   keeps it current. Every status of the list and of its header comes from
   `statusOf` (section 11.8).
 - The member conversation, at `#member/<bridge>/<handle>`. The header has
@@ -598,8 +602,12 @@ The work:
   no phrase, so the phrase comes from the member of the bridge. For the
   reads of each tab, see section 11.8.
 - The profile of the agent, in the details pane. The mark at 72, the
-  tagline, the tools as chips, a rule as an amber word, and the key New
-  face. What people liked, from `agents/<agent>/learned.md`, with a count
+  tagline, and the key New face. What it can do: one plain line per
+  ability, from the phrases of the catalog of tools, with the tools of the
+  wiki as one line and the tools of the bridges as another, and a rule
+  that asks first as an amber line, such as Asks before git push. The raw
+  names and the patterns sit in a tooltip. `src/lib/tools.ts` gives the
+  words. What people liked, from `agents/<agent>/learned.md`, with a count
   chip and Open page. Workers, with its chip, the question mark What is a
   worker, and Keep as a number field in place. Each worker: its name, its
   status, and the seat it serves or the time it slept, as `since()` gives
@@ -628,17 +636,28 @@ The work:
 
 - The wiki. The tree with its folders as groups, each row with its name and
   `since()`, the search, the page with its meta as parts, the history, and
-  the editor with the conflict of a 412.
+  the editor with the conflict of a 412. The groups come in the order that
+  a person looks for them: the pages at the root, then the folders that
+  people and agents keep for the place, such as `runbooks` or
+  `k3s/monitoring`, by path, then the work folders of the bridges, each
+  named by the title of its bridge, then the folders of the agents, each
+  named by the agent. The path of a folder sits in its tooltip. The editor
+  names the page by its title, and opens its text at the top with the
+  caret at the start.
 - The manager conversation. The look of the channel, the status waking with
   a grey light while the Task of the manager wakes, and New conversation. A
   manager that runs on the front gets no `run` event, so the screen polls
   `GET /v1/runs/{id}` while the run works. Without a manager, the screen
   says `No manager is set up.` with a question mark that names the setting.
-- New bridge. One question first: the goal. The placement is a visible
-  choice of two: Keep warm workers, the default (`queue`), and Fresh sandbox
-  per seat (`spawn`), which needs a manager. The seats come from the picker
-  of A once it lands, and until then from the rows of today. Advanced holds
-  the title, the handles, and what the manager can do.
+- New bridge. The first view holds one question, the goal, and the seats:
+  the choice of who seats the bridge where a manager is set up, the seat
+  rows, and the key Add a seat, which opens the picker of A. Advanced holds
+  the title, the handles, the placement, the caps, and what the manager
+  can do. The placement is a choice of two: Keep warm workers, the default
+  (`queue`), and Fresh sandbox per seat (`spawn`), which needs a manager.
+  The primary key names what it does: Open bridge for seats that the
+  person picks, and Ask the manager for a job that the manager splits,
+  which lands the person in the conversation of the manager.
 - New agent, at `#new-agent`. One question first: the name, beside what
   it handles. Then How many can work at once?, with 2 as the default. The
   profile shows that number as Keep. If the settings offer more than one
@@ -649,8 +668,11 @@ The work:
   `workers` makes the agent and its workers (`docs/CONTRACT.md`, section
   13).
 - The Skills place, at `#skills`. The list of section 5, the text of a skill
-  as Markdown with its front matter keys as chips, the description of a
-  tool, and the agents that can load it. The details pane holds one key,
+  as Markdown with one line that says how to call it, such as
+  `/proxmox-ops [task]`, the description of a tool, and the agents that can
+  load it. The front matter is for the agent that loads the skill, so the
+  page shows no other key of it. Where two panes show, the place opens the
+  first skill of the list. The details pane holds one key,
   Add skill, which opens a small chooser of four avenues: from a marketplace
   that the admin configured, from an address, a pasted SKILL.md, and
   uploaded files. Each avenue ends in a preview that the admin reads before
@@ -679,12 +701,17 @@ The last screen adds the Chat place and the live answer. The files are
   light with its word, and the time as a short meta, under a quiet heading
   per day. The main pane holds the conversation of the run, with the
   thread and the composer of a member on no bridge, the slash menu
-  included. A new chat shows the picks above the composer: `Tools` and
-  `Skills`, each a row of chips with check boxes and a count chip, and a
-  field to find one past twelve. The details pane holds `This chat`. It
-  shows the tools and the skills in use as chips, and an extra tool with
-  `for this chat`. It also shows the model, and the usage, with `so far`
-  while the run works. Without
+  included. A new chat is a question first: its header holds the title
+  alone, and the pane holds the composer with one quiet line right above
+  it that says what the chat can use, such as `Can use files, memory, the
+  time, the wiki, and 2 skills`. The line opens the picks: `Tools` and
+  `Skills`, each a list of check boxes in plain words with a count chip of
+  the rows that are on, and a field to find one past twelve. The tools of
+  the profile come first, and the other tools follow below a line. The
+  details pane holds `This chat`. It says what the chat can do as the
+  profile of an agent does, with `for this chat` on an extra tool, and its
+  skills in one line. It also shows the model, and the usage, with `so
+  far` while the run works. A cost below one cent reads `under $0.01`. Without
   `chat` in the settings, the place says `No quick chat is set up.` beside
   a question mark that names the setting.
 - The live answer. Only a one-on-one view opens the live stream of a

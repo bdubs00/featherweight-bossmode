@@ -3,7 +3,7 @@ import { act } from 'preact/test-utils';
 import { store } from '../state/store';
 import type { SkillsList, Whoami } from '../api/types';
 import { catalogOf, skillGroups, toolGroups } from '../lib/catalog';
-import { SkillActions, SkillList, SkillMain, forgetTools } from './Skills';
+import { callOf, SkillActions, SkillList, SkillMain, forgetTools } from './Skills';
 import { closeAddSkill, openAddSkill } from './AddSkill';
 import { click, fakeApi, fieldOf, keyNamed, mount, problem, settle, typeIn, unmountAll } from './testkit-c';
 
@@ -84,15 +84,19 @@ describe('the Skills place', () => {
   });
 
   it('reads the skills of each agent of the fleet while the place is open, and forgets them when it closes', async () => {
-    // The agents of the fleet: a pool runs the migrator, and a member holds the scribe. The profile of the front itself names no worker.
+    // The agents of the fleet: a pool runs the migrator, and its worker holds the scribe too. A member outside
+    // the pools holds the profiles of its own process, such as paybot, whose skills the front cannot answer.
     act(() => {
       store.dispatch({ type: 'agents', agents: [{ name: 'default', role: 'owner' }] });
       store.dispatch({
         type: 'fleet',
         fleet: {
           name: 'front-0',
-          members: [{ name: 'default/notes-0', state: 'live', lastSeen: '', canForward: true, accessMode: '', agents: [{ name: 'scribe', role: 'operator' }], active: 0, inputRequired: 0 }],
-          pools: [{ name: 'crew', atespace: 'default', agent: 'migrator', intake: 'q', wanted: 1, actual: 1, ready: 1, hash: 'h', checkedAt: '', tasks: [] }],
+          members: [
+            { name: 'default/crew-0', state: 'live', lastSeen: '', canForward: true, accessMode: '', agents: [{ name: 'migrator', role: 'owner' }, { name: 'scribe', role: 'operator' }], active: 0, inputRequired: 0 },
+            { name: 'default/lab-0', state: 'quiet', lastSeen: '', canForward: true, accessMode: '', agents: [{ name: 'paybot', role: 'operator' }], active: 0, inputRequired: 0 },
+          ],
+          pools: [{ name: 'crew', atespace: 'default', agent: 'migrator', intake: 'q', wanted: 1, actual: 1, ready: 1, hash: 'h', checkedAt: '', tasks: [{ name: 'crew-0', phase: 'Running', current: true }] }],
         },
       });
     });
@@ -103,24 +107,55 @@ describe('the Skills place', () => {
     });
     const el = mount(<SkillList />);
     await settle();
-    expect(store.get().agentSkills).toEqual({ migrator: ['ansible-style'], scribe: ['ansible-style', 'release-notes'] });
+    // paybot loads no skill, and the page never asks the front for it.
+    expect(store.get().agentSkills).toEqual({ migrator: ['ansible-style'], scribe: ['ansible-style', 'release-notes'], paybot: [] });
+    expect(api.calls.some((c) => c.path.includes('/agents/paybot'))).toBe(false);
     expect(el.querySelector('.srow')).toBeTruthy();
     unmountAll();
     expect(store.get().agentSkills).toEqual({});
   });
 
-  it('shows the text of a skill with its front matter and the agents that can load it', async () => {
+  it('shows the text of a skill, how to call it, and the agents that can load it', async () => {
     act(() => {
       store.dispatch({ type: 'agent-skills', agent: 'migrator', skills: ['ansible-style'] });
       store.dispatch({ type: 'agent-skills', agent: 'reviewer', skills: ['ansible-style', 'wiki-writer'] });
     });
-    api = fakeApi({ 'GET /v1/skills/ansible-style': { name: 'ansible-style', description: 'Write roles.', origin: 'local', body: '---\nname: ansible-style\ndescription: Write roles.\nlicense: MIT\nallowed-tools: [bash, files]\n---\n\n# Ansible style\n\n<script>bad()</script>Handlers start with a verb.\n', files: ['scripts/lint.sh'] } });
+    api = fakeApi({ 'GET /v1/skills/ansible-style': { name: 'ansible-style', description: 'Write roles.', origin: 'local', body: '---\nname: ansible-style\ndescription: Write roles.\nlicense: MIT\nallowed-tools: [bash, files]\nargument-hint: <role>\n---\n\n# Ansible style\n\n<script>bad()</script>Handlers start with a verb.\n', files: ['scripts/lint.sh'] } });
     const el = mount(<SkillMain item={{ kind: 'skill', id: 'ansible-style' }} />);
     await settle();
-    expect([...el.querySelectorAll('.fm li')].map((x) => x.textContent)).toEqual(['licenseMIT', 'allowed-toolsbash, files']);
+    // The front matter is for the agent. A person reads how to call the skill, and nothing else of it.
+    expect(el.querySelector('.fm')).toBeNull();
+    expect(el.querySelector('.skill-call')!.textContent).toBe('/ansible-style <role>');
+    expect(el.textContent).not.toContain('allowed-tools');
     expect(el.querySelector('.skill-text h1')!.textContent).toBe('Ansible style');
     expect(el.querySelector('.skill-text script')).toBeNull();
     expect([...el.querySelectorAll('.loaders li')].map((x) => x.textContent)).toEqual(['migrator', 'reviewer']);
+  });
+
+  it('opens the first skill where two panes show, and says nothing twice', async () => {
+    const wide = window.matchMedia;
+    window.matchMedia = ((q: string) => ({ matches: true, media: q, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
+    try {
+      api = fakeApi({ 'GET /v1/skills/ansible-style': { name: 'ansible-style', description: 'Write roles.', origin: 'imported', body: 'Text.', files: [] } });
+      location.hash = '#skills';
+      mount(<SkillMain />);
+      await settle();
+      expect(location.hash).toBe('#skills/skill/ansible-style');
+      // With nothing picked, the details pane holds Add skill alone, and never the list again.
+      const el = mount(<SkillActions />);
+      expect(el.querySelector('.imported')).toBeNull();
+      expect(keyNamed(el, 'Add skill')).toBeTruthy();
+    } finally {
+      window.matchMedia = wide;
+    }
+  });
+
+  it('says how to call a skill: the slash command and the hint of its arguments, and nothing for a skill that only a model loads', () => {
+    const doc = { frontMatter: [['argument-hint', '[from text]'], ['user-invocable', 'true']] as [string, string][], body: '', files: [] };
+    expect(callOf({ slash: '/proxmox-ops', argumentHint: '[task]' }, doc)).toBe('/proxmox-ops [task]');
+    expect(callOf({ slash: '/proxmox-ops', argumentHint: '' }, doc)).toBe('/proxmox-ops [from text]');
+    expect(callOf({ slash: '/notes', argumentHint: '' }, null)).toBe('/notes');
+    expect(callOf({ slash: '', argumentHint: '<x>' }, doc)).toBe('');
   });
 
   it('reads the text of a skill of a server from the kernel, with its name escaped', async () => {

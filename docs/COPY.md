@@ -111,6 +111,7 @@ Capacity shows where seating happens:
 | new | add | `<agent>, <worker>: <status>`, the tooltip of a lamp, such as `migrator, crew-0: working`, and `N <status>` for a share of a large fleet | done |
 | new | add | `Fleet: <caption>, <figures>`, the name of the readout for a screen reader, such as `Fleet: 9 workers, 2 working, 7 asleep` | done |
 | `<name>, home` (logo well) | keep | | done |
+| the dashed well with a picture where the deployment names no logo | change | the monogram of the name of the organization, such as `H` for Homelab, else a muted `B` for bossmode. The letters are hidden from a screen reader, which reads `<name>, home`. | done |
 
 ### src/ui/Signin.tsx
 
@@ -431,15 +432,16 @@ Capacity shows where seating happens:
 | new | add | `N skills`, the one line of the profile that counts them | done |
 | `Find a member` | add | the field above the people list | done |
 | `Not on a bridge` | add | the last group of the people list | done |
-| `N awake` (a chip with a green light), with `N workers awake` for a screen reader | add | | done |
+| `N awake` (a chip with a green light), with `N workers awake` for a screen reader | add | the chip shows only while a worker is awake. A green light never stands for zero, so `0 awake` never shows. | done |
 | `N free`, `Keep N` (a person who is not an owner reads Keep as a number) | add | | done |
 | `Keep 0` (the row of an agent with no worker in Not on a bridge) | remove | the row shows no words for an agent with no worker. The list holds the agents of the fleet, so a profile of the front with no pool and no run shows nowhere. | done |
-| `asks before <pattern>`, `asks first` (an amber word for a rule of the profile) | add | | done |
-| `Tools and rules` (the list of chips) | add | an accessible name | done |
+| `asks before <pattern>`, `asks first` (an amber word for a rule of the profile) | change | the rule as a person reads it, in an amber line under What it can do: `Asks before git push` for `bash: git push*`, `Asks before a real Ansible run` for `ansible.playbook: check=false`, `Asks before a tool that changes things`, `Asks first when <field> is <value>`, `Asks first: <ability>`, and `Asks first`. Two patterns with one meaning make one line. The patterns sit in the tooltip. | done |
+| `Tools and rules` (the list of chips) | add | an accessible name, now of the list of What it can do | done |
+| the tools of a profile as chips of raw names, such as `front.pages_read` | change | `What it can do`, a section of the profile with one plain line per ability: the phrase of the tool in the catalog of `GET /v1/tools`, such as `Run shell commands`. The tools of the wiki make one line, `Read and write the wiki`, `Read the wiki`, or `Write the wiki`, and the tools of the bridges make one line, `Read and post in bridges`, `Read bridges`, or `Post in bridges`. A whole server is `Use the tools of <server>`, and `*` is `Every tool`. The raw names sit in the tooltip. `N skills` moves to the end of the heading line of the section. | done |
 | `Edit` (the key of an owner on the profile) | add | | done |
 | `Keep is a whole number, 0 or more.` | add | the error of the Keep field | done |
 | `Remove workers`, with the dialog `Remove the workers of <agent>?`, `Every worker of <agent> stops. A seat of <agent> waits for a worker.`, and the key `Remove workers` | change | an owner only, as the danger item of the menu `More for workers` beside Keep, so no destructive key sits in plain sight | done |
-| `N runs`, `$N`, `N decisions` (Today) | add | `1 run` and `1 decision` for one. If a run reports no cost, `$N so far`. | done |
+| `N runs`, `$N`, `N decisions` (Today) | add | `1 run` and `1 decision` for one. If a run reports no cost, `$N so far`. A cost below one cent reads `under $0.01`, never `$0.00`, from `src/lib/cost.ts`. | done |
 
 ### src/ui/RunPane.tsx and src/ui/Conversation.tsx
 
@@ -501,6 +503,7 @@ Capacity shows where seating happens:
 | `New` | keep | | done |
 | `Search the wiki` | keep | | C |
 | `<name> · <time>` (row meta) | change | `<name>` and `14 min`, with a gap and no dot | C |
+| the path of a folder as the head of its group, such as `bridges/01m5h96ejx8yh5fqkg` | change | the title of the bridge for `bridges/<id>`, such as `Harden the lab hosts`, and the name of the agent for `agents/<agent>`, such as `docs-scribe`, with the path in the tooltip. A bridge that the page does not know keeps the path. | done |
 | `No page holds those words.` | change | `No page holds those words. Try fewer words.` | C |
 | `The search read part of the wiki. Use more words to find the rest.` | change | `Partial: more words find the rest.` | C |
 | `The wiki has no page.` | change | `The wiki is empty.` with the key `New page` | C |
@@ -513,7 +516,7 @@ Capacity shows where seating happens:
 | `History` (heading) | change | `History of <page>` | done |
 | `Version N, the current one: <title>` | change | `Version N`, with the chip `current` | C |
 | `Removed` | keep | | C |
-| `New page`, `Edit` (heading) | change | `New page`, `Edit <page>` | done |
+| `New page`, `Edit` (heading) | change | `New page`, `Edit <page>`, where the page is its title, such as `Edit Upgrade k3s on jucs-k3s`, and its name only without a title. The back link takes the same name. | done |
 | `<by> saved this page while you edited it, <time>. Your text is still here, and nothing is lost.` | change | `<by> saved this page while you edited it. Your text is still here.` | C |
 | `See their version` | keep | | C |
 | `Drop my text and take theirs`, `Save mine over theirs` | change | `Take theirs`, `Keep mine` | C |
@@ -550,13 +553,14 @@ Capacity shows where seating happens:
 | `Open a bridge` and its line `One job, split into tasks, with one agent on each.` | change | `Open a bridge`, and the one question first: `What is the job?` | C |
 | `Title`, `Goal` | change | `Goal` first, and `Title` in Advanced, filled from the goal | C |
 | `Members`, `Handle`, `Agent`, `Task`, `Add a member`, `Remove member N` | change | the picker of screen A, then `Seat` | C |
-| `Placement` with `Queue. Each member runs on a worker of the pool of its agent.` and `Spawn. The manager seats each member in a child Task of its own, and its budget bounds the whole bridge.` | change | a visible choice with two options: `Keep warm workers` (the default) and `Fresh sandbox per seat` | C |
+| `Placement` with `Queue. Each member runs on a worker of the pool of its agent.` and `Spawn. The manager seats each member in a child Task of its own, and its budget bounds the whole bridge.` | change | a choice with two options under Advanced: `Keep warm workers` (the default) and `Fresh sandbox per seat`. It is a choice of the deployer more than of a person, so the first view holds only the job and the seats. A placement that cannot open, a fresh sandbox without a manager, opens Advanced with its reason. | done |
 | `What the manager can do here` and its four rows | change | in Advanced, with the words of screen A | C |
 | `Each member starts a run as you. A bridge spends through the budgets of the pools of its members.` | remove | | C |
 | `Cancel`, `Open the bridge` | change | `Cancel`, `Open bridge` | done |
+| `Open bridge` while the manager splits the job | change | `Ask the manager`: the key sends the job to the conversation of the manager, which plans the seats there, and the person lands in that conversation with the job in view. The message names the placement only when it is not the default of the deployment. `Open bridge` stays for the path where the person picks the seats. | done |
 | `Seats`, `Pick the seats`, `Let the manager split it` | add | if the settings name a manager, the choice of who seats the bridge | done |
-| `Add a seat` (the heading of the seats beside that choice), `Add` (the key that opens the picker of the members pane) | add | | done |
-| `Placement`, `Title`, `Caps`, `Most messages`, `Most messages a minute`, `Most messages between two members` | add | Title and Caps in Advanced | done |
+| `Add a seat` (the heading of the seats beside that choice), `Add` (the key that opens the picker of the members pane) | change | `Add a seat`, the key that opens the picker, under the choice `Seats`, with no heading of its own. Without a manager, the heading `Seats` stands above the rows and the key. | done |
+| `Placement`, `Title`, `Caps`, `Most messages`, `Most messages a minute`, `Most messages between two members` | add | Title, Placement, and Caps in Advanced | done |
 | `Write a whole number.` | add | the error of a cap | done |
 | `The bridge needs a title.`, `The bridge needs a goal.` | change | `Write the goal of the bridge.` | C |
 | `Member N needs a handle of lower-case letters, digits, dots, dashes, or underscores.` | change | the reason of `handleReason()` | C |
@@ -579,7 +583,9 @@ Capacity shows where seating happens:
 | `<name> sets the accent <hex>.`, `The accent is <hex>.` | remove | Appearance holds the theme of the person only, and the accent belongs to the deployment | done |
 | `Skills` with the count chip, `Imported`, `Local`, `<server>`, `Tools`, `Built in` | keep | | done |
 | `Agents that can load it` with the count chip | keep | | done |
-| `Pick a skill or a tool in the list.` | keep | | done |
+| `Pick a skill or a tool in the list.` | keep | where two panes show, the place opens the first skill of the list, else its first tool, so this line shows only while the catalog loads. With nothing in the list, the main pane stays empty, because the list says `No skill yet.` | done |
+| the front matter of a skill as chips, such as `user-invocable true`, `argument-hint [task]`, and `arguments task` | change | how a person calls the skill, as one line of code under its description, such as `/proxmox-ops [task]`, and nothing else of the front matter. A skill that only a model loads shows no such line. | done |
+| the details pane of Skills with nothing picked, the list of the imported skills | change | the details pane holds `Add skill` alone. It lists the imported skills only beside the chooser of Add skill, where an install can replace one. With a skill open, it holds its keys alone: `Copy /<name>` and `Remove`. | done |
 | `This skill is not here. It can be removed, or it was renamed.` | keep | | done |
 | `No skill yet. Add one from a marketplace, an address, or a SKILL.md.` | change | `No skill yet.` with the key `Add skill` | C |
 | `Copy /<name>`, `Copied /<name>` | keep | | done |
@@ -608,10 +614,14 @@ Capacity shows where seating happens:
 | new | add | a row of the history: the title of the run, the status of the run, and `since()`, such as `25 min`. The status is a light with its word: `working`, `waiting for a worker`, `needs you`, `ready`, `ended`, `failed`, or `stopped`. A run without a title shows the start of its first message, else `Chat`. | done |
 | new | add | `Loading the chats.`, `No chat holds those words.` | done |
 | new | add | `No chat yet.` with the key `New chat` | done |
+| the key `New chat` under `No chat yet.` | remove | the key `New` of the header starts a chat, and the main pane already holds a new chat, so the empty list holds no second key | done |
 | new | add | `New chat`, the title of a chat before its first message | done |
+| the mark of the agent beside `New chat` | remove | the header of a new chat holds its title alone. The mark of a chat links to This chat, which a new chat does not have yet. | done |
+| the picks above the composer | change | a new chat is a question first: the composer, and right above it one quiet line that opens the picks, such as `Can use files, memory, the time, the wiki, and 2 skills`. The line names each tool by a short noun, counts the tools without one as `N more tools`, and counts the skills. It reads `Tools and skills` when the page cannot tell the tools, and `Loading the tools.` while they load. The picks open when the person turns every tool off. | done |
 | new | add | `Tools`, `Skills`, the two headings of the picks. Each has the count chip of the picks that are on, with `N of M` for a screen reader. | done |
-| the picks of `Tools` from the catalog of the front | change | `Tools` holds the tool list of the profile of the agent: each tool of the catalog that an entry names, and an entry that names none, such as `front.pages_*`, as one chip by its name. Every chip of `Tools` starts on. | done |
-| `More tools` | add | the heading of the other tools of the catalog, which start off, with its count chip. `spawn_task`, `await_task`, `propose_agent`, and `ask_user` never start on, so they sit here. | done |
+| the picks of `Tools` from the catalog of the front | change | `Tools` holds the tool list of the profile of the agent: each tool of the catalog that an entry names, and an entry that names none, such as `front.pages_*`. Every row of the profile starts on. | done |
+| a pick by its raw name, such as `front.pages_list` | change | each row of `Tools` in plain words, as the profile says it: the phrase of the catalog, such as `Read and change files in the workspace`, and one row for the tools of the wiki, `Read and write the wiki`, and one for the tools of the bridges. The raw names sit in the tooltip. A row of `Skills` holds the name of the skill and its description below it. | done |
+| `More tools` | remove | the other tools of the catalog follow the tools of the profile in the same list, below a line, and start off. Its count chip said 0 beside eight tools. `spawn_task`, `await_task`, `propose_agent`, and `ask_user` never start on, so they sit there. | done |
 | new | add | `Find a tool`, `Find a skill`, the fields of a row of picks that holds more than twelve | done |
 | new | add | `Loading the tools.`, while the picks wait for the catalogs | done |
 | new | add | `A chat needs at least one tool. Pick one.`, the error of the picks with every tool off. An empty tool list gives a run every tool. | done |
@@ -620,10 +630,11 @@ Capacity shows where seating happens:
 | new | add | `Stopped. Your next message starts a new chat.` | done |
 | new | add | `This chat`, the heading of the details, and `This chat, <status>`, the name of the mark that opens it | done |
 | new | add | `Tools`, `Skills` with the count chip, `1 tool` and `N tools`, `1 skill` and `N skills` for a screen reader | done |
+| the tools and the skills of This chat as chips of raw names | change | `What it can do`, as on the profile of an agent: one plain line per ability, the tools of the wiki as one line, the raw names in the tooltip, and `for this chat` on a tool that the picks gave. The skills follow in one line, such as `2 skills: notes and plan`, or `5 skills: a, b, and 3 more`. | done |
 | `Tools 0` (This chat of a chat whose picks the page cannot tell) | remove | `Tools` names the tools that the chat started with. They come from the resolved profile of the run, the picks of the tab, or the first event of the run. Else they are the list of the profile with the tools for this chat. The section leaves out where the page cannot tell. | done |
 | new | add | `for this chat`, the quiet word on the chip of a tool that the picks gave beyond the list of the agent | done |
 | new | add | `Model`, with the model of the resolved profile. It shows only for a run object that carries it. | done |
-| new | add | `Usage`, with `N turns`, `N tokens`, and `$N`, and `so far` while the run works. `1 turn` and `1 token` for one. | done |
+| new | add | `Usage`, with `N turns`, `N tokens`, and `$N`, and `so far` while the run works. `1 turn` and `1 token` for one. A cost below one cent reads `under $0.01`, never `$0.00`. | done |
 | new | add | `No quick chat is set up.` with the question mark `Where the quick chat is set up` and `The setting workbench.bossmode.chat names the agent of the quick chat.` | done |
 | `Rename`, `Save as agent` | remove | the backend has no route that sets the title of a run, and the new-agent screen takes no run to start from | done |
 

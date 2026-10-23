@@ -562,23 +562,25 @@ a.file {
   line-height: var(--t-body-lh);
   color: var(--muted);
 }
-.prof-chips {
+/* What the agent can do: one plain line per ability, and the rules that ask first in the amber word. */
+.abilities {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin: 0;
+  flex-direction: column;
+  gap: var(--s-1);
+  margin: var(--s-1) 0 0;
   padding: 0;
   list-style: none;
+  font-size: var(--t-control);
+  line-height: var(--t-control-lh);
+  overflow-wrap: anywhere;
 }
-.prof-chips .chip {
-  height: 26px;
-  line-height: 24px;
-}
-.prof-tool {
+.ability-note {
+  margin-left: var(--s-2);
+  font-size: var(--t-meta);
   font-weight: 600;
-  color: var(--ink);
+  color: var(--muted);
 }
-.chip-plain.prof-rule {
+.ability-rule {
   font-weight: 600;
   color: var(--word-amber);
 }

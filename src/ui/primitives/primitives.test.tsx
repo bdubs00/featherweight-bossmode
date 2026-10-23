@@ -7,6 +7,7 @@ import { markOf, markPath } from '../../lib/mark';
 import { forgetFaces } from '../../lib/faces';
 import { createRef } from 'preact';
 import { Advanced, Avatar, Button, Card, Chip, Choices, Command, Field, Find, GrooveBand, Help, IconButton, Input, Led, LineLed, LogoWell, Mark, PaneHeader, ReactionChip, Tabs, countText, glyphPx, initialsOf } from './index';
+import { monogramOf } from './LogoWell';
 import { flipOf } from './Help';
 import { Menu } from '../common';
 
@@ -254,15 +255,34 @@ describe('ReactionChip', () => {
 });
 
 describe('LogoWell', () => {
-  it('shows the empty well until a logo arrives', () => {
-    let el = mount(<LogoWell />);
-    expect(el.querySelector('.well.has-logo')).toBeNull();
-    expect(el.querySelector('img')).toBeNull();
-    expect(el.querySelector('a')!.getAttribute('aria-label')).toBe('bossmode, home');
+  it('shows the monogram of the organization until a logo arrives, and never a dashed edge', () => {
+    let el = mount(<LogoWell name="Homelab" />);
+    const well = el.querySelector('.well')!;
+    expect(well.classList.contains('monogram')).toBe(true);
+    expect(well.classList.contains('quiet')).toBe(false);
+    expect(well.textContent).toBe('H');
+    expect(el.querySelector('img, svg')).toBeNull();
+    expect(el.querySelector('a')!.getAttribute('aria-label')).toBe('Homelab, home');
     act(() => render(null, el));
     el = mount(<LogoWell src="blob:logo" name="Example Org" />);
     expect(el.querySelector('.well.has-logo img')!.getAttribute('src')).toBe('blob:logo');
+    expect(el.querySelector('.monogram')).toBeNull();
     expect(el.querySelector('a')!.getAttribute('aria-label')).toBe('Example Org, home');
+  });
+
+  it('shows the quiet monogram of bossmode for a deployment without a name', () => {
+    const el = mount(<LogoWell />);
+    const well = el.querySelector('.well.monogram.quiet')!;
+    expect(well.textContent).toBe('B');
+    expect(el.querySelector('a')!.getAttribute('aria-label')).toBe('bossmode, home');
+  });
+
+  it('takes the first letters of the first two words', () => {
+    expect(monogramOf('Example Org')).toBe('EO');
+    expect(monogramOf('homelab')).toBe('H');
+    expect(monogramOf('acme-corp labs inc')).toBe('AC');
+    expect(monogramOf('  ')).toBe('');
+    expect(monogramOf('éclair')).toBe('É');
   });
 });
 

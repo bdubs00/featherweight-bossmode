@@ -19,18 +19,51 @@
   display: flex;
   flex-direction: column;
 }
-/* The picks sit at the end of the pane, right above the composer that they serve. */
+/* A new chat is a question first: the line of what it can use sits at the end of the pane, right above the composer. */
 .chat-picks {
   display: flex;
   flex-direction: column;
-  gap: var(--s-5);
   margin-top: auto;
-  padding: var(--s-5);
+  padding: var(--s-3) var(--s-5) var(--s-2);
+}
+.chat-kit > summary,
+.chat-kit-line {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  min-height: var(--h-small);
+  font-size: var(--t-control);
+  line-height: var(--t-control-lh);
+  color: var(--muted);
+}
+.chat-kit > summary {
+  cursor: pointer;
+  list-style: none;
+}
+.chat-kit > summary::-webkit-details-marker {
+  display: none;
+}
+.chat-kit > summary:hover {
+  color: var(--ink);
+}
+.chat-kit > summary .glyph {
+  flex: none;
+  transform: rotate(180deg);
+}
+.chat-kit[open] > summary .glyph {
+  transform: rotate(-90deg);
+}
+.chat-kit-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  max-width: 640px;
+  padding: var(--s-2) 0 var(--s-2) 20px;
 }
 .pick-sec {
   display: flex;
   flex-direction: column;
-  gap: var(--s-3);
+  gap: var(--s-1);
 }
 .pick-head {
   display: flex;
@@ -43,57 +76,52 @@
   flex: 0 1 240px;
   margin-left: auto;
 }
-.pick-chips {
+.kit-rows {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--s-2);
+  flex-direction: column;
 }
-/* A pick is a chip with a check box: line edge when off, the ground of a picked choice when on. */
-.pick-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: var(--h-small);
-  padding: 0 var(--s-3) 0 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--r);
-  background: var(--paper);
-  color: var(--muted);
+/* A pick is a row: a check box and the plain words of a tool or a skill. */
+.kit-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 6px 0;
   font-size: var(--t-control);
   line-height: var(--t-control-lh);
-  font-weight: 600;
   cursor: pointer;
 }
-.pick-chip:hover {
-  color: var(--ink);
-}
-.pick-chip:has(input:checked) {
-  background: var(--raised);
-  border-color: var(--raised-line);
-  box-shadow: var(--e-selected);
-  color: var(--ink);
-}
-.pick-chip:has(input:focus-visible) {
-  outline: 2px solid var(--ink);
-  outline-offset: 2px;
-}
-.pick-chip input {
+.kit-row input {
   width: 16px;
   height: 16px;
-  margin: 0;
+  margin: 2px 0 0;
   flex: none;
   accent-color: var(--ink);
 }
-.pick-chip input:focus-visible {
-  outline: none;
+.kit-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+/* A tool reads as plain words. A skill reads as its name, which a person types after a slash, and its description. */
+.kit-label {
+  font-weight: 400;
+}
+.kit-text:has(.kit-sub) .kit-label {
+  font-weight: 600;
+}
+.kit-sub {
+  color: var(--muted);
+}
+.kit-sep {
+  margin: var(--s-1) 0;
+  border-top: 1px solid var(--line-soft);
 }
 
 /* ---------- This chat ---------- */
-.chat-chips .chip {
-  gap: var(--s-1);
-}
-.chip-note {
-  font-weight: 600;
+.chat-skills {
+  margin-top: var(--s-2);
+  font-size: var(--t-control);
+  line-height: var(--t-control-lh);
   color: var(--muted);
 }
 .chat-model {
@@ -106,15 +134,17 @@
 
 /* A target on a touch screen is at least 44 pixels. */
 @media (pointer: coarse) {
-  .pick-chip {
+  .kit-row,
+  .chat-kit > summary {
     min-height: var(--h-row);
+    align-items: center;
   }
 }
 
 /* A narrow window gives the picks the gutter of the page. */
 @media (max-width: 799px) {
   .chat-picks {
-    padding: var(--s-4);
+    padding: var(--s-3) var(--s-4) var(--s-2);
   }
   .pick-find {
     flex-basis: 100%;

@@ -20,6 +20,7 @@
 //   FAKE_LIVE=1        GET /v1/runs/{id}/live streams each answer outside a bridge in pieces, as the model writes it
 //   FAKE_LIVE_MS=120   the time between two pieces of a live answer, in milliseconds
 //   FAKE_LIVE_HOLD=1   a live answer stops near its middle and waits there, for a screenshot
+//   FAKE_ASLEEP=1      every worker of the fleet sleeps, as a fleet at night with no worker awake
 
 import http from 'node:http';
 import fs from 'node:fs';
@@ -45,6 +46,12 @@ const LIVE_MS = Number(process.env.FAKE_LIVE_MS || 120);
 const LIVE_HOLD = process.env.FAKE_LIVE_HOLD === '1';
 
 const S = seed();
+
+// A fleet at night: every worker sleeps, so the page shows no worker awake.
+if (process.env.FAKE_ASLEEP === '1') {
+  for (const p of FLEET.pools) for (const t of p.tasks) t.phase = 'Suspended';
+  for (const m of FLEET.members) if (!m.self) m.state = 'quiet';
+}
 
 /** The logo of the organization of the theme, with FAKE_LOGO=1. */
 const LOGO = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 44 44" width="44" height="44"><title>Example Org</title><rect width="44" height="44" fill="#111"/><path d="M10 12h24v5H16v3h14v5H16v3h18v5H10z" fill="#f3f3ef"/></svg>`;
@@ -918,7 +925,7 @@ on('PATCH', '/v1/bridges/([^/]+)/members/([^/]+)', async (c, id, handle) => {
 
 on('GET', '/v1/fleet', () => FLEET);
 // An agent of the view carries the parts of its profile that the page shows: the tools, the skills that it allows, and its rules.
-const agentView = ({ name, description, role }) => ({ name, description, role, tools: TOOLS_OF[name] || [], skills: allowlistOf(name), policy: name === 'migrator' ? { ask: ['bash: git push*'] } : name === 'reviewer' ? { ask: ['destructive'] } : undefined });
+const agentView = ({ name, description, role }) => ({ name, description, role, tools: TOOLS_OF[name] || [], skills: allowlistOf(name), policy: name === 'migrator' ? { ask: ['bash: git push*', 'ansible.playbook: check=false', 'ansible.adhoc: check=false'] } : name === 'reviewer' ? { ask: ['destructive'] } : undefined });
 // The front names only its own profile in GET /v1/agents, as the real
 // front does. The profiles that the workers of the pools run come from
 // GET /v1/agents/{name}, with the pool and with no abilities, and the page

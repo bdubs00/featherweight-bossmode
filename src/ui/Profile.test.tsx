@@ -109,7 +109,7 @@ describe('the profile', () => {
     await vi.waitFor(() => expect(el.querySelectorAll('.liked li').length).toBe(2));
     await vi.waitFor(() => expect(el.querySelector('.today')).not.toBeNull());
     const heads = [...el.querySelectorAll('.prof-sec h3')].map((h) => h.textContent);
-    expect(heads).toEqual(['What people liked', 'Workers', 'Today']);
+    expect(heads).toEqual(['What it can do', 'What people liked', 'Workers', 'Today']);
     // Each heart: what the agent did, what was asked as a muted line, the note, and Open the run.
     const first = el.querySelectorAll('.liked li')[0];
     expect([...first.querySelectorAll('.liked-body > *')].map((x) => x.className + ' ' + x.textContent)).toEqual(['liked-did Ran the lint.', 'liked-asked Migrate the cron module.', 'liked-note Clean.', 'prof-link Open the run']);
@@ -124,8 +124,38 @@ describe('the profile', () => {
     expect(el.querySelectorAll('.workers li')[1].textContent).toContain('old setup');
     expect(el.querySelector('.worker-gaps')!.textContent).toBe('crew-9 runs an older configuration.');
     expect(el.querySelector('.today')!.textContent).toBe('7 runs$1.902 decisions');
+    expect(el.querySelector('.prof-skills')!.textContent).toMatch(/^\d+ skills?$/);
     expect(el.textContent!.toLowerCase()).not.toContain('pool');
     expect(calls.some((c) => c.path === '/v1/pools/crew')).toBe(true);
+  });
+
+  it('says under $0.01 for a day that cost less than one cent, never $0.00', async () => {
+    restore();
+    const f = fakeFetch([
+      ['GET', /^\/v1\/pools\/crew$/, () => POOL],
+      ['GET', /^\/v1\/bossmode\/agents\/migrator\/today$/, () => ({ runs: 1, costUSD: 0.0042, decisions: 0 })],
+    ]);
+    restore = f.restore;
+    const el = mount(<Profile agent="migrator" />);
+    await vi.waitFor(() => expect(el.querySelector('.today')).not.toBeNull());
+    expect(el.querySelector('.today')!.textContent).toBe('1 rununder $0.010 decisions');
+    expect([...el.querySelectorAll('.today b')].map((b) => b.textContent)).toEqual(['1', '$0.01', '0']);
+  });
+
+  it('reads no pool for an agent that no pool runs, so its profile asks nothing that answers 404', async () => {
+    const el = mount(<Profile agent="reviewer" />);
+    await vi.waitFor(() => expect(calls.some((c) => c.path.startsWith('/v1/bossmode/agents/reviewer/today'))).toBe(true));
+    expect(calls.some((c) => c.path.startsWith('/v1/pools/'))).toBe(false);
+    expect(el.querySelector('.keep-read, .keep input')).not.toBeNull();
+  });
+
+  it('reads no page of hearts that the list of the wiki does not hold', async () => {
+    act(() => store.dispatch({ type: 'pages', pages: [{ path: 'index.md', title: 'Index', hash: 'h', by: 'alice', at: '', size: 1 }] }));
+    const el = mount(<Profile agent="migrator" />);
+    await vi.waitFor(() => expect(el.querySelector('.liked-sec, [aria-labelledby="liked-migrator"]')).not.toBeNull());
+    await new Promise((r) => setTimeout(r, 20));
+    expect(calls.some((c) => c.path.startsWith('/v1/pages/agents/migrator/learned.md'))).toBe(false);
+    expect(el.querySelector('[aria-labelledby="liked-migrator"] .chip')!.textContent).toContain('0');
   });
 
   it('words each worker from the phase of the stream, never from the read of the pool', async () => {
@@ -162,15 +192,18 @@ describe('the profile', () => {
     expect(el.querySelector('button[aria-label="More for workers"]')).toBeNull();
   });
 
-  it('shows the tools of a profile that a pool runs as chips, a glob as written, beside the rules', async () => {
+  it('says what an agent that a pool runs can do in plain words, with the raw names and the patterns in a tooltip', async () => {
     const g = fakeFetch([
       // The profile of the workers of a pool carries its tools and no abilities.
       ['GET', /^\/v1\/agents\/migrator$/, () => ({ name: 'migrator', role: 'owner', pool: 'crew', tools: ['bash', 'files', 'front.pages_*'], policy: { ask: ['bash: git push*'] } })],
     ]);
     try {
       const el = mount(<Profile agent="migrator" />);
-      await vi.waitFor(() => expect(el.querySelectorAll('.prof-chips .prof-tool').length).toBe(3));
-      expect([...el.querySelectorAll('.prof-chips .chip')].map((c) => c.textContent)).toEqual(['bash', 'files', 'front.pages_*', 'asks before git push']);
+      await vi.waitFor(() => expect(el.querySelectorAll('.abilities li').length).toBe(4));
+      const lines = [...el.querySelectorAll('.abilities li')];
+      expect(lines.map((c) => c.textContent)).toEqual(['Run shell commands', 'Read and change files in the workspace', 'Read and write the wiki', 'Asks before git push']);
+      expect(lines.map((c) => c.getAttribute('title'))).toEqual(['bash', 'files', 'front.pages_*', 'bash: git push*']);
+      expect(lines[3].classList.contains('ability-rule')).toBe(true);
     } finally {
       g.restore();
     }
@@ -182,8 +215,8 @@ describe('the profile', () => {
     ]);
     try {
       const el = mount(<Profile agent="migrator" />);
-      await vi.waitFor(() => expect(el.querySelectorAll('.prof-chips .prof-tool').length).toBe(2));
-      expect([...el.querySelectorAll('.prof-chips .chip')].map((c) => c.textContent)).toEqual(['front.bridge_read', 'front.bridge_post', 'asks before git push']);
+      await vi.waitFor(() => expect(el.querySelectorAll('.abilities li').length).toBe(2));
+      expect([...el.querySelectorAll('.abilities li')].map((c) => c.textContent)).toEqual(['Read and post in bridges', 'Asks before git push']);
     } finally {
       g.restore();
     }

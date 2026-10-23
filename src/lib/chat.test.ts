@@ -101,6 +101,11 @@ describe('the usage and the live answer', () => {
       { n: '$0.00', word: 'so far' },
     ]);
     expect(usageParts({ turns: 3 }, true)).toEqual([{ n: '3', word: 'turns so far' }]);
+    // A cost below one cent never reads $0.00.
+    expect(usageParts({ turns: 4, costUSD: 0.0031 }, false)).toEqual([
+      { n: '4', word: 'turns' },
+      { lead: 'under', n: '$0.01', word: '' },
+    ]);
     expect(usageParts(undefined, true)).toEqual([]);
   });
 

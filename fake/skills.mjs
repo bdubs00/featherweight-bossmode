@@ -284,13 +284,14 @@ export function register({ on, refuse, readJson, admin, AGENTS }) {
 
 /** toolsOfAgent names the tools of the profile of an agent in the fake: tool names, and the names of whole servers. */
 export const TOOLS_OF = {
-  migrator: ['bash', 'files', 'github'],
+  migrator: ['bash', 'files', 'skill', 'github', 'front.bridge_read', 'front.bridge_post', 'front.pages_list', 'front.pages_read', 'front.pages_write', 'front.pages_search', 'front.pages_history'],
   reviewer: ['bash', 'files', 'web_fetch', 'create_issue'],
   tester: ['bash', 'files'],
   writer: ['files', 'web_fetch', 'pages_write'],
   scribe: ['files', 'list_commits'],
   manager: ['front'],
-  chat: ['files', 'recall', 'memory', 'clock', 'front.pages_*'],
+  // The tool list of the quick chat of the homelab, which names tools that only the worker has, such as front.pages_list.
+  chat: ['files', 'recall', 'memory', 'clock', 'front.pages_list', 'front.pages_read', 'front.pages_write', 'front.pages_search', 'front.pages_history'],
 };
 
 /** toolNames are the names of the tools of GET /v1/tools. */

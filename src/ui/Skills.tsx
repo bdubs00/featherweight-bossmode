@@ -211,11 +211,17 @@ function AgentsThatLoad({ agents }: { agents: string[] }) {
   );
 }
 
-/** chipsOf are the keys of the front matter of a skill, as chips: the text first, the catalog where the text has none. */
-function chipsOf(s: CatalogSkill, doc: SkillDoc | null): [string, string][] {
-  const out: [string, string][] = doc ? [...doc.frontMatter] : [];
-  if (s.argumentHint && !out.some(([x]) => x === 'argument-hint')) out.push(['argument-hint', s.argumentHint]);
-  return out;
+/**
+ * callOf is how a person calls a skill: its slash command and the hint of
+ * its arguments, such as /proxmox-ops [task], or "" for a skill that only a
+ * model loads. The hint comes from the catalog, else from the front matter
+ * of the text.
+ */
+export function callOf(s: Pick<CatalogSkill, 'slash' | 'argumentHint'>, doc: SkillDoc | null): string {
+  if (!s.slash) return '';
+  const fromText = doc ? (doc.frontMatter.find(([k]) => k === 'argument-hint') || ['', ''])[1] : '';
+  const hint = (s.argumentHint || fromText).trim();
+  return hint ? s.slash + ' ' + hint : s.slash;
 }
 
 function SkillView({ s }: { s: CatalogSkill }) {
@@ -233,19 +239,15 @@ function SkillView({ s }: { s: CatalogSkill }) {
       live = false;
     };
   }, [s.name]);
-  const chips = chipsOf(s, doc);
+  // The front matter is for the agent that loads the skill. A person needs only the way to call it.
+  const call = callOf(s, doc);
   return (
     <>
       <p class="c-lede">{s.description}</p>
-      {chips.length > 0 && (
-        <ul class="fm" aria-label="Front matter">
-          {chips.map(([k, v]) => (
-            <li>
-              <span class="fm-key">{k}</span>
-              <span class="fm-value">{v}</span>
-            </li>
-          ))}
-        </ul>
+      {call && (
+        <p class="skill-call">
+          <code>{call}</code>
+        </p>
       )}
       {!doc && !failed && <p class="t-meta">Loading the skill.</p>}
       {failed && (
@@ -273,6 +275,18 @@ function ItemMenu({ s, admin, onRemove }: { s: CatalogSkill; admin: boolean; onR
   );
 }
 
+/** The width from which two panes show side by side, as App names it. */
+const TWO_PANES = '(min-width: 800px)';
+
+/** firstItem is the first skill of the list, else its first tool, else null. */
+export function firstItem(cat: Catalog): SkillItem | null {
+  const g = skillGroups(cat.skills)[0];
+  if (g && g.items[0]) return { kind: 'skill', id: g.items[0].name };
+  const t = toolGroups(cat.tools)[0];
+  if (t && t.items[0]) return { kind: 'tool', id: t.items[0].id };
+  return null;
+}
+
 /** The address of Add skill. A key that opens the chooser links there, so the address names the chooser. */
 const ADD_SKILL = hrefOf({ place: 'skills', add: true });
 
@@ -285,14 +299,16 @@ export function SkillMain({ item, add }: { item?: SkillItem; add?: boolean }) {
     if (add) openAddSkill();
   }, [add]);
   const [ask, setAsk] = useState(false);
+  // Where two panes show, the place opens the first skill of the list, else the first tool, so the main pane is never empty beside the list.
+  const first = !item && !add && !adding && cat ? firstItem(cat) : null;
+  useEffect(() => {
+    if (first && window.matchMedia(TWO_PANES).matches) go({ place: 'skills', item: first }, true);
+  }, [first && first.kind + ':' + first.id]);
   if (adding && admin) return <AddSkill />;
   const it = itemOf(cat, item);
   if (!item || !it) {
-    return (
-      <EmptyPane back={{ href: '#skills', label: 'Skills' }}>
-        <p>{item && cat ? 'This skill is not here. It can be removed, or it was renamed.' : 'Pick a skill or a tool in the list.'}</p>
-      </EmptyPane>
-    );
+    // The list says when it holds nothing, so the main pane does not say it twice.
+    return <EmptyPane back={{ href: '#skills', label: 'Skills' }}>{item && cat ? <p>This skill is not here. It can be removed, or it was renamed.</p> : cat && !first ? null : <p>Pick a skill or a tool in the list.</p>}</EmptyPane>;
   }
   const skill = item.kind === 'skill' ? (it as CatalogSkill) : null;
   const tool = item.kind === 'tool' ? (it as CatalogTool) : null;
@@ -419,12 +435,9 @@ export function SkillActions({ item }: { item?: SkillItem }) {
         }
       />
       <div class="scroll">
-        {skill && !adding && (
+        {/* The main pane names the skill, its origin, and how to call it, so the details hold its keys alone. */}
+        {skill && !adding && (skill.slash || (admin && skill.kind === 'imported')) && (
           <div class="dsec">
-            <h2 class="sec-head t-sub">{skill.slash ? <code class="slash">{skill.slash}</code> : skill.name}</h2>
-            <p class="t-meta">
-              {skill.kind === 'server' ? skill.server : skill.kind === 'imported' ? 'Imported' : 'Local'}
-            </p>
             <div class="dsec-keys">
               <CopyKey slash={skill.slash} />
               {admin && skill.kind === 'imported' && (
@@ -435,15 +448,7 @@ export function SkillActions({ item }: { item?: SkillItem }) {
             </div>
           </div>
         )}
-        {tool && !adding && (
-          <div class="dsec">
-            <h2 class="sec-head t-sub">
-              <code class="slash">{tool.id}</code>
-            </h2>
-            <p class="t-meta">{tool.builtin ? 'Built in' : tool.server}</p>
-          </div>
-        )}
-        {cat && (adding || !it) && <ImportedList skills={cat.skills.filter((x) => x.kind === 'imported')} />}
+        {cat && adding && <ImportedList skills={cat.skills.filter((x) => x.kind === 'imported')} />}
       </div>
       {ask && skill && <RemoveSkill s={skill} onDone={() => setAsk(false)} />}
     </section>

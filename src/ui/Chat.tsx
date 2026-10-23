@@ -13,7 +13,7 @@
 
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { api } from '../api/routes';
-import type { Agent, InlineProfile, QueuedData, QuickChat, Run, Skill, Tool } from '../api/types';
+import type { Agent, InlineProfile, QueuedData, QuickChat, Run, Skill } from '../api/types';
 import { store, useSelect } from '../state/store';
 import { forgetProfiles, useProfile } from '../state/profiles';
 import { forgetQueued, useQueued } from '../state/queued';
@@ -23,7 +23,11 @@ import { runStatus } from '../lib/presence';
 import { go, hrefOf } from '../lib/route';
 import { parseSlash } from '../lib/mention';
 import { since } from '../lib/words';
-import { answerSeqs, chatTitle, findChats, historyGroups, isQuickChat, lastSeq, newestFirst, startBody, toggle, toolPicks, usageParts, works, type PickItem } from '../lib/chat';
+import { answerSeqs, chatTitle, findChats, historyGroups, isQuickChat, lastSeq, newestFirst, startBody, toolPicks, usageParts, works } from '../lib/chat';
+import { abilitiesOf, joined, summaryOf, type Ability } from '../lib/tools';
+import { forgetToolCatalog, useToolCatalog } from '../state/tools';
+import { Abilities } from './Abilities';
+import { Glyph } from './icons';
 import { isOn, skillOf } from '../lib/catalog';
 import { useRoving } from './keys';
 import { attempt } from './notice';
@@ -42,15 +46,11 @@ const picksOf = new Map<string, InlineProfile>();
 /** The first message of a chat on its way, so the new conversation shows it before its transcript does. */
 let firstSent: { run: string; text: string } | null = null;
 
-let toolCache: Tool[] | null = null;
-let toolLoad: Promise<Tool[]> | null = null;
-
 /** forgetChat drops what the place keeps between two visits, for the tests. */
 export function forgetChat(): void {
   picksOf.clear();
   firstSent = null;
-  toolCache = null;
-  toolLoad = null;
+  forgetToolCatalog();
   forgetProfiles();
   forgetQueued();
 }
@@ -61,24 +61,6 @@ function useChat(): QuickChat | null {
 }
 
 const meOf = (s: ReturnType<typeof store.get>) => (s.me && s.me.principal ? s.me.principal.subject : '');
-
-/** useTools reads the catalog of tools of GET /v1/tools once per page load. A workbench without it gives none. */
-function useTools(): Tool[] | null {
-  const [tools, setTools] = useState<Tool[] | null>(toolCache);
-  useEffect(() => {
-    if (tools) return;
-    let live = true;
-    if (!toolLoad) toolLoad = api.tools().catch(() => [] as Tool[]);
-    toolLoad.then((t) => {
-      toolCache = t;
-      if (live) setTools(t);
-    });
-    return () => {
-      live = false;
-    };
-  }, []);
-  return tools;
-}
 
 /** useAgent reads the profile of an agent: its tools and its skills. undefined while it loads, null when the page cannot read it. */
 const useAgent = (name: string): Agent | null | undefined => useProfile(name);
@@ -182,14 +164,8 @@ export function ChatList({ current }: { current?: string }) {
           </div>
         ))}
         {!loaded && runs.length === 0 && <p class="people-note">Loading the chats.</p>}
-        {loaded && runs.length === 0 && (
-          <div class="empty">
-            <p>No chat yet.</p>
-            <Button href={hrefOf({ place: 'chat', fresh: true })} kind="primary">
-              New chat
-            </Button>
-          </div>
-        )}
+        {/* The key New of the header starts a chat, so the empty list holds no second key. */}
+        {loaded && runs.length === 0 && <p class="people-note">No chat yet.</p>}
         {runs.length > 0 && shown.length === 0 && <p class="people-note">No chat holds those words.</p>}
       </div>
     </section>
@@ -198,28 +174,62 @@ export function ChatList({ current }: { current?: string }) {
 
 /* ---------- the picks of a new chat ---------- */
 
-/** PickRow is one row of chips with check boxes, with a field to find one when it holds more than FIND_FROM. */
-function PickRow({ id, title, find, items, value, onChange, error }: { id: string; title: string; find: string; items: PickItem[]; value: string[]; onChange: (next: string[]) => void; error?: string }) {
+/** One row of the picks: a check box and the plain words of an ability or a skill. ids are the names that it turns on or off together. */
+interface PickRowItem {
+  key: string;
+  label: string;
+  sub?: string;
+  /** The raw names, for the tooltip. */
+  title: string;
+  ids: string[];
+}
+
+const fromAbility = (a: Ability): PickRowItem => ({ key: a.key, label: a.text, title: a.names.join(', '), ids: a.names });
+
+/** isOnAll reports whether every name of a row is on. */
+const isOnAll = (value: string[], ids: string[]) => ids.length > 0 && ids.every((x) => value.includes(x));
+
+/** setAll turns every name of a row on or off, and keeps the order of the picks. */
+function setAll(value: string[], ids: string[], on: boolean): string[] {
+  if (on) return [...value, ...ids.filter((x) => !value.includes(x))];
+  return value.filter((x) => !ids.includes(x));
+}
+
+/**
+ * PickList is one list of picks with its heading and the count of the rows
+ * that are on. The rows that start on come first, and the rows that start
+ * off follow below a line. Past FIND_FROM rows, a field finds one.
+ */
+function PickList({ id, title, find, first, rest = [], value, onChange, error }: { id: string; title: string; find: string; first: PickRowItem[]; rest?: PickRowItem[]; value: string[]; onChange: (next: string[]) => void; error?: string }) {
   const [q, setQ] = useState('');
   const words = q.trim().toLowerCase();
-  const shown = words ? items.filter((x) => x.name.toLowerCase().includes(words) || x.text.toLowerCase().includes(words)) : items;
-  const on = items.filter((x) => value.includes(x.id)).length;
+  const hit = (x: PickRowItem) => !words || (x.label + ' ' + (x.sub || '') + ' ' + x.title).toLowerCase().includes(words);
+  const all = [...first, ...rest];
+  const on = all.filter((x) => isOnAll(value, x.ids)).length;
+  const row = (x: PickRowItem) => (
+    <label class="kit-row" title={x.title}>
+      <input type="checkbox" checked={isOnAll(value, x.ids)} onChange={(e) => onChange(setAll(value, x.ids, (e.target as HTMLInputElement).checked))} />
+      <span class="kit-text">
+        <span class="kit-label">{x.label}</span>
+        {x.sub && <span class="kit-sub">{x.sub}</span>}
+      </span>
+    </label>
+  );
+  const shownFirst = first.filter(hit);
+  const shownRest = rest.filter(hit);
   return (
     <section class="pick-sec" aria-labelledby={id}>
       <div class="pick-head">
         <h2 class="t-sub" id={id}>
           {title}
         </h2>
-        <Chip label={on + ' of ' + items.length}>{on}</Chip>
-        {items.length > FIND_FROM && <Find label={find} value={q} onInput={setQ} class="pick-find" />}
+        <Chip label={on + ' of ' + all.length}>{on}</Chip>
+        {all.length > FIND_FROM && <Find label={find} value={q} onInput={setQ} class="pick-find" />}
       </div>
-      <div class="pick-chips" role="group" aria-labelledby={id}>
-        {shown.map((x) => (
-          <label class="pick-chip" title={x.text || undefined}>
-            <input type="checkbox" checked={value.includes(x.id)} onChange={(e) => onChange(toggle(value, x.id, (e.target as HTMLInputElement).checked))} />
-            <span>{x.name}</span>
-          </label>
-        ))}
+      <div class="kit-rows" role="group" aria-labelledby={id}>
+        {shownFirst.map(row)}
+        {shownFirst.length > 0 && shownRest.length > 0 && <div class="kit-sep" role="separator" />}
+        {shownRest.map(row)}
       </div>
       {error && (
         <p class="field-error" role="alert">
@@ -230,9 +240,9 @@ function PickRow({ id, title, find, items, value, onChange, error }: { id: strin
   );
 }
 
-/** skillItems are the skills of the catalog that a person can pick: the ones that a person can hand to a run. */
-function skillItems(skills: Skill[] | null): PickItem[] {
-  return (skills || []).filter((s) => s.userInvocable !== false || s.modelInvocable !== false).map((s) => ({ id: s.name, name: s.name, text: s.description }));
+/** skillItems are the skills of the catalog that a person can pick: the ones that a person or a model can hand to a run. */
+function skillItems(skills: Skill[] | null): PickRowItem[] {
+  return (skills || []).filter((s) => s.userInvocable !== false || s.modelInvocable !== false).map((s) => ({ key: s.name, label: s.name, sub: s.description, title: s.name, ids: [s.name] }));
 }
 
 /** defaultSkills are the skills of the catalog that the list of an agent gives: every skill for a list of null. */
@@ -242,14 +252,21 @@ function defaultSkills(skills: Skill[] | null, list: string[] | null | undefined
   return all.filter((s) => isOn(list, skillOf(s))).map((s) => s.name);
 }
 
-/** NewChat is a chat before its first message: the picks of tools and skills, and the composer. */
+/**
+ * NewChat is a chat before its first message: a question first. The pane
+ * holds the composer, and right above it one quiet line that says what the
+ * chat can use, such as Can use files, memory, the time, the wiki, and 2
+ * skills. The line opens the picks of tools and skills, each in the words
+ * of a person, with the raw names in a tooltip.
+ */
 function NewChat({ chat }: { chat: QuickChat }) {
-  const tools = useTools();
+  const tools = useToolCatalog();
   const skills = useSelect((s) => (s.skills ? s.skills.skills : null));
   const agent = useAgent(chat.agent);
   const [picks, setPicks] = useState<InlineProfile | null>(null);
   const [error, setError] = useState('');
   const [noSkills, setNoSkills] = useState(false);
+  const [open, setOpen] = useState(false);
   // The page reads the skills at boot. A chat that opens before them, or after a failed read, reads them again.
   useEffect(() => {
     if (!skills) loadSkills().catch(() => setNoSkills(true));
@@ -257,7 +274,7 @@ function NewChat({ chat }: { chat: QuickChat }) {
   const ready = tools !== null && agent !== undefined && (skills !== null || noSkills);
   // The tools of the profile start on, each tool of the catalog that an
   // entry names, or the entry by its name where the catalog holds no such
-  // tool. The other tools of the catalog wait under More tools.
+  // tool. The other tools of the catalog start off.
   const rows = useMemo(() => {
     const list = agent ? agent.tools : null;
     if (tools && tools.length) return toolPicks(tools, list);
@@ -273,13 +290,18 @@ function NewChat({ chat }: { chat: QuickChat }) {
       skills: skills && skills.length ? defaultSkills(skills, agent ? agent.skills : null) : undefined,
     });
   }, [ready]);
+  // The tools of the wiki make one row, and so do the tools of the bridges.
+  const own = useMemo(() => abilitiesOf(rows.own.map((x) => x.id), tools).map(fromAbility), [rows, tools]);
+  const more = useMemo(() => abilitiesOf(rows.more.map((x) => x.id), tools).map(fromAbility), [rows, tools]);
   const skillList = useMemo(() => skillItems(skills), [skills]);
   const commands = useMemo(() => slashCommands(skills, picks && picks.skills ? picks.skills : []), [skills, picks]);
+  const summary = !picks ? 'Loading the tools.' : picks.tools || (agent && agent.tools) ? summaryOf(abilitiesOf(picks.tools || (agent && agent.tools) || [], tools), picks.skills ? picks.skills.length : 0) : 'Tools and skills';
 
   const send = async (text: string): Promise<boolean> => {
     if (!picks) return false;
     if (picks.tools && picks.tools.length === 0) {
       setError('A chat needs at least one tool. Pick one.');
+      setOpen(true);
       return false;
     }
     setError('');
@@ -295,38 +317,37 @@ function NewChat({ chat }: { chat: QuickChat }) {
 
   return (
     <section class="screen chat-main" aria-labelledby="chat-title">
-      <PaneHeader id="chat-title" title="New chat" size="title" level={1} back={{ href: '#chat', label: 'Chat', to: 'list' }} lead={<Mark agent={chat.agent} size={36} />} />
+      <PaneHeader id="chat-title" title="New chat" size="title" level={1} back={{ href: '#chat', label: 'Chat', to: 'list' }} />
       <div class="scroll chat-picks-scroll">
         <div class="chat-picks">
-          {!picks && <p class="people-note">Loading the tools.</p>}
-          {picks && picks.tools && (
-            <PickRow
-              id="chat-tools"
-              title="Tools"
-              find="Find a tool"
-              items={rows.own}
-              value={picks.tools}
-              error={error}
-              onChange={(next) => {
-                setError('');
-                setPicks({ ...picks, tools: next });
-              }}
-            />
+          {!picks ? (
+            <p class="chat-kit-line">{summary}</p>
+          ) : (
+            <details class="chat-kit" open={open} onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}>
+              <summary>
+                <Glyph name="back" size={16} />
+                <span>{summary}</span>
+              </summary>
+              <div class="chat-kit-body">
+                {picks.tools && (
+                  <PickList
+                    id="chat-tools"
+                    title="Tools"
+                    find="Find a tool"
+                    first={own}
+                    rest={more}
+                    value={picks.tools}
+                    error={error}
+                    onChange={(next) => {
+                      setError('');
+                      setPicks({ ...picks, tools: next });
+                    }}
+                  />
+                )}
+                {picks.skills && <PickList id="chat-skills" title="Skills" find="Find a skill" first={skillList} value={picks.skills} onChange={(next) => setPicks({ ...picks, skills: next })} />}
+              </div>
+            </details>
           )}
-          {picks && picks.tools && rows.more.length > 0 && (
-            <PickRow
-              id="chat-more-tools"
-              title="More tools"
-              find="Find a tool"
-              items={rows.more}
-              value={picks.tools}
-              onChange={(next) => {
-                setError('');
-                setPicks({ ...picks, tools: next });
-              }}
-            />
-          )}
-          {picks && picks.skills && <PickRow id="chat-skills" title="Skills" find="Find a skill" items={skillList} value={picks.skills} onChange={(next) => setPicks({ ...picks, skills: next })} />}
         </div>
       </div>
       <Composer draft={'chat:new'} label={'Message to ' + chat.agent} placeholder="Ask a question" disabled={picks ? '' : 'Loading the tools.'} commands={commands} onSend={send} />
@@ -479,18 +500,33 @@ export function ChatMain({ run }: { run?: string }) {
 
 /* ---------- This chat ---------- */
 
-/** ChatDetails is the details pane of a chat: the tools and the skills in use, the model, and the usage. */
+/** skillsLine names the skills of a chat compactly: 2 skills: notes and plan, or 5 skills: a, b, and 3 more. */
+export function skillsLine(skills: string[]): string {
+  if (skills.length === 0) return '';
+  const head = skills.length === 1 ? '1 skill: ' : skills.length + ' skills: ';
+  if (skills.length <= 3) return head + joined(skills);
+  return head + joined([...skills.slice(0, 2), skills.length - 2 + ' more']);
+}
+
+/**
+ * ChatDetails is the details pane of a chat: what the chat can do, in the
+ * words of a person, with a quiet for this chat on a tool that the picks
+ * gave beyond the list of the agent, its skills in one line, the model, and
+ * the usage.
+ */
 export function ChatDetails({ run: runId }: { run: string }) {
   const chat = useChat();
   const run = useSelect((s) => s.runs[runId]);
   const skillsCatalog = useSelect((s) => (s.skills ? s.skills.skills : null));
   const agent = useAgent(chat ? chat.agent : '');
   const start = useStart(run, runId);
+  const catalog = useToolCatalog();
   if (!chat) return null;
-  // The tools that the chat started with. A list that the page cannot tell leaves the section out, so a chat with tools never reads Tools 0.
+  // The tools that the chat started with. A list that the page cannot tell leaves the tools out, so a chat with tools never reads no tool.
   const picks = picksOfRun(run, runId, agent, start);
   const extra = (run && run.extraTools) || (start && start.extraTools) || [];
   const tools = picks.tools ? [...picks.tools.filter((x) => !extra.includes(x)), ...extra] : null;
+  const abilities = tools ? abilitiesOf(tools, catalog) : [];
   const skills = picks.skills || (skillsCatalog || []).map((s) => s.name);
   const model = run && run.resolved && run.resolved.model;
   const parts = run ? usageParts(run.usage, works(run)) : [];
@@ -498,45 +534,21 @@ export function ChatDetails({ run: runId }: { run: string }) {
     <section class="screen chat-details" aria-labelledby="chat-details-title">
       <PaneHeader id="chat-details-title" title="This chat" back={{ href: hrefOf({ place: 'chat', run: runId }), label: run ? chatTitle(run) : 'Chat', to: 'main' }} />
       <div class="scroll">
-        {tools && (
-          <section class="prof-sec" aria-labelledby="chat-tools-in-use">
+        {(abilities.length > 0 || skills.length > 0) && (
+          <section class="prof-sec" aria-labelledby="chat-can">
             <div class="prof-sec-head">
-              <h3 class="t-sub" id="chat-tools-in-use">
-                Tools
+              <h3 class="t-sub" id="chat-can">
+                What it can do
               </h3>
-              <Chip label={tools.length === 1 ? '1 tool' : tools.length + ' tools'}>{tools.length}</Chip>
             </div>
-            {tools.length > 0 && (
-              <ul class="prof-chips chat-chips">
-                {tools.map((x) => (
-                  <li>
-                    <Chip class="prof-tool">
-                      {x}
-                      {extra.includes(x) && <span class="chip-note">for this chat</span>}
-                    </Chip>
-                  </li>
-                ))}
-              </ul>
+            <Abilities abilities={abilities} extra={extra} label="Tools" />
+            {skills.length > 0 && (
+              <p class="chat-skills" title={skills.join(', ')}>
+                {skillsLine(skills)}
+              </p>
             )}
           </section>
         )}
-        <section class="prof-sec" aria-labelledby="chat-skills-in-use">
-          <div class="prof-sec-head">
-            <h3 class="t-sub" id="chat-skills-in-use">
-              Skills
-            </h3>
-            <Chip label={skills.length === 1 ? '1 skill' : skills.length + ' skills'}>{skills.length}</Chip>
-          </div>
-          {skills.length > 0 && (
-            <ul class="prof-chips chat-chips">
-              {skills.map((x) => (
-                <li>
-                  <Chip class="prof-tool">{x}</Chip>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
         {model && (
           <section class="prof-sec" aria-labelledby="chat-model">
             <div class="prof-sec-head">
@@ -557,6 +569,7 @@ export function ChatDetails({ run: runId }: { run: string }) {
             <div class="today">
               {parts.map((p) => (
                 <span>
+                  {p.lead && p.lead + ' '}
                   <b>{p.n}</b>
                   {p.word && ' ' + p.word}
                 </span>
@@ -568,4 +581,3 @@ export function ChatDetails({ run: runId }: { run: string }) {
     </section>
   );
 }
-

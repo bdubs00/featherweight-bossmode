@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MARK_HUES, MAX_CELLS, MIN_CELLS, hash32, markOf, markPath } from './mark';
+import { MARK_HUES, MAX_CELLS, MIN_CELLS, centered, hash32, markOf, markPath } from './mark';
 
 const names = ['migrator', 'reviewer', 'tester', 'writer', 'scribe', 'manager', 'a', 'b', 'x1', 'release-notes', 'Ünïcode', ''];
 
@@ -33,9 +33,42 @@ describe('markOf', () => {
     expect(seen.size).toBe(MARK_HUES);
   });
 
+  it('sets the lit rows in the middle of the glyph, one row off at most', () => {
+    const rows = (cells: boolean[]) => [0, 1, 2, 3, 4].map((y) => cells.slice(y * 5, y * 5 + 5).some(Boolean));
+    for (let i = 0; i < 2000; i++) {
+      const r = rows(markOf('agent-' + i).cells);
+      const top = r.indexOf(true);
+      const bottom = 4 - r.lastIndexOf(true);
+      expect(Math.abs(top - bottom)).toBeLessThanOrEqual(1);
+    }
+    // The mark of chat lit only its three lower rows, and sat at the foot of its well.
+    const chat = rows(markOf('chat').cells);
+    expect(chat.indexOf(true)).toBe(1);
+    expect(chat.lastIndexOf(true)).toBe(3);
+  });
+
   it('gives different names different marks', () => {
     const shapes = new Set(['migrator', 'reviewer', 'tester', 'writer', 'scribe'].map((n) => markOf(n).cells.join()));
     expect(shapes.size).toBe(5);
+  });
+});
+
+describe('centered', () => {
+  it('moves a glyph by whole rows and keeps its shape', () => {
+    const cells = new Array<boolean>(25).fill(false);
+    cells[20] = cells[24] = true;
+    const out = centered(cells);
+    expect(out[10]).toBe(true);
+    expect(out[14]).toBe(true);
+    expect(out.filter(Boolean).length).toBe(2);
+  });
+
+  it('leaves a glyph that fills its rows, or an empty one, as it is', () => {
+    const full = new Array<boolean>(25).fill(false);
+    full[2] = full[22] = true;
+    expect(centered(full)).toBe(full);
+    const none = new Array<boolean>(25).fill(false);
+    expect(centered(none)).toBe(none);
   });
 });
 

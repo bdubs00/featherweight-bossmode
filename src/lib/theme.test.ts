@@ -22,7 +22,7 @@ describe('themeOf', () => {
     }
   });
 
-  it('keeps the empty well for a logo off this origin', () => {
+  it('keeps the monogram for a logo off this origin', () => {
     for (const logo of ['https://example.com/logo.svg', '//example.com/x', '/ui/logo', '/v1/../ui/x', '/v1\\x', 'javascript:alert(1)', '/v1/a b', 7]) {
       expect(themeOf({ ...base, theme: { logo: logo as string } }).logo).toBe('');
     }

@@ -1,16 +1,20 @@
-// Open a bridge. The one question first: what is the job. Then the seats,
-// which the person picks, or which the manager splits from the goal. Then
-// the placement, a visible choice of two: keep warm workers, the default,
-// or a fresh sandbox per seat, which needs a manager. Advanced holds the
-// title, filled from the goal, the handles, the caps, and what the manager
-// can do. The record goes to POST /v1/bridges. A job for the manager goes to
-// the conversation of the manager, which opens the bridge with its tools.
+// Open a bridge. The first view holds the one question, what is the job,
+// and the seats, which the person picks, or which the manager splits from
+// the goal. Advanced holds the rest: the title, filled from the goal, the
+// handles, the placement, the caps, and what the manager can do. The
+// placement is a choice of the deployer more than of a person: keep warm
+// workers, the default, or a fresh sandbox per seat, which needs a manager.
+// The record goes to POST /v1/bridges, and the key says Open bridge. A job
+// for the manager goes to the conversation of the manager, where the plan
+// of the seats will appear, and the key says Ask the manager.
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { Caps, Delegation, Placement } from '../api/types';
 import type { NewBridge as NewBridgeBody } from '../api/routes';
 import { useSelect } from '../state/store';
 import { askManager, loadAgents, openNewBridge } from '../state/actions';
+import { api } from '../api/routes';
+import { store } from '../state/store';
 import { handleReason, nextHandle } from '../lib/handles';
 import { taskOfGoal } from './seats';
 import { Picker } from './Picker';
@@ -105,10 +109,15 @@ export function bodyOf(f: BridgeForm): NewBridgeBody {
   return body;
 }
 
-/** askOf is the message that hands the job to the manager, to split into seats. */
-export function askOf(f: BridgeForm): string {
-  const place = f.placement === 'spawn' ? 'fresh sandbox per seat (spawn)' : 'keep warm workers (queue)';
-  const lines = ['Open a bridge for this job. Split it into seats, pick an agent for each seat, and seat them.', '', 'Job: ' + f.goal.trim(), 'Placement: ' + place];
+/**
+ * askOf is the message that hands the job to the manager, to split into
+ * seats. The person reads it in the conversation of the manager, so it
+ * names the placement only when the person picked another one than the
+ * default of the deployment.
+ */
+export function askOf(f: BridgeForm, defaultPlacement: Placement = 'queue'): string {
+  const lines = ['Open a bridge for this job. Split it into seats, pick an agent for each seat, and seat them.', '', 'Job: ' + f.goal.trim()];
+  if (f.placement !== defaultPlacement) lines.push('Placement: ' + (f.placement === 'spawn' ? 'a fresh sandbox per seat (spawn)' : 'keep warm workers (queue)'));
   if (f.title.trim()) lines.push('Title: ' + f.title.trim());
   return lines.join('\n');
 }
@@ -123,7 +132,8 @@ export function NewBridge() {
     goal: '',
     mode: 'pick',
     seats: [],
-    placement: (config && config.placement) || 'queue',
+    // Keep warm workers, unless the deployment picked a fresh sandbox per seat and has the manager that it needs.
+    placement: config && config.placement === 'spawn' && config.manager ? 'spawn' : 'queue',
     title: '',
     caps: {},
     delegation: { approve: false, budget: false, members: false, report: true },
@@ -157,14 +167,20 @@ export function NewBridge() {
     const bad = !!(errs.goal || errs.seats || errs.placement || Object.keys(errs.seat).length || Object.keys(errs.caps).length);
     setErrors(bad ? errs : null);
     if (bad) {
-      if (Object.keys(errs.caps).length || (Object.keys(errs.seat).length && !adv)) setAdv(true);
+      if (errs.placement || Object.keys(errs.caps).length || (Object.keys(errs.seat).length && !adv)) setAdv(true);
       return;
     }
     setBusy(true);
     let to = '';
     await attempt(async () => {
       if (f.mode === 'manager') {
-        await askManager(askOf(f));
+        // The manager plans the seats in its conversation, so the person lands there with the job that they typed.
+        const id = await askManager(askOf(f, (config && config.placement) || 'queue'));
+        try {
+          store.dispatch({ type: 'run', run: await api.run(id) });
+        } catch {
+          // The conversation reads the run on its own.
+        }
         to = '#manager';
       } else {
         const id = await openNewBridge(bodyOf(f));
@@ -199,10 +215,12 @@ export function NewBridge() {
           )}
 
           {f.mode === 'pick' && (
-            <section class="seats" aria-labelledby="seats-head">
-              <h2 class="field-label" id="seats-head">
-                {hasManager ? 'Add a seat' : 'Seats'}
-              </h2>
+            <section class="seats" aria-labelledby={hasManager ? undefined : 'seats-head'} aria-label={hasManager ? 'Seats' : undefined}>
+              {!hasManager && (
+                <h2 class="field-label" id="seats-head">
+                  Seats
+                </h2>
+              )}
 
               {f.seats.map((s) => (
                 <div class="seat">
@@ -227,8 +245,8 @@ export function NewBridge() {
                 </div>
               ))}
               <span class="pick-anchor">
-                <Button ref={addKey} size="s" aria-haspopup="dialog" aria-expanded={picking} disabled={f.seats.length >= max} onClick={() => setPicking(!picking)}>
-                  Add
+                <Button ref={addKey} size="s" icon="plus" aria-haspopup="dialog" aria-expanded={picking} disabled={f.seats.length >= max} onClick={() => setPicking(!picking)}>
+                  Add a seat
                 </Button>
                 {picking && <Picker bridge="" drafts={f.seats.map((s) => s.agent)} draftHandles={f.seats.map((s) => s.handle)} onPick={addSeat} onClose={() => setPicking(false)} anchor={addKey} place="key" />}
               </span>
@@ -240,12 +258,11 @@ export function NewBridge() {
             </section>
           )}
 
-          <Choices name="placement" legend="Placement" value={f.placement} options={PLACEMENTS} onChange={(placement) => patch({ placement })} error={err.placement} />
-
           <Advanced open={adv} onToggle={setAdv}>
             <Field label="Title">
               <Input value={f.title} maxLength={120} placeholder={titleOf(f.goal)} onInput={(e) => patch({ title: (e.target as HTMLInputElement).value })} />
             </Field>
+            <Choices name="placement" legend="Placement" value={f.placement} options={PLACEMENTS} onChange={(placement) => patch({ placement })} error={err.placement} />
             <fieldset>
               <legend>Caps</legend>
               <div class="field-row">
@@ -270,7 +287,7 @@ export function NewBridge() {
           <div class="form-end">
             <Button href="#">Cancel</Button>
             <Button type="submit" kind="primary" disabled={busy}>
-              Open bridge
+              {f.mode === 'manager' ? 'Ask the manager' : 'Open bridge'}
             </Button>
           </div>
         </div>

@@ -30,14 +30,40 @@ export function byName(by: string): string {
   return personName(by);
 }
 
-/** One folder of the wiki: its path, and the pages right in it. The root has the path "". */
+/**
+ * One folder of the wiki: its path, its name for a person, and the pages
+ * right in it. The root has the path "". A folder of the work of a bridge,
+ * bridges/<id>, is named by the title of the bridge, and a folder of an
+ * agent, agents/<agent>, by the name of the agent.
+ */
 export interface Folder {
   path: string;
+  kind: 'root' | 'people' | 'bridge' | 'agent';
+  title: string;
   pages: PageMeta[];
 }
 
-/** foldersOf groups the pages by folder: the pages at the root first, then each folder by its path. */
-export function foldersOf(pages: PageMeta[]): Folder[] {
+/** The order of the kinds of folders: the pages that people keep first, the work folders of bridges and agents last. */
+const KIND_ORDER: Folder['kind'][] = ['root', 'people', 'bridge', 'agent'];
+
+/** folderOf names a folder by its path, with the titles of the bridges that the page knows. */
+export function folderOf(path: string, bridgeTitles: Record<string, string>): Omit<Folder, 'pages'> {
+  if (!path) return { path, kind: 'root', title: '' };
+  const [head, id, ...rest] = path.split('/');
+  const tail = rest.length ? '/' + rest.join('/') : '';
+  if (head === 'bridges' && id) return { path, kind: 'bridge', title: bridgeTitles[id] ? bridgeTitles[id] + tail : path };
+  if (head === 'agents' && id) return { path, kind: 'agent', title: id + tail };
+  return { path, kind: 'people', title: path };
+}
+
+/**
+ * foldersOf groups the pages by folder, in the order that a person looks
+ * for them: the pages at the root, then the folders that people and agents
+ * keep for the work of the place, such as runbooks or homelab, by path,
+ * then the work folders of the bridges by title, then the folders of the
+ * agents by name.
+ */
+export function foldersOf(pages: PageMeta[], bridgeTitles: Record<string, string> = {}): Folder[] {
   const by = new Map<string, PageMeta[]>();
   for (const p of pages) {
     const i = p.path.lastIndexOf('/');
@@ -45,9 +71,10 @@ export function foldersOf(pages: PageMeta[]): Folder[] {
     if (!by.has(dir)) by.set(dir, []);
     by.get(dir)!.push(p);
   }
+  const key = (f: Omit<Folder, 'pages'>) => (f.kind === 'people' ? f.path : f.title).toLocaleLowerCase();
   return [...by.keys()]
-    .sort((a, b) => (a === '' ? -1 : b === '' ? 1 : a < b ? -1 : a > b ? 1 : 0))
-    .map((path) => ({ path, pages: by.get(path)!.sort((a, b) => (a.path < b.path ? -1 : 1)) }));
+    .map((path) => ({ ...folderOf(path, bridgeTitles), pages: by.get(path)!.sort((a, b) => (a.path < b.path ? -1 : 1)) }))
+    .sort((a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind) || (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : a.path < b.path ? -1 : 1));
 }
 
 /** Since is a short meta of a moment, with the full time in a tooltip. */
@@ -84,7 +111,10 @@ export function PageTree({ current }: { current?: string }) {
   const [hits, setHits] = useState<SearchHit[] | null>(null);
   const [cut, setCut] = useState(false);
   const [shut, setShut] = useState<Record<string, boolean>>({});
-  const folders = useMemo(() => foldersOf(Object.values(byPath)), [byPath]);
+  // The list of bridges holds the closed ones too, so a folder of a bridge is named by its title.
+  const bridges = useSelect((s) => s.bridges.byId);
+  const titles = useMemo(() => Object.fromEntries(Object.values(bridges).map((b) => [b.id, b.title])), [bridges]);
+  const folders = useMemo(() => foldersOf(Object.values(byPath), titles), [byPath, titles]);
   const list = useRoving<HTMLDivElement>();
   const count = Object.keys(byPath).length;
   useEffect(() => {
@@ -156,9 +186,9 @@ export function PageTree({ current }: { current?: string }) {
               return (
                 <div class="group" role="group" aria-labelledby={f.path ? id : undefined} aria-label={f.path ? undefined : 'Pages'}>
                   {f.path && (
-                    <button type="button" class="group-head" id={id} aria-expanded={open} onClick={() => setShut({ ...shut, [f.path]: open })}>
+                    <button type="button" class="group-head" id={id} aria-expanded={open} title={f.title !== f.path ? f.path : undefined} onClick={() => setShut({ ...shut, [f.path]: open })}>
                       <Glyph name="back" size={14} />
-                      <span class="clip">{f.path}</span>
+                      <span class="clip">{f.title}</span>
                       <Chip>{f.pages.length}</Chip>
                     </button>
                   )}
@@ -378,6 +408,10 @@ export function PageEditor({ path: initial, create }: { path?: string; create?: 
   const [busy, setBusy] = useState(false);
   const [conflict, setConflict] = useState<Page | null>(null);
   const box = useRef<HTMLTextAreaElement>(null);
+  // The heading names the page by its title, as the tree and the page do, and by its name only without one.
+  const listed = useSelect((s) => (initial ? s.pages.byPath[initial] : undefined));
+  const [title, setTitle] = useState('');
+  const name = title || (listed && listed.title) || pageName(initial || '');
 
   useEffect(() => {
     if (create || !initial) return;
@@ -394,8 +428,16 @@ export function PageEditor({ path: initial, create }: { path?: string; create?: 
           setText(p.text);
           setBase(p.hash);
         }
+        if (p.title) setTitle(p.title);
         setReady(true);
-        requestAnimationFrame(() => box.current && box.current.focus());
+        // The text opens at its top, with the caret at its start: a person reads a page from the top.
+        requestAnimationFrame(() => {
+          const t = box.current;
+          if (!t) return;
+          t.focus({ preventScroll: true });
+          t.setSelectionRange(0, 0);
+          t.scrollTop = 0;
+        });
       })
       .catch(showError);
   }, [initial, create]);
@@ -442,7 +484,7 @@ export function PageEditor({ path: initial, create }: { path?: string; create?: 
   const cancelHref = create ? '#pages' : hrefOf({ place: 'pages', path: initial || '', mode: 'read' });
   return (
     <section class="screen pageedit" aria-labelledby="edit-title">
-      <PaneHeader id="edit-title" title={create ? 'New page' : 'Edit ' + pageName(initial || '')} size="title" level={1} back={{ href: cancelHref, label: create ? 'Wiki' : pageName(initial || ''), to: 'here' }} />
+      <PaneHeader id="edit-title" title={create ? 'New page' : 'Edit ' + name} size="title" level={1} back={{ href: cancelHref, label: create ? 'Wiki' : name, to: 'here' }} />
       <form
         class="scroll pad editor"
         onSubmit={(e) => {
