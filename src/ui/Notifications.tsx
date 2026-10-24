@@ -66,6 +66,7 @@ export function Notifications({ onClose }: { onClose: () => void }) {
   const addKey = useRef<HTMLButtonElement>(null);
   const faces = useSelect((s) => s.faces);
   const agentName = (a: string) => (faces[a] && faces[a].displayName) || a;
+  const nameOf = (c: NotifyChannel) => c.label || kindName(c.kind, read);
   useEffect(() => {
     let live = true;
     api
@@ -210,7 +211,7 @@ export function Notifications({ onClose }: { onClose: () => void }) {
     try {
       const results = await api.testNotification(id);
       const res = results.find((x) => x.channel === id) || (results.length === 1 ? results[0] : undefined);
-      said({ busy: false, ...testWords(res, c.label) });
+      said({ busy: false, ...testWords(res, nameOf(c)) });
     } catch (e) {
       said({ busy: false, ok: false, words: 'The test failed. ' + messageOf(e) });
     }
@@ -226,7 +227,6 @@ export function Notifications({ onClose }: { onClose: () => void }) {
   };
 
   const ready = load === 'ready' && !!read;
-  const nameOf = (c: NotifyChannel) => c.label || kindName(c.kind, read);
   const quietSaid = quietErr || (problems.quiet.length ? problems.quiet.join(' ') : '');
   const gone = removing !== null ? f.channels[removing] : undefined;
   return (

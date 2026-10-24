@@ -157,6 +157,8 @@ export function ChannelDialog({
   const [said, setSaid] = useState<Partial<Record<ChannelSlot, string[]>>>(problems || {});
   const [top, setTop] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [shown, setShown] = useState(0);
+  const box = useRef<HTMLDivElement>(null);
   const live = useRef(true);
   useEffect(
     () => () => {
@@ -164,6 +166,16 @@ export function ChannelDialog({
     },
     [],
   );
+  // After a refusal, the first field that is wrong takes the focus, so a phone shows it.
+  useEffect(() => {
+    if (!shown || !box.current) return;
+    const bad = box.current.querySelector('[aria-invalid="true"]') as HTMLElement | null;
+    if (bad) bad.focus();
+    else {
+      const said = box.current.querySelector('.field-error, .duty-problems') as HTMLElement | null;
+      if (said && typeof said.scrollIntoView === 'function') said.scrollIntoView({ block: 'nearest' });
+    }
+  }, [shown]);
   const kinds = useMemo(() => offeredKinds(read), [read]);
   const agents = useSelect(selectAgents);
   const faces = useSelect((s) => s.faces);
@@ -186,6 +198,7 @@ export function ChannelDialog({
     const errs = channelErrors(f, read.serverDefault);
     if (Object.keys(errs).length) {
       setErrors(errs);
+      setShown((n) => n + 1);
       return;
     }
     setBusy(true);
@@ -195,6 +208,7 @@ export function ChannelDialog({
     setBusy(false);
     setSaid(r.problems || {});
     setTop(r.top || []);
+    setShown((n) => n + 1);
   };
 
   const kind = f.kind;
@@ -206,7 +220,7 @@ export function ChannelDialog({
 
   return (
     <Confirm title={base ? 'Edit ' + base.label : 'Add a place'} confirm={base ? 'Save' : 'Add place'} busy={busy || (!base && !kinds.length)} class="notify-dialog channel-dialog" onCancel={onCancel} onConfirm={save}>
-      <div class="notify-form">
+      <div class="notify-form" ref={box}>
         <Said list={[...top, ...(said.row || [])]} />
         {base ? (
           <p class="t-meta">{kindName(base.kind, read)}</p>

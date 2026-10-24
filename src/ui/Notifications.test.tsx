@@ -207,7 +207,10 @@ describe('Add a place', () => {
     pick('slack');
     expect(field(place(), 'Address')!.querySelector('.help-key')!.getAttribute('aria-label')).toBe('Where to find it');
     click(keyNamed(place(), 'Add place'));
+    await settle();
     expect(field(place(), 'Name')!.querySelector('.field-error')!.textContent).toBe('Give the place a name.');
+    // The first field that is wrong takes the focus.
+    expect(document.activeElement).toBe(control(place(), 'Name'));
     expect(field(place(), 'Address')!.querySelector('.field-error')!.textContent).toBe('Paste the address from Slack.');
     typeIn(control(place(), 'Name'), 'Ops room');
     typeIn(control(place(), 'Address'), 'https://hooks.slack.com/services/T0/B0/xyz');
