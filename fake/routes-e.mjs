@@ -411,6 +411,43 @@ function eventWords(e) {
   return 'When something happens in the fleet.';
 }
 
+/** whereSaid says one filter of a check, as the front does. */
+function whereSaid(w) {
+  const f = String(w.field || '').trim();
+  const v = (x) => JSON.stringify(x);
+  if (w.is !== undefined) return f + ' is ' + v(w.is);
+  if (w.isNot !== undefined) return f + ' is not ' + v(w.isNot);
+  if (Array.isArray(w.oneOf)) return f + ' is ' + w.oneOf.map(v).join(' or ');
+  if (w.contains !== undefined) return f + ' contains ' + v(w.contains);
+  if (w.atLeast !== undefined) return f + ' is at least ' + v(w.atLeast);
+  if (w.atMost !== undefined) return f + ' is at most ' + v(w.atMost);
+  return f;
+}
+
+/** checkSaid says what the check of a duty looks for and when it wakes the agent, as the readback of the front does after the start. */
+function checkSaid(d) {
+  const c = d.checkFirst;
+  let s = '';
+  if (c.look && c.look.http) {
+    const u = new URL(c.look.http.url);
+    s = 'First it looks at ' + u.host + u.pathname.replace(/\/$/, '');
+  } else if (c.look && c.look.tool) s = 'First it calls the tool ' + c.look.tool;
+  if (c.items) s += ' for the items at ' + c.items;
+  if (c.where && c.where.length) s += ', where ' + c.where.map(whereSaid).join(' and ');
+  s += '. ';
+  const wake = c.wake || { when: 'new' };
+  if (wake.when === 'any') s += 'Any item wakes ' + d.agent + '.';
+  else if (wake.when === 'atLeast') s += wake.count + ' items or more wake ' + d.agent + '.';
+  else s += 'Only items that it did not see before wake ' + d.agent + ', by their ' + (c.key || '') + '.';
+  const x = d.do || {};
+  const message = (x.ask && x.ask.message) || (x.post && x.post.message) || (x.manager && x.manager.message) || '';
+  if (message.includes('{found}')) s += ' The run gets the list.';
+  return s;
+}
+
+/** withCheck adds what the check looks for to the readback of a start, as the front does. A start that does not read back stays empty. */
+const withCheck = (start, d) => (start && d.checkFirst && d.checkFirst.look ? start + ' ' + checkSaid(d) : start);
+
 /** The bridges and the playbooks that problemsOf checks a duty against. register fills them. */
 const ctx = { bridges: new Map(), playbooks: new Map() };
 
@@ -554,7 +591,7 @@ export function register({ on, refuse, readJson, now, AGENTS, admin, S, publish 
     const today = (h || []).filter((r) => Date.now() - Date.parse(r.at) < DAY).reduce((n, r) => n + (r.costUSD || 0), 0);
     const out = {
       ...rec,
-      readback: rec.source === 'file' ? rec.readback : s ? readbackOf(s) : rec.when.webhook ? 'When another app calls.' : rec.when.event ? eventWords(rec.when.event) : '',
+      readback: rec.source === 'file' ? rec.readback : withCheck(s ? readbackOf(s) : rec.when.webhook ? 'When another app calls.' : rec.when.event ? eventWords(rec.when.event) : '', rec),
       next: s && !rec.paused ? nextOf(s) : [],
       state: { lastRun: (h && h[0]) || null, todayUSD: Math.round(today * 100) / 100, failuresInRow: (h || []).findIndex((r) => r.state !== 'failed') < 0 ? (h || []).length : (h || []).findIndex((r) => r.state !== 'failed'), pausedReason: (st && st.pausedReason) || '' },
     };
@@ -596,7 +633,8 @@ export function register({ on, refuse, readJson, now, AGENTS, admin, S, publish 
     const { duty, problems } = problemsOf({ ...body, name }, zone);
     const dry = c.url.searchParams.get('dryRun') === 'true';
     const s = duty.when && duty.when.schedule;
-    const readback = s && !problems.some((p) => p.startsWith('when')) ? readbackOf(s) : duty.when && duty.when.webhook ? 'When another app calls.' : duty.when && duty.when.event && !problems.some((p) => p.startsWith('when')) ? eventWords(duty.when.event) : '';
+    const start = s && !problems.some((p) => p.startsWith('when')) ? readbackOf(s) : duty.when && duty.when.webhook ? 'When another app calls.' : duty.when && duty.when.event && !problems.some((p) => p.startsWith('when')) ? eventWords(duty.when.event) : '';
+    const readback = problems.some((p) => p.startsWith('checkFirst')) ? start : withCheck(start, duty);
     if (dry) {
       const out = { duty: { ...duty, owner: old ? old.owner : c.person.subject }, readback, next: readback && s ? nextOf(s) : [], problems };
       if (c.url.searchParams.get('test') === 'true') {
