@@ -1130,7 +1130,8 @@ The work:
   with Replace, and Remove where the place can do without it, and never
   its value. A place through an agent needs a budget per message, which
   the person writes: the page fills no amount. The key of the dialog saves
-  the whole list, and the focus goes back to the key that opened it.
+  the whole list, and the focus goes back to the key that opened it. After
+  a refusal, the first field that is wrong takes the focus.
 - Tell me about of a duty offers each shared channel of the operator by
   its label, such as The Ops room channel, with Failures and Questions.
 
