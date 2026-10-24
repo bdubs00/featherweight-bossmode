@@ -20,9 +20,12 @@
 //                                           504 for words that hold "slow"
 //   PATCH  /v1/duties                       {"paused", "reason"}, for an admin
 //   GET    /v1/duties/options               {"secrets": [{"name", "hosts"}], "events", "actions", "looks"}
-//   GET    /v1/notifications                the settings of the person, with "token": "set" or "", serverDefault, and off
-//   PUT    /v1/notifications                the same body: "set" keeps the token, "" clears it. 400 {"problems"}
-//   POST   /v1/notifications/test           {"sent": true}, or 502 {"error"} for no topic or a topic that holds "fail"
+//   GET    /v1/notifications                {"channels", "quietHours", "offered", "shared", "off", "serverDefault"}: url,
+//                                           secret, and ntfy.token read "set" or ""
+//   PUT    /v1/notifications                {"channels", "quietHours"}: "set" keeps a write-only value, "" clears it.
+//                                           400 {"problems"} with paths such as channels[1].url
+//   POST   /v1/notifications/test           {"channel"} or {}: {"results": [{"channel", "sent", "error"}]}. 400 for an
+//                                           unknown place
 //   GET    /v1/playbooks                    {"playbooks": [...]}, without caps and delegation
 //   GET    /v1/playbooks/{name}             the playbook whole
 //   PUT    /v1/playbooks/{name}             {"goal", "placement", "seats", "caps", "delegation", "revision"}: 201, 200, 400, or 409
@@ -470,6 +473,7 @@ export function register({ on, refuse, readJson, now, AGENTS, admin, S, publish 
       checkFirst: { look: { tool: 'servicenow.query_incidents', input: { query: 'assignment_group=Platform Ops^priority<=2^active=true' } }, items: 'result.records', key: 'number', where: [{ field: 'priority', oneOf: [1, 2] }], wake: { when: 'new' } },
       do: { ask: { message: 'Triage the new incidents and hand each one to its team: {found}' } },
       limits: { budget: { maxCostUSD: 0.2, maxTurns: 20 }, perDayUSD: 3, overlap: 'queue', catchUp: '15m' },
+      notify: { failure: ['owner', 'channel:ops-room'], needsYou: ['owner'] },
       revision: 3,
     },
     runsOf(15, 12, (i, at) =>
@@ -708,49 +712,156 @@ export function register({ on, refuse, readJson, now, AGENTS, admin, S, publish 
 
   /* ---------- notifications ---------- */
 
-  /** The settings of each person, with the token itself, which no read answers. */
+  // Each person keeps a list of channels, after section 11 of the contract
+  // of the build. The fake offers every kind and one shared channel of the
+  // operator. A read answers "set" or "" for url, secret, and ntfy.token. A
+  // write keeps the stored value for "set", clears it for "", and replaces
+  // it with any other value. alice starts with her phone and Home
+  // Assistant. A test fails for a place whose topic or stored address holds
+  // fail, as the stored address of Home Assistant does.
+  const SERVER = 'https://ntfy.sh';
+  const KINDS = ['ntfy', 'slack', 'discord', 'teams', 'webhook', 'email', 'agent', 'shared'];
+  const KIND_LABELS = { ntfy: 'ntfy', slack: 'Slack', discord: 'Discord', teams: 'Teams', webhook: 'Webhook', email: 'Email', agent: 'Agent', shared: 'Shared' };
+  const SHARED = [{ name: 'ops-room', kind: 'slack', label: 'Ops room' }];
+  const SEND = { questions: true, failures: true, digest: false };
   const notes = new Map();
   const settingsOf = (c) => {
     const who = c.person.subject;
-    if (!notes.has(who)) notes.set(who, { ntfy: { server: '', topic: '', token: '' }, send: { questions: true, failures: true, digest: false }, quietHours: { from: '', to: '', timeZone: zoneOf(c) } });
+    if (!notes.has(who))
+      notes.set(who, {
+        channels:
+          who === 'alice@example.com'
+            ? [
+                { id: 'phone', kind: 'ntfy', label: 'My phone', send: SEND, ntfy: { server: '', topic: 'alice-fw-8f3k', token: 'tk_alice' } },
+                { id: 'home', kind: 'webhook', label: 'Home Assistant', send: { questions: true, failures: false, digest: true }, url: 'https://ha.example.com/api/webhook/fw-failing', secret: 'ha-signing-secret' },
+              ]
+            : [],
+        quietHours: { from: '', to: '', timeZone: zoneOf(c) },
+      });
     return notes.get(who);
   };
-  const SERVER = 'https://ntfy.sh';
-  const notifyView = (n) => {
-    const out = { ...n, ntfy: { ...n.ntfy, token: n.ntfy.token ? 'set' : '' }, serverDefault: SERVER };
-    if (!n.ntfy.topic) out.off = 'Nothing goes out until you name a topic.';
+  const set = (v) => (v ? 'set' : '');
+  const channelView = (ch) => {
+    const out = { ...ch, send: { ...ch.send } };
+    if (ch.url !== undefined) out.url = set(ch.url);
+    if (ch.secret !== undefined) out.secret = set(ch.secret);
+    if (ch.ntfy) out.ntfy = { ...ch.ntfy, token: set(ch.ntfy.token) };
     return out;
   };
+  const notifyView = (n) => {
+    const reaches = n.channels.some((ch) => ch.send.questions || ch.send.failures || ch.send.digest);
+    return {
+      channels: n.channels.map(channelView),
+      quietHours: n.quietHours,
+      offered: KINDS.map((kind) => ({ kind, label: KIND_LABELS[kind] })),
+      shared: SHARED,
+      off: !n.channels.length ? 'No place reaches you yet.' : !reaches ? 'Each of your places has every switch off.' : '',
+      serverDefault: SERVER,
+    };
+  };
+  /** privateHost reports whether an address goes to a host of a private network, which the fake never allows. */
+  const privateHost = (u) => {
+    try {
+      const h = new URL(u).hostname.toLowerCase();
+      return h === 'localhost' || /^(10|127)\./.test(h) || /^192\.168\./.test(h) || /^172\.(1[6-9]|2\d|3[01])\./.test(h) || /\.(lan|local|internal)$/.test(h);
+    } catch {
+      return false;
+    }
+  };
+  const runnable = (agent) => AGENTS.some((a) => a.name === agent && (a.role === 'owner' || a.role === 'operator'));
+
+  /** writeOnly reads a write-only field of a write: "set" keeps the old value, "" clears it, and any other value replaces it. */
+  const writeOnly = (v, old) => (v === 'set' ? old || '' : String(v || ''));
 
   on('GET', '/v1/notifications', (c) => notifyView(settingsOf(c)));
 
   on('PUT', '/v1/notifications', async (c) => {
     const old = settingsOf(c);
     const body = await readJson(c.req);
-    const n = body.ntfy || {};
-    const send = body.send || {};
+    const list = Array.isArray(body.channels) ? body.channels : [];
     const q = body.quietHours || {};
     const problems = [];
-    if (n.server && !/^https?:\/\/[^\s/]+/.test(n.server)) problems.push('ntfy.server: The address of a server starts with https://.');
-    if (n.topic && !/^[A-Za-z0-9_-]{1,64}$/.test(n.topic)) problems.push('ntfy.topic: A topic holds 1 to 64 of letters, digits, hyphens, and underscores.');
+    if (list.length > 10) problems.push('channels: A person keeps at most 10 places.');
+    const ids = new Set();
+    const channels = list.map((x, i) => {
+      const at = `channels[${i}]`;
+      const was = old.channels.find((o) => x.id && o.id === x.id) || {};
+      const id = x.id || String(x.label || x.kind || 'place').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + Math.random().toString(36).slice(2, 6);
+      if (ids.has(id)) problems.push(`${at}.id: Another place has the id ${id}.`);
+      ids.add(id);
+      const s = x.send || {};
+      const ch = { id, kind: String(x.kind || ''), label: String(x.label || '').trim(), send: { questions: !!s.questions, failures: !!s.failures, digest: !!s.digest } };
+      if (!KINDS.includes(ch.kind)) problems.push(`${at}.kind: This workbench does not send to ${ch.kind || 'that kind'}.`);
+      if (!ch.label) problems.push(`${at}.label: Give the place a name.`);
+      const url = writeOnly(x.url, was.url);
+      switch (ch.kind) {
+        case 'ntfy': {
+          const n = x.ntfy || {};
+          ch.ntfy = { server: String(n.server || ''), topic: String(n.topic || ''), token: writeOnly(n.token, was.ntfy && was.ntfy.token) };
+          if (ch.ntfy.server && !/^https?:\/\/[^\s/]+/.test(ch.ntfy.server)) problems.push(`${at}.ntfy.server: The address of a server starts with https://.`);
+          if (!/^[A-Za-z0-9_-]{1,64}$/.test(ch.ntfy.topic)) problems.push(`${at}.ntfy.topic: A topic holds 1 to 64 of letters, digits, hyphens, and underscores.`);
+          break;
+        }
+        case 'slack':
+          ch.url = url;
+          if (url && !/^https:\/\/hooks\.slack\.com\//.test(url)) problems.push(`${at}.url: The address of Slack starts with https://hooks.slack.com/.`);
+          break;
+        case 'discord':
+          ch.url = url;
+          if (url && !/^https:\/\/(discord|discordapp)\.com\/api\/webhooks\//.test(url)) problems.push(`${at}.url: The address of Discord starts with https://discord.com/api/webhooks/.`);
+          break;
+        case 'teams':
+        case 'webhook':
+          ch.url = url;
+          if (ch.kind === 'webhook') ch.secret = writeOnly(x.secret, was.secret);
+          if (url && !/^https:\/\//.test(url)) problems.push(`${at}.url: The address starts with https://.`);
+          else if (url && privateHost(url)) problems.push(`${at}.url: The front posts to no private address that the operator did not allow.`);
+          break;
+        case 'email': {
+          const to = String((x.email && x.email.to) || '').trim();
+          ch.email = { to };
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) problems.push(`${at}.email.to: Write an email address.`);
+          break;
+        }
+        case 'agent': {
+          const a = x.agent || {};
+          const budget = a.budget || {};
+          ch.agent = { agent: String(a.agent || ''), how: String(a.how || '').trim(), budget };
+          if (!runnable(ch.agent.agent)) problems.push(`${at}.agent.agent: You cannot run the agent ${ch.agent.agent || 'that you picked'}.`);
+          if (!ch.agent.how) problems.push(`${at}.agent.how: Say how the agent should reach you.`);
+          if (!(Number(budget.maxCostUSD) > 0)) problems.push(`${at}.agent.budget: A place through an agent needs the most that a message can cost.`);
+          break;
+        }
+        case 'shared':
+          ch.shared = String(x.shared || '');
+          if (!SHARED.some((s) => s.name === ch.shared)) problems.push(`${at}.shared: There is no shared channel ${ch.shared || 'of that name'}.`);
+          break;
+      }
+      if (['slack', 'discord', 'teams', 'webhook'].includes(ch.kind) && !url) problems.push(`${at}.url: Paste the address.`);
+      return ch;
+    });
     if ((q.from || q.to) && (hhmm(q.from) < 0 || hhmm(q.to) < 0)) problems.push('quietHours.from: Quiet hours need two times of the day.');
     if (q.timeZone && !zoneOk(q.timeZone)) problems.push('quietHours.timeZone: ' + q.timeZone + ' is not a time zone.');
-    if (problems.length) refuse(400, problems[0].replace(/^[\w.]+: /, ''), { problems });
-    const token = n.token === 'set' ? old.ntfy.token : String(n.token || '');
-    const next = {
-      ntfy: { server: String(n.server || ''), topic: String(n.topic || ''), token },
-      send: { questions: !!send.questions, failures: !!send.failures, digest: !!send.digest },
-      quietHours: { from: String(q.from || ''), to: String(q.to || ''), timeZone: String(q.timeZone || zoneOf(c)) },
-    };
+    if (problems.length) refuse(400, problems[0].replace(/^[\w.[\]]+: /, ''), { problems });
+    const next = { channels, quietHours: { from: String(q.from || ''), to: String(q.to || ''), timeZone: String(q.timeZone || zoneOf(c)) } };
     notes.set(c.person.subject, next);
     return notifyView(next);
   });
 
-  on('POST', '/v1/notifications/test', (c) => {
+  on('POST', '/v1/notifications/test', async (c) => {
     const n = settingsOf(c);
-    if (!n.ntfy.topic) refuse(502, 'no topic is set, so the test went nowhere', { error: 'no topic is set, so the test went nowhere' });
-    if (/fail/i.test(n.ntfy.topic)) refuse(502, 'the ntfy server answered 401 unauthorized', { error: 'the ntfy server answered 401 unauthorized' });
-    return { sent: true };
+    const body = await readJson(c.req).catch(() => ({}));
+    const id = body && body.channel ? String(body.channel) : '';
+    if (id && !n.channels.some((ch) => ch.id === id)) refuse(400, 'there is no place ' + id, { error: 'there is no place ' + id });
+    // The quiet hours hold no test.
+    const results = n.channels
+      .filter((ch) => !id || ch.id === id)
+      .map((ch) => {
+        const where = (ch.ntfy && ch.ntfy.topic) || ch.url || '';
+        if (/fail/i.test(where)) return { channel: ch.id, sent: false, error: ch.kind === 'ntfy' ? 'the ntfy server answered 401 unauthorized' : 'the address answered 404 not found' };
+        return { channel: ch.id, sent: true, error: '' };
+      });
+    return { results };
   });
 
   /* ---------- playbooks ---------- */
