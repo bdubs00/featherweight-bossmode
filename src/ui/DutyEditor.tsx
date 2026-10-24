@@ -887,13 +887,16 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
               ]}
               onChange={(overlap) => patch({ overlap })}
             />
-            <Field label="Catch up a missed time" class="duty-narrow">
-              <select class="recess" value={f.catchUp} onChange={(e) => patch({ catchUp: (e.target as HTMLSelectElement).value })}>
-                {withChoice(CATCH_UPS, f.catchUp, (v) => 'Within ' + spanText(v)).map(([v, w]) => (
-                  <option value={v}>{w}</option>
-                ))}
-              </select>
-            </Field>
+            {/* Only a schedule has times that a front can miss. An event and another app start a run when they come. */}
+            {f.start === 'schedule' && !keepsWhen && (
+              <Field label="Catch up a missed time" class="duty-narrow">
+                <select class="recess" value={f.catchUp} onChange={(e) => patch({ catchUp: (e.target as HTMLSelectElement).value })}>
+                  {withChoice(CATCH_UPS, f.catchUp, (v) => 'Within ' + spanText(v)).map(([v, w]) => (
+                    <option value={v}>{w}</option>
+                  ))}
+                </select>
+              </Field>
+            )}
             <Said list={pr.limits} />
           </section>
 

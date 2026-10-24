@@ -448,7 +448,7 @@ function DutyView({ name }: { name: string }) {
             Limits
           </h2>
           <ul class="duty-lines">
-            {limitWords(d.limits).map((w) => (
+            {limitWords(d.limits, !!(d.when && d.when.schedule)).map((w) => (
               <li>{w}</li>
             ))}
           </ul>

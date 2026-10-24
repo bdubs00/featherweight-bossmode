@@ -392,6 +392,8 @@ describe('the chips of a message', () => {
     await settle();
     expect(text(el.querySelector('section[aria-labelledby="duty-when-head"]'))).toBe('When When another app calls. The page keeps this start.');
     expect(select(el, 'Repeat')).toBeNull();
+    // Another app starts a run when it calls, so no time can be missed.
+    expect(fieldOf(el, 'Catch up a missed time')).toBeNull();
     click(keyNamed(el, 'Save duty'));
     await settle();
     expect((lastPut().body as DutyRecord).when).toEqual(hook.when);

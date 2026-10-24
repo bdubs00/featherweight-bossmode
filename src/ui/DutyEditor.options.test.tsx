@@ -148,6 +148,19 @@ describe('When', () => {
     expect(text(el.querySelector('.duty-readback-box .duty-readback'))).toBe('When a page under homelab/ changes.');
   });
 
+  it('asks to catch up a missed time only for a schedule, and keeps what happens while the last run works for every start', async () => {
+    api = fakeApi({ 'GET /v1/duties': { duties: [], paused: false }, 'GET /v1/duties/options': ALL, 'PUT /v1/duties/new?dryRun=true': dry({ readback: '' }) });
+    const el = mount(<DutyEditor />);
+    await settle();
+    const legends = () => [...el.querySelectorAll('section[aria-labelledby="duty-limits-head"] legend')].map((l) => l.textContent);
+    expect(fieldOf(el, 'Catch up a missed time')).toBeTruthy();
+    click(radio(el, 'duty-start', 'event'));
+    expect(fieldOf(el, 'Catch up a missed time')).toBeNull();
+    expect(legends()).toEqual(['If the last run still works']);
+    click(radio(el, 'duty-start', 'schedule'));
+    expect(fieldOf(el, 'Catch up a missed time')).toBeTruthy();
+  });
+
   it('keeps the event of a duty that the front no longer lists', async () => {
     const d: Duty = {
       name: 'after-close',

@@ -311,6 +311,8 @@ describe('the page of a duty', () => {
     await settle();
     expect(what()).toBe("What it does scribe opens a bridge from the playbook Weekly patching Patch on Today's date.");
     expect(text(el.querySelector('.duty-readback'))).toBe('When a bridge of triage closes');
+    // An event misses no time, so the limits say nothing of one.
+    expect(text(el.querySelector('section[aria-labelledby="duty-limits"]'))).toBe('Limits A run gets at most $0.50. A time that comes while the last run works is skipped.');
     unmountAll();
     api.restore();
     const manager = base({ name: 'ask-boss', do: { manager: { message: 'Sum up the week.' } } });

@@ -274,6 +274,8 @@ describe('a duty in words', () => {
     expect(dutyLight(duty({ paused: true, state: { pausedReason: 'Three runs in a row failed.' } }))).toMatchObject({ word: 'paused', label: 'Three runs in a row failed.' });
     expect(dutyLight(d, true).word).toBe('paused');
     expect(limitWords(d.limits)).toEqual(['A run gets at most $0.50 and 40 turns.', 'The duty spends at most $2.00 a day.', 'A time that comes while the last run works is skipped.', 'A missed time runs once, within 1 hour.']);
+    // A duty without a schedule misses no time.
+    expect(limitWords(d.limits, false)).toEqual(['A run gets at most $0.50 and 40 turns.', 'The duty spends at most $2.00 a day.', 'A time that comes while the last run works is skipped.']);
     expect(awayWords(d.whileAway)).toBe('The manager decides a question for you. After 2 hours without an answer, the answer is no.');
     expect(awayWords({ decider: 'nobody', timeout: '30m', then: 'cancel' })).toBe('Nobody decides a question for you. After 30 minutes without an answer, the run stops.');
     expect(tellWords(d.notify)).toBe('Failures and questions.');

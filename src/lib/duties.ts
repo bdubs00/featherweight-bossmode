@@ -565,8 +565,8 @@ export function startWords(d: Pick<DutyRecord, 'when'>, name?: (agent: string) =
   return '';
 }
 
-/** limitWords reads the limits of a duty back in words. */
-export function limitWords(l: DutyRecord['limits'] | undefined): string[] {
+/** limitWords reads the limits of a duty back in words. A missed time concerns a schedule only, so a duty without one leaves it out. */
+export function limitWords(l: DutyRecord['limits'] | undefined, schedule = true): string[] {
   if (!l) return [];
   const out: string[] = [];
   const b = l.budget || {};
@@ -580,7 +580,7 @@ export function limitWords(l: DutyRecord['limits'] | undefined): string[] {
   const overlap = l.overlap || 'skip';
   out.push(overlap === 'queue' ? 'A time that comes while the last run works runs after it.' : overlap === 'allow' ? 'A time that comes while the last run works runs anyway.' : 'A time that comes while the last run works is skipped.');
   const c = l.catchUp === undefined ? '1h' : l.catchUp;
-  out.push(seconds(c) === 0 ? 'A missed time does not run.' : 'A missed time runs once, within ' + spanText(c) + '.');
+  if (schedule) out.push(seconds(c) === 0 ? 'A missed time does not run.' : 'A missed time runs once, within ' + spanText(c) + '.');
   return out;
 }
 
