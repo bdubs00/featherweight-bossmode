@@ -483,3 +483,49 @@ describe('the name of a draft', () => {
     expect(lastPut().path).toBe('/v1/duties/sum-up-the-week?dryRun=true');
   });
 });
+
+describe('the refusals of Write the check for me', () => {
+  const writeWith = async (answer: Route) => {
+    api = fakeApi({ 'GET /v1/duties': { duties: [], paused: false }, 'GET /v1/duties/options': ALL, 'PUT /v1/duties/new?dryRun=true': dry(), 'POST /v1/duties/new/write-check': answer });
+    const el = mount(<DutyEditor />);
+    await settle();
+    openCheck(el);
+    pick(el, 'Migrator');
+    typeIn(fieldOf(el, 'Wake the agent only when'), 'a new P1 in the queue');
+    click(keyNamed(el, 'Write the check for me'));
+    await settle();
+    return el;
+  };
+  const wordsError = (el: HTMLElement) => text(fieldOf(el, 'Wake the agent only when')!.closest('label')!.querySelector('.field-error'));
+
+  it('show the whole reason of a 422, and what the agent tried, which the page does not take', async () => {
+    const el = await writeWith(() => ({
+      status: 422,
+      body: {
+        title: 'Unprocessable Content',
+        detail: 'the check found no list at result.records. The answer holds a list at data.items',
+        error: 'the check found no list at result.records. The answer holds a list at data.items',
+        checkFirst: { look: { tool: 'servicenow.query_incidents', input: {} }, items: 'result.records', key: 'number', wake: { when: 'new' } },
+        readback: 'Call the tool servicenow.query_incidents of migrator. Take the list at result.records.',
+      },
+    }));
+    expect(wordsError(el)).toBe('The check found no list at result.records. The answer holds a list at data.items.');
+    const tried = el.querySelector('.duty-tried')!;
+    expect(text(tried)).toBe('What migrator tried Call the tool servicenow.query_incidents of migrator. Take the list at result.records.');
+    // The record stays out of the form: the fields by hand stay closed, and the duty has no check.
+    expect(fieldOf(el, 'Tool')).toBeNull();
+    expect(keyNamed(el, 'Remove the check')).toBeUndefined();
+  });
+
+  it('read a record that the agent tried in words when the 422 holds no readback', async () => {
+    const el = await writeWith(() => ({ status: 422, body: { detail: 'no list', error: 'no list', checkFirst: { look: { http: { url: 'https://queue.example.com/api' } }, wake: { when: 'any' } } } }));
+    expect(text(el.querySelector('.duty-tried'))).toBe('What migrator tried Look at queue.example.com/api. Take the whole answer as the list. Wake migrator when the check finds an item.');
+  });
+
+  it('show a problem of the words under the words, and one of the agent under the agent picker', async () => {
+    const el = await writeWith(() => ({ status: 400, body: { detail: 'bad', problems: ['words: Say what the agent waits for in more words.', 'agent: migrator has no tool that reads a queue.'] } }));
+    expect(wordsError(el)).toBe('Say what the agent waits for in more words.');
+    expect(text(el.querySelector('section[aria-labelledby="duty-who-head"] .duty-problems'))).toBe('Migrator has no tool that reads a queue.');
+    expect(el.querySelector('.duty-tried')).toBeNull();
+  });
+});

@@ -14,7 +14,9 @@
 //   DELETE /v1/duties/{name}                204
 //   POST   /v1/duties/{name}/run            202 {"run"}, or 200 {"skipped"} while the last run works
 //   POST   /v1/duties/{name}/write-check    {"words", "agent"}: {"checkFirst", "readback", "check"} after a few
-//                                           seconds, 422 with the reason, or 504 for words that hold "slow"
+//                                           seconds. 400 {"problems"} for no words or no agent. 422 with the reason
+//                                           in error, and the record that the agent tried for words about a queue.
+//                                           504 for words that hold "slow"
 //   PATCH  /v1/duties                       {"paused", "reason"}, for an admin
 //   GET    /v1/duties/options               {"secrets": [{"name", "hosts"}], "events", "actions", "looks"}
 //   GET    /v1/notifications                the settings of the person, with "token": "set" or "", serverDefault, and off
@@ -674,9 +676,9 @@ export function register({ on, refuse, readJson, now, AGENTS, admin, S, publish 
     const body = await readJson(c.req);
     // For a saved duty, the agent of the duty wins. A duty that is not saved yet names its agent.
     const agent = d ? d.agent : String(body.agent || '');
-    if (!agent) refuse(400, 'name the agent that writes the check: the duty is not saved yet');
+    if (!agent) refuse(400, 'name the agent that writes the check: the duty is not saved yet', { problems: ['agent: Pick the agent that writes the check.'] });
     const words = String(body.words || '').trim();
-    if (!words) refuse(400, 'write what the agent waits for');
+    if (!words) refuse(400, 'write what the agent waits for', { problems: ['words: Write what the agent waits for.'] });
     // The agent of the fake thinks for a few seconds, and words that hold slow wait until the front gives up.
     await new Promise((r) => setTimeout(r, /slow/i.test(words) ? 8000 : 2500));
     if (/slow/i.test(words)) refuse(504, 'the agent did not answer within 120 seconds');
@@ -684,7 +686,15 @@ export function register({ on, refuse, readJson, now, AGENTS, admin, S, publish 
     let check;
     if (url) check = { look: { http: { url: url[1] } }, items: 'items', key: 'id', wake: { when: 'new' } };
     else if (/incident|p1|p2|servicenow/i.test(words)) check = { look: { tool: 'servicenow.query_incidents', input: { query: 'priority<=2^active=true' } }, items: 'result.records', key: 'number', where: [{ field: 'priority', oneOf: [1, 2] }], wake: { when: 'new' } };
-    else refuse(422, `${agent} has no tool that reads that. Name the address of the list, or set the check up by hand`);
+    else if (/queue/i.test(words)) {
+      // The agent wrote a record, and its test found no list: the 422 carries what it tried.
+      const tried = { look: { tool: 'servicenow.query_incidents', input: { query: 'active=true' } }, items: 'result.records', key: 'number', wake: { when: 'new' } };
+      const why = 'the check found no list at result.records. The answer of the tool holds its list at data.items';
+      refuse(422, why, { error: why, checkFirst: tried, readback: 'Call the tool servicenow.query_incidents of ' + agent + '. Take the list at result.records. Wake ' + agent + ' only for items whose number it did not see before.' });
+    } else {
+      const why = `${agent} has no tool that reads that. Name the address of the list, or set the check up by hand`;
+      refuse(422, why, { error: why });
+    }
     return { checkFirst: check, readback: (check.look.tool ? 'Call the tool ' + check.look.tool : 'Look at ' + check.look.http.url) + '. Wake ' + agent + ' only for items that it did not see before.', check: checkNow(check) };
   });
 

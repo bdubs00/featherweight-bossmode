@@ -446,8 +446,9 @@
   width: auto;
   max-width: 100%;
 }
-/* Write the check for me, while the agent works on it. */
-.duty-wait {
+/* Write the check for me, while the agent works on it, and what it tried when it could not. */
+.duty-wait,
+.duty-tried {
   display: flex;
   flex-direction: column;
   gap: var(--s-1);

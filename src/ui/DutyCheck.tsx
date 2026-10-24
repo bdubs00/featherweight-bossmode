@@ -11,7 +11,7 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
 import { ApiError } from '../api/client';
-import type { CheckFound, DutyOptions, DutyRecord } from '../api/types';
+import type { CheckFirst as CheckRecord, CheckFound, DutyOptions, DutyRecord } from '../api/types';
 import {
   WHERE_TESTS,
   checkFormOf,
@@ -23,6 +23,7 @@ import {
   foundWords,
   hasCheck,
   itemWords,
+  problemsBy,
   secretsFor,
   splitProblem,
   type CheckForm,
@@ -37,6 +38,21 @@ import { Button, Choices, Field, Help, IconButton, Input, TextArea } from './pri
 
 /** messageOf is the sentence of a failed call. */
 const messageOf = (e: unknown) => (e instanceof Error && e.message ? e.message : 'The action failed. Try it again.');
+
+/** reasonOf is the whole reason of a refusal of Write the check: its error, else its detail, with a capital and a period. */
+function reasonOf(e: unknown): string {
+  const p = e instanceof ApiError ? e.problem : null;
+  const r = p && typeof p.error === 'string' && p.error.trim() ? p.error.trim() : p && typeof p.detail === 'string' && p.detail.trim() ? p.detail.trim() : '';
+  if (!r) return messageOf(e);
+  const s = r[0].toUpperCase() + r.slice(1);
+  return /[.!?]$/.test(s) ? s : s + '.';
+}
+
+/** What the agent tried, from a 422 of Write the check: the record that it wrote and its readback, which the page shows and does not take. */
+interface TriedRecord {
+  checkFirst: CheckRecord | null;
+  readback: string;
+}
 
 /** The words of the looks that the front can serve. */
 const LOOKS: { id: 'http' | 'tool'; label: string }[] = [
@@ -63,6 +79,8 @@ export interface CheckProps {
   whereError?: string;
   /** The problems of the front that concern the check. */
   problems?: string[];
+  /** Gets the problems of Write the check that concern the agent, which show under the agent picker. */
+  onAgentProblems?: (list: string[]) => void;
   open: boolean;
   onToggle: (open: boolean) => void;
 }
@@ -228,6 +246,7 @@ export function CheckFirst(p: CheckProps) {
   const [wrote, setWrote] = useState('');
   const [writeError, setWriteError] = useState('');
   const [stopped, setStopped] = useState(false);
+  const [attempted, setAttempted] = useState<TriedRecord | null>(null);
   const [manual, setManual] = useState(() => hasCheck(check));
   const [tried, setTried] = useState<Tried>(null);
   const [trying, setTrying] = useState(false);
@@ -253,6 +272,8 @@ export function CheckFirst(p: CheckProps) {
     setWriting(true);
     setWriteError('');
     setStopped(false);
+    setAttempted(null);
+    if (p.onAgentProblems) p.onAgentProblems([]);
     try {
       const w = await api.writeCheck(writeName, words.trim(), agent, ctl.signal);
       onChange(checkFormOf(w.checkFirst));
@@ -266,7 +287,19 @@ export function CheckFirst(p: CheckProps) {
         setWriter(false);
         setManual(true);
       } else if (e instanceof ApiError && e.status === 504) setWriteError(agentName + ' did not answer within two minutes. Try again, or set the check up by hand.');
-      else setWriteError(messageOf(e));
+      else if (e instanceof ApiError && e.status === 422) {
+        // The agent could not write a check that works. A record that it wrote shows as it is, so the person sees what it tried.
+        setWriteError(reasonOf(e));
+        const pr = e.problem || {};
+        const record = pr.checkFirst && typeof pr.checkFirst === 'object' ? (pr.checkFirst as CheckRecord) : null;
+        const readback = typeof pr.readback === 'string' ? pr.readback : '';
+        if (record || readback) setAttempted({ checkFirst: record, readback });
+      } else if (e instanceof ApiError && e.status === 400 && e.problem && Array.isArray(e.problem.problems) && e.problem.problems.length) {
+        // A problem of the words shows under the words, and one of the agent under the agent picker.
+        const by = problemsBy(e.problem.problems as unknown[], (path) => (path === 'agent' || path.startsWith('agent.') ? 'agent' : 'words'));
+        setWriteError([...(by.words || []), ...(by.top || [])].join(' '));
+        if (by.agent && p.onAgentProblems) p.onAgentProblems(by.agent);
+      } else setWriteError(messageOf(e));
     }
     if (abort.current === ctl) abort.current = null;
     setWriting(false);
@@ -335,6 +368,12 @@ export function CheckFirst(p: CheckProps) {
               <p class="t-meta" role="status">
                 Stopped. The check did not change.
               </p>
+            )}
+            {attempted && !writing && (
+              <div class="duty-tried">
+                <p class="t-meta">What {agentName} tried</p>
+                <p class="duty-readback">{attempted.readback || (attempted.checkFirst && attempted.checkFirst.look ? checkWords(attempted.checkFirst, agentName) : '')}</p>
+              </div>
             )}
           </div>
         )}

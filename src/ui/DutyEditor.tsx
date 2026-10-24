@@ -799,6 +799,7 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
               error={err.count}
               whereError={err.where}
               problems={pr.check}
+              onAgentProblems={(agent) => setProblems((x) => (agent.length ? { ...x, agent } : x.agent ? { ...x, agent: undefined } : x))}
               open={checkOpen}
               onToggle={setCheckOpen}
             />
