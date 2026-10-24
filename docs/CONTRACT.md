@@ -1253,9 +1253,9 @@ front reads the words of a person in that zone. A schedule without
 | `POST /v1/notifications/test` | `{"channel": "<id>"}`, from Send a test of one place, after a save of a change. The answer `{"results": [{"channel", "sent", "error"}]}` shows under the row of the place: `Sent to <name>. Look for it there.`, or `Not sent to <name>.` and the error. A 400, such as for an unknown place, says `The test failed.` and the error. The page never sends the empty body, which tests every place. |
 | `GET /v1/playbooks` | `{"playbooks": [{"name", "goal", "placement", "seats", "revision", "owner", "updatedAt"}]}`, newest change first. New bridge, the action open of a duty, and Save as playbook read it. A 404 means that the front keeps no playbooks: New bridge offers none, and the action open says `This workbench keeps no playbooks.` |
 | `GET /v1/playbooks/{name}` | The playbook with `caps` and `delegation`. New bridge reads it to fill its form. |
-| `PUT /v1/playbooks/{name}` | `{"goal", "placement", "seats", "caps", "delegation"}`: the form of New bridge without the title, with its seats as `seats`, each `{"handle", "agent", "task"}`, and `revision` when the name holds a playbook already. The front refuses an unknown field, such as `members`, with 400. Save as playbook in the menu More of a bridge sends it. A 409 says `This playbook changed since you opened it. Try again.` A 400 `{"problems"}` shows under the name. |
+| `PUT /v1/playbooks/{name}` | `{"goal", "placement", "seats", "caps", "delegation"}`: the form of New bridge without the title, with its seats as `seats`, each `{"handle", "agent", "task"}`, and `revision` when the name holds a playbook already. The front refuses an unknown field, such as `members`, with 400. Save as playbook in the menu More of a bridge sends it, and a save says `Saved the playbook <name>.` in the notice of the page. A 409 says `This playbook changed since you opened it. Try again.` A 400 `{"problems"}` shows under the name. |
 | `DELETE /v1/playbooks/{name}` | 204. Delete, in the list See the playbooks of the action open, after a dialog that asks first. |
-| `GET /v1/inbox` | `{"items": [{"kind", "run", "approval", "duty", "agent", "bridge", "text", "since"}]}`, `kind` `approval`, `question`, `failure`, or `paused`. `approval` is the id of the approval that the run waits for, or `""` for a question of a seat in a bridge and for a failure or a paused duty. Activity reads it when it opens, each minute while it shows, and after a reset of the stream. See the rules of Activity below. |
+| `GET /v1/inbox` | `{"items": [{"kind", "run", "approval", "duty", "agent", "bridge", "text", "since"}]}`, `kind` `approval`, `question`, `failure`, or `paused`. `approval` is the id of the approval that the run waits for, or `""` for a question of a seat in a bridge and for a failure or a paused duty. `run` is `""` for a failure of a start that the queue never took, and its row then links no run. Activity reads it when it opens, each minute while it shows, and after a reset of the stream. See the rules of Activity below. |
 
 A duty, as a read answers it. The page writes the same record without
 `owner`, `source`, `readback`, `next`, `state`, and `history`:
@@ -1383,8 +1383,30 @@ The rules of the page:
 - **New:** the history of a duty shows `decided` under each run, in words:
   `The manager allowed shell.exec: <reason>`, `Nobody answered in time, so
   git.push was denied.`, or `You stopped the run at bash: <reason>`.
-- The page shows a duty with `source` `file` with the key Run now alone,
-  because the routes never change it.
+- A duty with `source` `file` is an entry of `workbench.sources`. The
+  front reads it with an agent, a start, and a readback, such as `When
+  another app calls the address of this source, each new event starts a
+  run of <agent>. An operator sets it in the settings of the front, so it
+  changes there.`, and with no action, empty limits, no `whileAway`, and
+  no notifications. It refuses every change with 409. So the page of such
+  a duty shows only `This duty comes from the settings of the front.
+  Change it there.`, When with the readback, and Agent with the mark and
+  the name of the agent, and no key: no Run now, Pause, Edit, or More.
+- The readback of the front says when a duty starts and, for a duty with a
+  check, what the check looks for. The page says each fact once: with a
+  readback, the page of a duty shows no section Check first, and the
+  dialog of a save shows no words of the check. Without a readback, the
+  page says the check in its own words.
+- Catch up a missed time concerns a schedule only. The editor shows it
+  only for a start on a schedule, and the limits of a duty say nothing of
+  a missed time for an event or another app. If the last run still works
+  stays for every start.
+- The name that the editor makes from the message takes its first six
+  words, at most 40 characters, and cuts between words. It never ends on a
+  small joining word, such as in, of, or the.
+- A start whose `run` is `""` has no run: the queue never took it, such as
+  a start that failed before any run existed. Its line in the history and
+  its row in Activity link no run, and the page reads none.
 - The page offers Pause, Edit, and Delete to an admin, to an owner of the
   agent, and to the owner of the duty. The front decides with 403.
 - A run links to the page at `/ui`, as `/ui#run/<id>`, as a heart does.
@@ -1417,13 +1439,14 @@ The light of a run of a duty:
 | `queued` | waiting for a worker | grey |
 | `input-required` | needs you | amber |
 | `failed` | failed | red |
+| `retrying` | retrying, with the reason under the run in the history, such as `The run failed: <reason>. It goes again.` | amber that holds still, because it waits for nothing from the person |
 | `skipped` | skipped | grey |
 | `canceled` | stopped | grey |
 
 A duty with `paused` true, or every duty under the switch, shows `paused`.
 The list puts the duties in this order: a duty that needs you, a failed
-duty, a duty that works, and then the rest by their next time. A paused duty
-comes last.
+duty, a duty that works or retries, and then the rest by their next time.
+A paused duty comes last.
 
 A place, as a read answers it. Each kind holds only its own fields:
 

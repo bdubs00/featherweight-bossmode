@@ -156,6 +156,7 @@ Capacity shows where seating happens:
 | `The workbench did not answer. Check the connection and try again.` | keep | | Lead |
 | `The workbench answered with something that is not JSON.` | change | `The workbench answered with something that is not JSON. Reload the page.` | done |
 | the notice stays until Dismiss or the next action that works | change | when the person moves to another screen, the notice also clears | done |
+| new | add | a notice of an action that worked, such as `Saved the playbook <name>.`, a status with the key `Dismiss`. It goes after six seconds, stays through a move to another screen, and gives way to a notice of a failed action | done |
 
 ### src/lib/presence.ts
 
@@ -812,6 +813,10 @@ stands for a value.
 
 | Now | Verdict | New text | Who |
 |---|---|---|---|
+| the placeholder `0.50` of `The most a run can cost` | change | `Required, such as 0.50`, so nobody reads a default amount | done |
+| `Catch up a missed time` for a start by an event or by another app | remove | it shows for a schedule only. `If the last run still works` stays | done |
+| a name that ends on a joining word, such as `list-the-new-helpdesk-tickets-in` | change | the name ends on a word that carries the meaning: `list-the-new-helpdesk-tickets` | done |
+| the header `Everyone else` over the only group of the picker of Who | remove | a lone group has no header | done |
 | new | add | `On a schedule`, `When something happens`, the choice of When, with `What starts the duty` for a screen reader | done |
 | new | add | `What happens` with `Pick what happens` and the events in words: `When a bridge closes`, `When a run of an agent fails`, `When a question waits too long`, `When a page changes`, `When a routine is ready`, `When a cap is reached`, and `When something happens in the fleet` for a kind that the page does not know | done |
 | new | add | `Of the agent` with `Any agent`, `Waits longer than` with `15 minutes` to `a day`, and `Pages under` with the placeholder `Every page` | done |
@@ -846,12 +851,17 @@ stands for a value.
 | new | add | `Started. See the history for what it did.` after Run now of a duty that posts in a bridge or opens one, with no link | done |
 | the title of a duty of another action | change | `<agent> posts in <bridge>` and ` to <handles>`, `<agent> opens a bridge from the playbook <title>`, or `Ask the manager`, then its message or its goal | done |
 | new | add | under a run of the history, `Decided while you were away` for a screen reader, and one line per decision: `The manager allowed <tool>: <reason>`, `The manager denied <tool>.`, `<person> stopped the run at <tool>.`, `You allowed <tool>.`, `Nobody answered in time, so <tool> was denied.`, or `Nobody answered in time, so the run stopped at <tool>.` | done |
+| `working` for a start that goes again | change | `retrying`, with an amber light that holds still, and under the run the reason of the front, such as `The run failed: <reason>. It goes again.`, or `The run failed, and it goes again.` without one | done |
+| `Run now`, `Pause`, `Edit`, More, Limits, While you are away, and Tell me about on a duty of the settings of the front | remove | only `This duty comes from the settings of the front. Change it there.`, When with the readback of the front, or `Another app starts it.` without one, and `Agent` with the name of the agent | done |
+| Check first beside a readback that says the check | remove | the readback says the check once. Check first shows only without a readback | done |
+| `Open the run` for a start with no run | remove | a start that the queue never took links no run, in the history and in Activity | done |
 
 ### src/ui/Playbooks.tsx, src/ui/Channel.tsx, src/ui/NewBridge.tsx
 
 | Now | Verdict | New text | Who |
 |---|---|---|---|
 | new | add | `Save as playbook` and `Make this a duty` in the menu More of a bridge | done |
+| new | add | `Saved the playbook <name>.` in the notice of the page after a save | done |
 | new | add | the dialog `Save as playbook` with `Name`, `It keeps the goal, <n> seats, the placement, the caps, and what the manager can do.`, `A playbook of this name exists. Saving replaces it.`, and the key `Save playbook`, or `Save and make a duty` from Make this a duty | done |
 | new | add | the errors `Give the playbook a name.`, `A name holds 1 to 63 of a to z, 0 to 9, hyphens, and underscores.`, `This bridge has no seat to save.`, and `This playbook changed since you opened it. Try again.` | done |
 | new | add | `Playbook` with `Pick a playbook`, `Loading the playbooks`, `No playbook yet`, and `<title>, not here`, each playbook as `<title>: <first line of its goal>`. Under it, `Save one from a bridge: open More, then Save as playbook.` A front without playbooks says `This workbench keeps no playbooks.` | done |
@@ -900,7 +910,7 @@ stands for a value.
 | new | add | `Secret` with the placeholder `Optional`, and the line `With a secret, each post carries the header X-Featherweight-Signature. It holds sha256= and the HMAC of the body, keyed by the secret.` | done |
 | new | add | a saved field: `Saved` with `Replace`, and `Remove` for the token and the secret, named `Replace the <field>` and `Remove the <field>`. After Replace, the placeholder `A new <field>` and `The saved <field> stays until you write a new one.` with `Keep it`. After Remove, `The saved <field> goes when you save.` with `Keep it`. | done |
 | new | add | `Email address` with the placeholder `you@example.com` | done |
-| new | add | `Agent` with `Pick an agent` or `No agent that you can run`, `How should it reach you?` with the placeholder `Send it to me on Signal.`, and `The most a message can cost` with `$` and the placeholder `0.02` | done |
+| new | add | `Agent` with `Pick an agent` or `No agent that you can run`, `How should it reach you?` with the placeholder `Send it to me on Signal.`, and `The most a message can cost` with `$` and the placeholder `Required, such as 0.02` | done |
 | new | add | `Channel` with `Pick a channel`, each shared channel by its label, and `<name>, no longer shared` | done |
 | new | add | `Tell me about` with the switches `Questions`, `Failures`, and `A daily digest` | done |
 | new | add | the errors `Pick a kind of place.`, `Give the place a name.`, `Write the address of the server, such as https://ntfy.sh.`, `This workbench has no ntfy server of its own. Write the address of one, such as https://ntfy.sh.`, `Write the topic that your phone follows.`, `A topic holds no space and no slash.`, `Paste the address from Slack.` (and Discord and Teams), `Paste the address of the app.`, `A Slack address starts with https://hooks.slack.com/.`, `A Discord address starts with https://discord.com/api/webhooks/.`, `The address starts with https://.`, `Write the address to mail.`, `Write an email address, such as you@example.com.`, `Pick the agent that reaches you.`, `Say how the agent should reach you.`, `A place through an agent needs a budget. Write the most a message can cost, such as 0.02.`, `Write an amount above 0, such as 0.02.`, and `Pick a shared channel.` | done |

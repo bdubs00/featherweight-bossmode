@@ -636,7 +636,9 @@ The work:
   a green light, or `waiting for a worker` with a grey one. The name of an
   agent stays on one line, and where it and the word do not fit side by
   side, the status keeps only its light, with the word in its tooltip. Two groups: On
-  this bridge, then Everyone else. Everyone else holds the agents that can
+  this bridge, then Everyone else, each with its header when both hold an
+  agent. A lone group, such as in the editor of a duty, has no header.
+  Everyone else holds the agents that can
   work a seat, those that a pool runs or a worker of a pool holds, and never
   the manager or the agent of the quick chat. A click puts a new seat row at the top of the
   members. The row holds the handle of `nextHandle` and the task, filled
@@ -1097,8 +1099,17 @@ The work:
   field, and one with no field shows at the top of the form.
 - The page of a duty says what its action does and lists its history. Under
   a run, the history says who decided a question while the person was
-  away: the manager, the wait that ran out, or a person.
-- Playbooks. Save as playbook, in the menu More of a bridge, saves its
+  away: the manager, the wait that ran out, or a person. The readback of
+  the front says the start and the check, so the page says each fact once.
+  A start that goes again shows retrying with an amber light that holds
+  still, and its line says that the run failed and goes again.
+- A source of the settings of the front shows only the note that it
+  changes there, its start, and its agent, with no key.
+- The cost of a duty says `Required, such as 0.50` in its field, so nobody
+  reads a default amount. Catch up a missed time shows for a schedule
+  only.
+- Playbooks. Save as playbook, in the menu More of a bridge, says `Saved the
+  playbook <name>.` in the notice of the page once it saves. It saves its
   goal, placement, seats, caps, and what the manager can do under a name
   that the person types. New bridge starts from a playbook, which fills the
   form.

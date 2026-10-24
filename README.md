@@ -87,11 +87,14 @@ and a quick chat with a history of six chats. Last come a fleet with two
 pools, a wiki of eight pages, and a face for every agent. The Routines place
 has nine routines of three agents: one needs your sign-off, four are live,
 one rehearses, one is proposed, and two are retired. The Duties place has
-six duties. One reports each weekday, and one restores a backup each night
-and needs you. One watches a queue with a check that mostly sleeps, and the
-manager decided a question of one of its runs. One paused itself after
-three failed runs. Another app starts one, whose last run failed, and the
-last one posts in a bridge when a bridge of the migrator closes. The fake
+five duties and two sources of the settings of the front. One duty reports
+each weekday, and its last start goes again after a failed run. One
+restores a backup each night and needs you. One watches a queue with a
+check that mostly sleeps, and the manager decided a question of one of its
+runs. One paused itself after three failed runs. The last one posts in a
+bridge when a bridge of the migrator closes, and its last start failed
+before the queue took a run. Another app calls one source, and the other
+looks at an address. The fake
 also serves the options of the duties, Write the check after a short wait
 (words that hold slow wait until the front gives up), a playbook of weekly
 patching, the places of each person, and the inbox of the duties. alice
