@@ -48,7 +48,7 @@ const REPORT = base({
 });
 const RUNS: DutyRun[] = [
   { at: ago(15), slot: ago(15), run: '01KWOKE', state: 'failed', costUSD: 0.04, found: 2, woke: true, reason: 'The run reached its limit.' },
-  { at: ago(30), slot: ago(30), run: '', state: 'completed', found: 0, woke: false },
+  { at: ago(30), slot: ago(30), run: '', state: 'quiet', found: 0, woke: false },
   { at: ago(45), slot: ago(45), run: '', state: 'skipped', reason: 'The last run still works.' },
 ];
 const WATCH = base({
@@ -121,6 +121,20 @@ describe('the list of duties', () => {
     expect(text(rows[2])).not.toContain('Next');
     // A person who is no admin gets no switch.
     expect(keyNamed(el, 'Pause all duties')).toBeUndefined();
+  });
+
+  it('shows the names of two duties that say the same, so a person can tell them apart', async () => {
+    const MORNING = base({ name: 'morning-report', readback: 'Every day at 9:00 AM, UTC.', next: NEXT });
+    const EVENING = base({ name: 'evening-report', readback: 'Every day at 6:00 PM, UTC.', next: NEXT });
+    api = fakeApi(listOf([MORNING, EVENING, WATCH]));
+    const el = mount(<DutyList />);
+    await settle();
+    const rows = [...el.querySelectorAll('.duty-row')];
+    const row = (name: string) => rows.find((r) => r.getAttribute('href') === '#duties/' + name)!;
+    expect(text(row('morning-report').querySelector('.duty-row-meta'))).toContain('Morning report');
+    expect(text(row('evening-report').querySelector('.duty-row-meta'))).toContain('Evening report');
+    // A duty whose words are its own shows no name.
+    expect(text(row('watch-p1').querySelector('.duty-row-meta'))).not.toContain('Watch p1');
   });
 
   it('shows a start that goes again as retrying, with a still amber light, among the duties that work', async () => {
@@ -304,6 +318,18 @@ describe('the page of a duty', () => {
       'You stopped the run at bash: wrong host',
     ]);
     expect(list.querySelectorAll('time').length).toBe(3);
+  });
+
+  it('says nothing of a check in the history of a duty that has none', async () => {
+    // The front sends found 0 and woke false also for a run without a check.
+    const plain: DutyRun = { at: ago(5), slot: ago(5), run: '01KPLAIN', state: 'completed', costUSD: 0.01, found: 0, woke: false };
+    api = fakeApi(one(REPORT, [plain]));
+    const el = mount(<DutyMain name="daily-report" />);
+    await settle();
+    const run = el.querySelector('.duty-run')!;
+    expect(text(run)).toContain('finished');
+    expect(text(run)).not.toContain('Found');
+    expect(run.querySelector('.duty-run-found')).toBeNull();
   });
 
   it('says what a duty of each action does', async () => {

@@ -77,7 +77,7 @@ function matchesDuty(d: Duty, q: string): boolean {
   return [dutyTitle(d), d.name, d.agent, d.readback || ''].some((x) => x.toLowerCase().includes(w));
 }
 
-function DutyRow({ d, on, allPaused }: { d: Duty; on: boolean; allPaused: boolean }) {
+function DutyRow({ d, on, allPaused, named }: { d: Duty; on: boolean; allPaused: boolean; named: boolean }) {
   const light = dutyLight(d, allPaused);
   const agentName = useAgentName(d.agent);
   const when = d.readback || startWords(d);
@@ -93,6 +93,7 @@ function DutyRow({ d, on, allPaused }: { d: Duty; on: boolean; allPaused: boolea
         </span>
         {when && <span class="duty-row-when">{when}</span>}
         <span class="duty-row-meta">
+          {named && <span class="clip">{titleOfName(d.name)}</span>}
           <span class="clip">{agentName}</span>
           {next && <span>Next {next}</span>}
           <span>{costText(today)} today</span>
@@ -158,6 +159,13 @@ export function DutyList({ current }: { current?: string }) {
   }, []);
   const words = q.trim();
   const shown = useMemo(() => sortDuties((list || []).filter((d) => !words || matchesDuty(d, words))), [list, words]);
+  // Two duties that say the same show their names too, so a person can
+  // tell them apart.
+  const same = useMemo(() => {
+    const seen = new Map<string, number>();
+    for (const d of list || []) seen.set(dutyTitle(d), (seen.get(dutyTitle(d)) || 0) + 1);
+    return seen;
+  }, [list]);
   const count = list ? list.length : 0;
   return (
     <section class="screen duty-list" aria-labelledby="duties-title">
@@ -191,7 +199,7 @@ export function DutyList({ current }: { current?: string }) {
         <div role="list" class="duty-rows">
           {shown.map((d) => (
             <div role="listitem">
-              <DutyRow d={d} on={d.name === current} allPaused={paused} />
+              <DutyRow d={d} on={d.name === current} allPaused={paused} named={(same.get(dutyTitle(d)) || 0) > 1} />
             </div>
           ))}
         </div>
