@@ -796,3 +796,82 @@ column Now names the string of the approved boards where one changed.
 | `Signed off by` with the names of people | remove | who signed a routine off lives on the routine | done |
 | `Proposed by agents` and `Open in Confluence` | remove | Confluence is a later change | done |
 | new | add | `Loading the week.` | done |
+
+## 9. The Duties place, the second wave
+
+The rule of the owner holds for every string: a person never writes cron,
+a regular expression, a template, or code. A schedule, an event, and a
+check are words with a readback. These words never show: cron, regex,
+template, payload, webhook, and JSON. A word in brackets, such as
+`<agent>`, stands for a value.
+
+### src/ui/DutyEditor.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| new | add | `On a schedule`, `When something happens`, the choice of When, with `What starts the duty` for a screen reader | done |
+| new | add | `What happens` with `Pick what happens` and the events in words: `When a bridge closes`, `When a run of an agent fails`, `When a question waits too long`, `When a page changes`, `When a routine is ready`, `When a cap is reached`, and `When something happens in the fleet` for a kind that the page does not know | done |
+| new | add | `Of the agent` with `Any agent`, `Waits longer than` with `15 minutes` to `a day`, and `Pages under` with the placeholder `Every page` | done |
+| new | add | the readback of an event: `When a bridge of <agent> closes.`, `When a run of <agent> fails.`, `When a question waits longer than <span>.`, `When a page under <path> changes.`, `When a routine of <agent> is ready.` | done |
+| new | add | `Only between two dates`, `First day`, `Last day`, and the errors `The last day comes before the first day.` and `Pick what starts the duty.` | done |
+| new | add | `Ask the agent`, `Post in a bridge`, `Open a bridge from a playbook`, and `Ask the manager`, the choice of What, with `What the duty does` for a screen reader | done |
+| new | add | `Bridge` with `Pick a bridge`, `No bridge is open`, `<title>, closed`, and `A bridge that you cannot see`. `Send to` with a handle per seat, and `Everyone on the bridge reads it.`, `1 member reads it.`, or `<n> members read it.` | done |
+| new | add | `Message` with the placeholder `Review what changed since [The last run].`, and the errors `Pick the bridge.` and `Write the message for the bridge.` | done |
+| new | add | `Goal` with the placeholder `The goal of the playbook`, and the error `Pick a playbook.` | done |
+| new | add | `Ask the manager` with the placeholder `Check the backups of [Today's date] and tell me what failed.`, and the error `Write what the manager does.` | done |
+| `[What happened]` with no chip | change | the chip `What happened`, once an event starts the duty | done |
+| `The duty cannot save yet.` above Save duty | change | the same box at the top of the form, for a problem of the front with no field. A problem of a field shows beside the field, with the text after its path. | done |
+
+### src/ui/DutyCheck.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `Write the check` | change | `Write the check for me`. The key stays off until the editor has an agent, with `Pick the agent first. It writes the check.` under it. | done |
+| new | add | `<agent> writes the check, then tries it once. This can take up to two minutes.` and `<n> seconds so far.` or `1 minute 5 seconds so far.`, with the key `Cancel` | done |
+| new | add | `Stopped. The check did not change.` after Cancel, and `<agent> did not answer within two minutes. Try again, or set the check up by hand.` for a 504 | done |
+| `Tool`, a field of text with a list of the tools | change | `Tool`, a choice with `Pick a tool`, `Loading the tools`, or `This agent has no tool to call`, each tool as `<phrase>, <tool>`. Without an agent: `Pick the agent first. Its tools show here.` | done |
+| new | add | `What the tool gets`, the head of the names and values of the input | done |
+| `Secret`, a field of text with the placeholder `Optional` | change | `Secret`, a choice with `No secret` and the secrets for the host of the address, and `<name>, not for this address` for a secret that the check names. The question mark `What the secret is` says `A setting of the front that holds the token of the address. The page never sees the token. Only the secrets for the host of the address show.` | done |
+| `Keeps the items where <filters>.` and `Remove the filters` | change | `Keep the items where`, a row per filter: a field, the test `is`, `is not`, `is one of`, `holds`, `is at least`, or `is at most`, and a value, with `Remove filter <n>` and `Add a filter`. The error is `At least and at most need a number.` | done |
+
+### src/ui/Duties.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| the title of a duty of another action | change | `<agent> posts in <bridge>` and ` to <handles>`, `<agent> opens a bridge from the playbook <title>`, or `Ask the manager`, then its message or its goal | done |
+| new | add | under a run of the history, `Decided while you were away` for a screen reader, and one line per decision: `The manager allowed <tool>: <reason>`, `The manager denied <tool>.`, `<person> stopped the run at <tool>.`, `You allowed <tool>.`, `Nobody answered in time, so <tool> was denied.`, or `Nobody answered in time, so the run stopped at <tool>.` | done |
+
+### src/ui/Playbooks.tsx, src/ui/Channel.tsx, src/ui/NewBridge.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| new | add | `Save as playbook` and `Make this a duty` in the menu More of a bridge | done |
+| new | add | the dialog `Save as playbook` with `Name`, `It keeps the goal, <n> seats, the placement, the caps, and what the manager can do.`, `A playbook of this name exists. Saving replaces it.`, and the key `Save playbook`, or `Save and make a duty` from Make this a duty | done |
+| new | add | the errors `Give the playbook a name.`, `A name holds 1 to 63 of a to z, 0 to 9, hyphens, and underscores.`, `This bridge has no seat to save.`, and `This playbook changed since you opened it. Try again.` | done |
+| new | add | `Playbook` with `Pick a playbook`, `Loading the playbooks`, `No playbook yet`, and `<title>, not here`, each playbook as `<title>: <first line of its goal>`. Under it, `Save one from a bridge: open More, then Save as playbook.` A front without playbooks says `This workbench keeps no playbooks.` | done |
+| new | add | `See the playbooks`, each with its title, its goal, `1 seat` or `<n> seats`, and `Delete`. The dialog says `Delete <title>?` and `A duty that opens a bridge from it stops until you pick another playbook.` | done |
+| new | add | `Start from a playbook` with `No playbook`, at the top of New bridge, for a person with playbooks | done |
+
+### src/ui/Chat.tsx, src/ui/Manager.tsx, src/ui/Fleet.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| new | add | `More` with `Make this a duty` on the header of a quick chat, of the manager, and of a conversation with an agent, once the conversation exists | done |
+
+### src/ui/Activity.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| new | add | the chip of a duty, its name in words, such as `Nightly restore test`, with the tooltip `Open the duty <name>` | done |
+| new | add | a row of a duty: the agent, the light `failed` or `paused`, the text of the front, and the chip. Its main pane adds `Open the run`. | done |
+
+### src/ui/Shell.tsx, src/ui/Notifications.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| new | add | `Notifications` in the account menu, and the dialog `Notifications` with `Loading your settings.` or `This workbench sends no notifications.` | done |
+| new | add | `Server` with the server of the front as its placeholder, and `Topic` with the question mark `What the topic is`: `The name that the ntfy app on your phone follows. Pick a name that is hard to guess.` | done |
+| new | add | `Token` with the placeholder `Optional`, or `A token is saved.` with `Remove`. After Remove, `The saved token goes when you save.` with `Keep it`. | done |
+| new | add | `Tell me about` with the switches `Questions`, `Failures`, and `A daily digest`. `Quiet hours` with `Hold notifications at night`, `From`, `To`, and `Time zone`. | done |
+| new | add | `Send a test`, `Sending.`, `Sent. Look for it on your phone.`, `The front sent nothing. Check the topic and the server.`, and `The test failed. <reason>` | done |
+| new | add | the errors `Write the address of the server, such as https://ntfy.sh.`, `Write the topic that your phone follows.`, `A topic holds no space and no slash.`, and `Pick both times.` | done |

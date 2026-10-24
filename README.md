@@ -69,7 +69,11 @@ and the reads of a worker that sleeps. They test the words and the folds of
 a system line, and the links of every screen of the page. They test the
 Routines place: the groups, the sign-off card and its moves, the evidence,
 the runbook, and the week of an agent. They test the Duties place: the list,
-the page of a duty, the editor with its readback, and the switch of an admin.
+the page of a duty with the decisions of its history, the editor with its
+readback, its events, its actions, its tools, secrets, and filters of a
+check, Write the check for me with Cancel, the problems of the front beside
+their fields, and the switch of an admin. They also test the playbooks,
+Make this a duty, the duties in Activity, and the dialog Notifications.
 
 ## Run against the fake server
 
@@ -82,9 +86,15 @@ and a quick chat with a history of six chats. Last come a fleet with two
 pools, a wiki of eight pages, and a face for every agent. The Routines place
 has nine routines of three agents: one needs your sign-off, four are live,
 one rehearses, one is proposed, and two are retired. The Duties place has
-five duties. One reports each weekday, and one restores a backup each night
-and needs you. One watches a queue with a check that mostly sleeps. One
-paused itself after three failed runs, and another app starts the last one.
+six duties. One reports each weekday, and one restores a backup each night
+and needs you. One watches a queue with a check that mostly sleeps, and the
+manager decided a question of one of its runs. One paused itself after
+three failed runs. Another app starts one, whose last run failed, and the
+last one posts in a bridge when a bridge of the migrator closes. The fake
+also serves the options of the duties, Write the check after a short wait
+(words that hold slow wait until the front gives up), a playbook of weekly
+patching, the notifications of each person (a topic that holds fail makes
+the test fail), and the inbox of the duties.
 Timers move members between
 presences, with their runs and their workers, and post messages every few
 seconds. It takes the files of a message with the limits of the front,

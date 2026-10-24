@@ -1,7 +1,7 @@
-// The playbooks on the page: Save as playbook, a dialog of a bridge that
+// The playbooks on the page. Save as playbook is a dialog of a bridge that
 // saves its goal, placement, seats, caps, and what the manager can do under
-// a name; the choice of a playbook, in New bridge and in the action open of
-// a duty; and the list of the playbooks with Delete, under that choice.
+// a name. The choice of a playbook serves New bridge and the action open of
+// a duty. Under that choice, a list shows the playbooks with Delete.
 // docs/CONTRACT.md, section 16, names the routes.
 
 import { useEffect, useState } from 'preact/hooks';

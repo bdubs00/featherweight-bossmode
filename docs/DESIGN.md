@@ -364,12 +364,15 @@ the item of the inbox that the main pane shows, so a narrow window opens it.
 `#skills/add` opens the chooser of Add skill. `#routines/<agent>/<name>`
 focuses a routine, `/evidence` and `/runbook` after it focus a tab, and
 `/agent` focuses the week of its agent. `#duties/<name>` focuses a duty,
-`/edit` after it focuses its editor, and `#duties/new` focuses New duty.
+`/edit` after it focuses its editor, and `#duties/new` focuses New duty. A
+short query after it, such as `#duties/new?agent=scribe&do=ask&message=...`,
+holds what Make this a duty brought, so a reload keeps it.
 
 A pane with nothing picked keeps its header row and its groove band. Thus
 the bands of the three panes stay in one line. The invitation to act sits in
 the middle of the pane. The account key opens a menu with the name of the person, the
-theme (Match the system, Light, Graphite), Connections, and Sign out.
+theme (Match the system, Light, Graphite), Notifications, Connections, and
+Sign out. Notifications opens a dialog, section 11.10.
 
 ## 6. The primitives
 
@@ -1042,3 +1045,86 @@ Left out, and why:
 - New routine. A routine comes from `fw routine propose` or from an agent,
   and the page has no editor of its body. An empty place says `No routine
   yet.` with no key.
+
+### 11.10 The Duties place
+
+A duty is work that an agent does on its own, on a schedule or on an event
+of the fleet, within limits that the person sets. Section 16 of
+`docs/CONTRACT.md` names the routes, and `reports/Duties contract
+2026-10-23.md` of the project is the contract of the build. The rule of
+the owner holds on every screen of the place: a person never writes cron,
+a regular expression, a template, or code. A schedule, an event, and a
+check are words with a readback, and a name is human.
+
+Files: `src/ui/Duties.tsx`, `src/ui/DutyEditor.tsx`, `src/ui/DutyCheck.tsx`,
+`src/ui/Playbooks.tsx`, `src/ui/Notifications.tsx`, `src/lib/duties.ts`,
+`src/lib/playbooks.ts`, `src/lib/notifications.ts`, `src/state/duties.ts`,
+`src/state/playbooks.ts`, `src/styles/duties.css`, and `fake/routes-e.mjs`,
+each with its tests. Activity, the channel, New bridge, the chats, and the
+account menu take small edits.
+
+The work:
+
+- The place. Duties sits in the app bar after Fleet. The list pane holds
+  each duty with the mark of its agent, what it does, its time in words,
+  the light of its last run, its next time, and its spend of today, in the
+  order of attention. The main pane holds a duty with its history, or the
+  editor.
+- The editor. Who, When, Check first, What, Limits, While you are away, and
+  Tell me about, in that order. `GET /v1/duties/options` names the events,
+  the actions, the looks of a check, and the secrets that the front serves
+  now. The editor offers nothing else, and a duty keeps a choice that it
+  holds.
+- When. A schedule is a sentence with choices, five presets, a box for
+  plain words, and two optional dates behind `Only between two dates`. An
+  event is a choice in words, such as `When a bridge closes`, with the
+  agent, the wait, or the path of the wiki that its kind takes. The front
+  reads either back.
+- Check first. Write the check for me asks the agent of the editor, and
+  stays off until the editor has one. The call takes up to two minutes, so
+  the section says so, counts the seconds, and offers Cancel. By hand, a
+  check looks at an address, with a secret of the front that may go to its
+  host, or calls a tool of the agent, picked from its profile, with its
+  input as names and values. The filters are rows of a field, a test in
+  words, and a value.
+- What. Ask the agent, Post in a bridge (an open bridge, the members, and
+  the message), Open a bridge from a playbook (the playbook, an optional
+  goal, and the list of the playbooks with Delete), or Ask the manager.
+  Each message holds its placeholders as words in brackets, and a chip
+  inserts one. What happened shows once an event starts the duty.
+- Problems. A problem of the front that names a field shows beside the
+  field, and one with no field shows at the top of the form.
+- The page of a duty says what its action does and lists its history. Under
+  a run, the history says who decided a question while the person was
+  away: the manager, the wait that ran out, or a person.
+- Playbooks. Save as playbook, in the menu More of a bridge, saves its
+  goal, placement, seats, caps, and what the manager can do under a name
+  that the person types. New bridge starts from a playbook, which fills the
+  form.
+- Make this a duty, in the menu More of a quick chat, of the manager, of a
+  conversation with an agent, and of a bridge, opens New duty with the
+  agent and the first message of the person. The manager gives Ask the
+  manager. An open bridge gives Post in this bridge. A closed bridge first
+  saves a playbook, then gives Open a bridge from it. The budget stays
+  empty, because a paid default is a silent cost.
+- Activity. A run of a duty shows the name of its duty as a chip that opens
+  the duty. The failed runs and the paused duties of `GET /v1/inbox` show
+  beside the decisions and the questions, each once.
+- Notifications. A dialog of the account menu: the ntfy server, with the
+  server of the front as its placeholder, the topic, a token that the page
+  writes and never reads, three switches, quiet hours in the time zone of
+  the browser, Save, and Send a test, which says what happened. The dialog
+  scrolls on a short screen.
+
+Every screen of the place works at 390 pixels with no sideways scroll. A
+row of a filter keeps one line there, and a long name of a duty in a chip
+ends in an ellipsis.
+
+Left out, and why:
+
+- A rubric per duty and its trend. The contract of the build names no
+  shape for it yet.
+- Files with a message of Ask the agent. The record keeps them, and the
+  editor shows none.
+- The approvals and questions of a duty that sit on a bridge show in their
+  bridge, so the items of the inbox of those kinds add no row.

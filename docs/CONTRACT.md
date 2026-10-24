@@ -1223,13 +1223,16 @@ again. It also reads the week of the agent that the details pane shows. A
 A duty is what an agent does on its own: who, when, what, and its limits.
 The Duties place reads the routes of the duties of the workbench, after the
 contract of the build, `reports/Duties contract 2026-10-23.md`. Section 2 of
-that file names the routes, and section 1 names the record.
+that file names the routes, section 1 names the record, and section 10
+holds the additions of the second wave, which win over the rest.
 `src/api/routes.ts` holds the calls, and `src/api/types.ts` holds the
-shapes. `fake/routes-e.mjs` serves the same shapes.
+shapes. `fake/routes-e.mjs` serves the same shapes, with the
+notifications, the playbooks, and the inbox.
 
-Each call of a duty sends the header `X-Time-Zone`, with the IANA time zone
-of the browser, such as `America/New_York`. The front reads the words of a
-person in that zone. A schedule without `timeZone` also takes that zone.
+Each call of a route under `/v1/duties` sends the header `X-Time-Zone`,
+with the IANA time zone of the browser, such as `America/New_York`. The
+front reads the words of a person in that zone. A schedule without
+`timeZone` also takes that zone.
 
 | Route | What the page does with it |
 |---|---|
@@ -1237,12 +1240,21 @@ person in that zone. A schedule without `timeZone` also takes that zone.
 | `GET /v1/duties/{name}` | The duty with `history`, the last 50 runs, newest first. The page of a duty and the editor call it. A 404 says in place that the duty is gone. |
 | `PUT /v1/duties/{name}?dryRun=true` | The editor sends the whole form. It calls the route after each change of When, for the words of a person, and on Save duty. The page shows `readback`, the first five times of `next`, and `problems`. |
 | `PUT /v1/duties/{name}?dryRun=true&test=true` | The key Try the check. The page shows the count of `check`, whether the items wake the agent, and each item of `found`. |
+| `GET /v1/duties/options` | `{"secrets": [{"name", "hosts"}], "events": [...], "actions": [...], "looks": [...]}`. The editor reads it once per load and offers no other choice. `events` are kinds such as `bridge.closed`, `run.failed`, `question.waiting`, `page.changed`, `routine.ready`, and `cap.reached`. `actions` are among `ask`, `post`, `open`, and `manager`. `looks` are among `http` and `tool`. A duty keeps a choice that it holds, so an edit never drops it. For a 404, or any failure, the page offers what the first wave offered: the action `ask`, both looks, no event, and no secret. |
 | `PUT /v1/duties/{name}` | Save duty, in the dialog that shows the readback and the next five times. The answer is 201 for a new duty and 200 for a change. The page then opens the duty. |
 | `PATCH /v1/duties/{name}` | `{"paused": true}` or `{"paused": false}`, from the keys Pause and Resume. |
 | `DELETE /v1/duties/{name}` | Delete, in the menu More, after a dialog that asks first. The page then opens the list. |
 | `POST /v1/duties/{name}/run` | Run now, with the body `{}`. For 202 `{"run": "<id>"}`, the page says `A run started.` and links the run. For 200 `{"skipped": "<reason>"}`, the page shows the reason. |
-| `POST /v1/duties/{name}/write-check` | `{"words": "..."}`, from the key Write the check. The answer `{"checkFirst", "readback", "check"}` fills the fields of the check. A 422 shows its detail under the words. For a 404 or a 501, the key goes, and the fields by hand show. |
+| `POST /v1/duties/{name}/write-check` | `{"words": "...", "agent": "..."}`, from the key Write the check for me. `agent` is the agent of the editor, which a duty that is not saved yet needs. For a saved duty, the front uses the agent of the duty. The key stays off until the editor has an agent. The call takes up to two minutes: the page says so, counts the seconds, and offers Cancel, which aborts the request. The answer `{"checkFirst", "readback", "check"}` fills the fields of the check. A 422 shows its detail under the words. A 504 says that the agent did not answer within two minutes. For a 404 or a 501, the key goes, and the fields by hand show. |
 | `PATCH /v1/duties` | `{"paused": true, "reason": "..."}` or `{"paused": false}`. This is the switch that pauses every duty. If `whoami` says `admin`, the page shows it. Before a pause, a dialog asks first. |
+| `GET /v1/notifications` | The settings of the person who is signed in: `{"ntfy": {"server", "topic", "token"}, "send": {"questions", "failures", "digest"}, "quietHours": {"from", "to", "timeZone"}, "serverDefault": "...", "off": "..."}`. `token` is `"set"` or `""`, never the token. The dialog Notifications of the account menu reads it. An empty server shows `serverDefault` as its placeholder. `off`, when the front sends it, is the reason in words that nothing goes out, and the dialog shows it above the fields. A 404 says `This workbench sends no notifications.` |
+| `PUT /v1/notifications` | The same body without `serverDefault` and `off`, from Save. `token` is `"set"` to keep the stored token, `""` to clear it (the key Remove), or a new token. Quiet hours that are off go as `"from": ""` and `"to": ""`. A 400 `{"problems": [...]}` reads as the problems of a duty: `ntfy.server`, `ntfy.topic`, `ntfy.token`, `send`, and `quietHours` show beside their fields, and a problem with no path shows above them. |
+| `POST /v1/notifications/test` | The body `{}`, from Send a test, after a save of a change. 200 `{"sent": true}` says `Sent. Look for it on your phone.` 502 `{"error"}` says `The test failed.` and the error. |
+| `GET /v1/playbooks` | `{"playbooks": [{"name", "goal", "placement", "seats", "revision", "owner", "updatedAt"}]}`, newest change first. New bridge, the action open of a duty, and Save as playbook read it. A 404 means that the front keeps no playbooks: New bridge offers none, and the action open says `This workbench keeps no playbooks.` |
+| `GET /v1/playbooks/{name}` | The playbook with `caps` and `delegation`. New bridge reads it to fill its form. |
+| `PUT /v1/playbooks/{name}` | The body of `POST /v1/bridges` without the title: `{"goal", "placement", "members", "caps", "delegation"}`, and `revision` when the name holds a playbook already. Save as playbook in the menu More of a bridge sends it. A 409 says `This playbook changed since you opened it. Try again.` A 400 `{"problems"}` shows under the name. |
+| `DELETE /v1/playbooks/{name}` | 204. Delete, in the list See the playbooks of the action open, after a dialog that asks first. |
+| `GET /v1/inbox` | `{"items": [{"kind", "run", "duty", "agent", "bridge", "text", "since"}]}`, `kind` `approval`, `question`, `failure`, or `paused`. Activity reads it when it opens, each minute while it shows, and after a reset of the stream. See the rules of Activity below. |
 
 A duty, as a read answers it. The page writes the same record without
 `owner`, `source`, `readback`, `next`, `state`, and `history`:
@@ -1263,6 +1275,18 @@ A duty, as a read answers it. The page writes the same record without
 }
 ```
 
+An entry of `history` has the shape of `lastRun`: `at`, `slot`, `run`,
+`state`, `costUSD`, `found`, `woke`, `reason`, `start`, `attempt`, and
+`title`. **New:** it also has `decided`, the questions of the run that
+somebody decided while the person was away:
+
+```json
+{ "decided": [{ "at": "2026-10-23T13:05:00Z", "by": "manager", "verdict": "allow", "tool": "shell.exec", "reason": "It only reads the disk." }] }
+```
+
+`by` is `manager`, `timeout`, or the subject of a person. `verdict` is
+`allow`, `deny`, or `cancel`.
+
 The rules of the page:
 
 - A person never sees cron or the syntax of a template. When is a sentence
@@ -1280,15 +1304,66 @@ The rules of the page:
   For a 409, the page says `This duty changed since you opened it. Open it
   again, then make your change.`
 - The page never sends `owner`. It keeps each field that the form does not
-  show. These fields are `pool`, a start by an event or by a call, and an
-  action other than `ask`. They are also `maxTokens`, `maxToolCalls`,
-  `retries`, `runAs`, `paused`, and other people in `notify`.
+  show. These fields are `pool` and a start by a call of another app.
+  They are also `maxTokens`, `maxToolCalls`, `retries`, `runAs`, `paused`,
+  and other people in `notify`.
+- **New:** When is a schedule or, where `options.events` lists one, an
+  event: `{"event": {"kind", "agent", "after", "path"}}` with only the
+  fields of its kind. `bridge.closed`, `run.failed`, and `routine.ready`
+  take an agent. `question.waiting` takes `after`, a span, and an agent.
+  `page.changed` takes `path`. Each kind shows in words, such as `When a
+  bridge closes`. A schedule takes `start` and `end`, two dates, behind the
+  switch `Only between two dates`.
+- **New:** What is one of the actions of `options.actions`: `ask`,
+  `{"post": {"bridge", "to", "message"}}` with an open bridge and the
+  handles of its members (none is everyone), `{"open": {"playbook",
+  "goal"}}` with an optional goal, and `{"manager": {"message"}}`.
+- **New:** Check first calls a tool of the agent where `options.looks`
+  holds `tool`. The tool is a choice among the tools of the profile of the
+  agent, `GET /v1/agents/{name}`, each with its phrase. A server that the
+  profile names whole, such as `servicenow.*`, gives each tool of the
+  catalog of `GET /v1/tools` under it. The input is a list of names and
+  values. A secret of an address is a choice among the secrets of
+  `options.secrets` whose `hosts` hold the host of the address, by name,
+  with its port, or under `*.domain`. Nobody types a secret. The filters of
+  `where` are rows of a field, a test, and a value, which the person adds,
+  changes, and removes.
 - Until the message or the field Name gives a name, a dry run of a new duty
   goes to `/v1/duties/new-duty`. A dry run saves nothing.
-- **New:** the page reads a problem of a dry run as a sentence, or as
-  `{"field", "message"}`. When shows the problems whose field starts with
-  `when`. When shows a problem without a field only if the front read back
-  no schedule.
+- **New:** a problem of a dry run, and of a 400 of a save, is a string. A
+  problem that concerns a field starts with its dotted path and a colon,
+  such as `when.schedule: ...` or `do.post.bridge: ...`. The page shows the
+  text after the colon beside the field: `agent` under Who, `when` in the
+  readback of When, `checkFirst` in Check first, which opens, `do.*.message`,
+  `do.post.bridge`, `do.post.to`, `do.open.playbook`, and `do.open.goal`
+  beside their fields, `limits.budget` beside the cost, `limits.budget.maxTurns`
+  beside the turns, `limits.perDayUSD` beside the most per day, `whileAway`
+  and `notify` in their sections, and `name` beside the name. A problem with
+  no path, or with a path that the form does not show, shows at the top of
+  the form.
+- **New:** Make this a duty, in the menu More of a quick chat, of the
+  manager, of a conversation with an agent, and of a bridge, opens
+  `#duties/new?agent=<agent>&do=<action>&message=<text>`, or with
+  `bridge=<id>` or `playbook=<name>`. A reload keeps it. The message is the
+  first message of the person in the conversation, cut at 2000
+  characters. The manager gives the action `manager`, and a bridge that is
+  open gives `post` in that bridge. A closed bridge first saves a playbook
+  under a name that the person types, then gives `open` from it. The agent
+  is the agent of the conversation, or of the first seat of the bridge. The
+  budget stays empty. An action that the front does not serve becomes `ask`
+  with the same message.
+- **New:** Activity. A run whose metadata holds `workbench.duty` shows the
+  name of its duty as a chip that opens `#duties/<name>`. The items of
+  `GET /v1/inbox` of kind `failure` and `paused` show as rows, each with
+  the agent, the light `failed` or `paused`, the text, and the chip. An item
+  of kind `approval` or `question` of a bridge has its row in the bridge
+  already, so the page leaves it out. One of a run on no bridge shows the
+  card of the run once the page reads the run, with Allow and Deny, and a
+  line that waits until then. A failure of a run that a row of a seat shows
+  gives that row its chip, and no second row.
+- **New:** the history of a duty shows `decided` under each run, in words:
+  `The manager allowed shell.exec: <reason>`, `Nobody answered in time, so
+  git.push was denied.`, or `You stopped the run at bash: <reason>`.
 - The page shows a duty with `source` `file` with the key Run now alone,
   because the routes never change it.
 - The page offers Pause, Edit, and Delete to an admin, to an owner of the
@@ -1311,7 +1386,7 @@ the words, and the page stores the placeholder. Nobody types a brace.
 | `[The last run]` | `{last.run}` |
 | `[How the last run ended]` | `{last.state}` |
 | `[This duty's name]` | `{duty}` |
-| `[What happened]` | `{event}`, with no chip until an event starts a duty |
+| `[What happened]` | `{event}`, offered once an event starts the duty |
 
 The light of a run of a duty:
 
@@ -1331,7 +1406,12 @@ The list puts the duties in this order: a duty that needs you, a failed
 duty, a duty that works, and then the rest by their next time. A paused duty
 comes last.
 
-**Open:** Write the check names a duty, and a new duty does not exist
-before its first save. So for a new duty, the front can answer 404. The
-page then shows the fields by hand. A body that also takes `agent` closes
-this gap.
+**Open:** a duty named `options` meets the route `GET /v1/duties/options`.
+The front can refuse that name, or the route can move.
+
+**Open:** `GET /v1/playbooks` answers `seats`, and `PUT` takes the body of
+`POST /v1/bridges`, which names them `members`. The page sends `members`
+and reads `seats`, or `members` where a read holds them.
+
+**Open:** the shape of the notifications names no way to turn quiet hours
+off. The page sends two empty times.
