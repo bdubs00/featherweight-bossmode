@@ -576,3 +576,39 @@ describe('Tell me about', () => {
     expect(tell(el)).toEqual([['Tell me about', ['Failures on', 'Questions on']]]);
   });
 });
+
+describe('the dialog of a save', () => {
+  const CHECKED: Duty = {
+    name: 'watch-queue',
+    agent: 'migrator',
+    when: { schedule: { repeat: 'every', every: '15m', timeZone: 'UTC' } },
+    checkFirst: { look: { http: { url: 'https://q.example/api' } }, items: 'items', key: 'id', wake: { when: 'new' } },
+    do: { ask: { message: 'Handle {found}.' } },
+    limits: { budget: { maxCostUSD: 0.25 }, overlap: 'skip', catchUp: '1h' },
+    source: 'store',
+    revision: 4,
+  };
+  const SAID = 'Every 15 minutes, UTC. First it looks at q.example/api for the items at items. Only items that it did not see before wake migrator, by their id. The run gets the list.';
+
+  it('says the check once: in the readback of the front, or in the words of the page without one', async () => {
+    for (const readback of [SAID, '']) {
+      location.hash = '#duties/watch-queue/edit';
+      api = fakeApi({
+        'GET /v1/duties': { duties: [CHECKED], paused: false },
+        'GET /v1/duties/watch-queue': { ...CHECKED, history: [] },
+        'PUT /v1/duties/watch-queue?dryRun=true': dry({ readback }),
+      });
+      const el = mount(<DutyEditor name="watch-queue" />);
+      await settle();
+      click(keyNamed(el, 'Save duty'));
+      await settle();
+      const dialog = document.querySelector('dialog.confirm')!;
+      expect(text(dialog.querySelector('.duty-readback'))).toBe(readback);
+      expect(text(dialog).includes('Look at q.example')).toBe(!readback);
+      expect(text(dialog).split('q.example').length).toBe(2);
+      unmountAll();
+      api.restore();
+      forgetDuties();
+    }
+  });
+});

@@ -993,7 +993,8 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
               </ol>
             </>
           )}
-          {reviewed && <p>{checkWords(reviewed, agentName || 'the agent')}</p>}
+          {/* The readback of the front holds the check already. Without it, the page says the check in its own words. */}
+          {reviewed && !review.readback && <p>{checkWords(reviewed, agentName || 'the agent')}</p>}
           <p>{limitWords(record().limits)[0]}</p>
         </Confirm>
       )}

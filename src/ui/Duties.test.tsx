@@ -55,7 +55,7 @@ const WATCH = base({
   name: 'watch-p1',
   agent: 'triage',
   when: { schedule: { repeat: 'every', every: '15m', between: ['08:00', '18:00'], timeZone: 'UTC' } },
-  readback: 'Every 15 minutes between 8:00 AM and 6:00 PM, UTC.',
+  readback: 'Every 15 minutes between 8:00 AM and 6:00 PM, UTC. First it calls the tool servicenow.query_incidents for the items at result.records. Only items that it did not see before wake triage, by their number.',
   next: NEXT,
   checkFirst: { look: { tool: 'servicenow.query_incidents', input: { query: 'priority<=2' } }, items: 'result.records', key: 'number', wake: { when: 'new' } },
   do: { ask: { message: 'Triage these: {found}' } },
@@ -201,11 +201,13 @@ describe('the page of a duty', () => {
     expect(api.calls.find((c) => c.path === '/v1/duties/watch-p1')!.headers['X-Time-Zone']).toBe(ZONE);
     expect(text(el.querySelector('h1'))).toBe('Triage these: [What the check found]');
     expect(text(el.querySelector('.pane-head'))).toContain('failed');
-    expect(text(el.querySelector('.duty-readback'))).toBe('Every 15 minutes between 8:00 AM and 6:00 PM, UTC.');
+    expect(text(el.querySelector('.duty-readback'))).toBe(WATCH.readback);
     expect([...el.querySelectorAll('.duty-next li')].map(text)).toEqual(NEXT.slice(0, 5).map(nextWords));
     expect(text(el.querySelector('.duty-message'))).toBe('Triage these: What the check found');
     expect(el.querySelector('.duty-ph')!.textContent).toBe('What the check found');
-    expect(text(el)).toContain('Call the tool servicenow.query_incidents of triage. Take the list at result.records. Wake triage only for items whose number it did not see before.');
+    // The readback of the front says the check, so the page says it once.
+    expect(el.querySelector('#duty-check')).toBeNull();
+    expect(text(el).split('servicenow.query_incidents').length).toBe(2);
     expect(text(el)).toContain('A run gets at most $0.50.');
     expect(text(el)).toContain('The manager decides a question for you. After 2 hours without an answer, the answer is no.');
     expect(text(el)).toContain('Failures and questions.');
@@ -234,6 +236,13 @@ describe('the page of a duty', () => {
     mount(<DutyMain name="watch-p1" />);
     await settle();
     expect(api.calls.some((c) => c.path === '/v1/notifications')).toBe(false);
+  });
+
+  it('says the check in its own words when the front gives no readback', async () => {
+    api = fakeApi(one({ ...WATCH, readback: '' }, RUNS));
+    const el = mount(<DutyMain name="watch-p1" />);
+    await settle();
+    expect(text(el.querySelector('section[aria-labelledby="duty-check"] p'))).toBe('Call the tool servicenow.query_incidents of triage. Take the list at result.records. Wake triage only for items whose number it did not see before.');
   });
 
   it('says in the history who decided a question while you were away', async () => {

@@ -432,7 +432,8 @@ function DutyView({ name }: { name: string }) {
           </h2>
           <DoWords d={d} agentName={agentName} title={title} />
         </section>
-        {d.checkFirst && (
+        {/* The readback of the front says what the check looks for, so the section shows only without it. */}
+        {d.checkFirst && !d.readback && (
           <section class="duty-sec" aria-labelledby="duty-check">
             <h2 class="t-sub duty-sec-head" id="duty-check">
               Check first
