@@ -244,6 +244,7 @@ describe('the page of a duty', () => {
     expect(text(runs[1])).toContain('slept Found nothing');
     expect(runs[1].querySelector('a')).toBeNull();
     expect(text(runs[2])).toContain('skipped The last run still works.');
+    expect(runs[2].querySelector('a')).toBeNull();
     expect(text(el.querySelector('#duty-history'))).toContain('3');
   });
 
@@ -260,6 +261,17 @@ describe('the page of a duty', () => {
     mount(<DutyMain name="watch-p1" />);
     await settle();
     expect(api.calls.some((c) => c.path === '/v1/notifications')).toBe(false);
+  });
+
+  it('links no run for a start that the queue never took', async () => {
+    const lost: DutyRun = { at: ago(10), slot: ago(10), run: '', state: 'failed', reason: 'The queue of triage did not answer.' };
+    api = fakeApi(one({ ...WATCH, state: { lastRun: lost, todayUSD: 0, failuresInRow: 1 } }, [lost, RUNS[0]]));
+    const el = mount(<DutyMain name="watch-p1" />);
+    await settle();
+    const runs = [...el.querySelectorAll('.duty-run')];
+    expect(text(runs[0])).toContain('failed The queue of triage did not answer.');
+    expect(runs[0].querySelector('a')).toBeNull();
+    expect(runs[1].querySelector('a.duty-run-link')!.getAttribute('href')).toBe('/ui#run/01KWOKE');
   });
 
   it('says the check in its own words when the front gives no readback', async () => {

@@ -76,6 +76,21 @@ describe('Activity and the duties', () => {
     expect(main.querySelector('a[href="/ui#run/run-x"]')!.textContent).toBe('Open the run');
   });
 
+  it('links no run for a failed start that the queue never took, whose run is empty', async () => {
+    api = fakeApi({ 'GET /v1/inbox': { items: [{ kind: 'failure', run: '', approval: '', duty: 'daily-report', agent: 'scribe', bridge: '', text: 'The queue of scribe did not answer.', since: at(1) }] } });
+    const el = mount(
+      <>
+        <ActivityList />
+        <ActivityMain item="u:failure/daily-report" />
+      </>,
+    );
+    await settle();
+    const main = el.querySelector('.inbox-main-pane')!;
+    expect(main.querySelector('.inbox-reason')!.textContent).toBe('The queue of scribe did not answer.');
+    expect([...el.querySelectorAll('a')].some((a) => a.textContent === 'Open the run' || (a.getAttribute('href') || '').startsWith('/ui#run/'))).toBe(false);
+    expect(api.calls.some((c) => c.path.startsWith('/v1/runs/'))).toBe(false);
+  });
+
   it('shows the card of a question of a duty on no bridge from the approval of its item, decides it, and reads the inbox again', async () => {
     let reads = 0;
     api = fakeApi({
