@@ -13,6 +13,8 @@ import type { ChannelKind, NotifyChannel, NotifyRead, NotifySend, NotifySettings
 import { oneSentence } from '../api/client';
 import { money, splitProblem } from './duties';
 
+export { channelWords } from './duties';
+
 /** The most channels that a person keeps. */
 export const MAX_CHANNELS = 10;
 
@@ -49,12 +51,6 @@ export function kindName(kind: string, r?: NotifyRead | null): string {
   if (known(kind)) return KINDS[kind].name;
   const o = r && r.offered ? r.offered.find((x) => x.kind === kind) : undefined;
   return (o && o.label) || kind;
-}
-
-/** channelWords names a shared channel in words, such as The Ops room channel. */
-export function channelWords(label: string): string {
-  const s = String(label || '').trim();
-  return /\bchannel$/i.test(s) ? 'The ' + s : 'The ' + s + ' channel';
 }
 
 /** sharedOf finds a shared channel of the operator by its name. */

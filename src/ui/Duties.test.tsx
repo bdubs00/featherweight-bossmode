@@ -220,6 +220,21 @@ describe('the page of a duty', () => {
     expect(text(el.querySelector('#duty-history'))).toContain('3');
   });
 
+  it('names the shared channel of the operator that hears of the duty by its label', async () => {
+    const d = { ...WATCH, notify: { failure: ['owner', 'channel:ops-room'], needsYou: [] } };
+    api = fakeApi({ ...one(d, RUNS), 'GET /v1/notifications': { channels: [], quietHours: { from: '', to: '', timeZone: 'UTC' }, shared: [{ name: 'ops-room', kind: 'slack', label: 'Ops room' }] } });
+    const el = mount(<DutyMain name="watch-p1" />);
+    await settle();
+    expect(text(el.querySelector('section[aria-labelledby="duty-tell"] p'))).toBe('Failures. The Ops room channel hears of failures.');
+  });
+
+  it('reads no settings for a duty that names no shared channel', async () => {
+    api = fakeApi(one(WATCH, RUNS));
+    mount(<DutyMain name="watch-p1" />);
+    await settle();
+    expect(api.calls.some((c) => c.path === '/v1/notifications')).toBe(false);
+  });
+
   it('says in the history who decided a question while you were away', async () => {
     const decided: DutyRun = {
       at: ago(20),

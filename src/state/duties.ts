@@ -6,13 +6,14 @@
 // again when a run of its history changes its state in the store.
 //
 // It also keeps what the front serves now for the editor, GET
-// /v1/duties/options, and the items of GET /v1/inbox that Activity shows
+// /v1/duties/options, the shared channels of the operator from GET
+// /v1/notifications, and the items of GET /v1/inbox that Activity shows
 // beside the bridges: the failures and the paused duties.
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
 import { ApiError } from '../api/client';
-import type { Duty, DutyOptions, DutyRecord, DutyStarted, InboxItem } from '../api/types';
+import type { Duty, DutyOptions, DutyRecord, DutyStarted, InboxItem, SharedChannel } from '../api/types';
 import { store } from './store';
 
 export interface DutiesState {
@@ -32,9 +33,11 @@ export interface DutiesState {
   options: DutyOptions | null;
   /** The items of GET /v1/inbox, or null before the first read. */
   inbox: InboxItem[] | null;
+  /** The shared channels of the operator that a duty can name, or null before the read. */
+  shared: SharedChannel[] | null;
 }
 
-const initial: DutiesState = { list: null, paused: false, byName: {}, gone: {}, error: '', off: false, options: null, inbox: null };
+const initial: DutiesState = { list: null, paused: false, byName: {}, gone: {}, error: '', off: false, options: null, inbox: null, shared: null };
 
 /**
  * FALLBACK is what an older front serves, which has no route of the
@@ -66,6 +69,7 @@ export function forgetDuties(): void {
   listing = null;
   optioning = null;
   inboxing = null;
+  sharing = null;
   reading.clear();
   if (unwatch) unwatch();
   unwatch = null;
@@ -222,6 +226,26 @@ export function loadDutyOptions(): Promise<DutyOptions> {
       },
     );
   return optioning;
+}
+
+let sharing: Promise<SharedChannel[]> | null = null;
+
+/** loadSharedChannels reads the shared channels of the operator once per page load. A front without them, or a failed read, gives none. */
+export function loadSharedChannels(): Promise<SharedChannel[]> {
+  if (state.shared) return Promise.resolve(state.shared);
+  if (!sharing)
+    sharing = api.notifications().then(
+      (r) => {
+        const shared = (r && Array.isArray(r.shared) ? r.shared : []).filter((x) => x && x.name);
+        set({ ...state, shared });
+        return shared;
+      },
+      () => {
+        set({ ...state, shared: [] });
+        return [];
+      },
+    );
+  return sharing;
 }
 
 let inboxing: Promise<void> | null = null;

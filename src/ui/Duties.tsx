@@ -13,6 +13,7 @@ import { costText } from '../lib/cost';
 import {
   PLACEHOLDERS,
   awayWords,
+  channelsIn,
   checkLine,
   checkWords,
   decidedWords,
@@ -29,7 +30,7 @@ import {
   toWords,
 } from '../lib/duties';
 import { useSelect } from '../state/store';
-import { loadDuties, loadDuty, pauseAll, pauseDuty, removeDuty, runDutyNow, useDuties } from '../state/duties';
+import { loadDuties, loadDuty, loadSharedChannels, pauseAll, pauseDuty, removeDuty, runDutyNow, useDuties } from '../state/duties';
 import { useRoving } from './keys';
 import { attempt, showError } from './notice';
 import { Confirm, Menu, When } from './common';
@@ -306,12 +307,19 @@ function DutyView({ name }: { name: string }) {
   const [said, setSaid] = useState<Said>(null);
   const [busy, setBusy] = useState(false);
   const [asking, setAsking] = useState(false);
+  const shared = useDuties((s) => s.shared);
   useEffect(() => {
     setFailed('');
     setSaid(null);
     setAsking(false);
     loadDuty(name).catch((e) => setFailed(e instanceof Error ? e.message : 'The action failed. Try it again.'));
   }, [name]);
+  // A duty that names a shared channel reads the labels of the shared channels once.
+  const names = d && d.notify ? [...channelsIn(d.notify.failure), ...channelsIn(d.notify.needsYou)] : [];
+  useEffect(() => {
+    if (names.length) loadSharedChannels().catch(() => {});
+  }, [names.length > 0]);
+  const labelOf = (n: string) => ((shared || []).find((c) => c.name === n) || { label: n }).label || n;
   // The stream carries no event of a duty. A run of its history that the
   // store follows, and that changes its state, reads the duty again.
   const runs = d && d.history ? d.history.map((r) => r.run || '').filter(Boolean).slice(0, 10) : [];
@@ -453,7 +461,7 @@ function DutyView({ name }: { name: string }) {
           <h2 class="t-sub duty-sec-head" id="duty-tell">
             Tell me about
           </h2>
-          <p>{tellWords(d.notify)}</p>
+          <p>{tellWords(d.notify, labelOf)}</p>
         </section>
         <section class="duty-sec" aria-labelledby="duty-history">
           <h2 class="t-sub duty-sec-head" id="duty-history">

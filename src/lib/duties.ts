@@ -577,14 +577,34 @@ export function awayWords(w: DutyRecord['whileAway'] | undefined): string {
   return who + ' After ' + spanText(a.timeout || '2h') + ' without an answer, ' + then + '.';
 }
 
-/** tellWords reads back what the person hears of. */
-export function tellWords(n: DutyRecord['notify'] | undefined): string {
+/** The prefix of a shared channel of the operator in the lists of notify, such as channel:ops-room. */
+export const CHANNEL = 'channel:';
+
+/** channelsIn names the shared channels of a list of notify, without the prefix. */
+export const channelsIn = (list: string[] | undefined): string[] => (list || []).filter((x) => x.startsWith(CHANNEL)).map((x) => x.slice(CHANNEL.length));
+
+/** channelWords names a shared channel in words, such as The Ops room channel. */
+export function channelWords(label: string): string {
+  const s = String(label || '').trim();
+  return /\bchannel$/i.test(s) ? 'The ' + s : 'The ' + s + ' channel';
+}
+
+/**
+ * tellWords reads back what the person hears of, then what each shared
+ * channel hears of. labelOf gives the label of a shared channel by its
+ * name.
+ */
+export function tellWords(n: DutyRecord['notify'] | undefined, labelOf: (name: string) => string = (x) => x): string {
   const fail = !!(n && n.failure && n.failure.includes('owner'));
   const ask = !!(n && n.needsYou && n.needsYou.includes('owner'));
-  if (fail && ask) return 'Failures and questions.';
-  if (fail) return 'Failures.';
-  if (ask) return 'Questions.';
-  return 'Nothing.';
+  const own = fail && ask ? 'Failures and questions.' : fail ? 'Failures.' : ask ? 'Questions.' : 'Nothing.';
+  const fails = channelsIn(n && n.failure);
+  const asks = channelsIn(n && n.needsYou);
+  const more = [...new Set([...fails, ...asks])].map((c) => {
+    const what = fails.includes(c) && asks.includes(c) ? 'failures and questions' : fails.includes(c) ? 'failures' : 'questions';
+    return channelWords(labelOf(c)) + ' hears of ' + what + '.';
+  });
+  return [own, ...more].join(' ');
 }
 
 /* ---------- the name ---------- */
@@ -711,6 +731,9 @@ export interface DutyForm {
   then: 'deny' | 'cancel';
   failures: boolean;
   questions: boolean;
+  /** The shared channels of the operator that hear of a failure and of a question, by name. */
+  channelFailures: string[];
+  channelQuestions: string[];
 }
 
 export function emptyCheck(): CheckForm {
@@ -747,6 +770,8 @@ export function emptyForm(zone: string): DutyForm {
     then: 'deny',
     failures: true,
     questions: true,
+    channelFailures: [],
+    channelQuestions: [],
   };
 }
 
@@ -854,6 +879,8 @@ export function formOf(d: Duty, zone: string): DutyForm {
     then: w && w.then === 'cancel' ? 'cancel' : 'deny',
     failures: !d.notify || !d.notify.failure ? true : d.notify.failure.includes('owner'),
     questions: !d.notify || !d.notify.needsYou ? true : d.notify.needsYou.includes('owner'),
+    channelFailures: channelsIn(d.notify && d.notify.failure),
+    channelQuestions: channelsIn(d.notify && d.notify.needsYou),
   };
 }
 
@@ -962,8 +989,15 @@ export function money(text: string): number {
   return Number(s);
 }
 
-/** keepOthers keeps the people of a list other than owner, and adds owner when on. */
-const keepOthers = (list: string[] | undefined, on: boolean) => [...(list || []).filter((x) => x !== 'owner'), ...(on ? ['owner'] : [])];
+/**
+ * keepOthers keeps the people of a list other than owner, and adds owner
+ * when on, then each shared channel of channels as channel:<name>.
+ */
+const keepOthers = (list: string[] | undefined, on: boolean, channels: string[] = []) => [
+  ...(list || []).filter((x) => x !== 'owner' && !x.startsWith(CHANNEL)),
+  ...(on ? ['owner'] : []),
+  ...channels.map((c) => CHANNEL + c),
+];
 
 /** eventOf writes the event of the form, with only the fields of its kind. */
 export function eventOf(e: EventForm): DutyEvent {
@@ -1025,7 +1059,10 @@ export function recordOf(f: DutyForm, base: Duty | null, name: string): DutyReco
     do: doOf(f, b),
     limits,
     whileAway: { decider: f.decider, timeout: f.timeout, then: f.then },
-    notify: { failure: keepOthers(b && b.notify ? b.notify.failure : undefined, f.failures), needsYou: keepOthers(b && b.notify ? b.notify.needsYou : undefined, f.questions) },
+    notify: {
+      failure: keepOthers(b && b.notify ? b.notify.failure : undefined, f.failures, f.channelFailures),
+      needsYou: keepOthers(b && b.notify ? b.notify.needsYou : undefined, f.questions, f.channelQuestions),
+    },
   };
   if (b && b.pool) r.pool = b.pool;
   const check = checkOf(f.check);

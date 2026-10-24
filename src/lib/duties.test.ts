@@ -166,6 +166,16 @@ describe('the form of a duty', () => {
     expect(r.pool).toBe('crew');
   });
 
+  it('reads the shared channels of notify into the form, and writes each one that is on as channel:<name>', () => {
+    const d = duty({ notify: { failure: ['bob@example.com', 'owner', 'channel:ops-room'], needsYou: ['channel:pager'] } });
+    const f = formOf(d, 'UTC');
+    expect([f.failures, f.questions, f.channelFailures, f.channelQuestions]).toEqual([true, false, ['ops-room'], ['pager']]);
+    expect(recordOf(f, d, d.name).notify).toEqual({ failure: ['bob@example.com', 'owner', 'channel:ops-room'], needsYou: ['channel:pager'] });
+    const r = recordOf({ ...f, channelFailures: [], channelQuestions: ['pager', 'ops-room'] }, d, d.name);
+    expect(r.notify).toEqual({ failure: ['bob@example.com', 'owner'], needsYou: ['channel:pager', 'channel:ops-room'] });
+    expect(emptyForm('UTC')).toMatchObject({ channelFailures: [], channelQuestions: [] });
+  });
+
   it('sends a new duty with no budget of its own, so a save without one fails', () => {
     const f = { ...emptyForm('UTC'), agent: 'scribe', message: 'Draft the notes of [Today’s date].' };
     const r = recordOf(f, null, 'draft-the-notes');
@@ -257,6 +267,11 @@ describe('a duty in words', () => {
     expect(awayWords({ decider: 'nobody', timeout: '30m', then: 'cancel' })).toBe('Nobody decides a question for you. After 30 minutes without an answer, the run stops.');
     expect(tellWords(d.notify)).toBe('Failures and questions.');
     expect(tellWords({ failure: [], needsYou: [] })).toBe('Nothing.');
+    // A shared channel of the operator hears of what the duty names for it, by its label.
+    const label = (n: string) => (n === 'ops-room' ? 'Ops room' : n);
+    expect(tellWords({ failure: ['owner', 'channel:ops-room'], needsYou: ['channel:ops-room', 'channel:pager'] }, label)).toBe(
+      'Failures. The Ops room channel hears of failures and questions. The pager channel hears of questions.',
+    );
   });
 
   it('says who decided a question while the person was away', () => {

@@ -16,6 +16,8 @@
 // it. A problem of the front that names a field shows beside the field,
 // and one with no field shows at the top. Make this a duty opens the form
 // with the agent and the message of a chat or a bridge, from the address.
+// Tell me about also offers the shared channels of the operator, from GET
+// /v1/notifications, and keeps a shared channel that the duty names.
 
 import type { RefObject } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
@@ -39,6 +41,8 @@ import {
   actOf,
   applyPreset,
   checkOf,
+  channelWords,
+  channelsIn,
   checkWords,
   chipText,
   domOf,
@@ -78,7 +82,7 @@ import {
 import { useSelect } from '../state/store';
 import { membersOf } from '../state/reducer';
 import { loadBridge } from '../state/actions';
-import { FALLBACK, loadDuties, loadDutyOptions, loadDuty, saveDuty, useDuties } from '../state/duties';
+import { FALLBACK, loadDuties, loadDutyOptions, loadDuty, loadSharedChannels, saveDuty, useDuties } from '../state/duties';
 import { showError } from './notice';
 import { Confirm } from './common';
 import { Picker } from './Picker';
@@ -426,6 +430,7 @@ export function DutyEditor({ name, seed }: { name?: string; seed?: DutySeed }) {
   const [failed, setFailed] = useState('');
   useEffect(() => {
     loadDutyOptions().catch(() => {});
+    loadSharedChannels().catch(() => {});
     if (name) loadDuty(name).catch((e) => setFailed(messageOf(e)));
     else loadDuties().catch(() => {});
   }, [name]);
@@ -465,6 +470,7 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
   const list = useDuties((s) => s.list);
   const options = useDuties((s) => s.options) || FALLBACK;
   const loaded = useDuties((s) => !!s.options);
+  const shared = useDuties((s) => s.shared);
   const [f, setF] = useState<DutyForm>(() => (base ? formOf(base, zone) : seededForm(seed, zone)));
   const [errors, setErrors] = useState<FormErrors | null>(null);
   const [problems, setProblems] = useState<Problems>({});
@@ -496,6 +502,14 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
   const baseAct = base ? actOf(base.do) : '';
   const acts = useMemo(() => (['ask', 'post', 'open', 'manager'] as Act[]).filter((a) => options.actions.includes(a) || a === baseAct || a === 'ask'), [options, baseAct]);
   const lookOn = options.looks.length > 0 || hasCheck(f.check);
+  // The shared channels of the operator, and each one that the duty names, so an edit keeps it.
+  const tellTo = useMemo(() => {
+    const out = (shared || []).map((c) => ({ name: c.name, words: channelWords(c.label || c.name) }));
+    const held = base && base.notify ? [...channelsIn(base.notify.failure), ...channelsIn(base.notify.needsYou)] : [];
+    for (const n of held) if (!out.some((c) => c.name === n)) out.push({ name: n, words: channelWords(n) });
+    return out;
+  }, [shared, base]);
+  const toggle = (list: string[], name: string, on: boolean) => (on ? [...list.filter((x) => x !== name), name] : list.filter((x) => x !== name));
 
   // An action that Make this a duty brought and that the front does not serve becomes Ask the agent, with the same message.
   useEffect(() => {
@@ -917,7 +931,12 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
             <h2 class="t-sub duty-sec-head" id="duty-tell-head">
               Tell me about
             </h2>
-            <div role="group" aria-labelledby="duty-tell-head">
+            <div role="group" aria-labelledby={tellTo.length ? 'duty-tell-you' : 'duty-tell-head'}>
+              {tellTo.length > 0 && (
+                <p class="t-meta duty-tell-name" id="duty-tell-you">
+                  You
+                </p>
+              )}
               <label class="check">
                 <input type="checkbox" checked={f.failures} onChange={(e) => patch({ failures: (e.target as HTMLInputElement).checked })} />
                 <span>Failures</span>
@@ -927,6 +946,21 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
                 <span>Questions</span>
               </label>
             </div>
+            {tellTo.map((c, i) => (
+              <div role="group" aria-labelledby={'duty-tell-' + i}>
+                <p class="t-meta duty-tell-name" id={'duty-tell-' + i}>
+                  {c.words}
+                </p>
+                <label class="check">
+                  <input type="checkbox" checked={f.channelFailures.includes(c.name)} onChange={(e) => patch({ channelFailures: toggle(f.channelFailures, c.name, (e.target as HTMLInputElement).checked) })} />
+                  <span>Failures</span>
+                </label>
+                <label class="check">
+                  <input type="checkbox" checked={f.channelQuestions.includes(c.name)} onChange={(e) => patch({ channelQuestions: toggle(f.channelQuestions, c.name, (e.target as HTMLInputElement).checked) })} />
+                  <span>Questions</span>
+                </label>
+              </div>
+            ))}
             <Said list={pr.tell} />
           </section>
 

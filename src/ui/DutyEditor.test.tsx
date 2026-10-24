@@ -522,3 +522,57 @@ describe('Check first', () => {
     expect(text(el.querySelector('.duty-found > p'))).toBe('Now: 2 items. They would wake migrator.');
   });
 });
+
+describe('Tell me about', () => {
+  const DUTY: Duty = {
+    name: 'nightly-restore',
+    agent: 'migrator',
+    when: { schedule: { repeat: 'daily', times: ['02:00'], timeZone: 'UTC' } },
+    do: { ask: { message: 'Restore last night and check it.' } },
+    limits: { budget: { maxCostUSD: 0.5 }, overlap: 'skip', catchUp: '1h' },
+    whileAway: { decider: 'manager', timeout: '2h', then: 'deny' },
+    notify: { failure: ['owner', 'channel:pager'], needsYou: ['owner'] },
+    source: 'store',
+    revision: 2,
+    readback: 'Every day at 2:00 AM, UTC.',
+  };
+  const tell = (el: HTMLElement) =>
+    [...el.querySelectorAll('section[aria-labelledby="duty-tell-head"] [role="group"]')].map((g) => [
+      text(document.getElementById(g.getAttribute('aria-labelledby')!)),
+      [...g.querySelectorAll<HTMLInputElement>('input')].map((i) => i.closest('label')!.textContent + (i.checked ? ' on' : ' off')),
+    ]);
+
+  it('offers the shared channels of the operator by their label, keeps a channel that the duty names, and stores each as channel:<name>', async () => {
+    location.hash = '#duties/nightly-restore/edit';
+    api = fakeApi({
+      'GET /v1/notifications': { channels: [], quietHours: { from: '', to: '', timeZone: 'UTC' }, shared: [{ name: 'ops-room', kind: 'slack', label: 'Ops room' }] },
+      'GET /v1/duties': { duties: [DUTY], paused: false },
+      'GET /v1/duties/nightly-restore': { ...DUTY, history: [] },
+      'PUT /v1/duties/nightly-restore?dryRun=true': dry(),
+      'PUT /v1/duties/nightly-restore': (c: Call) => ({ body: { ...DUTY, ...(c.body as object) } }),
+    });
+    const el = mount(<DutyEditor name="nightly-restore" />);
+    await settle();
+    expect(tell(el)).toEqual([
+      ['You', ['Failures on', 'Questions on']],
+      ['The Ops room channel', ['Failures off', 'Questions off']],
+      ['The pager channel', ['Failures on', 'Questions off']],
+    ]);
+    const room = el.querySelector('[aria-labelledby="duty-tell-0"]')!;
+    click([...room.querySelectorAll('input')][1]);
+    click([...el.querySelector('[aria-labelledby="duty-tell-1"]')!.querySelectorAll('input')][0]);
+    click(keyNamed(el, 'Save duty'));
+    await settle();
+    click(keyNamed(document.querySelector('dialog.confirm')!, 'Save duty'));
+    await settle();
+    const saved = puts().find((c) => c.path === '/v1/duties/nightly-restore')!;
+    expect((saved.body as DutyRecord).notify).toEqual({ failure: ['owner'], needsYou: ['owner', 'channel:ops-room'] });
+  });
+
+  it('shows only the switches of the person when the front lists no shared channel', async () => {
+    api = fakeApi({ 'GET /v1/duties': { duties: [], paused: false }, 'PUT /v1/duties/new?dryRun=true': dry() });
+    const el = mount(<DutyEditor />);
+    await settle();
+    expect(tell(el)).toEqual([['Tell me about', ['Failures on', 'Questions on']]]);
+  });
+});

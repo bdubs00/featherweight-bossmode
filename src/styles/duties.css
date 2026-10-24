@@ -464,6 +464,11 @@
 .duty-dates > .check {
   align-self: flex-start;
 }
+/* The name of each group of Tell me about: You, and each shared channel. */
+.duty-tell-name {
+  margin-top: var(--s-2);
+  font-weight: 600;
+}
 .duty-to .checks {
   flex-direction: row;
   flex-wrap: wrap;
