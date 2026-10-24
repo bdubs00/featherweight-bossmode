@@ -489,7 +489,8 @@ export function register({ on, refuse, readJson, now, AGENTS, admin, S, publish 
       limits: { budget: { maxCostUSD: 0.5, maxTurns: 40 }, perDayUSD: 2, overlap: 'skip', catchUp: '1h', retries: 1 },
       revision: 7,
     },
-    runsOf(24 * 60, 6, (i, at) => ({ at, slot: at, run: 'duty-notes-' + i, state: 'completed', costUSD: 0.11 + i / 100 })),
+    // The last start failed and goes again. Its first run failed, so the start names none until the next attempt.
+    [{ at: ago(4), slot: ago(4), run: '', state: 'retrying', costUSD: 0.03, attempt: 1, reason: 'The run failed: the model answered 529 overloaded. It goes again.' }, ...runsOf(24 * 60, 6, (i, at) => ({ at: ago((i + 1) * 24 * 60 + 7), slot: at, run: 'duty-notes-' + i, state: 'completed', costUSD: 0.11 + i / 100 }))],
   );
   add(
     {
@@ -559,7 +560,8 @@ export function register({ on, refuse, readJson, now, AGENTS, admin, S, publish 
       limits: { budget: { maxCostUSD: 0.3, maxTurns: 30 }, overlap: 'queue', catchUp: '1h' },
       revision: 2,
     },
-    [],
+    // The queue never took the run of the last start, so the start and its failure name no run.
+    [{ at: ago(40), slot: ago(40), run: '', state: 'failed', start: 'event', reason: 'The queue of reviewer did not take the run: the queue is full.' }],
   );
   // The run of the restore test waits for an answer, on no bridge, so Activity shows its card.
   const waiting = D.get('nightly-restore-test').history[0];
