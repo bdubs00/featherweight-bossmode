@@ -12,7 +12,8 @@
 //                                           The draft of a duty without a name is new. A save refuses new and options.
 //   PATCH  /v1/duties/{name}                {"paused"}
 //   DELETE /v1/duties/{name}                204
-//   POST   /v1/duties/{name}/run            202 {"run"}, or 200 {"skipped"} while the last run works
+//   POST   /v1/duties/{name}/run            202 {"run"}, 202 {"run": ""} for a duty that posts or opens a bridge,
+//                                           or 200 {"skipped"} while the last run works
 //   POST   /v1/duties/{name}/write-check    {"words", "agent"}: {"checkFirst", "readback", "check"} after a few
 //                                           seconds. 400 {"problems"} for no words or no agent. 422 with the reason
 //                                           in error, and the record that the agent tried for words about a queue.
@@ -634,8 +635,15 @@ export function register({ on, refuse, readJson, now, AGENTS, admin, S, publish 
     const d = find(raw);
     const last = d.history[0];
     if ((d.limits.overlap || 'skip') === 'skip' && last && ['running', 'queued', 'input-required'].includes(last.state)) return { skipped: 'The last run still works.' };
-    const id = 'duty-run-' + ++runN + '-' + Date.now().toString(36);
     const at = now();
+    // A duty that posts in a bridge or opens one starts no run of an agent: the answer names an empty run, and the history says what it did.
+    if (d.do.post || d.do.open) {
+      const bridge = d.do.post ? S.bridges.get(d.do.post.bridge) : null;
+      d.history.unshift({ at, slot: at, run: '', state: 'completed', reason: d.do.post ? 'Posted in ' + (bridge ? bridge.title : 'the bridge') + '.' : 'Opened a bridge from the playbook ' + d.do.open.playbook + '.' });
+      c.status = 202;
+      return { run: '' };
+    }
+    const id = 'duty-run-' + ++runN + '-' + Date.now().toString(36);
     const entry = { at, slot: at, run: id, state: 'running', costUSD: 0 };
     d.history.unshift(entry);
     const x = d.do || {};

@@ -285,8 +285,12 @@ function useCanChange(d: Duty | undefined): boolean {
   });
 }
 
-/** What Run now said: the run that started, or why the duty skipped. */
-type Said = { run: string } | { skipped: string } | null;
+/**
+ * What Run now said: the run that started, a start with no run of an agent
+ * (a duty that posts in a bridge or opens one answers an empty run), or
+ * why the duty skipped.
+ */
+type Said = { run: string } | { started: true } | { skipped: string } | null;
 
 /** DutyView is the page of one duty: what it does, when, its limits, and its history, with Run now, Pause, Edit, and Delete. */
 function DutyView({ name }: { name: string }) {
@@ -350,7 +354,7 @@ function DutyView({ name }: { name: string }) {
     run(async () => {
       setSaid(null);
       const r = await runDutyNow(name);
-      setSaid(r.run ? { run: r.run } : { skipped: r.skipped || 'The duty started no run.' });
+      setSaid(r.run ? { run: r.run } : r.skipped ? { skipped: r.skipped } : typeof r.run === 'string' ? { started: true } : { skipped: 'The duty started no run.' });
     });
   const items = canChange && !fromFile ? [{ label: 'Delete', danger: true, onSelect: () => setAsking(true) }] : [];
   const next = (d.next || []).slice(0, 5);
@@ -384,6 +388,8 @@ function DutyView({ name }: { name: string }) {
               <>
                 A run started. <a href={runHref(said.run)}>Open the run</a>
               </>
+            ) : 'started' in said ? (
+              'Started. See the history for what it did.'
             ) : (
               'Skipped: ' + said.skipped
             )}

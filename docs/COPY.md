@@ -840,6 +840,7 @@ template, payload, webhook, and JSON. A word in brackets, such as
 
 | Now | Verdict | New text | Who |
 |---|---|---|---|
+| new | add | `Started. See the history for what it did.` after Run now of a duty that posts in a bridge or opens one, with no link | done |
 | the title of a duty of another action | change | `<agent> posts in <bridge>` and ` to <handles>`, `<agent> opens a bridge from the playbook <title>`, or `Ask the manager`, then its message or its goal | done |
 | new | add | under a run of the history, `Decided while you were away` for a screen reader, and one line per decision: `The manager allowed <tool>: <reason>`, `The manager denied <tool>.`, `<person> stopped the run at <tool>.`, `You allowed <tool>.`, `Nobody answered in time, so <tool> was denied.`, or `Nobody answered in time, so the run stopped at <tool>.` | done |
 

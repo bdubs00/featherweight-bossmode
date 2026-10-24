@@ -273,7 +273,7 @@ describe('the page of a duty', () => {
 
   it('starts a run now and links it, and says why a duty skipped', async () => {
     let n = 0;
-    api = fakeApi({ ...one(REPORT), 'POST /v1/duties/daily-report/run': () => (++n === 1 ? { status: 202, body: { run: '01KNEW' } } : { body: { skipped: 'The last run still works.' } }) });
+    api = fakeApi({ ...one(REPORT), 'POST /v1/duties/daily-report/run': () => (++n === 1 ? { status: 202, body: { run: '01KNEW' } } : n === 2 ? { body: { skipped: 'The last run still works.' } } : { status: 202, body: { run: '' } }) });
     const el = mount(<DutyMain name="daily-report" />);
     await settle();
     click(keyNamed(el, 'Run now'));
@@ -286,6 +286,11 @@ describe('the page of a duty', () => {
     click(keyNamed(el, 'Run now'));
     await settle();
     expect(text(el.querySelector('.duty-said'))).toBe('Skipped: The last run still works.');
+    // A duty that posts in a bridge or opens one starts no run of an agent: the answer names an empty run.
+    click(keyNamed(el, 'Run now'));
+    await settle();
+    expect(text(el.querySelector('.duty-said'))).toBe('Started. See the history for what it did.');
+    expect(el.querySelector('.duty-said a')).toBeNull();
   });
 
   it('pauses and resumes a duty', async () => {
