@@ -148,6 +148,20 @@ describe('routes', () => {
     expect(parentOf({ place: 'duties' })).toEqual({ place: 'home' });
   });
 
+  it('keeps what Make this a duty brought in a short query after #duties/new, so a reload keeps it', () => {
+    const r: Route = { place: 'duties', fresh: true, seed: { agent: 'scribe', act: 'ask', message: 'Write the notes of today / tomorrow & more.' } };
+    const h = hrefOf(r);
+    expect(h).toBe('#duties/new?agent=scribe&do=ask&message=Write+the+notes+of+today+%2F+tomorrow+%26+more.');
+    expect(parseRoute(h)).toEqual(r);
+    expect(parseRoute('#duties/new?agent=x&do=open&playbook=weekly-patching')).toEqual({ place: 'duties', fresh: true, seed: { agent: 'x', act: 'open', playbook: 'weekly-patching' } });
+    expect(parseRoute('#duties/new?do=nonsense&bridge=b1')).toEqual({ place: 'duties', fresh: true, seed: { bridge: 'b1' } });
+    expect(parseRoute('#duties/new?')).toEqual({ place: 'duties', fresh: true });
+    expect(columnOf(r)).toBe('main');
+    // A long message is cut, so the address stays short.
+    const long = hrefOf({ place: 'duties', fresh: true, seed: { message: 'x'.repeat(5000) } });
+    expect((parseRoute(long) as { seed: { message: string } }).seed.message.length).toBe(2000);
+  });
+
   it('adds the slash that the sign-in needs to the path of the page', () => {
     expect(canonicalPath('/bossmode')).toBe('/bossmode/');
     expect(canonicalPath('/bossmode/')).toBe('/bossmode/');

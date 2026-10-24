@@ -6,10 +6,12 @@
 // workers, the default, or a fresh sandbox per seat, which needs a manager.
 // The record goes to POST /v1/bridges, and the key says Open bridge. A job
 // for the manager goes to the conversation of the manager, where the plan
-// of the seats will appear, and the key says Ask the manager.
+// of the seats will appear, and the key says Ask the manager. A person with
+// playbooks can start from one: it fills the goal, the seats, the
+// placement, the caps, and what the manager can do.
 
 import { useEffect, useRef, useState } from 'preact/hooks';
-import type { Caps, Delegation, Placement } from '../api/types';
+import type { Caps, Delegation, Placement, Playbook } from '../api/types';
 import type { NewBridge as NewBridgeBody } from '../api/routes';
 import { useSelect } from '../state/store';
 import { askManager, loadAgents, openNewBridge } from '../state/actions';
@@ -20,6 +22,8 @@ import { taskOfGoal } from './seats';
 import { Picker } from './Picker';
 import { go } from '../lib/route';
 import { attempt } from './notice';
+import { loadPlaybooks, readPlaybook, seatsOf, usePlaybooks } from '../state/playbooks';
+import { PlaybookPick } from './Playbooks';
 import { Advanced, Button, Choices, Field, IconButton, Input, Mark, PaneHeader, TextArea } from './primitives';
 
 /** One seat of the form. task follows the goal until the person changes it. */
@@ -127,6 +131,21 @@ export function askOf(f: BridgeForm, defaultPlacement: Placement = 'queue'): str
 
 let seatKey = 0;
 
+/** bridgeFormOf fills the form from a playbook: its goal, its seats, its placement, its caps, and what the manager can do. The title stays. */
+export function bridgeFormOf(p: Playbook, f: BridgeForm): BridgeForm {
+  const caps: BridgeForm['caps'] = {};
+  for (const [k] of CAPS) if (p.caps && typeof p.caps[k] === 'number' && p.caps[k]! > 0) caps[k] = String(p.caps[k]);
+  return {
+    ...f,
+    goal: p.goal || '',
+    mode: 'pick',
+    seats: seatsOf(p).map((x) => ({ key: ++seatKey, agent: x.agent, handle: x.handle, task: x.task, own: true })),
+    placement: p.placement === 'spawn' || p.placement === 'queue' ? p.placement : f.placement,
+    caps,
+    delegation: { ...f.delegation, ...(p.delegation || {}) },
+  };
+}
+
 export function NewBridge() {
   const agents = useSelect((s) => s.agents);
   const config = useSelect((s) => s.config);
@@ -148,11 +167,25 @@ export function NewBridge() {
   const [errors, setErrors] = useState<ReturnType<typeof bridgeErrors> | null>(null);
   const first = useRef<HTMLTextAreaElement>(null);
   const max = (config && config.maxMembers) || 16;
+  const books = usePlaybooks((s) => s.list);
+  const [from, setFrom] = useState('');
 
   useEffect(() => {
     if (!agents) attempt(loadAgents);
+    loadPlaybooks().catch(() => {});
     if (first.current) first.current.focus();
   }, []);
+
+  /** startFrom fills the form from a playbook that the person picked. */
+  const startFrom = async (name: string) => {
+    setFrom(name);
+    if (!name) return;
+    await attempt(async () => {
+      const p = await readPlaybook(name);
+      setF((x) => bridgeFormOf(p, x));
+      setErrors(null);
+    });
+  };
 
   const patch = (p: Partial<BridgeForm>) => {
     setF((x) => ({ ...x, ...p }));
@@ -200,6 +233,7 @@ export function NewBridge() {
       <PaneHeader id="new-title" title="Open a bridge" size="title" level={1} back={{ href: '#', label: 'Bridges', to: 'list' }} />
       <form class="scroll pad" onSubmit={submit} noValidate>
         <div class="make">
+          {books && books.length > 0 && <PlaybookPick value={from} onChange={startFrom} label="Start from a playbook" empty="No playbook" />}
           <Field label="What is the job?" error={err.goal}>
             <TextArea ref={first} rows={3} value={f.goal} invalid={!!err.goal} placeholder="Migrate the logrotate module to an Ansible role, and review it." onInput={(e) => setGoal((e.target as HTMLTextAreaElement).value)} />
           </Field>

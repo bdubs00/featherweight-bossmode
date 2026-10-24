@@ -86,7 +86,7 @@ describe('the channel', () => {
     expect(tabs[2].querySelector('.chip-amber .sr')!.textContent).toBe('1 decision waits');
     expect([...el.querySelectorAll('.pane-actions button')].map((b) => b.textContent || b.getAttribute('aria-label'))).toEqual(['Close bridge', 'More']);
     act(() => (el.querySelector('button[aria-label="More"]') as HTMLButtonElement).click());
-    expect([...el.querySelectorAll('[role="menuitem"]')].map((x) => x.textContent)).toEqual(['What the manager can do']);
+    expect([...el.querySelectorAll('[role="menuitem"]')].map((x) => x.textContent)).toEqual(['What the manager can do', 'Save as playbook', 'Make this a duty']);
   });
 
   it('folds the system lines and the agent chatter, and opens a fold in place', async () => {
@@ -224,7 +224,7 @@ describe('the channel', () => {
     expect([...el.querySelectorAll('.pane-actions button')].map((b) => b.textContent || b.getAttribute('aria-label'))).toEqual(['More']);
     expect(el.querySelector('.pane-actions a.collapsed-only')!.getAttribute('href')).toBe('#bridge/b-chan/roster');
     act(() => (el.querySelector('button[aria-label="More"]') as HTMLButtonElement).click());
-    expect([...el.querySelectorAll('[role="menuitem"]')].map((x) => x.textContent)).toEqual(['What the manager can do', 'Close bridge']);
+    expect([...el.querySelectorAll('[role="menuitem"]')].map((x) => x.textContent)).toEqual(['What the manager can do', 'Save as playbook', 'Make this a duty', 'Close bridge']);
     expect(el.querySelector('.pane-head .tabs')).not.toBeNull();
     unmountAll();
     width = 390;

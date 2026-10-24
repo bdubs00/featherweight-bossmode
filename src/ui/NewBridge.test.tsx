@@ -111,7 +111,8 @@ describe('NewBridge', () => {
     const alerts = [...el.querySelectorAll('[role="alert"]')].map((x) => x.textContent);
     expect(alerts).toContain('Write the goal of the bridge.');
     expect(alerts).toContain('Member 1 needs an agent.');
-    expect(api.calls).toEqual([]);
+    // The form reads the playbooks of the person, and sends nothing.
+    expect(api.calls.filter((c) => c.method !== 'GET')).toEqual([]);
   });
 
   it('hands the job to the manager when the manager splits it', async () => {

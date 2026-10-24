@@ -1,5 +1,6 @@
 // The channel of the open bridge. The header holds the title, the tabs
-// Posts, Wiki, and Decisions, the key Close bridge, and the menu More. Posts
+// Posts, Wiki, and Decisions, the key Close bridge, and the menu More. More
+// also saves the bridge as a playbook, and makes it a duty. Posts
 // opens at the recent end of the channel, folds runs of system lines and of
 // agent chatter, and ends with the capacity line when the seats outnumber
 // the workers. Earlier messages reads the page in front and keeps the entry
@@ -15,7 +16,7 @@ import { membersOf, type Channel as ChannelState, type Roster } from '../state/r
 import { questionWaits } from '../state/inbox';
 import { senderName, since } from '../lib/words';
 import { decidedRuns, hiddenLine } from '../lib/lines';
-import { hrefOf, type BridgeTab } from '../lib/route';
+import { go, hrefOf, type BridgeTab } from '../lib/route';
 import { useRoving, smooth } from './keys';
 import { attempt } from './notice';
 import { refusalOf } from '../lib/attachments';
@@ -28,6 +29,7 @@ import { wavesLine } from './seats';
 import { Button, Chip, Led, LineLed, Mark, PaneHeader, Tabs, countText } from './primitives';
 import { byName } from './Pages';
 import { Glyph } from './icons';
+import { SavePlaybook } from './Playbooks';
 
 /** Delegations is the dialog of what the manager can do in this bridge. */
 function Delegations({ id, value, onClose }: { id: string; value: Delegation; onClose: () => void }) {
@@ -464,7 +466,12 @@ export function Channel({ id, tab: tabProp }: { id: string; tab?: BridgeTab }) {
   const waiting = useSelect((s) => waitingCards(s.channels[id], s.rosters[id]));
   const firstLoaded = useSelect((s) => (s.channels[id] ? s.channels[id].prev === 0 : false));
   const tab: BridgeTab = tabProp || 'posts';
-  const [confirm, setConfirm] = useState<'close' | 'delegation' | null>(null);
+  const [confirm, setConfirm] = useState<'close' | 'delegation' | 'playbook' | 'duty' | null>(null);
+  // The agent of the first seat does a duty that Make this a duty starts from the bridge.
+  const firstAgent = useSelect((s) => {
+    const m = membersOf(s.rosters[id]).find((x) => x && !x.fired);
+    return m ? m.agent : '';
+  });
   // Below 1500 pixels, Close bridge moves into More, so the title keeps
   // the room beside the tabs. In a narrow window, or where the members
   // pane leaves the channel cramped, the tabs take a strip of their own,
@@ -571,6 +578,9 @@ export function Channel({ id, tab: tabProp }: { id: string; tab?: BridgeTab }) {
               label="More"
               items={[
                 { label: 'What the manager can do', onSelect: () => setConfirm('delegation') },
+                { label: 'Save as playbook', onSelect: () => setConfirm('playbook') },
+                // A closed bridge becomes a duty that opens a bridge from its playbook. An open one becomes a duty that posts in it.
+                { label: 'Make this a duty', onSelect: () => (closed ? setConfirm('duty') : go({ place: 'duties', fresh: true, seed: { agent: firstAgent, act: 'post', bridge: id } })) },
                 ...(closed ? [{ label: 'Reopen', onSelect: () => attempt(() => patchBridge(id, { state: 'open' })) }] : wide ? [] : [{ label: 'Close bridge', danger: true, onSelect: () => setConfirm('close') }]),
               ]}
             />
@@ -600,6 +610,10 @@ export function Channel({ id, tab: tabProp }: { id: string; tab?: BridgeTab }) {
         </Confirm>
       )}
       {confirm === 'delegation' && <Delegations id={id} value={b.delegation} onClose={() => setConfirm(null)} />}
+      {confirm === 'playbook' && <SavePlaybook bridge={id} onClose={() => setConfirm(null)} />}
+      {confirm === 'duty' && (
+        <SavePlaybook bridge={id} confirm="Save and make a duty" onClose={() => setConfirm(null)} onSaved={(name) => go({ place: 'duties', fresh: true, seed: { agent: firstAgent, act: 'open', playbook: name } })} />
+      )}
     </section>
   );
 }
