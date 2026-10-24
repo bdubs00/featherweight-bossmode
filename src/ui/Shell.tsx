@@ -18,6 +18,7 @@ import { selectFacts } from '../state/reducer';
 import { selectAttention } from '../state/inbox';
 import { Glyph, type GlyphName } from './icons';
 import { Avatar, Chip, LogoWell, Led, countText } from './primitives';
+import { Notifications } from './Notifications';
 
 /* ---------- the logo of the deployment ---------- */
 
@@ -86,13 +87,16 @@ const THEMES: [ThemeChoice, string][] = [
 
 /**
  * AccountMenu is the account key at the foot of the app bar: the name of
- * the person, the theme, Connections, and Sign out. ArrowUp and ArrowDown
- * move in the menu, and Escape closes it and gives the focus back.
+ * the person, the theme, Notifications, Connections, and Sign out. ArrowUp
+ * and ArrowDown move in the menu, and Escape closes it and gives the focus
+ * back. Notifications opens a dialog, which gives the focus back to the
+ * account key when it closes.
  */
 function AccountMenu({ onSignOut }: { onSignOut: () => void }) {
   const me = useSelect((s) => s.me);
   const choice = useChoice();
   const [open, setOpen] = useState(false);
+  const [notify, setNotify] = useState(false);
   const btn = useRef<HTMLButtonElement>(null);
   const list = useRef<HTMLDivElement>(null);
   const subject = (me && me.principal && me.principal.subject) || '';
@@ -157,6 +161,16 @@ function AccountMenu({ onSignOut }: { onSignOut: () => void }) {
             </button>
           ))}
           <div class="menu-sep" role="separator" />
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              close();
+              setNotify(true);
+            }}
+          >
+            <span class="t">Notifications</span>
+          </button>
           <a role="menuitem" href="/ui#connections">
             <span class="t">Connections</span>
           </a>
@@ -172,6 +186,7 @@ function AccountMenu({ onSignOut }: { onSignOut: () => void }) {
           </button>
         </div>
       )}
+      {notify && <Notifications onClose={() => setNotify(false)} />}
     </div>
   );
 }

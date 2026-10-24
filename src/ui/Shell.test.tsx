@@ -73,12 +73,12 @@ describe('Shell', () => {
     expect(el.querySelector('.place[aria-current="page"]')!.textContent).toContain('Manager');
   });
 
-  it('opens the account menu with the theme, Connections, and Sign out', () => {
+  it('opens the account menu with the theme, Notifications, Connections, and Sign out', () => {
     const el = mount(<Shell route={{ place: 'home' }} list={null} main={<p>main</p>} details={null} onSignOut={() => {}} />);
     const key = el.querySelector('.account-key') as HTMLButtonElement;
     act(() => key.click());
     const items = [...el.querySelectorAll('[role^="menuitem"]')].map((x) => x.textContent);
-    expect(items).toEqual(['Match the system', 'Light', 'Graphite', 'Connections', 'Sign out']);
+    expect(items).toEqual(['Match the system', 'Light', 'Graphite', 'Notifications', 'Connections', 'Sign out']);
     expect(el.querySelector('[role="menuitemradio"][aria-checked="true"]')!.textContent).toBe('Match the system');
   });
 });
