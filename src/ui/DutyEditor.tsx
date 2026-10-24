@@ -863,7 +863,7 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
               <Field label="The most a run can cost" error={joinError(err.cost, pr.cost)}>
                 <span class="duty-money">
                   <span aria-hidden="true">$</span>
-                  <Input inputMode="decimal" value={f.cost} invalid={!!(err.cost || pr.cost)} placeholder="0.50" onInput={(e) => patch({ cost: (e.target as HTMLInputElement).value })} />
+                  <Input inputMode="decimal" value={f.cost} invalid={!!(err.cost || pr.cost)} placeholder="Required, such as 0.50" onInput={(e) => patch({ cost: (e.target as HTMLInputElement).value })} />
                 </span>
               </Field>
               <Field label="Most turns" error={joinError(err.turns, pr.turns)}>

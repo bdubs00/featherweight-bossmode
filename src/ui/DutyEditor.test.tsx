@@ -109,8 +109,10 @@ describe('New duty', () => {
     expect(put.path).toBe('/v1/duties/new?dryRun=true');
     expect(put.headers['X-Time-Zone']).toBe(ZONE);
     expect((put.body as DutyRecord).when).toEqual({ schedule: WEEKDAYS });
-    // No silent cost: the record goes out with no budget of its own.
+    // No silent cost: the record goes out with no budget of its own, and the field says that it needs one.
     expect((put.body as DutyRecord).limits.budget).toEqual({});
+    expect(fieldOf(el, 'The most a run can cost')!.value).toBe('');
+    expect(fieldOf(el, 'The most a run can cost')!.placeholder).toBe('Required, such as 0.50');
     const box = el.querySelector('.duty-readback-box')!;
     expect(text(box.querySelector('.duty-readback'))).toBe(READBACK);
     expect([...box.querySelectorAll('.duty-next li')].map(text)).toEqual(NEXT.slice(0, 5).map(nextWords));

@@ -314,7 +314,7 @@ export function ChannelDialog({
                 <Field label="The most a message can cost" error={err('cost')}>
                   <span class="duty-money">
                     <span aria-hidden="true">$</span>
-                    <Input inputMode="decimal" value={f.cost} invalid={!!err('cost')} placeholder="0.02" onInput={(e) => set({ cost: (e.target as HTMLInputElement).value })} />
+                    <Input inputMode="decimal" value={f.cost} invalid={!!err('cost')} placeholder="Required, such as 0.02" onInput={(e) => set({ cost: (e.target as HTMLInputElement).value })} />
                   </span>
                 </Field>
               </>

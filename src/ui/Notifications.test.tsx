@@ -264,6 +264,7 @@ describe('Add a place', () => {
     expect(field(place(), 'How should it reach you?')).toBeTruthy();
     // No budget by default: the person writes the most a message can cost.
     expect(control(place(), 'The most a message can cost').value).toBe('');
+    expect(control(place(), 'The most a message can cost').placeholder).toBe('Required, such as 0.02');
     typeIn(control(place(), 'Name'), 'Signal');
     act(() => {
       agent.value = 'relay';
