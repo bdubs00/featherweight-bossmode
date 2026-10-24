@@ -860,7 +860,7 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
               Limits
             </h2>
             <div class="field-row">
-              <Field label="The most a run can cost" error={joinError(err.cost, pr.cost)}>
+              <Field label="The most a run can cost" error={joinError(err.cost, pr.cost)} class="duty-cost">
                 <span class="duty-money">
                   <span aria-hidden="true">$</span>
                   <Input inputMode="decimal" value={f.cost} invalid={!!(err.cost || pr.cost)} placeholder="Required, such as 0.50" onInput={(e) => patch({ cost: (e.target as HTMLInputElement).value })} />

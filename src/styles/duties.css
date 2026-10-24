@@ -427,6 +427,10 @@
   font-weight: 600;
   color: var(--muted);
 }
+/* The cost is wide enough for its placeholder, Required, such as 0.50, so on a phone it takes a line of its own. */
+.field-row > .field.duty-cost {
+  flex-basis: 200px;
+}
 
 /* A filter of a check: a field, a test, and a value. On a phone the value
    takes a line of its own, so no control gets too narrow to read. */
