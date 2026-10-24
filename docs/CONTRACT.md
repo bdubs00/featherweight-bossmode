@@ -1252,7 +1252,7 @@ front reads the words of a person in that zone. A schedule without
 | `POST /v1/notifications/test` | The body `{}`, from Send a test, after a save of a change. 200 `{"sent": true}` says `Sent. Look for it on your phone.` 502 `{"error"}` says `The test failed.` and the error. |
 | `GET /v1/playbooks` | `{"playbooks": [{"name", "goal", "placement", "seats", "revision", "owner", "updatedAt"}]}`, newest change first. New bridge, the action open of a duty, and Save as playbook read it. A 404 means that the front keeps no playbooks: New bridge offers none, and the action open says `This workbench keeps no playbooks.` |
 | `GET /v1/playbooks/{name}` | The playbook with `caps` and `delegation`. New bridge reads it to fill its form. |
-| `PUT /v1/playbooks/{name}` | The body of `POST /v1/bridges` without the title: `{"goal", "placement", "members", "caps", "delegation"}`, and `revision` when the name holds a playbook already. Save as playbook in the menu More of a bridge sends it. A 409 says `This playbook changed since you opened it. Try again.` A 400 `{"problems"}` shows under the name. |
+| `PUT /v1/playbooks/{name}` | `{"goal", "placement", "seats", "caps", "delegation"}`: the form of New bridge without the title, with its seats as `seats`, each `{"handle", "agent", "task"}`, and `revision` when the name holds a playbook already. The front refuses an unknown field, such as `members`, with 400. Save as playbook in the menu More of a bridge sends it. A 409 says `This playbook changed since you opened it. Try again.` A 400 `{"problems"}` shows under the name. |
 | `DELETE /v1/playbooks/{name}` | 204. Delete, in the list See the playbooks of the action open, after a dialog that asks first. |
 | `GET /v1/inbox` | `{"items": [{"kind", "run", "duty", "agent", "bridge", "text", "since"}]}`, `kind` `approval`, `question`, `failure`, or `paused`. Activity reads it when it opens, each minute while it shows, and after a reset of the stream. See the rules of Activity below. |
 
@@ -1408,10 +1408,6 @@ comes last.
 
 **Open:** a duty named `options` meets the route `GET /v1/duties/options`.
 The front can refuse that name, or the route can move.
-
-**Open:** `GET /v1/playbooks` answers `seats`, and `PUT` takes the body of
-`POST /v1/bridges`, which names them `members`. The page sends `members`
-and reads `seats`, or `members` where a read holds them.
 
 **Open:** the shape of the notifications names no way to turn quiet hours
 off. The page sends two empty times.

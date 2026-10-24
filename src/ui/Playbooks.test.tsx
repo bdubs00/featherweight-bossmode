@@ -55,7 +55,7 @@ describe('a playbook from a bridge', () => {
     expect(playbookBodyOf(B, MEMBERS)).toEqual({
       goal: 'Migrate the Puppet modules to Ansible.',
       placement: 'queue',
-      members: [
+      seats: [
         { handle: 'migrator-1', agent: 'migrator', task: 'Migrate cron.' },
         { handle: 'reviewer', agent: 'reviewer', task: 'Review.' },
       ],
@@ -82,6 +82,8 @@ describe('a playbook from a bridge', () => {
     const put = api.calls.find((c) => c.method === 'PUT' && c.path.startsWith('/v1/playbooks/'))!;
     expect(put.path).toBe('/v1/playbooks/puppet-to-ansible');
     expect(put.body).toEqual(playbookBodyOf(B, MEMBERS));
+    // The front refuses an unknown field, so the seats go as seats and never as members.
+    expect('members' in (put.body as object)).toBe(false);
     expect(dialog()).toBeNull();
     expect(document.activeElement!.getAttribute('aria-label')).toBe('More');
   });

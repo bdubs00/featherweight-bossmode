@@ -16,7 +16,7 @@ export function playbookBodyOf(b: Bridge, members: Member[]): PlaybookBody {
   const body: PlaybookBody = {
     goal: b.goal || '',
     placement: b.placement || 'queue',
-    members: members.filter((m) => !m.fired).map((m) => ({ handle: m.handle, agent: m.agent, task: m.task })),
+    seats: members.filter((m) => !m.fired).map((m) => ({ handle: m.handle, agent: m.agent, task: m.task })),
     delegation: { ...b.delegation },
   };
   if (Object.keys(caps).length) body.caps = caps;

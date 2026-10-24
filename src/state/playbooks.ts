@@ -86,11 +86,8 @@ export function loadPlaybooks(): Promise<void> {
   return listing;
 }
 
-/** seatsOf reads the seats of a playbook. A front that answers members in their place gives them too. */
-export function seatsOf(p: Playbook): Playbook['seats'] {
-  const x = p as Playbook & { members?: Playbook['seats'] };
-  return p.seats || x.members || [];
-}
+/** seatsOf reads the seats of a playbook. */
+export const seatsOf = (p: Playbook): Playbook['seats'] => p.seats || [];
 
 /** readPlaybook reads one playbook whole, with its caps and what the manager can do. */
 export const readPlaybook = (name: string): Promise<Playbook> => api.playbook(name);

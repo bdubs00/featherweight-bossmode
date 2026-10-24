@@ -21,7 +21,7 @@
 //   POST   /v1/notifications/test           {"sent": true}, or 502 {"error"} for no topic or a topic that holds "fail"
 //   GET    /v1/playbooks                    {"playbooks": [...]}, without caps and delegation
 //   GET    /v1/playbooks/{name}             the playbook whole
-//   PUT    /v1/playbooks/{name}             the body of POST /v1/bridges without the title, and revision: 201, 200, 400, or 409
+//   PUT    /v1/playbooks/{name}             {"goal", "placement", "seats", "caps", "delegation", "revision"}: 201, 200, 400, or 409
 //   DELETE /v1/playbooks/{name}             204
 //   GET    /v1/inbox                        {"items": [{"kind", "run", "duty", "agent", "bridge", "text", "since"}]}
 //
@@ -724,12 +724,14 @@ export function register({ on, refuse, readJson, now, AGENTS, admin, S, publish 
     const body = await readJson(c.req);
     const old = books.get(name);
     if (old && body.revision !== undefined && body.revision !== old.revision) refuse(409, `the playbook changed: revision ${old.revision} is newer than ${body.revision}`);
-    const seats = Array.isArray(body.members) ? body.members : Array.isArray(body.seats) ? body.seats : [];
+    // As the front, the fake refuses a field that a playbook does not have, such as members.
+    for (const k of Object.keys(body)) if (!['goal', 'placement', 'seats', 'caps', 'delegation', 'revision'].includes(k)) refuse(400, `json: unknown field "${k}"`);
+    const seats = Array.isArray(body.seats) ? body.seats : [];
     const problems = [];
     if (!String(body.goal || '').trim()) problems.push('goal: Write the goal of the playbook.');
-    if (!seats.length) problems.push('members: A playbook needs at least one seat.');
+    if (!seats.length) problems.push('seats: A playbook needs at least one seat.');
     seats.forEach((m, i) => {
-      if (!AGENTS.some((a) => a.name === m.agent)) problems.push(`members[${i}].agent: There is no agent ${m.agent || ''}.`);
+      if (!AGENTS.some((a) => a.name === m.agent)) problems.push(`seats[${i}].agent: There is no agent ${m.agent || ''}.`);
     });
     if (problems.length) refuse(400, problems[0].replace(/^[\w.[\]]+: /, ''), { problems });
     const p = {

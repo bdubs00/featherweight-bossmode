@@ -81,8 +81,19 @@ export interface NewBridge {
   caps?: Partial<Caps>;
 }
 
-/** The body of PUT /v1/playbooks/{name}: the body of POST /v1/bridges without the title, with the revision that the person read on a change. */
-export type PlaybookBody = Omit<NewBridge, 'title'> & { revision?: number };
+/**
+ * The body of PUT /v1/playbooks/{name}: the form of New bridge without the
+ * title, with its seats as seats, and the revision that the person read on
+ * a change. The front refuses an unknown field, such as members.
+ */
+export interface PlaybookBody {
+  goal: string;
+  placement?: Placement;
+  seats: NewMember[];
+  delegation?: Partial<Delegation>;
+  caps?: Partial<Caps>;
+  revision?: number;
+}
 
 /** A message of the person to a channel. to names the seats, and a slash command goes as skill. */
 export interface NewMessage {
