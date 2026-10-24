@@ -438,7 +438,7 @@
   align-self: stretch;
 }
 .duty-filter-row > .input {
-  flex: 1 1 8em;
+  flex: 1 1 6em;
   min-width: 0;
 }
 .duty-filter-row > select.recess {

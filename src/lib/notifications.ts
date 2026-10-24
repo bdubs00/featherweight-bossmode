@@ -22,7 +22,7 @@ export interface NotifyForm {
   timeZone: string;
 }
 
-/** notifyFormOf reads the settings into the form. Quiet hours default to 22:00 to 07:00 in the zone of the browser. */
+/** notifyFormOf reads the settings into the form. Quiet hours that are off default to 22:00 to 07:00 in the zone of the browser. */
 export function notifyFormOf(r: NotifyRead | null, zone: string): NotifyForm {
   const n = (r && r.ntfy) || { server: '', topic: '', token: '' };
   const send = (r && r.send) || { questions: true, failures: true, digest: false };
@@ -39,7 +39,8 @@ export function notifyFormOf(r: NotifyRead | null, zone: string): NotifyForm {
     quiet,
     from: quiet ? q.from : '22:00',
     to: quiet ? q.to : '07:00',
-    timeZone: q.timeZone || zone || 'UTC',
+    // Quiet hours that are off start in the zone of the browser.
+    timeZone: (quiet && q.timeZone) || zone || 'UTC',
   };
 }
 

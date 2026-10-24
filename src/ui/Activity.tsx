@@ -164,7 +164,7 @@ function DoneKey({ r, rows, fromMain, label }: { r: InboxRow; rows: InboxRow[]; 
 /* ---------- the rows ---------- */
 
 /** useInbox builds the rows of the inbox from the store, and loads the runs, the results, and the channels that they need. */
-export function useInbox(): { rows: InboxRow[]; loaded: boolean } {
+export function useInbox(): { rows: InboxRow[]; loaded: boolean; settled: boolean } {
   const bridges = useSelect((s) => s.bridges);
   const rosters = useSelect((s) => s.rosters);
   const runs = useSelect((s) => s.runs);
@@ -219,6 +219,7 @@ export function useInbox(): { rows: InboxRow[]; loaded: boolean } {
   useEffect(() => {
     if (unread) ensureChannels(unread.split(','));
   }, [unread]);
+  const lost = useSelect((s) => s.lost);
   const rows = sortInbox(inboxRows({ bridges: open, rosters, runs, channels, results, me, facts, entries, items }));
   // A question that waits and whose entry the page does not hold yet is read alone.
   const missing = rows
@@ -236,7 +237,10 @@ export function useInbox(): { rows: InboxRow[]; loaded: boolean } {
   useEffect(() => {
     if (waiting) ensureResults(waiting.split(','));
   }, [waiting, runs]);
-  return { rows, loaded: bridges.loaded && open.every((b) => !!rosters[b.id]) };
+  const loaded = bridges.loaded && open.every((b) => !!rosters[b.id]);
+  // The rows have settled once the items of the duties and the runs of their questions are in too.
+  const asked = asking ? asking.split(',').every((id) => !!runs[id] || !!lost[id]) : true;
+  return { rows, loaded, settled: loaded && items !== null && asked };
 }
 
 /** dutyHref is the address of the page of a duty. */
@@ -300,7 +304,8 @@ function rowText(r: InboxRow): string {
 
 function rowName(r: InboxRow): string {
   if (r.kind === 'message' && r.entry) return senderName(r.entry.from);
-  if (r.kind === 'duty-failed' || r.kind === 'duty-paused' || r.kind === 'duty-waits') return r.duty ? titleOfName(r.duty) : r.agent || 'A duty';
+  // A row of a duty names its agent, as a row of a seat does, and its chip names the duty.
+  if (r.kind === 'duty-failed' || r.kind === 'duty-paused' || r.kind === 'duty-waits') return r.agent || (r.duty ? titleOfName(r.duty) : 'A duty');
   return r.handle || '';
 }
 
@@ -366,7 +371,9 @@ function InboxItem({ r, on, rows }: { r: InboxRow; on: boolean; rows: InboxRow[]
 }
 
 export function ActivityList({ item }: { item?: string }) {
-  const { rows, loaded } = useInbox();
+  const { rows, loaded, settled } = useInbox();
+  const ready = useRef(settled);
+  ready.current = settled;
   const chosen = usePicked();
   const picked = item || chosen;
   const shown = useShown(item, rows);
@@ -387,13 +394,14 @@ export function ActivityList({ item }: { item?: string }) {
       lastIndex.current = i;
       return;
     }
-    if (!picked || rows.length === 0 || (settledRow && settledRow.key === picked)) return;
+    // Until the inbox has loaded, a row of the address can still come, so the list keeps it.
+    if (!picked || rows.length === 0 || !ready.current || (settledRow && settledRow.key === picked)) return;
     const next = rows[Math.min(lastIndex.current, rows.length - 1)];
     pick(next.key);
     const lost = !document.activeElement || document.activeElement === document.body;
     const el = list.current ? [...list.current.querySelectorAll<HTMLElement>('[data-key]')].find((x) => x.getAttribute('data-key') === next.key) : undefined;
     if (lost && el) el.focus();
-  }, [keyList, picked]);
+  }, [keyList, picked, settled]);
   const onKey = (e: KeyboardEvent) => {
     if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) return;
     const el = e.target as HTMLElement;
@@ -478,7 +486,6 @@ export function ActivityMain({ item }: { item?: string }) {
   const tone = waits ? 'amber' : r.kind === 'stopped' || r.kind === 'limit' || r.kind === 'duty-paused' ? 'grey' : r.status === 'error' ? 'red' : undefined;
   const word = waits ? 'needs you' : r.kind === 'stopped' ? 'stopped' : r.kind === 'limit' ? 'at its limit' : r.kind === 'duty-paused' ? 'paused' : r.kind === 'duty-failed' ? 'failed' : r.status === 'error' ? 'error' : '';
   const convo = r.bridge && r.handle && (r.kind !== 'message' || (r.entry && r.entry.from.kind === 'agent')) ? hrefOf({ place: 'member', bridge: r.bridge, handle: r.handle, tab: 'chat' }) : '';
-  const duty = !r.bridge && r.duty ? dutyHref(r.duty) : '';
   const asked = r.kind === 'asked' && r.handle ? { entry: r.entry, handle: r.handle } : null;
   return (
     <section class="screen inbox-main-pane" aria-labelledby="inbox-title">
@@ -490,17 +497,12 @@ export function ActivityMain({ item }: { item?: string }) {
         back={{ href: '#activity', label: 'Activity', to: 'list' }}
         lead={r.kind === 'message' && r.entry && r.entry.from.kind === 'person' ? <Avatar subject={r.entry.from.name || ''} display={r.entry.from.display} size={36} /> : <Mark agent={r.agent || name} size={36} label={name} halo={tone ? { tone, word } : undefined} />}
         actions={
-          convo || duty || doneOf(r) ? (
+          convo || doneOf(r) ? (
             <>
               {doneOf(r) && <DoneKey r={r} rows={rows} fromMain />}
               {convo && (
                 <Button size="s" href={convo}>
                   Open conversation
-                </Button>
-              )}
-              {duty && (
-                <Button size="s" href={duty}>
-                  Open the duty
                 </Button>
               )}
             </>

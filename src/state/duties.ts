@@ -235,7 +235,8 @@ export function loadInbox(): Promise<void> {
       .then(
         (items) => set({ ...state, inbox: items }),
         (e) => {
-          if (e instanceof ApiError && (e.status === 404 || e.status === 501)) set({ ...state, inbox: [] });
+          // A front without the route has no item. Another failure keeps the items that the page holds, or none.
+          if ((e instanceof ApiError && (e.status === 404 || e.status === 501)) || !state.inbox) set({ ...state, inbox: [] });
         },
       )
       .finally(() => (inboxing = null));

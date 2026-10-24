@@ -4,7 +4,7 @@ import { store } from '../state/store';
 import { forgetDuties } from '../state/duties';
 import { ActivityList, ActivityMain, pick } from './Activity';
 import { at, bridge, run, seat } from './testkit-b';
-import { fakeApi, keyNamed, mount, settle, unmountAll } from './testkit-c';
+import { fakeApi, mount, settle, unmountAll } from './testkit-c';
 import { currentNotice } from './notice';
 
 let api: ReturnType<typeof fakeApi>;
@@ -53,14 +53,14 @@ describe('Activity and the duties', () => {
     await settle();
     expect(rows(el).map((r) => [r.querySelector('b')!.textContent, r.querySelector('.status-word')!.textContent, r.querySelector('.inbox-text')!.textContent])).toEqual([
       ['checker', 'error', 'Stopped at 40 turns'],
-      ['Daily report', 'failed', 'The run reached its limit of turns.'],
-      ['Monthly summary', 'paused', 'Three runs in a row failed.'],
+      ['scribe', 'failed', 'The run reached its limit of turns.'],
+      ['writer', 'paused', 'Three runs in a row failed.'],
     ]);
     expect(rows(el)[1].querySelector('a.duty-chip')!.getAttribute('href')).toBe('#duties/daily-report');
     expect(el.querySelector('header .chip .sr')!.textContent).toBe('3 items');
   });
 
-  it('shows a failed run of a duty in the main pane, with Open the duty and the run', async () => {
+  it('shows a failed run of a duty in the main pane, with the chip of the duty and the run', async () => {
     api = fakeApi({ 'GET /v1/inbox': ITEMS });
     const el = mount(
       <>
@@ -70,11 +70,10 @@ describe('Activity and the duties', () => {
     );
     await settle();
     const main = el.querySelector('.inbox-main-pane')!;
-    expect(main.querySelector('h1')!.textContent).toBe('Daily report');
-    expect(keyNamed(main, 'Open the duty')!.getAttribute('href')).toBe('#duties/daily-report');
+    expect(main.querySelector('h1')!.textContent).toBe('scribe');
+    expect(main.querySelector('.pane-head a.duty-chip')!.getAttribute('href')).toBe('#duties/daily-report');
     expect(main.querySelector('.inbox-reason')!.textContent).toBe('The run reached its limit of turns.');
     expect(main.querySelector('a[href="/ui#run/run-x"]')!.textContent).toBe('Open the run');
-    expect(main.querySelector('.pane-head a.duty-chip')).toBeTruthy();
   });
 
   it('shows the card of a question of a duty that sits on no bridge, and decides it', async () => {
@@ -98,7 +97,7 @@ describe('Activity and the duties', () => {
     // The main pane shows the card, which needs no bridge.
     const main = el.querySelector('.inbox-main-pane')!;
     expect(main.querySelector('.card')).toBeTruthy();
-    expect(keyNamed(main, 'Open the duty')).toBeTruthy();
+    expect(main.querySelector('.pane-head a.duty-chip')!.textContent).toBe('Restore test');
     act(() => row.focus());
     act(() => {
       row.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
