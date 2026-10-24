@@ -1224,10 +1224,11 @@ A duty is what an agent does on its own: who, when, what, and its limits.
 The Duties place reads the routes of the duties of the workbench, after the
 contract of the build, `reports/Duties contract 2026-10-23.md`. Section 2 of
 that file names the routes, section 1 names the record, and section 10
-holds the additions of the second wave, which win over the rest.
+holds the additions of the second wave, which win over the rest. Section
+11 holds the channels of notification, which replace its section 5.
 `src/api/routes.ts` holds the calls, and `src/api/types.ts` holds the
-shapes. `fake/routes-e.mjs` serves the same shapes, with the
-notifications, the playbooks, and the inbox.
+shapes. `fake/routes-e.mjs` serves the same shapes, with the places of
+each person, the playbooks, and the inbox.
 
 Each call of a route under `/v1/duties` sends the header `X-Time-Zone`,
 with the IANA time zone of the browser, such as `America/New_York`. The
@@ -1247,9 +1248,9 @@ front reads the words of a person in that zone. A schedule without
 | `POST /v1/duties/{name}/run` | Run now, with the body `{}`. For 202 `{"run": "<id>"}`, the page says `A run started.` and links the run. A duty that posts in a bridge or opens one starts no run of an agent: for 202 `{"run": ""}`, the page says `Started. See the history for what it did.` with no link. For 200 `{"skipped": "<reason>"}`, the page shows the reason. |
 | `POST /v1/duties/{name}/write-check` | `{"words": "...", "agent": "..."}`, from the key Write the check for me. `agent` is the agent of the editor, which a duty that is not saved yet needs. For a saved duty, the front uses the agent of the duty. The key stays off until the editor has an agent. The call takes up to two minutes: the page says so, counts the seconds, and offers Cancel, which aborts the request. The answer `{"checkFirst", "readback", "check"}` fills the fields of the check. A 422 is a problem document whose `error` holds the reason, the same text as `detail`: the page shows it whole under the words. When the 422 carries `checkFirst` and `readback`, the record that the agent wrote and that did not work, the page shows them under `What <agent> tried`, as words, and does not take them into the form. A 400 carries `problems`, such as `words: ...` or `agent: ...`: a problem of the words shows under the words, and one of the agent under the agent picker of Who. A 504 says that the agent did not answer within two minutes. For a 404 or a 501, the key goes, and the fields by hand show. |
 | `PATCH /v1/duties` | `{"paused": true, "reason": "..."}` or `{"paused": false}`. This is the switch that pauses every duty. If `whoami` says `admin`, the page shows it. Before a pause, a dialog asks first. |
-| `GET /v1/notifications` | The settings of the person who is signed in: `{"ntfy": {"server", "topic", "token"}, "send": {"questions", "failures", "digest"}, "quietHours": {"from", "to", "timeZone"}, "serverDefault": "...", "off": "..."}`. `token` is `"set"` or `""`, never the token. The dialog Notifications of the account menu reads it. An empty server shows `serverDefault` as its placeholder. `off`, when the front sends it, is the reason in words that nothing goes out, and the dialog shows it above the fields. A 404 says `This workbench sends no notifications.` |
-| `PUT /v1/notifications` | The same body without `serverDefault` and `off`, from Save. `token` is `"set"` to keep the stored token, `""` to clear it (the key Remove), or a new token. Quiet hours that are off go as `"from": ""` and `"to": ""`. A 400 `{"problems": [...]}` reads as the problems of a duty: `ntfy.server`, `ntfy.topic`, `ntfy.token`, `send`, and `quietHours` show beside their fields, and a problem with no path shows above them. |
-| `POST /v1/notifications/test` | The body `{}`, from Send a test, after a save of a change. 200 `{"sent": true}` says `Sent. Look for it on your phone.` 502 `{"error"}` says `The test failed.` and the error. |
+| `GET /v1/notifications` | The settings of the person who is signed in, as section 11.1 of the contract of the build shows them: `{"channels": [<place>], "quietHours": {"from", "to", "timeZone"}, "offered": [{"kind", "label"}], "shared": [{"name", "kind", "label"}], "off": "...", "serverDefault": "..."}`. The dialog Where to reach me of the account menu reads it when it opens. `offered` names the kinds of Add a place: the page offers no other kind, and no kind that it does not know. `shared` fills the choice of a shared channel, and Tell me about of a duty. `off`, the reason in words that no place reaches the person, shows above a list that holds a place. An empty list says `Nothing goes out until you add a place. Activity always shows what needs you.` instead. `serverDefault` is the ntfy server of the front, the placeholder of an empty server. A 404 or a 501 says `This workbench sends no notifications.` |
+| `PUT /v1/notifications` | `{"channels", "quietHours"}`, without `offered`, `shared`, `off`, and `serverDefault`. Save sends the switches and the quiet hours. Add place, Save in a place, and Remove send the whole list at once, as it stands. A place holds only the fields of its kind. A new place goes without `id`, and the answer gives it one. `url`, `secret`, and `ntfy.token` go as `"set"` to keep the stored value, `""` to clear it (the key Remove of the field), or the new value. Quiet hours that are off go as `"from": ""` and `"to": ""`. An answer without `channels` makes the page read the settings again, so each place has its id. A 400 `{"problems": [...]}` names a field as `channels[<i>].<path>`, such as `channels[1].url: ...`: the text shows under the row of that place, and beside its field in Edit. A problem of `quietHours` shows beside the quiet hours, and a problem with no path, or with another path, shows at the top. In the dialog of a place, a problem of another place shows at the top, after the name of that place. |
+| `POST /v1/notifications/test` | `{"channel": "<id>"}`, from Send a test of one place, after a save of a change. The answer `{"results": [{"channel", "sent", "error"}]}` shows under the row of the place: `Sent to <name>. Look for it there.`, or `Not sent to <name>.` and the error. A 400, such as for an unknown place, says `The test failed.` and the error. The page never sends the empty body, which tests every place. |
 | `GET /v1/playbooks` | `{"playbooks": [{"name", "goal", "placement", "seats", "revision", "owner", "updatedAt"}]}`, newest change first. New bridge, the action open of a duty, and Save as playbook read it. A 404 means that the front keeps no playbooks: New bridge offers none, and the action open says `This workbench keeps no playbooks.` |
 | `GET /v1/playbooks/{name}` | The playbook with `caps` and `delegation`. New bridge reads it to fill its form. |
 | `PUT /v1/playbooks/{name}` | `{"goal", "placement", "seats", "caps", "delegation"}`: the form of New bridge without the title, with its seats as `seats`, each `{"handle", "agent", "task"}`, and `revision` when the name holds a playbook already. The front refuses an unknown field, such as `members`, with 400. Save as playbook in the menu More of a bridge sends it. A 409 says `This playbook changed since you opened it. Try again.` A 400 `{"problems"}` shows under the name. |
@@ -1424,5 +1425,58 @@ The list puts the duties in this order: a duty that needs you, a failed
 duty, a duty that works, and then the rest by their next time. A paused duty
 comes last.
 
+A place, as a read answers it. Each kind holds only its own fields:
+
+```json
+{ "id": "ha", "kind": "webhook", "label": "Home Assistant",
+  "send": { "questions": true, "failures": true, "digest": false },
+  "url": "set", "secret": "set" }
+```
+
+| `kind` | The form of the place | Checks of the page before a save |
+|---|---|---|
+| `ntfy` | `Server` (`ntfy.server`, with `serverDefault` as its placeholder), `Topic`, and `Token` (`ntfy.token`) | A topic, with no space and no slash. A server is an address. With `serverDefault` `""`, the front has no server, so the place needs one. |
+| `slack` | `Address` (`url`) | The address starts with `https://hooks.slack.com/`. |
+| `discord` | `Address` (`url`) | The address starts with `https://discord.com/api/webhooks/` or `https://discordapp.com/api/webhooks/`. |
+| `teams` | `Address` (`url`) | The address starts with `https://`. |
+| `webhook` | `Address` (`url`) and `Secret` (`secret`), with the header of the signature | The address starts with `https://`. |
+| `email` | `Email address` (`email.to`) | An email address. |
+| `agent` | `Agent` (`agent.agent`), `How should it reach you?` (`agent.how`), and `The most a message can cost` (`agent.budget.maxCostUSD`) | An agent that the person can run: an owner or an operator of it, or a role that the page cannot tell. The words. A budget above 0, which the person writes. The page fills no amount, and keeps the other limits of `agent.budget`. |
+| `shared` | `Channel` (`shared`), a choice of `shared` by label | A pick. The label of the channel fills an empty name. |
+
+The rules of the places:
+
+- Every place needs a name, its `label`.
+- A new place sends questions and failures, and no digest, until the
+  person changes the switches of the dialog.
+- A write-only field never shows its value. With a stored value it shows
+  `Saved` and the key Replace, which opens an empty field. The token of
+  ntfy and the secret of a webhook also have the key Remove, which clears
+  the value on save, and `Keep it` brings it back. The address of a place
+  has no Remove, because the place needs one: Remove of the place stops
+  it.
+- A place of a kind that the page does not know shows its name, its
+  switches, Send a test, and Remove, without Edit, and the page sends it
+  back as it came.
+- A person keeps at most 10 places. Add a place then says `You keep 10
+  places, the most there is. Remove one to add another.`
+- The keys that open a dialog, Add a place, Edit, and Remove, stay enabled
+  while a save runs, so the focus goes back to them when the dialog closes.
+  They wait for the save.
+- **New:** Tell me about of a duty reads `shared` once per load and offers
+  each shared channel by its label, such as `The Ops room channel`, with
+  Failures and Questions. A check stores `channel:<name>` in `failure` or
+  `needsYou` of `notify`. A shared channel that the duty names and the
+  settings no longer list shows with its name, so an edit keeps it. The
+  page of a duty says which channel hears of what, such as `The Ops room
+  channel hears of failures.`, and reads the settings only for a duty that
+  names a shared channel.
+
 **Open:** the shape of the notifications names no way to turn quiet hours
 off. The page sends two empty times.
+
+**Open:** section 11.1 of the contract of the build leaves out
+`serverDefault`, which the front of the second wave answers. The page
+still reads it for the placeholder of the server. Without it, the page
+cannot tell whether the front has a server, so it leaves that check to the
+front.

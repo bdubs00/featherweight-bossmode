@@ -73,7 +73,8 @@ the page of a duty with the decisions of its history, the editor with its
 readback, its events, its actions, its tools, secrets, and filters of a
 check, Write the check for me with Cancel, the problems of the front beside
 their fields, and the switch of an admin. They also test the playbooks,
-Make this a duty, the duties in Activity, and the dialog Notifications.
+Make this a duty, the duties in Activity, the dialog Where to reach me with
+its places, and the shared channels in Tell me about of a duty.
 
 ## Run against the fake server
 
@@ -93,8 +94,11 @@ three failed runs. Another app starts one, whose last run failed, and the
 last one posts in a bridge when a bridge of the migrator closes. The fake
 also serves the options of the duties, Write the check after a short wait
 (words that hold slow wait until the front gives up), a playbook of weekly
-patching, the notifications of each person (a topic that holds fail makes
-the test fail), and the inbox of the duties.
+patching, the places of each person, and the inbox of the duties. alice
+reaches her phone by ntfy and Home Assistant by a webhook, every kind is
+offered, and an admin shares the channel Ops room, which the watch of the
+queue tells of its failures. A test of a place whose topic or address holds
+fail fails, as the test of Home Assistant does.
 Timers move members between
 presences, with their runs and their workers, and post messages every few
 seconds. It takes the files of a message with the limits of the front,

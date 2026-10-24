@@ -371,8 +371,8 @@ holds what Make this a duty brought, so a reload keeps it.
 A pane with nothing picked keeps its header row and its groove band. Thus
 the bands of the three panes stay in one line. The invitation to act sits in
 the middle of the pane. The account key opens a menu with the name of the person, the
-theme (Match the system, Light, Graphite), Notifications, Connections, and
-Sign out. Notifications opens a dialog, section 11.10.
+theme (Match the system, Light, Graphite), Where to reach me, Connections,
+and Sign out. Where to reach me opens a dialog, section 11.10.
 
 ## 6. The primitives
 
@@ -1057,7 +1057,8 @@ a regular expression, a template, or code. A schedule, an event, and a
 check are words with a readback, and a name is human.
 
 Files: `src/ui/Duties.tsx`, `src/ui/DutyEditor.tsx`, `src/ui/DutyCheck.tsx`,
-`src/ui/Playbooks.tsx`, `src/ui/Notifications.tsx`, `src/lib/duties.ts`,
+`src/ui/Playbooks.tsx`, `src/ui/Notifications.tsx`,
+`src/ui/ChannelDialog.tsx`, `src/lib/duties.ts`,
 `src/lib/playbooks.ts`, `src/lib/notifications.ts`, `src/state/duties.ts`,
 `src/state/playbooks.ts`, `src/styles/duties.css`, and `fake/routes-e.mjs`,
 each with its tests. Activity, the channel, New bridge, the chats, and the
@@ -1110,11 +1111,28 @@ The work:
 - Activity. A run of a duty shows the name of its duty as a chip that opens
   the duty. The failed runs and the paused duties of `GET /v1/inbox` show
   beside the decisions and the questions, each once.
-- Notifications. A dialog of the account menu: the ntfy server, with the
-  server of the front as its placeholder, the topic, a token that the page
-  writes and never reads, three switches, quiet hours in the time zone of
-  the browser, Save, and Send a test, which says what happened. The dialog
-  scrolls on a short screen.
+- Where to reach me. A dialog of the account menu that lists the places
+  where the front reaches the person: ntfy, Slack, Discord, Teams, an app
+  by a webhook, email, an agent of the fleet, or a shared channel of the
+  operator. No one surface holds the notifications, and a person moulds
+  the list to their needs. Each place is a row with a line edge: its name,
+  where it reaches in words, three switches (questions, failures, and a
+  daily digest), Send a test, which says under the row what happened,
+  Edit, and Remove, which asks first. An empty list says that nothing goes
+  out until the person adds a place, and that Activity always shows what
+  needs them. Under the list sit Add a place and the quiet hours, one
+  setting of the person in the time zone of the browser. The dialog scrolls
+  on a short screen.
+- Add a place and Edit. A second dialog over the first one. Add a place
+  offers only the kinds that the front serves, as rows with one line each
+  that says what the kind reaches, then the short form of the kind under
+  the choice. A write-only field, such as the address of Slack, shows Saved
+  with Replace, and Remove where the place can do without it, and never
+  its value. A place through an agent needs a budget per message, which
+  the person writes: the page fills no amount. The key of the dialog saves
+  the whole list, and the focus goes back to the key that opened it.
+- Tell me about of a duty offers each shared channel of the operator by
+  its label, such as The Ops room channel, with Failures and Questions.
 
 Every screen of the place works at 390 pixels with no sideways scroll. A
 row of a filter keeps one line there, and a long name of a duty in a chip

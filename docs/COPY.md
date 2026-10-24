@@ -802,8 +802,11 @@ column Now names the string of the approved boards where one changed.
 The rule of the owner holds for every string: a person never writes cron,
 a regular expression, a template, or code. A schedule, an event, and a
 check are words with a readback. These words never show: cron, regex,
-template, payload, webhook, and JSON. A word in brackets, such as
-`<agent>`, stands for a value.
+template, payload, webhook, and JSON. The one exception is Add a place:
+another app calls its setting an incoming webhook, a webhook, or a JSON
+post, so the line of a kind and its question mark use those words, and the
+person finds the setting there. A word in brackets, such as `<agent>`,
+stands for a value.
 
 ### src/ui/DutyEditor.tsx
 
@@ -873,9 +876,38 @@ template, payload, webhook, and JSON. A word in brackets, such as
 
 | Now | Verdict | New text | Who |
 |---|---|---|---|
-| new | add | `Notifications` in the account menu, and the dialog `Notifications` with `Loading your settings.` or `This workbench sends no notifications.` | done |
-| new | add | `Server` with the server of the front as its placeholder, and `Topic` with the question mark `What the topic is`: `The name that the ntfy app on your phone follows. Pick a name that is hard to guess.` | done |
-| new | add | `Token` with the placeholder `Optional`, or `A token is saved.` with `Remove`. After Remove, `The saved token goes when you save.` with `Keep it`. | done |
-| new | add | `Tell me about` with the switches `Questions`, `Failures`, and `A daily digest`. `Quiet hours` with `Hold notifications at night`, `From`, `To`, and `Time zone`. | done |
-| new | add | `Send a test`, `Sending.`, `Sent. Look for it on your phone.`, `The front sent nothing. Check the topic and the server.`, and `The test failed. <reason>` | done |
-| new | add | the errors `Write the address of the server, such as https://ntfy.sh.`, `Write the topic that your phone follows.`, `A topic holds no space and no slash.`, and `Pick both times.` | done |
+| `Notifications` in the account menu, and the dialog `Notifications` | change | `Where to reach me` in the account menu, and the dialog `Where to reach me` with `Loading your settings.` or `This workbench sends no notifications.` | done |
+| `Server`, `Topic`, and `Token` in the dialog | change | they move to the form of an ntfy place, in the dialog of a place | done |
+| `Send a test`, `Sent. Look for it on your phone.`, `The front sent nothing. Check the topic and the server.`, and `The test failed. <reason>` | change | `Send a test` on each place, named `Send a test to <name>` for a screen reader, then under its row `Sending.`, `Sent to <name>. Look for it there.`, `Not sent to <name>. <reason>`, `The front sent nothing to <name>.`, `The test failed. <reason>`, or `The test failed. The front gave this place no id.` | done |
+| new | add | `Nothing goes out until you add a place. Activity always shows what needs you.`, the empty list | done |
+| new | add | a place: its name, and where it reaches in words: `ntfy, topic <topic>`, `Slack`, `Discord`, `Teams`, `Webhook`, `Email to <address>`, `Through <agent>`, or `<label>, shared by an admin`. The list is `Your places` for a screen reader. | done |
+| new | add | the switches `Questions`, `Failures`, and `A daily digest` on each place, the group `What goes to <name>` for a screen reader, and the keys `Edit` and `Remove`, named `Edit <name>` and `Remove <name>` | done |
+| new | add | `Add a place`, and the error `You keep 10 places, the most there is. Remove one to add another.` | done |
+| new | add | the dialog `Remove <name>?` with `Nothing goes to <name> after this.` and the key `Remove` | done |
+| new | add | a problem of the front under the row of its place, and at the top of the dialog of another place as `<name>: <text>` or `Quiet hours: <text>` | done |
+| `Tell me about` with the switches `Questions`, `Failures`, and `A daily digest` | change | the same switches on each place, and in the dialog of a place | done |
+| `Quiet hours` with `Hold notifications at night`, `From`, `To`, and `Time zone`, and the error `Pick both times.` | keep | | done |
+
+### src/ui/ChannelDialog.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| new | add | the dialog `Add a place` with `What kind of place` and the key `Add place`, or `Edit <name>` with the name of its kind and the key `Save`. A front that offers nothing: `This workbench offers no place yet. Ask an admin.` | done |
+| new | add | the kinds, each with its line: `ntfy`, `The ntfy app on your phone, through a topic that it follows.` `Slack`, `A channel of your Slack workspace, through an incoming webhook.` `Discord`, `A channel of your Discord server, through its webhook.` `Teams`, `A channel of Microsoft Teams, through a workflow.` `Webhook`, `Any app that takes a JSON post, such as Home Assistant, n8n, or Zapier.` `Email`, `A plain mail to an address that you name.` `Through an agent`, `An agent of the fleet delivers it with its own tools, as you describe in words.` `A shared channel`, `A channel that an admin shares, such as the room of your team.` | done |
+| new | add | `Name`, with the placeholder `My phone`, `Ops room`, `Team server`, `Ops team`, `Home Assistant`, `Work mail`, or `Signal` by kind | done |
+| new | add | ntfy: `Server`, with the server of the front as its placeholder, else `https://ntfy.sh`, `Topic` with the question mark `What the topic is`: `The name that the ntfy app on your phone follows. Pick a name that is hard to guess.`, and `Token` with the placeholder `Optional` | done |
+| new | add | `Address` with the question mark `Where to find it`: `In Slack, add the app Incoming Webhooks to the channel, then copy the address that it gives you.`, `In Discord, open the settings of the channel, then Integrations, then Webhooks. Make one and copy its address.`, `In Teams, add the workflow that posts to a channel when a webhook request is received, then copy its address.`, or `The app that takes the post gives the address, such as an automation of Home Assistant or a flow of n8n.` The placeholders `https://hooks.slack.com/services/…`, `https://discord.com/api/webhooks/…`, and `https://…` | done |
+| new | add | `Secret` with the placeholder `Optional`, and the line `With a secret, each post carries the header X-Featherweight-Signature. It holds sha256= and the HMAC of the body, keyed by the secret.` | done |
+| new | add | a saved field: `Saved` with `Replace`, and `Remove` for the token and the secret, named `Replace the <field>` and `Remove the <field>`. After Replace, the placeholder `A new <field>` and `The saved <field> stays until you write a new one.` with `Keep it`. After Remove, `The saved <field> goes when you save.` with `Keep it`. | done |
+| new | add | `Email address` with the placeholder `you@example.com` | done |
+| new | add | `Agent` with `Pick an agent` or `No agent that you can run`, `How should it reach you?` with the placeholder `Send it to me on Signal.`, and `The most a message can cost` with `$` and the placeholder `0.02` | done |
+| new | add | `Channel` with `Pick a channel`, each shared channel by its label, and `<name>, no longer shared` | done |
+| new | add | `Tell me about` with the switches `Questions`, `Failures`, and `A daily digest` | done |
+| new | add | the errors `Pick a kind of place.`, `Give the place a name.`, `Write the address of the server, such as https://ntfy.sh.`, `This workbench has no ntfy server of its own. Write the address of one, such as https://ntfy.sh.`, `Write the topic that your phone follows.`, `A topic holds no space and no slash.`, `Paste the address from Slack.` (and Discord and Teams), `Paste the address of the app.`, `A Slack address starts with https://hooks.slack.com/.`, `A Discord address starts with https://discord.com/api/webhooks/.`, `The address starts with https://.`, `Write the address to mail.`, `Write an email address, such as you@example.com.`, `Pick the agent that reaches you.`, `Say how the agent should reach you.`, `A place through an agent needs a budget. Write the most a message can cost, such as 0.02.`, `Write an amount above 0, such as 0.02.`, and `Pick a shared channel.` | done |
+
+### src/ui/DutyEditor.tsx and src/ui/Duties.tsx: the shared channels
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| new | add | in Tell me about, once the settings list a shared channel: `You`, then each shared channel as `The <label> channel`, each with `Failures` and `Questions` | done |
+| `Failures and questions.` (the readback of Tell me about on the page of a duty) | change | the same, then for each shared channel that the duty names `The <label> channel hears of failures.`, `of questions.`, or `of failures and questions.` | done |
