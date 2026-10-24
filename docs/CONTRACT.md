@@ -1254,7 +1254,7 @@ front reads the words of a person in that zone. A schedule without
 | `GET /v1/playbooks/{name}` | The playbook with `caps` and `delegation`. New bridge reads it to fill its form. |
 | `PUT /v1/playbooks/{name}` | `{"goal", "placement", "seats", "caps", "delegation"}`: the form of New bridge without the title, with its seats as `seats`, each `{"handle", "agent", "task"}`, and `revision` when the name holds a playbook already. The front refuses an unknown field, such as `members`, with 400. Save as playbook in the menu More of a bridge sends it. A 409 says `This playbook changed since you opened it. Try again.` A 400 `{"problems"}` shows under the name. |
 | `DELETE /v1/playbooks/{name}` | 204. Delete, in the list See the playbooks of the action open, after a dialog that asks first. |
-| `GET /v1/inbox` | `{"items": [{"kind", "run", "duty", "agent", "bridge", "text", "since"}]}`, `kind` `approval`, `question`, `failure`, or `paused`. Activity reads it when it opens, each minute while it shows, and after a reset of the stream. See the rules of Activity below. |
+| `GET /v1/inbox` | `{"items": [{"kind", "run", "approval", "duty", "agent", "bridge", "text", "since"}]}`, `kind` `approval`, `question`, `failure`, or `paused`. `approval` is the id of the approval that the run waits for, or `""` for a question of a seat in a bridge and for a failure or a paused duty. Activity reads it when it opens, each minute while it shows, and after a reset of the stream. See the rules of Activity below. |
 
 A duty, as a read answers it. The page writes the same record without
 `owner`, `source`, `readback`, `next`, `state`, and `history`:
@@ -1365,9 +1365,13 @@ The rules of the page:
   `GET /v1/inbox` of kind `failure` and `paused` show as rows, each with
   the agent, the light `failed` or `paused`, the text, and the chip. An item
   of kind `approval` or `question` of a bridge has its row in the bridge
-  already, so the page leaves it out. One of a run on no bridge shows the
-  card of the run once the page reads the run, with Allow and Deny, and a
-  line that waits until then. A failure of a run that a row of a seat shows
+  already, so the page leaves it out. One of a run on no bridge shows a
+  card with Allow and Deny at once, from its `approval` and its text, with
+  no read of the run. A question takes its text as the question and a free
+  answer. Once the page holds the run, the run gives the whole card, with
+  the call and its rule. Only an item whose `approval` is `""` makes the
+  page read the run, and it shows a line that waits until then. After a
+  decision on such a card, the page reads the inbox again. A failure of a run that a row of a seat shows
   gives that row its chip, and no second row.
 - **New:** the history of a duty shows `decided` under each run, in words:
   `The manager allowed shell.exec: <reason>`, `Nobody answered in time, so

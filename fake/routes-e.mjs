@@ -24,7 +24,7 @@
 //   GET    /v1/playbooks/{name}             the playbook whole
 //   PUT    /v1/playbooks/{name}             {"goal", "placement", "seats", "caps", "delegation", "revision"}: 201, 200, 400, or 409
 //   DELETE /v1/playbooks/{name}             204
-//   GET    /v1/inbox                        {"items": [{"kind", "run", "duty", "agent", "bridge", "text", "since"}]}
+//   GET    /v1/inbox                        {"items": [{"kind", "run", "approval", "duty", "agent", "bridge", "text", "since"}]}
 //
 // The header X-Time-Zone gives the zone of a schedule that names none. The
 // fake reads the words of a person with a small grammar, as the front
@@ -766,10 +766,10 @@ export function register({ on, refuse, readJson, now, AGENTS, admin, S, publish 
     const items = [];
     for (const d of D.values()) {
       const last = d.history[0];
-      if (d.paused) items.push({ kind: 'paused', duty: d.name, agent: d.agent, text: (d.state && d.state.pausedReason) || 'Someone paused this duty.', since: last ? last.at : now() });
-      else if (last && last.state === 'failed') items.push({ kind: 'failure', run: last.run || '', duty: d.name, agent: d.agent, text: last.reason || 'The run failed.', since: last.at });
+      if (d.paused) items.push({ kind: 'paused', run: '', approval: '', duty: d.name, agent: d.agent, bridge: '', text: (d.state && d.state.pausedReason) || 'Someone paused this duty.', since: last ? last.at : now() });
+      else if (last && last.state === 'failed') items.push({ kind: 'failure', run: last.run || '', approval: '', duty: d.name, agent: d.agent, bridge: '', text: last.reason || 'The run failed.', since: last.at });
       const run = last && last.run ? S.runs.get(last.run) : null;
-      if (run && run.state === 'input-required') items.push({ kind: run.pending && run.pending.schema ? 'question' : 'approval', run: run.id, duty: d.name, agent: d.agent, bridge: '', text: d.agent + ' waits for your answer.', since: last.at });
+      if (run && run.state === 'input-required' && run.pending) items.push({ kind: run.pending.schema ? 'question' : 'approval', run: run.id, approval: run.pending.id, duty: d.name, agent: d.agent, bridge: '', text: d.agent + ' waits for your answer.', since: last.at });
     }
     return { items };
   });

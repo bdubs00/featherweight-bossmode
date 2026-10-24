@@ -4,7 +4,7 @@ import { store } from '../state/store';
 import { forgetDuties } from '../state/duties';
 import { ActivityList, ActivityMain, pick } from './Activity';
 import { at, bridge, run, seat } from './testkit-b';
-import { fakeApi, mount, settle, unmountAll } from './testkit-c';
+import { fakeApi, keyNamed, mount, settle, unmountAll } from './testkit-c';
 import { currentNotice } from './notice';
 
 let api: ReturnType<typeof fakeApi>;
@@ -76,7 +76,33 @@ describe('Activity and the duties', () => {
     expect(main.querySelector('a[href="/ui#run/run-x"]')!.textContent).toBe('Open the run');
   });
 
-  it('shows the card of a question of a duty that sits on no bridge, and decides it', async () => {
+  it('shows the card of a question of a duty on no bridge from the approval of its item, decides it, and reads the inbox again', async () => {
+    let reads = 0;
+    api = fakeApi({
+      'GET /v1/inbox': () => ({ body: ++reads === 1 ? { items: [{ kind: 'approval', run: 'run-ask', approval: 'ap-1', duty: 'restore-test', agent: 'backup', bridge: '', text: 'backup wants to run restic restore.', since: at(3) }] } : { items: [] } }),
+      'POST /v1/runs/run-ask/approvals/ap-1': {},
+    });
+    const el = mount(
+      <>
+        <ActivityList />
+        <ActivityMain />
+      </>,
+    );
+    await settle(8);
+    const row = rows(el).find((r) => r.querySelector('b')!.textContent === 'backup')!;
+    expect(row.querySelector('.inbox-text')!.textContent).toBe('backup wants to run restic restore.');
+    const main = el.querySelector('.inbox-main-pane')!;
+    expect(main.querySelector('.inbox-said')!.textContent).toBe('backup wants to run restic restore.');
+    expect(main.querySelector('.card')).toBeTruthy();
+    // The card needs no read of the run.
+    expect(api.calls.some((c) => c.path.startsWith('/v1/runs/run-ask') && c.method === 'GET')).toBe(false);
+    act(() => (keyNamed(main, 'Allow') as HTMLButtonElement).click());
+    await settle();
+    expect(api.calls.filter((c) => c.method === 'POST').map((c) => [c.path, c.body])).toEqual([['/v1/runs/run-ask/approvals/ap-1', { decision: 'allow' }]]);
+    expect(reads).toBe(2);
+  });
+
+  it('reads the run of a question of a duty that names no approval, then shows its card and decides it', async () => {
     const asking = run('run-ask', 'backup', 'input-required', { pending: { id: 'ap-1', tool: 'bash', input: { command: 'restic restore latest' }, reason: 'ask', requestedAt: at(3) }, metadata: { 'workbench.duty': 'restore-test' } });
     api = fakeApi({
       'GET /v1/inbox': { items: [{ kind: 'approval', run: 'run-ask', duty: 'restore-test', agent: 'backup', text: 'backup wants to run a command.', since: at(3) }] },

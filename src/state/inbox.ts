@@ -276,8 +276,10 @@ export function inboxRows(s: InboxInput): InboxRow[] {
 /**
  * itemRows builds the rows of the items of GET /v1/inbox that no row of a
  * bridge shows: a failed run, a paused duty, and a question of a run of a
- * duty that sits on no bridge. A question shows as its card once the page
- * holds its run, and as a line that waits until then. A failed run that a
+ * duty that sits on no bridge. The approval of the item gives the card of
+ * a question at once, with Allow and Deny. The run, once the page holds
+ * it, gives the whole card, with the call and its rule. An item without
+ * an approval shows as a line that waits for its run. A failed run that a
  * row of a seat shows gives that row its duty instead.
  */
 function itemRows(s: InboxInput, seats: InboxRow[]): InboxRow[] {
@@ -300,12 +302,20 @@ function itemRows(s: InboxInput, seats: InboxRow[]): InboxRow[] {
     if ((it.kind !== 'approval' && it.kind !== 'question') || it.bridge || !it.run) continue;
     const run = s.runs[it.run];
     const agent = it.agent || (run ? run.agent : '');
-    if (run && run.state === 'input-required' && run.pending) {
+    const approval = it.approval || '';
+    if (run && run.state === 'input-required' && run.pending && (!approval || run.pending.id === approval)) {
       const d = decisionOf(run, s.results[run.id]);
       if (d) {
-        out.push({ ...where, agent, handle: agent, key: 'd:' + run.id + '/' + d.id, kind: d.question || d.schema ? 'question' : 'decision', status: 'needs-you', decision: d, at: run.pending.requestedAt || it.since || run.updatedAt });
+        out.push({ ...where, agent, handle: agent, key: 'd:' + run.id + '/' + d.id, kind: d.question || d.schema ? 'question' : 'decision', status: 'needs-you', decision: d, reason: it.text || '', at: run.pending.requestedAt || it.since || run.updatedAt });
         continue;
       }
+    }
+    if (approval) {
+      // The card of the item needs no read of the run. It knows no call, so it offers no Always allow.
+      const question = it.kind === 'question';
+      const d: Decision = { run: it.run, id: approval, label: question ? 'Answer' : 'Allow', question, reason: question ? it.text || undefined : undefined, state: 'pending', always: false };
+      out.push({ ...where, agent, handle: agent, key: 'd:' + it.run + '/' + approval, kind: question ? 'question' : 'decision', status: 'needs-you', decision: d, reason: it.text || '', at: it.since || '' });
+      continue;
     }
     if (run && !['input-required', 'queued', 'running', 'suspended'].includes(run.state)) continue;
     out.push({ ...where, agent, key: 'w:' + it.run, kind: 'duty-waits', status: 'needs-you', reason: it.text || '', at: it.since || '' });

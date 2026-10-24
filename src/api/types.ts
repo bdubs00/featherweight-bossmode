@@ -1169,6 +1169,8 @@ export interface DutyOptions {
 export interface InboxItem {
   kind: 'approval' | 'question' | 'failure' | 'paused' | string;
   run?: string;
+  /** The id of the approval that the run waits for, or "" for a question of a seat in a bridge and for a failure or a paused duty. */
+  approval?: string;
   duty?: string;
   agent?: string;
   bridge?: string;

@@ -184,9 +184,9 @@ export function useInbox(): { rows: InboxRow[]; loaded: boolean; settled: boolea
     const t = setInterval(() => loadInbox().catch(() => {}), 60_000);
     return () => clearInterval(t);
   }, []);
-  // The run of a question of a duty that sits on no bridge, so its card shows.
+  // The run of a question of a duty that sits on no bridge and names no approval, so its card shows. An item with its approval needs no read.
   const asking = (items || [])
-    .filter((it) => (it.kind === 'approval' || it.kind === 'question') && !it.bridge && it.run)
+    .filter((it) => (it.kind === 'approval' || it.kind === 'question') && !it.bridge && it.run && !it.approval)
     .map((it) => it.run!)
     .join(',');
   useEffect(() => {
@@ -295,6 +295,8 @@ const askedText = (text: string): string => {
 
 function rowText(r: InboxRow): string {
   if (r.decision && r.kind === 'question') return (r.handle || '') + ' asks: ' + (r.decision.reason || 'A question for you');
+  // A card from an item of the inbox knows no call: the words of the front say what it waits for.
+  if (r.decision && !r.decision.tool && r.reason) return r.reason;
   if (r.decision) return decisionTitle(r.handle || '', r.decision);
   if (r.kind === 'asked' && r.entry) return excerpt((r.handle || '') + ' asks: ' + askedText(r.entry.text), 120);
   if (r.kind === 'asked') return (r.handle || '') + ' asks you';
@@ -412,8 +414,10 @@ export function ActivityList({ item }: { item?: string }) {
     if (!act) return;
     e.preventDefault();
     const d = r.decision;
-    if (act === 'allow' && d) attempt(() => decide(d.run, d.id, 'allow'));
-    else if (act === 'deny' && d) attempt(() => decide(d.run, d.id, 'deny'));
+    // A question of a duty on no bridge leaves the inbox of the duties, so the inbox reads again.
+    const after = () => (r.bridge ? undefined : loadInbox());
+    if (act === 'allow' && d) attempt(() => decide(d.run, d.id, 'allow').then(after));
+    else if (act === 'deny' && d) attempt(() => decide(d.run, d.id, 'deny').then(after));
     else if (act === 'answer') {
       pick(r.key);
       if (window.matchMedia(TWO_PANES).matches) {
@@ -518,7 +522,18 @@ export function ActivityMain({ item }: { item?: string }) {
         </div>
       ) : (
         <div class="scroll pad">
-          {decision && <DecisionCard d={decision} who={r.handle || name} onDecide={() => afterDecision(r, rows)} />}
+          {decision && !decision.tool && !decision.question && r.reason && <p class="inbox-said">{r.reason}</p>}
+          {decision && (
+            <DecisionCard
+              d={decision}
+              who={r.handle || name}
+              onDecide={() => {
+                afterDecision(r, rows);
+                // A question of a duty on no bridge leaves the inbox of the duties, which the stream does not tell.
+                if (!r.bridge) loadInbox().catch(() => {});
+              }}
+            />
+          )}
           {isDutyRow(r) && (
             <div class="inbox-stop">
               <p class="inbox-stop-line">

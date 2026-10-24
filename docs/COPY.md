@@ -865,6 +865,7 @@ template, payload, webhook, and JSON. A word in brackets, such as
 |---|---|---|---|
 | new | add | the chip of a duty, its name in words, such as `Nightly restore test`, with the tooltip `Open the duty <name>` | done |
 | new | add | a row of a duty: the agent, the light `failed` or `paused`, the text of the front, and the chip. Its main pane adds `Open the run`. | done |
+| new | add | a question of a duty on no bridge: the text of the front as the line of the row and above its card, such as `backup wants to run restic restore.`, and the card `<agent> asks for your decision` with Deny and Allow | done |
 
 ### src/ui/Shell.tsx, src/ui/Notifications.tsx
 

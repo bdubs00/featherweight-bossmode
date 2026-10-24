@@ -218,4 +218,24 @@ describe('the items of the inbox of the duties', () => {
     expect(keyAction('a', ask)).toBe('allow');
     expect(keyAction('s', rows[3])).toBeNull();
   });
+
+  it('give the card of a question of a duty from the approval of its item, with no read of the run', () => {
+    const s = base();
+    s.items = [
+      { kind: 'approval', run: 'run-a', approval: 'ap-7', duty: 'restore-test', agent: 'backup', bridge: '', text: 'backup wants to run restic restore.', since: at(3) },
+      { kind: 'question', run: 'run-q', approval: 'ap-8', duty: 'restore-test', agent: 'backup', bridge: '', text: 'Which snapshot?', since: at(4) },
+    ];
+    const rows = sortInbox(inboxRows(s)).filter((r) => r.duty === 'restore-test');
+    expect(rows.map((r) => [r.key, r.kind, r.handle, r.reason])).toEqual([
+      ['d:run-a/ap-7', 'decision', 'backup', 'backup wants to run restic restore.'],
+      ['d:run-q/ap-8', 'question', 'backup', 'Which snapshot?'],
+    ]);
+    expect(rows[0].decision).toEqual({ run: 'run-a', id: 'ap-7', label: 'Allow', question: false, reason: undefined, state: 'pending', always: false });
+    expect(rows[1].decision).toMatchObject({ run: 'run-q', id: 'ap-8', label: 'Answer', question: true, reason: 'Which snapshot?' });
+    expect(keyAction('d', rows[0])).toBe('deny');
+    // Once the page holds the run, the run gives the whole card.
+    s.runs['run-a'] = run('run-a', 'input-required', { agent: 'backup', pending: { id: 'ap-7', tool: 'bash', input: { command: 'restic restore latest' }, reason: 'ask', requestedAt: at(3) } });
+    const whole = inboxRows(s).find((r) => r.key === 'd:run-a/ap-7')!;
+    expect(whole.decision!.tool).toBe('bash');
+  });
 });
