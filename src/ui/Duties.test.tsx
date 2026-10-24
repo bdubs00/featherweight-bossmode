@@ -4,6 +4,7 @@ import type { Duty, DutyRun, Whoami } from '../api/types';
 import { store } from '../state/store';
 import { forgetDuties } from '../state/duties';
 import { nextShort, nextWords } from '../lib/duties';
+import { hrefOf } from '../lib/route';
 import { DUTY_IS, DutyList, DutyMain } from './Duties';
 import { Profile } from './Profile';
 import { clearNotice } from './notice';
@@ -355,7 +356,7 @@ describe('the page of a duty', () => {
     expect(location.hash).toBe('#duties');
   });
 
-  it('offers only Run now to a person who cannot change the duty, and to a duty of the settings', async () => {
+  it('offers only Run now to a person who cannot change the duty', async () => {
     act(() => store.dispatch({ type: 'me', me: BOB }));
     api = fakeApi(one(REPORT));
     let el = mount(<DutyMain name="daily-report" />);
@@ -364,15 +365,38 @@ describe('the page of a duty', () => {
     expect(keyNamed(el, 'Pause')).toBeUndefined();
     expect(keyNamed(el, 'Edit')).toBeUndefined();
     expect(el.querySelector('button[aria-label="More"]')).toBeNull();
-    unmountAll();
-    api.restore();
+  });
+
+  it('shows a source of the settings of the front with the note, its start, and its agent, and no key', async () => {
     act(() => store.dispatch({ type: 'me', me: ADMIN }));
-    const file = { ...REPORT, name: 'from-settings', source: 'file' };
-    api = fakeApi(one(file));
-    el = mount(<DutyMain name="from-settings" />);
-    await settle();
-    expect(text(el)).toContain('This duty comes from the settings of the front. Change it there.');
-    expect(keyNamed(el, 'Edit')).toBeUndefined();
+    // A source as the front reads it: no action, empty limits, no decisions while away, and no notifications.
+    const hook: Duty = {
+      name: 'lab-hook',
+      agent: 'triage',
+      when: { webhook: { auth: { mode: 'bearer', secret: 'LAB_HOOK' } } },
+      do: {},
+      limits: { budget: {} },
+      source: 'file',
+      revision: 0,
+      readback: 'When another app calls the address of this source, each new event starts a run of triage. An operator sets it in the settings of the front, so it changes there.',
+      next: [],
+    };
+    const poll: Duty = { ...hook, name: 'tickets', when: {}, checkFirst: { look: { http: { url: 'https://helpdesk.example.com/api/tickets' } }, items: 'tickets', key: '', wake: { when: 'new' } }, readback: 'Every 5m, it looks at helpdesk.example.com/api/tickets, and each new item starts a run of triage. An operator sets it in the settings of the front, so it changes there.' };
+    for (const d of [hook, poll]) {
+      api = fakeApi(one(d));
+      const el = mount(<DutyMain name={d.name} />);
+      await settle();
+      expect(text(el.querySelector('h1'))).toBe(d.name === 'tickets' ? 'Tickets' : 'Lab hook');
+      expect([...el.querySelectorAll('.duty-body > *')].map((x) => text(x.querySelector('h2') || x))).toEqual(['This duty comes from the settings of the front. Change it there.', 'When', 'Agent']);
+      expect(text(el.querySelector('.duty-readback'))).toBe(d.readback);
+      expect(text(el.querySelector('.duty-who'))).toBe('triage');
+      expect(el.querySelector('.duty-who a')!.getAttribute('href')).toBe(hrefOf({ place: 'fleet', agent: 'triage', profile: true }));
+      // The front refuses every change of a source, so no key shows, Run now neither.
+      expect(el.querySelectorAll('.duty-keys, button').length).toBe(0);
+      expect(el.querySelector('.pane-head .status')).toBeNull();
+      unmountAll();
+      api.restore();
+    }
   });
 
   it('reads the duty again when a run of its history changes its state, as no event of a duty reaches the page', async () => {

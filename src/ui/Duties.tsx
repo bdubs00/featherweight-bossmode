@@ -348,7 +348,7 @@ function DutyView({ name }: { name: string }) {
   }
   const title = dutyTitle(d);
   const light = dutyLight(d, allPaused);
-  const fromFile = d.source === 'file';
+  if (d.source === 'file') return <SourceView d={d} title={title} agentName={agentName} back={back} />;
   const run = async (f: () => Promise<void>) => {
     setBusy(true);
     try {
@@ -364,7 +364,7 @@ function DutyView({ name }: { name: string }) {
       const r = await runDutyNow(name);
       setSaid(r.run ? { run: r.run } : r.skipped ? { skipped: r.skipped } : typeof r.run === 'string' ? { started: true } : { skipped: 'The duty started no run.' });
     });
-  const items = canChange && !fromFile ? [{ label: 'Delete', danger: true, onSelect: () => setAsking(true) }] : [];
+  const items = canChange ? [{ label: 'Delete', danger: true, onSelect: () => setAsking(true) }] : [];
   const next = (d.next || []).slice(0, 5);
   const history = d.history || [];
   const reason = d.state && d.state.pausedReason;
@@ -378,7 +378,7 @@ function DutyView({ name }: { name: string }) {
           <Button size="s" disabled={busy} onClick={runNow}>
             Run now
           </Button>
-          {canChange && !fromFile && (
+          {canChange && (
             <>
               <Button size="s" disabled={busy} onClick={() => run(() => pauseDuty(name, !d.paused))}>
                 {d.paused ? 'Resume' : 'Pause'}
@@ -403,7 +403,6 @@ function DutyView({ name }: { name: string }) {
             )}
           </p>
         )}
-        {fromFile && <p class="duty-said">This duty comes from the settings of the front. Change it there.</p>}
         {(d.paused || allPaused) && (
           <p class="duty-said">
             <LineLed tone="grey" /> {allPaused ? 'Every duty is paused.' : reason ? 'Paused. ' + reason : 'Paused.'}
@@ -488,6 +487,39 @@ function DutyView({ name }: { name: string }) {
           <p>The duty stops for good, and its history goes with it. A run that works now goes on.</p>
         </Confirm>
       )}
+    </section>
+  );
+}
+
+/**
+ * SourceView is the page of a duty that comes from the settings of the
+ * front, an entry of workbench.sources: the note that it changes there,
+ * when it starts, and its agent. It has no limits, no decisions while the
+ * person is away, and no notifications, and the front refuses every
+ * change, so the page offers no key.
+ */
+function SourceView({ d, title, agentName, back }: { d: Duty; title: string; agentName: string; back: { href: string; label: string; to: 'list' } }) {
+  return (
+    <section class="screen duty" aria-labelledby="duty-title">
+      <PaneHeader id="duty-title" title={<span title={title}>{title}</span>} size="title" level={1} back={back} />
+      <div class="scroll pad duty-body">
+        <p class="duty-said">This duty comes from the settings of the front. Change it there.</p>
+        <section class="duty-sec" aria-labelledby="duty-when">
+          <h2 class="t-sub duty-sec-head" id="duty-when">
+            When
+          </h2>
+          <p class="duty-readback">{d.readback || startWords(d) || 'Another app starts it.'}</p>
+        </section>
+        <section class="duty-sec" aria-labelledby="duty-agent">
+          <h2 class="t-sub duty-sec-head" id="duty-agent">
+            Agent
+          </h2>
+          <p class="duty-who">
+            <Mark agent={d.agent} size={24} />
+            <a href={hrefOf({ place: 'fleet', agent: d.agent, profile: true })}>{agentName}</a>
+          </p>
+        </section>
+      </div>
     </section>
   );
 }
