@@ -117,8 +117,10 @@ describe('Where to reach me', () => {
   });
 
   it('says that nothing goes out until the person adds a place, and that Activity shows what needs them', async () => {
-    await open({ ...READ, channels: [] });
+    await open({ ...READ, channels: [], off: 'No place reaches you yet.' });
     expect(outer().querySelector('.notify-places')).toBeNull();
+    // The empty list says it in its own words, so the reason of the front stays out.
+    expect(outer().querySelector('.notify-off')).toBeNull();
     expect(outer().querySelector('.notify-empty')!.textContent).toBe('Nothing goes out until you add a place. Activity always shows what needs you.');
     expect(keyNamed(outer(), 'Add a place')).toBeTruthy();
   });

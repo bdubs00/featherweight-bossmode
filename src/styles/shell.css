@@ -182,6 +182,10 @@ dialog.confirm .notify-said.field-error {
 .notify-sign {
   overflow-wrap: anywhere;
 }
+/* The name of the header stays whole, so a person copies it right. */
+.notify-sign code {
+  white-space: nowrap;
+}
 
 /* ---------- the panes ---------- */
 .pane {

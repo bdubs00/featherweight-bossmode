@@ -274,7 +274,9 @@ export function ChannelDialog({
             {kind === 'webhook' && (
               <>
                 <WriteOnly label="Secret" noun="secret" optional value={f.secret} placeholder="Optional" error={err('secret')} onChange={(secret) => set({ secret })} />
-                <p class="t-meta notify-sign">With a secret, each post carries the header X-Featherweight-Signature. It holds sha256= and the HMAC of the body, keyed by the secret.</p>
+                <p class="t-meta notify-sign">
+                  With a secret, each post carries the header <code>X-Featherweight-Signature</code>. It holds <code>sha256=</code> and the HMAC of the body, keyed by the secret.
+                </p>
               </>
             )}
             {kind === 'email' && (

@@ -5,6 +5,9 @@
 // the front serves. The quiet hours stay one setting of the person, in the
 // time zone of the browser.
 //
+// The reason of the front that nothing goes out shows above the list. An
+// empty list says it in its own words instead.
+//
 // Save writes the switches and the quiet hours. Add place, Save in a place,
 // and Remove write the whole list at once, as it stands. Send a test saves
 // a change first, then says what happened to that place. docs/CONTRACT.md,
@@ -234,7 +237,7 @@ export function Notifications({ onClose }: { onClose: () => void }) {
         {load === 'failed' && <p role="alert">{failed}</p>}
         {ready && (
           <div class="notify-form">
-            {read!.off && (
+            {read!.off && f.channels.length > 0 && (
               <p class="notify-off" role="status">
                 <LineLed tone="grey" /> {read!.off}
               </p>
