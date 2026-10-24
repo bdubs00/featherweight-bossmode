@@ -436,8 +436,9 @@ export function runLight(r: DutyRun | null | undefined): Light {
       return { word: 'skipped', tone: 'grey', label: why || 'This time started no run.' };
     case 'canceled':
       return { word: 'stopped', tone: 'grey', label: why || 'Someone stopped the run.' };
+    case 'quiet':
+      return { word: 'slept', tone: 'grey', label: 'The check found no work, so the agent slept.' };
   }
-  if (r.woke === false) return { word: 'slept', tone: 'grey', label: 'The check found no work, so the agent slept.' };
   if (r.state === 'completed') return { word: 'finished', tone: 'grey', label: 'The run finished.' };
   const word = r.state ? r.state.replace(/[-_]/g, ' ') : 'unknown';
   return { word, tone: 'grey', label: why || 'The front reports ' + word + '.' };
@@ -453,12 +454,12 @@ export function dutyLight(d: Duty, allPaused = false): Light {
 /**
  * checkLine says what the check of a run found, such as Found 2, woke the
  * agent. The light of a run that slept says slept, and a check that failed
- * says why in its reason, so both say only the count or nothing. A run
- * without a check gives "".
+ * says why in its reason, so both say only the count or nothing. The front
+ * sends found and woke for every run, so a run that its check did not
+ * wake, and that did not sleep, gives "": it had no check.
  */
 export function checkLine(r: DutyRun): string {
-  if (typeof r.found !== 'number' && typeof r.woke !== 'boolean') return '';
-  if (r.state === 'failed' && !r.woke) return '';
+  if (r.woke !== true && r.state !== 'quiet') return '';
   const n = typeof r.found === 'number' ? (r.found === 0 ? 'Found nothing' : 'Found ' + r.found) : 'Checked';
   return n + (r.woke ? ', woke the agent' : '');
 }

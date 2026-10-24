@@ -1036,7 +1036,7 @@ export interface DutyRun {
   costUSD?: number;
   /** The count of the items that the check found. */
   found?: number;
-  /** False when the check found no work, so the agent slept. */
+  /** True when the check woke the agent. The front sends false also for a run without a check. The state quiet says that the agent slept. */
   woke?: boolean;
   /** Why the time started no run, in words, such as a skip. */
   reason?: string;

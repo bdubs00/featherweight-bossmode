@@ -259,10 +259,14 @@ describe('a duty in words', () => {
     expect(runLight({ at: '', state: 'failed', reason: 'The model refused.' })).toMatchObject({ word: 'failed', tone: 'red', label: 'The model refused.' });
     expect(runLight({ at: '', state: 'running' })).toMatchObject({ word: 'working', tone: 'green' });
     expect(runLight({ at: '', state: 'input-required' })).toMatchObject({ word: 'needs you', tone: 'amber' });
-    expect(runLight({ at: '', state: 'completed', found: 0, woke: false })).toMatchObject({ word: 'slept', tone: 'grey' });
+    expect(runLight({ at: '', state: 'quiet', found: 0, woke: false })).toMatchObject({ word: 'slept', tone: 'grey' });
+    // The front sends woke false also for the run of a duty without a check.
+    expect(runLight({ at: '', state: 'completed', found: 0, woke: false })).toMatchObject({ word: 'finished', tone: 'grey' });
     expect(runLight({ at: '', state: 'skipped', reason: 'The last run still works.' })).toMatchObject({ word: 'skipped', label: 'The last run still works.' });
     expect(checkLine({ at: '', state: 'completed', found: 2, woke: true })).toBe('Found 2, woke the agent');
-    expect(checkLine({ at: '', state: 'completed', found: 0, woke: false })).toBe('Found nothing');
+    expect(checkLine({ at: '', state: 'quiet', found: 0, woke: false })).toBe('Found nothing');
+    expect(checkLine({ at: '', state: 'quiet', found: 3, woke: false })).toBe('Found 3');
+    expect(checkLine({ at: '', state: 'completed', found: 0, woke: false })).toBe('');
     expect(checkLine({ at: '', state: 'failed', found: 0, woke: false, reason: 'The check failed.' })).toBe('');
     expect(checkLine({ at: '', state: 'completed' })).toBe('');
   });
