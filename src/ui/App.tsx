@@ -19,7 +19,7 @@ import { dismissBuild, useNewBuild } from '../lib/build';
 import { applyTheme, themeOf } from '../lib/theme';
 import { canonicalPath, columnOf, go, parentOf, parseRoute, type Route } from '../lib/route';
 import { isTyping } from './keys';
-import { clearNotice, showError, useNotice } from './notice';
+import { clearNotice, clearSaid, showError, useNotice, useSaid } from './notice';
 import { EmptyPane, Shell, shownOf } from './Shell';
 import { BridgeList } from './BridgeList';
 import { Channel } from './Channel';
@@ -176,6 +176,18 @@ function Notice({ text }: { text: string }) {
   );
 }
 
+/** Said is the notice of an action that worked: its sentence, with Dismiss. It goes by itself after a few seconds. */
+function Said({ text }: { text: string }) {
+  return (
+    <div class="notice" role="status">
+      <p>{text}</p>
+      <Button kind="quiet" size="s" onClick={clearSaid}>
+        Dismiss
+      </Button>
+    </div>
+  );
+}
+
 /**
  * NewBuild offers the page that a deploy put out while this tab ran the old
  * one. The person reloads when it suits. A draft of a composer or of a page
@@ -199,6 +211,7 @@ export function App() {
   const route = useRoute();
   const [auth, setAuth] = useState<Auth>({ kind: 'loading' });
   const notice = useNotice();
+  const said = useSaid();
   const fresh = useNewBuild();
   const open = route.place === 'bridge' ? route.id : '';
   const config = useSelect((s) => s.config);
@@ -397,5 +410,5 @@ export function App() {
   }
 
   const panes = panesOf(route);
-  return <Shell route={route} list={panes.list} main={panes.main} details={panes.details} notice={notice ? <Notice text={notice} /> : fresh ? <NewBuild /> : null} onSignOut={signOut} />;
+  return <Shell route={route} list={panes.list} main={panes.main} details={panes.details} notice={notice ? <Notice text={notice} /> : said ? <Said text={said} /> : fresh ? <NewBuild /> : null} onSignOut={signOut} />;
 }

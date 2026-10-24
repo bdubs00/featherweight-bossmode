@@ -1,11 +1,19 @@
 // The one notice of the page: a sentence about a failed action, shown in
-// an alert until the person dismisses it or the next action works.
+// an alert until the person dismisses it or the next action works. A
+// short sentence about an action that worked, such as Saved the playbook
+// weekly-patching., takes the same place for a few seconds, as a status.
+// A failed action takes its place.
 
 import { useEffect, useState } from 'preact/hooks';
 import { ApiError, SigninNeeded } from '../api/client';
 
 let text = '';
+let said = '';
+let saidTimer: ReturnType<typeof setTimeout> | null = null;
 const listeners = new Set<() => void>();
+
+/** How long the sentence of an action that worked stays, in milliseconds. */
+export const SAID_MS = 6000;
 
 const tell = () => {
   for (const f of [...listeners]) f();
@@ -17,6 +25,29 @@ export function showError(e: unknown): void {
   if (e instanceof DOMException && e.name === 'AbortError') return;
   console.error(e);
   text = e instanceof ApiError ? e.message : e instanceof Error && e.message ? e.message : 'The action failed. Try it again.';
+  clearSaid();
+  tell();
+}
+
+/** showSaid shows a short sentence about an action that worked, for SAID_MS, or until the person dismisses it. */
+export function showSaid(words: string): void {
+  if (saidTimer) clearTimeout(saidTimer);
+  said = words;
+  saidTimer = setTimeout(clearSaid, SAID_MS);
+  tell();
+}
+
+/** currentSaid is the sentence about an action that worked, or "" when none shows. */
+export function currentSaid(): string {
+  return said;
+}
+
+/** clearSaid hides the sentence about an action that worked. */
+export function clearSaid(): void {
+  if (saidTimer) clearTimeout(saidTimer);
+  saidTimer = null;
+  if (!said) return;
+  said = '';
   tell();
 }
 
@@ -40,6 +71,12 @@ export function useNotice(): string {
     return () => listeners.delete(f);
   }, []);
   return text;
+}
+
+/** useSaid reads the sentence about an action that worked, and redraws when it changes. */
+export function useSaid(): string {
+  useNotice();
+  return said;
 }
 
 /** attempt runs an action and shows its error. It returns true when the action worked. */

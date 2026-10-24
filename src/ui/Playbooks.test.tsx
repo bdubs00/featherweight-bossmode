@@ -6,6 +6,7 @@ import { forgetPlaybooks } from '../state/playbooks';
 import { playbookBodyOf } from '../lib/playbooks';
 import { Channel } from './Channel';
 import { NewBridge } from './NewBridge';
+import { clearSaid, currentSaid } from './notice';
 import { bridge, seat } from './testkit-b';
 import { click, fakeApi, fieldOf, keyNamed, mount, settle, typeIn, unmountAll, type Call, type Route } from './testkit-c';
 
@@ -31,6 +32,7 @@ beforeEach(() => {
   });
 });
 afterEach(() => {
+  clearSaid();
   unmountAll();
   if (api) api.restore();
 });
@@ -86,6 +88,8 @@ describe('a playbook from a bridge', () => {
     expect('members' in (put.body as object)).toBe(false);
     expect(dialog()).toBeNull();
     expect(document.activeElement!.getAttribute('aria-label')).toBe('More');
+    // A short notice says that it worked.
+    expect(currentSaid()).toBe('Saved the playbook puppet-to-ansible.');
   });
 
   it('replaces a playbook of the same name with the revision that it read, and says when it changed in the meantime', async () => {

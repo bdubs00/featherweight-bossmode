@@ -12,7 +12,7 @@ import { splitProblem, titleOfName } from '../lib/duties';
 import { membersOf } from '../state/reducer';
 import { useSelect } from '../state/store';
 import { loadPlaybooks, removePlaybook, savePlaybook, seatsOf, usePlaybooks } from '../state/playbooks';
-import { attempt } from './notice';
+import { attempt, showSaid } from './notice';
 import { Confirm } from './common';
 import { Glyph } from './icons';
 import { Button, Field, Input } from './primitives';
@@ -60,6 +60,7 @@ export function SavePlaybook({ bridge, confirm = 'Save playbook', onClose, onSav
       const body = playbookBodyOf(b, members);
       await savePlaybook(name, old && typeof old.revision === 'number' ? { ...body, revision: old.revision } : body);
       setBusy(false);
+      showSaid('Saved the playbook ' + name + '.');
       onClose();
       if (onSaved) onSaved(name);
       return;
