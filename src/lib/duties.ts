@@ -629,7 +629,14 @@ const NAME = /^[a-z0-9_-]{1,63}$/;
 /** The names that the routes keep: new is the draft of a duty that has no name yet, and options is a route of the front. No duty takes them. */
 export const RESERVED = ['new', 'options'];
 
-/** nameOf makes a name from what a duty does: the first words, in lower case, joined by hyphens. */
+/** The small words that join others. A name never ends on one, so it never reads as cut. */
+const JOINING = new Set(['a', 'an', 'and', 'as', 'at', 'by', 'for', 'from', 'in', 'into', 'of', 'on', 'or', 'per', 'than', 'that', 'the', 'then', 'to', 'with']);
+
+/**
+ * nameOf makes a name from what a duty does: the first six words, in lower
+ * case, joined by hyphens, at most 40 characters. It cuts between words,
+ * and drops a small joining word at the end, such as in or the.
+ */
 export function nameOf(message: string): string {
   const words = String(message || '')
     .replace(/\[[^\]]*\]/g, ' ')
@@ -639,12 +646,13 @@ export function nameOf(message: string): string {
     .split(' ')
     .filter(Boolean)
     .slice(0, 6);
-  let s = '';
+  const kept: string[] = [];
   for (const w of words) {
-    if ((s ? s.length + 1 : 0) + w.length > 40) break;
-    s += (s ? '-' : '') + w;
+    if (kept.join('-').length + (kept.length ? 1 : 0) + w.length > 40) break;
+    kept.push(w);
   }
-  return s;
+  while (kept.length > 1 && JOINING.has(kept[kept.length - 1])) kept.pop();
+  return kept.join('-');
 }
 
 /** nameReason says why a name cannot name a duty, or "". */

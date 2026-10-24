@@ -208,6 +208,11 @@ describe('the form of a duty', () => {
   it('makes a name from what the duty does', () => {
     expect(nameOf("Write the report of [Today's date] to homelab/reports.")).toBe('write-the-report-of-to-homelab');
     expect(nameOf('')).toBe('');
+    // A name ends on a word that carries the meaning, never on a joining word that reads as cut.
+    expect(nameOf('List the new helpdesk tickets in one line each.')).toBe('list-the-new-helpdesk-tickets');
+    expect(nameOf('Check the backups of the cluster and report.')).toBe('check-the-backups-of-the-cluster');
+    expect(nameOf('Summarize everything that happened yesterday in the incident channel of the platform team')).toBe('summarize-everything-that-happened');
+    expect(nameOf('The')).toBe('the');
   });
 });
 

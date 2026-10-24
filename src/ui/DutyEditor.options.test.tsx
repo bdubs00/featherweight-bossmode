@@ -232,7 +232,7 @@ describe('What', () => {
       'GET /v1/playbooks': { playbooks: [{ name: 'weekly-patching', goal: 'Patch the lab hosts and report.', placement: 'queue', seats: [{ handle: 'patcher', agent: 'migrator', task: 'Patch.' }], revision: 3, updatedAt: '2026-10-20T10:00:00Z' }] },
       'DELETE /v1/playbooks/weekly-patching': del,
       'PUT /v1/duties/new?dryRun=true': dry(),
-      'PUT /v1/duties/patch-on?dryRun=true': dry(),
+      'PUT /v1/duties/patch?dryRun=true': dry(),
     });
     const el = mount(<DutyEditor />);
     await settle();
@@ -247,7 +247,8 @@ describe('What', () => {
     change(fieldOf(el, 'Playbook'), 'weekly-patching');
     typeIn(fieldOf(el, 'Goal'), 'Patch on ');
     click(keyNamed(el, "Today's date"));
-    expect(fieldOf(el, 'Name')!.value).toBe('patch-on');
+    // The name drops the joining word at its end.
+    expect(fieldOf(el, 'Name')!.value).toBe('patch');
     click(keyNamed(el, 'Save duty'));
     await settle();
     expect((lastPut().body as DutyRecord).do).toEqual({ open: { playbook: 'weekly-patching', goal: 'Patch on {date}' } });

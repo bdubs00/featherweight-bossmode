@@ -260,7 +260,7 @@ describe('New duty', () => {
     click(keyNamed(el, "Today's date"));
     await settle();
     expect(fieldOf(el, 'Ask migrator')!.value).toBe("Draft the notes of [Today's date]");
-    expect(fieldOf(el, 'Name')!.value).toBe('draft-the-notes-of');
+    expect(fieldOf(el, 'Name')!.value).toBe('draft-the-notes');
     typeIn(fieldOf(el, 'Name'), 'taken');
     typeIn(cost, '0.50');
     click(keyNamed(el, 'Save duty'));
