@@ -39,6 +39,8 @@ import { useResult } from './RunPane';
 import { FollowBox, Msg, Quiet } from './Thread';
 import { useLiveAnswer } from './Live';
 import { Avatar, Button, Chip, Find, Help, Led, Mark, PaneHeader } from './primitives';
+import { Menu } from './common';
+import { askOfRun } from '../lib/duties';
 
 /** The number of items of a list of picks above which it gets a field to find one. */
 export const FIND_FROM = 12;
@@ -495,6 +497,12 @@ function ChatRun({ chat, runId }: { chat: QuickChat; runId: string }) {
           <a class="mark-link" href={hrefOf({ place: 'chat', run: runId, details: true })} aria-label={'This chat' + (light ? ', ' + light.word : '')} title={light ? light.word : undefined}>
             <Mark agent={chat.agent} size={36} label={chat.agent} halo={light ? { tone: light.tone, word: light.word } : undefined} />
           </a>
+        }
+        actions={
+          run ? (
+            // A chat that did a job once becomes a duty that does it again, with the agent and the first message.
+            <Menu label="More" items={[{ label: 'Make this a duty', onSelect: () => go({ place: 'duties', fresh: true, seed: { agent: chat.agent, act: 'ask', message: askOfRun(run, t.items) } }) }]} />
+          ) : undefined
         }
       />
       <FollowBox end={end}>

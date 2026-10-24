@@ -1155,3 +1155,15 @@ export function elapsedWords(s: number): string {
   const r = n % 60;
   return m + (m === 1 ? ' minute' : ' minutes') + (r ? ' ' + r + (r === 1 ? ' second' : ' seconds') : '') + ' so far.';
 }
+
+/**
+ * askOfRun is the first message of the person in a conversation: the input
+ * of its run, else its first message in the transcript. Make this a duty
+ * starts a duty from it.
+ */
+export function askOfRun(run: { input?: string } | undefined, items: { kind: string; text?: string }[]): string {
+  const input = run && run.input ? run.input.trim() : '';
+  if (input) return input;
+  const first = items.find((x) => x.kind === 'user' && x.text && x.text.trim());
+  return first && first.text ? first.text.trim() : '';
+}

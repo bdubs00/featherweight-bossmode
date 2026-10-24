@@ -29,7 +29,8 @@ import { useLiveAnswer } from './Live';
 import { answerSeqs, lastSeq, works } from '../lib/chat';
 import { Profile } from './Profile';
 import { EmptyPane } from './Shell';
-import { Confirm } from './common';
+import { Confirm, Menu } from './common';
+import { askOfRun } from '../lib/duties';
 import { Button, Chip, Find, Help, IconButton, Led, Mark, PaneHeader } from './primitives';
 import type { Tone } from '../lib/presence';
 
@@ -349,6 +350,12 @@ export function AgentChat({ agent }: { agent: string }) {
         level={1}
         back={{ href: '#fleet', label: 'Fleet', to: 'list' }}
         lead={<ProfileLink href={hrefOf({ place: 'fleet', agent, profile: true })} agent={agent} label={name} light={light} />}
+        actions={
+          runId ? (
+            // A conversation that did a job once becomes a duty of this agent that does it again.
+            <Menu label="More" items={[{ label: 'Make this a duty', onSelect: () => go({ place: 'duties', fresh: true, seed: { agent, act: 'ask', message: askOfRun(run, t.items) } }) }]} />
+          ) : undefined
+        }
       />
       <FollowBox end={end}>
         {runId ? <Conversation run={run} result={res} t={t} agentLabel={agent} live={live} /> : <div class="thread" />}

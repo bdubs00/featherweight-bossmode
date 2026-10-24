@@ -24,7 +24,9 @@ import { parseSlash } from '../lib/mention';
 import { attempt, showError } from './notice';
 import { NO_FILES_WITH_COMMAND, describeFiles, refusalOf } from '../lib/attachments';
 import { AttachedFiles } from './AttachedFiles';
-import { Avatar } from './common';
+import { Avatar, Menu } from './common';
+import { go } from '../lib/route';
+import { askOfRun } from '../lib/duties';
 import { Button, Help, Led, Mark, PaneHeader } from './primitives';
 import { Composer } from './Composer';
 import { Conversation, POLL_MS, usePoll, useTranscript } from './Conversation';
@@ -154,9 +156,15 @@ export function Manager() {
         back={{ href: '#', label: 'Bridges', to: 'list' }}
         lead={<Mark agent={agent} size={36} />}
         actions={
-          <Button size="s" disabled={!runId && !sent} onClick={() => setManagerRun('')}>
-            New conversation
-          </Button>
+          <>
+            <Button size="s" disabled={!runId && !sent} onClick={() => setManagerRun('')}>
+              New conversation
+            </Button>
+            {runId && (
+              // A conversation becomes a duty that asks the manager the same again.
+              <Menu label="More" items={[{ label: 'Make this a duty', onSelect: () => go({ place: 'duties', fresh: true, seed: { agent, act: 'manager', message: askOfRun(run, t.items) } }) }]} />
+            )}
+          </>
         }
       />
       <FollowBox end={end}>
