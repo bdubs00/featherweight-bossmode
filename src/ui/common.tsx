@@ -137,6 +137,8 @@ export function Confirm(props: {
   confirm: string;
   danger?: boolean;
   busy?: boolean;
+  /** A class of the dialog, such as the one of a tall form that scrolls. */
+  class?: string;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -166,7 +168,7 @@ export function Confirm(props: {
   return (
     <dialog
       ref={ref}
-      class="confirm"
+      class={'confirm' + (props.class ? ' ' + props.class : '')}
       aria-labelledby="confirm-title"
       onCancel={(e) => {
         e.preventDefault();

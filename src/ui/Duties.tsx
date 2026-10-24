@@ -8,7 +8,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { Duty, DutyRun } from '../api/types';
-import { go, hrefOf } from '../lib/route';
+import { go, hrefOf, type DutySeed } from '../lib/route';
 import { costText } from '../lib/cost';
 import {
   PLACEHOLDERS,
@@ -222,9 +222,9 @@ export function DutyList({ current }: { current?: string }) {
 
 /* ---------- the main pane ---------- */
 
-/** DutyMain is the main pane: a new duty, the editor of a duty, a duty, or, without one, the first duty where two panes show. */
-export function DutyMain({ name, edit, fresh }: { name?: string; edit?: boolean; fresh?: boolean }) {
-  if (fresh) return <DutyEditor />;
+/** DutyMain is the main pane: a new duty, the editor of a duty, a duty, or, without one, the first duty where two panes show. A seed fills a new duty from Make this a duty. */
+export function DutyMain({ name, edit, fresh, seed }: { name?: string; edit?: boolean; fresh?: boolean; seed?: DutySeed }) {
+  if (fresh) return <DutyEditor seed={seed} />;
   if (name && edit) return <DutyEditor name={name} />;
   if (name) return <DutyView name={name} />;
   return <DutyHome />;

@@ -203,7 +203,7 @@ describe('New duty', () => {
         if (b.when.say) said.push(b.when.say);
         if (b.when.say === 'every other tuesday at 3pm')
           return { body: { duty: { ...b, when: { schedule: { repeat: 'weekly', days: ['tue'], everyWeeks: 2, times: ['15:00'], timeZone: 'America/New_York' } } }, readback: 'Every other Tuesday at 3:00 PM, New York time.', next: NEXT, problems: [] } };
-        if (b.when.say) return { body: { duty: null, readback: '', next: [], problems: [{ field: 'when.say', message: 'Every Tuesday is clear. After lunch is not a time: pick one.' }, { field: 'limits.budget', message: 'A duty needs a budget.' }] } };
+        if (b.when.say) return { body: { duty: null, readback: '', next: [], problems: ['when.say: Every Tuesday is clear. After lunch is not a time: pick one.', 'limits.budget: A duty needs a budget.'] } };
         return { body: { duty: b, readback: READBACK, next: NEXT, problems: [] } };
       },
     });
@@ -430,14 +430,14 @@ describe('Check first', () => {
     openCheck(el);
     expect(fieldOf(el, 'Address')).toBeNull();
     typeIn(fieldOf(el, 'Wake the agent only when'), 'there is a new P1 in the queue');
-    click(keyNamed(el, 'Write the check'));
+    click(keyNamed(el, 'Write the check for me'));
     await settle();
     const write = api.calls.find((c) => c.method === 'POST')!;
     expect(write.path).toBe('/v1/duties/new-duty/write-check');
-    expect(write.body).toEqual({ words: 'there is a new P1 in the queue' });
+    expect(write.body).toEqual({ words: 'there is a new P1 in the queue', agent: 'migrator' });
     expect(write.headers['X-Time-Zone']).toBe(ZONE);
     // The route answered 404: the key goes, and the fields by hand show.
-    expect(keyNamed(el, 'Write the check')).toBeUndefined();
+    expect(keyNamed(el, 'Write the check for me')).toBeUndefined();
     expect(fieldOf(el, 'Wake the agent only when')).toBeNull();
     typeIn(fieldOf(el, 'Address'), 'https://example.com/api/queue');
     typeIn(fieldOf(el, 'Where the list is'), 'result.records');
@@ -474,9 +474,9 @@ describe('Check first', () => {
     pick(el, 'Migrator');
     openCheck(el);
     typeIn(fieldOf(el, 'Wake the agent only when'), 'a new incident');
-    click(keyNamed(el, 'Write the check'));
+    click(keyNamed(el, 'Write the check for me'));
     await settle();
-    expect(keyNamed(el, 'Write the check')).toBeUndefined();
+    expect(keyNamed(el, 'Write the check for me')).toBeUndefined();
     expect(fieldOf(el, 'Address')).toBeTruthy();
   });
 
@@ -500,19 +500,24 @@ describe('Check first', () => {
     await settle();
     openCheck(el);
     typeIn(fieldOf(el, 'Wake the agent only when'), 'a new P1 or P2');
-    click(keyNamed(el, 'Write the check'));
-    expect(text(fieldOf(el, 'Wake the agent only when')!.closest('label')!.querySelector('.field-error'))).toBe('Pick the agent first. It writes the check.');
+    // The key stays off until the editor has an agent, which writes the check.
+    expect((keyNamed(el, 'Write the check for me') as HTMLButtonElement).disabled).toBe(true);
+    expect(text(el.querySelector('#duty-write-hint'))).toBe('Pick the agent first. It writes the check.');
     pick(el, 'Migrator');
-    click(keyNamed(el, 'Write the check'));
+    expect((keyNamed(el, 'Write the check for me') as HTMLButtonElement).disabled).toBe(false);
+    click(keyNamed(el, 'Write the check for me'));
     await settle();
     expect(text(fieldOf(el, 'Wake the agent only when')!.closest('label')!.querySelector('.field-error'))).toBe('The agent has no tool that reads the queue.');
-    click(keyNamed(el, 'Write the check'));
+    click(keyNamed(el, 'Write the check for me'));
     await settle();
-    expect(keyNamed(el, 'Write the check')).toBeTruthy();
+    expect(keyNamed(el, 'Write the check for me')).toBeTruthy();
     expect(fieldOf(el, 'Tool')!.value).toBe('servicenow.query_incidents');
     expect(fieldOf(el, 'Where the list is')!.value).toBe('result.records');
     expect((el.querySelector('input[aria-label="Value 2"]') as HTMLInputElement).value).toBe('20');
-    expect(text(el)).toContain('Keeps the items where priority is one of 1 and 2.');
+    // The filter of the agent shows as a field, a test, and a value, which the person can change.
+    expect((el.querySelector('input[aria-label="Field of filter 1"]') as HTMLInputElement).value).toBe('priority');
+    expect(select(el, 'Test of filter 1')!.value).toBe('oneOf');
+    expect((el.querySelector('input[aria-label="Value of filter 1"]') as HTMLInputElement).value).toBe('1, 2');
     expect(text(el.querySelector('details.duty-check .duty-readback'))).toBe('Every 15 minutes, look in ServiceNow for incidents with priority 1 or 2. Wake triage only for new ones.');
     expect(text(el.querySelector('.duty-found > p'))).toBe('Now: 2 items. They would wake migrator.');
   });

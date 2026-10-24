@@ -5,9 +5,11 @@
 // of docs/CONTRACT.md, section 16. The front reads the schedule back and
 // computes the next times. The page only shows its answer.
 
-import type { CheckFirst, CheckFound, CheckWhere, Day, Duty, DutyProblem, DutyRecord, DutyRun, Repeat, Schedule } from '../api/types';
+import type { CheckFirst, CheckFound, CheckWhere, Day, Duty, DutyDecided, DutyDo, DutyEvent, DutyProblem, DutyRecord, DutyRun, DutySecret, Repeat, Schedule, Tool } from '../api/types';
 import type { Light } from './presence';
 import { costText } from './cost';
+import { personName } from './words';
+import type { DutySeed } from './route';
 
 /* ---------- placeholders ---------- */
 
@@ -27,8 +29,8 @@ export const PLACEHOLDERS: Placeholder[] = [
   { key: 'last.run', words: 'The last run', chip: true },
   { key: 'last.state', words: 'How the last run ended', chip: true },
   { key: 'duty', words: "This duty's name", chip: true },
-  // An event starts no duty in phase 1, so no chip offers it yet.
-  { key: 'event', words: 'What happened', chip: false },
+  // The editor offers this chip only to a duty that an event starts.
+  { key: 'event', words: 'What happened', chip: true },
 ];
 
 /** fold is the form of a word that a match ignores: the case and the kind of apostrophe. */
@@ -445,6 +447,25 @@ export function checkLine(r: DutyRun): string {
   return n + (r.woke ? ', woke the agent' : '');
 }
 
+/**
+ * decidedWords says who decided a question of a run of a duty while the
+ * person was away, such as The manager allowed shell.exec: it only reads.
+ * me is the subject of the person who reads it.
+ */
+export function decidedWords(d: DutyDecided, me = ''): string {
+  const tool = d.tool || 'a tool';
+  const why = d.reason && d.reason.trim() ? ': ' + d.reason.trim() : '.';
+  if (d.by === 'timeout') {
+    if (d.verdict === 'cancel') return 'Nobody answered in time, so the run stopped at ' + tool + why;
+    if (d.verdict === 'allow') return 'Nobody answered in time, so ' + tool + ' went ahead' + why;
+    return 'Nobody answered in time, so ' + tool + ' was denied' + why;
+  }
+  const who = d.by === 'manager' ? 'The manager' : me && d.by === me ? 'You' : cap(personName(d.by));
+  if (d.verdict === 'allow') return who + ' allowed ' + tool + why;
+  if (d.verdict === 'cancel') return who + ' stopped the run at ' + tool + why;
+  return who + ' denied ' + tool + why;
+}
+
 /** firstLine is the first sentence or line of a text, cut at a word past 80 characters. */
 export function firstLine(text: string): string {
   const line = String(text || '').trim().split('\n')[0].trim();
@@ -467,21 +488,64 @@ export function dutyTitle(d: Pick<DutyRecord, 'name' | 'do'>): string {
   return titleOfName(d.name);
 }
 
+/* ---------- events ---------- */
+
+/** The words of each event of the fleet, as the choice of When says it. */
+export const EVENT_WORDS: Record<string, string> = {
+  'bridge.closed': 'When a bridge closes',
+  'run.failed': 'When a run of an agent fails',
+  'question.waiting': 'When a question waits too long',
+  'page.changed': 'When a page changes',
+  'routine.ready': 'When a routine is ready',
+  'cap.reached': 'When a cap is reached',
+};
+
+/** The fields that each event takes beside its kind: an agent that narrows it, how long a question waits, or a path of the wiki. */
+export const EVENT_FIELDS: Record<string, ('agent' | 'after' | 'path')[]> = {
+  'bridge.closed': ['agent'],
+  'run.failed': ['agent'],
+  'question.waiting': ['after', 'agent'],
+  'page.changed': ['path'],
+  'routine.ready': ['agent'],
+  'cap.reached': [],
+};
+
+/** eventLabel is the choice of an event kind in words. */
+export const eventLabel = (kind: string): string => EVENT_WORDS[kind] || 'When something happens in the fleet';
+
+/** The spans that a question can wait before it starts a duty. */
+export const WAITS: [string, string][] = [
+  ['15m', '15 minutes'],
+  ['30m', '30 minutes'],
+  ['1h', '1 hour'],
+  ['2h', '2 hours'],
+  ['4h', '4 hours'],
+  ['24h', 'a day'],
+];
+
+/** eventWords reads an event back in words, with its agent, its wait, or its path, such as When a bridge of triage closes. */
+export function eventWords(e: DutyEvent, name: (agent: string) => string = (a) => a): string {
+  const who = e.agent ? name(e.agent) : '';
+  switch (e.kind) {
+    case 'bridge.closed':
+      return who ? 'When a bridge of ' + who + ' closes' : 'When a bridge closes';
+    case 'run.failed':
+      return who ? 'When a run of ' + who + ' fails' : 'When a run of an agent fails';
+    case 'question.waiting':
+      return 'When a question' + (who ? ' of ' + who : '') + ' waits longer than ' + spanText(e.after || '1h');
+    case 'page.changed':
+      return e.path ? 'When a page under ' + e.path + ' changes' : 'When a page changes';
+    case 'routine.ready':
+      return who ? 'When a routine of ' + who + ' is ready' : 'When a routine is ready';
+  }
+  return eventLabel(e.kind);
+}
+
 /** startWords says what starts a duty that has no schedule. */
-export function startWords(d: Pick<DutyRecord, 'when'>): string {
+export function startWords(d: Pick<DutyRecord, 'when'>, name?: (agent: string) => string): string {
   const w = d.when || {};
   if (w.webhook) return 'When another app calls';
-  if (w.event) {
-    const k: Record<string, string> = {
-      'bridge.closed': 'When a bridge closes',
-      'run.failed': 'When a run of an agent fails',
-      'question.waiting': 'When a question waits too long',
-      'page.changed': 'When a page changes',
-      'routine.ready': 'When a routine is ready',
-      'cap.reached': 'When a cap is reached',
-    };
-    return k[w.event.kind] || 'When something happens in the fleet';
-  }
+  if (w.event) return eventWords(w.event, name);
   return '';
 }
 
@@ -561,6 +625,27 @@ export interface InputRow {
   was?: unknown;
 }
 
+/** The tests of a filter, as the record names them. */
+export type WhereTest = 'is' | 'isNot' | 'oneOf' | 'contains' | 'atLeast' | 'atMost';
+
+/** The tests of a filter in words, as the choice says them. */
+export const WHERE_TESTS: [WhereTest, string][] = [
+  ['is', 'is'],
+  ['isNot', 'is not'],
+  ['oneOf', 'is one of'],
+  ['contains', 'holds'],
+  ['atLeast', 'is at least'],
+  ['atMost', 'is at most'],
+];
+
+/** One filter of a check as the form holds it: a field of an item, a test, and the value as text. was is the value of the record, which an unchanged text keeps. */
+export interface WhereRow {
+  field: string;
+  test: WhereTest;
+  text: string;
+  was?: unknown;
+}
+
 /** The check as the form holds it. */
 export interface CheckForm {
   look: 'http' | 'tool';
@@ -573,8 +658,20 @@ export interface CheckForm {
   key: string;
   wake: 'new' | 'any' | 'atLeast';
   count: string;
-  /** The filters of a check that the agent wrote. The page shows them and keeps them. */
-  where: CheckWhere[];
+  /** The filters that keep some items, such as priority is one of 1 and 2. */
+  where: WhereRow[];
+}
+
+/** The actions of a duty. */
+export type Act = 'ask' | 'post' | 'open' | 'manager';
+export const ACTS: Act[] = ['ask', 'post', 'open', 'manager'];
+
+/** An event as the form holds it. after and path are text. */
+export interface EventForm {
+  kind: string;
+  agent: string;
+  after: string;
+  path: string;
 }
 
 /** The form of a duty, each field as the person typed it. */
@@ -583,12 +680,22 @@ export interface DutyForm {
   /** True once the person wrote the name, so it no longer follows the message. */
   nameOwn: boolean;
   agent: string;
+  /** What starts the duty: a schedule or an event of the fleet. */
+  start: 'schedule' | 'event';
   when: WhenForm;
   /** The words of the box, when the front read them back with no schedule to fill the sentence. The record then sends them. */
   say: string;
+  event: EventForm;
   check: CheckForm;
-  /** The message in words, with the placeholders in brackets. */
+  act: Act;
+  /** The message in words, with the placeholders in brackets, for ask, post, and manager. */
   message: string;
+  /** The bridge of post and the handles that the message goes to. No handle is everyone. */
+  bridge: string;
+  to: string[];
+  /** The playbook of open and the goal that takes the place of its own, in words. */
+  playbook: string;
+  goal: string;
   cost: string;
   turns: string;
   perDay: string;
@@ -605,16 +712,25 @@ export function emptyCheck(): CheckForm {
   return { look: 'http', url: '', secret: '', header: '', tool: '', input: [], items: '', key: '', wake: 'new', count: '', where: [] };
 }
 
+export const emptyEvent = (): EventForm => ({ kind: '', agent: '', after: '1h', path: '' });
+
 /** emptyForm is a new duty: no agent, every weekday at 9:00 AM in the zone of the browser, and no budget. */
 export function emptyForm(zone: string): DutyForm {
   return {
     name: '',
     nameOwn: false,
     agent: '',
+    start: 'schedule',
     when: whenFormOf(null, zone),
     say: '',
+    event: emptyEvent(),
     check: emptyCheck(),
+    act: 'ask',
     message: '',
+    bridge: '',
+    to: [],
+    playbook: '',
+    goal: '',
     // No silent cost: the person writes the budget.
     cost: '',
     turns: '',
@@ -633,6 +749,42 @@ const num = (n: number | undefined) => (typeof n === 'number' && n > 0 ? String(
 /** amount shows dollars as a person writes them, with cents: 0.2 is 0.20. A finer amount stays whole. */
 const amount = (n: number | undefined) => (typeof n === 'number' && n > 0 ? (Number.isInteger(Math.round(n * 1e6) / 1e4) ? n.toFixed(2) : String(n)) : '');
 
+/** valueText shows a value of a filter or of a tool as text: a text as it is, anything else as JSON. */
+const valueText = (v: unknown): string => (typeof v === 'string' ? v : JSON.stringify(v));
+
+/** whereRowsOf reads the filters of a check into the form. A filter of another shape keeps its field and its first test. */
+export function whereRowsOf(where: CheckWhere[] | undefined): WhereRow[] {
+  return (where || []).map((w) => {
+    const test = (WHERE_TESTS.map(([t]) => t).find((t) => t in w) || 'is') as WhereTest;
+    const v = (w as unknown as Record<string, unknown>)[test];
+    const text = test === 'oneOf' && Array.isArray(v) ? v.map(valueText).join(', ') : v === undefined ? '' : valueText(v);
+    return { field: w.field, test, text, was: v };
+  });
+}
+
+/** valueOfText reads the text of a value that a person changed: a number stays a number, else the text. */
+function valueOfText(text: string): unknown {
+  const t = text.trim();
+  return /^-?\d+(\.\d+)?$/.test(t) ? Number(t) : t;
+}
+
+/** whereOf writes the filters of the form. An unchanged text keeps the value of the record, and a row without a field goes. */
+export function whereOf(rows: WhereRow[]): CheckWhere[] {
+  const out: CheckWhere[] = [];
+  for (const r of rows) {
+    const field = r.field.trim();
+    if (!field) continue;
+    const before = r.was !== undefined && (r.test === 'oneOf' && Array.isArray(r.was) ? r.was.map(valueText).join(', ') : valueText(r.was));
+    let v: unknown;
+    if (before === r.text) v = r.was;
+    else if (r.test === 'oneOf') v = r.text.split(',').map((x) => x.trim()).filter(Boolean).map(valueOfText);
+    else if (r.test === 'atLeast' || r.test === 'atMost') v = Number(r.text.trim());
+    else v = valueOfText(r.text);
+    out.push({ field, [r.test]: v } as CheckWhere);
+  }
+  return out;
+}
+
 /** checkFormOf reads a check into the form. */
 export function checkFormOf(c: CheckFirst | null | undefined): CheckForm {
   const f = emptyCheck();
@@ -641,7 +793,7 @@ export function checkFormOf(c: CheckFirst | null | undefined): CheckForm {
   if (look.tool) {
     f.look = 'tool';
     f.tool = look.tool;
-    f.input = Object.entries(look.input || {}).map(([name, v]) => ({ name, text: typeof v === 'string' ? v : JSON.stringify(v), was: v }));
+    f.input = Object.entries(look.input || {}).map(([name, v]) => ({ name, text: valueText(v), was: v }));
   } else if (look.http) {
     f.url = look.http.url || '';
     f.secret = look.http.secret || '';
@@ -651,8 +803,16 @@ export function checkFormOf(c: CheckFirst | null | undefined): CheckForm {
   f.key = c.key || '';
   f.wake = (c.wake && c.wake.when) || 'new';
   f.count = c.wake && c.wake.count ? String(c.wake.count) : '';
-  f.where = c.where || [];
+  f.where = whereRowsOf(c.where);
   return f;
+}
+
+/** actOf names the action of a duty. */
+export function actOf(x: DutyDo | undefined): Act {
+  if (x && x.post) return 'post';
+  if (x && x.open) return 'open';
+  if (x && x.manager) return 'manager';
+  return 'ask';
 }
 
 /** formOf reads a duty into the form. */
@@ -661,15 +821,24 @@ export function formOf(d: Duty, zone: string): DutyForm {
   const l = d.limits || ({} as DutyRecord['limits']);
   const b = l.budget || {};
   const w = d.whileAway;
+  const x = d.do || {};
+  const e = d.when && d.when.event;
   return {
     ...f,
     name: d.name,
     nameOwn: true,
     agent: d.agent,
+    start: e ? 'event' : 'schedule',
     when: whenFormOf(d.when && d.when.schedule, zone),
     say: d.when && !d.when.schedule && d.when.say ? d.when.say : '',
+    event: e ? { kind: e.kind || '', agent: e.agent || '', after: e.after || '1h', path: e.path || '' } : emptyEvent(),
     check: checkFormOf(d.checkFirst),
-    message: toWords((d.do && d.do.ask && d.do.ask.message) || ''),
+    act: actOf(x),
+    message: toWords((x.ask && x.ask.message) || (x.post && x.post.message) || (x.manager && x.manager.message) || ''),
+    bridge: (x.post && x.post.bridge) || '',
+    to: (x.post && x.post.to) || [],
+    playbook: (x.open && x.open.playbook) || '',
+    goal: toWords((x.open && x.open.goal) || ''),
     cost: amount(b.maxCostUSD),
     turns: num(b.maxTurns),
     perDay: amount(l.perDayUSD),
@@ -680,6 +849,20 @@ export function formOf(d: Duty, zone: string): DutyForm {
     then: w && w.then === 'cancel' ? 'cancel' : 'deny',
     failures: !d.notify || !d.notify.failure ? true : d.notify.failure.includes('owner'),
     questions: !d.notify || !d.notify.needsYou ? true : d.notify.needsYou.includes('owner'),
+  };
+}
+
+/** seededForm is a new duty with what Make this a duty brought. The budget stays empty: the person writes it. */
+export function seededForm(seed: DutySeed | undefined, zone: string): DutyForm {
+  const f = emptyForm(zone);
+  if (!seed) return f;
+  return {
+    ...f,
+    agent: seed.agent || '',
+    act: seed.act && ACTS.includes(seed.act) ? seed.act : 'ask',
+    message: seed.message || '',
+    bridge: seed.bridge || '',
+    playbook: seed.playbook || '',
   };
 }
 
@@ -715,9 +898,56 @@ export function checkOf(c: CheckForm): CheckFirst | null {
   }
   if (c.items.trim()) out.items = c.items.trim();
   if (c.key.trim()) out.key = c.key.trim();
-  if (c.where.length) out.where = c.where;
+  const where = whereOf(c.where);
+  if (where.length) out.where = where;
   out.wake = c.wake === 'atLeast' ? { when: 'atLeast', count: Math.max(1, Math.floor(Number(c.count) || 1)) } : { when: c.wake };
   return out;
+}
+
+/** urlHost is the host of an address, with and without its port, or null for an address that does not read. */
+export function urlHost(url: string): { host: string; hostname: string } | null {
+  try {
+    const u = new URL(String(url || '').trim());
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+    return { host: u.host.toLowerCase(), hostname: u.hostname.toLowerCase() };
+  } catch {
+    return null;
+  }
+}
+
+/** secretsFor keeps the secrets of the front that may go to the host of an address: a host by name, with its port, or a host under *.domain. */
+export function secretsFor(secrets: DutySecret[], url: string): DutySecret[] {
+  const h = urlHost(url);
+  if (!h) return [];
+  const fits = (pattern: string) => {
+    const p = String(pattern || '').toLowerCase();
+    if (p === h.host || p === h.hostname) return true;
+    return p.startsWith('*.') && (h.hostname.endsWith(p.slice(1)) || h.host.endsWith(p.slice(1)));
+  };
+  return secrets.filter((s) => (s.hosts || []).some(fits));
+}
+
+/**
+ * checkTools lists the tools of an agent that a check can call: each tool
+ * that the profile names, and each tool of the catalog under a server that
+ * it names whole, such as servicenow.*. A profile without a list gives the
+ * whole catalog.
+ */
+export function checkTools(names: string[] | null | undefined, catalog: Tool[] | null | undefined): string[] {
+  const all = (catalog || []).map((t) => {
+    const src = t.source || t.server || '';
+    return src && src !== 'builtin' && t.origin !== 'builtin' ? src + '.' + t.name : t.name;
+  });
+  if (!names) return [...new Set(all)].sort();
+  const out: string[] = [];
+  for (const n of names) {
+    const glob = /^(.+)[./]\*$/.exec(n);
+    const server = glob ? glob[1] : !/[.*/]/.test(n) && (catalog || []).some((t) => (t.source || t.server) === n) ? n : '';
+    if (server) {
+      for (const t of catalog || []) if ((t.source || t.server) === server) out.push(server + '.' + t.name);
+    } else if (!n.includes('*')) out.push(n);
+  }
+  return [...new Set(out)];
 }
 
 /** money reads an amount of dollars that a person typed, such as 0.50 or $2, or NaN. */
@@ -730,17 +960,46 @@ export function money(text: string): number {
 /** keepOthers keeps the people of a list other than owner, and adds owner when on. */
 const keepOthers = (list: string[] | undefined, on: boolean) => [...(list || []).filter((x) => x !== 'owner'), ...(on ? ['owner'] : [])];
 
+/** eventOf writes the event of the form, with only the fields of its kind. */
+export function eventOf(e: EventForm): DutyEvent {
+  const out: DutyEvent = { kind: e.kind };
+  const fields = EVENT_FIELDS[e.kind] || ['agent', 'after', 'path'];
+  if (fields.includes('agent') && e.agent) out.agent = e.agent;
+  if (fields.includes('after') && e.after) out.after = e.after;
+  if (fields.includes('path') && e.path.trim()) out.path = e.path.trim();
+  return out;
+}
+
+/** doOf writes the action of the form. The placeholders go back to the record. */
+export function doOf(f: DutyForm, base: Duty | null): DutyDo {
+  const message = toPlaceholders(f.message.trim());
+  switch (f.act) {
+    case 'post': {
+      const post: NonNullable<DutyDo['post']> = { bridge: f.bridge, message };
+      if (f.to.length) post.to = [...f.to];
+      return { post };
+    }
+    case 'open': {
+      const open: NonNullable<DutyDo['open']> = { playbook: f.playbook };
+      if (f.goal.trim()) open.goal = toPlaceholders(f.goal.trim());
+      return { open };
+    }
+    case 'manager':
+      return { manager: { message } };
+  }
+  return { ask: { ...((base && base.do && base.do.ask) || {}), message } };
+}
+
 /**
  * recordOf writes the record of PUT /v1/duties/{name}. A field that the
  * form does not show keeps its value from the duty that the person
- * edits: the pool, an event start, another action, the limits of tokens
- * and tool calls, the retries, and runAs. The owner never goes out: the
- * front sets it.
+ * edits: the pool, a start by another app, the limits of tokens and tool
+ * calls, the retries, and runAs. The owner never goes out: the front
+ * sets it.
  */
 export function recordOf(f: DutyForm, base: Duty | null, name: string): DutyRecord {
   const b = base;
-  const keepWhen = !!(b && b.when && (b.when.event || b.when.webhook));
-  const keepDo = !!(b && b.do && !b.do.ask && (b.do.post || b.do.open || b.do.manager));
+  const keepWhen = !!(b && b.when && b.when.webhook);
   const old = (b && b.limits) || ({} as DutyRecord['limits']);
   const budget: DutyRecord['limits']['budget'] = { ...(old.budget || {}) };
   delete budget.maxCostUSD;
@@ -753,11 +1012,12 @@ export function recordOf(f: DutyForm, base: Duty | null, name: string): DutyReco
   const perDay = money(f.perDay);
   if (perDay > 0) limits.perDayUSD = perDay;
   if (old.retries !== undefined) limits.retries = old.retries;
+  const when = keepWhen ? b!.when : f.start === 'event' ? { event: eventOf(f.event) } : f.say ? { say: f.say } : { schedule: scheduleOf(f.when) };
   const r: DutyRecord = {
     name,
     agent: f.agent,
-    when: keepWhen ? b!.when : f.say ? { say: f.say } : { schedule: scheduleOf(f.when) },
-    do: keepDo ? b!.do : { ask: { ...((b && b.do && b.do.ask) || {}), message: toPlaceholders(f.message.trim()) } },
+    when,
+    do: doOf(f, b),
     limits,
     whileAway: { decider: f.decider, timeout: f.timeout, then: f.then },
     notify: { failure: keepOthers(b && b.notify ? b.notify.failure : undefined, f.failures), needsYou: keepOthers(b && b.notify ? b.notify.needsYou : undefined, f.questions) },
@@ -775,29 +1035,40 @@ export function recordOf(f: DutyForm, base: Duty | null, name: string): DutyReco
 export interface FormErrors {
   agent?: string;
   when?: string;
+  dates?: string;
   message?: string;
+  bridge?: string;
+  playbook?: string;
   cost?: string;
   turns?: string;
   perDay?: string;
   count?: string;
+  where?: string;
   name?: string;
 }
 
 /** formErrors says what is wrong with the form before a dry run. taken names the duties that exist, for a new one. */
-export function formErrors(f: DutyForm, opts: { fresh: boolean; name: string; taken: string[]; keepsWhen: boolean; keepsDo: boolean }): FormErrors {
+export function formErrors(f: DutyForm, opts: { fresh: boolean; name: string; taken: string[]; keepsWhen: boolean }): FormErrors {
   const e: FormErrors = {};
   if (!f.agent) e.agent = 'Pick the agent that does the duty.';
-  if (!opts.keepsWhen && !f.say) {
+  if (!opts.keepsWhen && f.start === 'event') {
+    if (!f.event.kind) e.when = 'Pick what starts the duty.';
+  } else if (!opts.keepsWhen && !f.say) {
     const w = whenError(f.when);
     if (w) e.when = w;
+    if (f.when.start && f.when.end && f.when.end < f.when.start) e.dates = 'The last day comes before the first day.';
   }
-  if (!opts.keepsDo && !f.message.trim()) e.message = 'Write what the agent does.';
+  if (f.act === 'post' && !f.bridge) e.bridge = 'Pick the bridge.';
+  if (f.act === 'open' && !f.playbook) e.playbook = 'Pick a playbook.';
+  if (f.act !== 'open' && !f.message.trim()) e.message = f.act === 'post' ? 'Write the message for the bridge.' : f.act === 'manager' ? 'Write what the manager does.' : 'Write what the agent does.';
   // No silent cost: a duty saves only with the most that a run can cost.
   if (!f.cost.trim()) e.cost = 'A duty needs a budget. Write the most a run can cost, such as 0.50.';
   else if (!(money(f.cost) > 0)) e.cost = 'Write an amount above 0, such as 0.50.';
   if (f.turns.trim() && !(Number.isInteger(Number(f.turns)) && Number(f.turns) > 0)) e.turns = 'Write a whole number.';
   if (f.perDay.trim() && !(money(f.perDay) > 0)) e.perDay = 'Write an amount above 0, such as 2.00.';
   if (hasCheck(f.check) && f.check.wake === 'atLeast' && !(Number.isInteger(Number(f.check.count)) && Number(f.check.count) > 0)) e.count = 'Write a whole number of items.';
+  if (hasCheck(f.check) && f.check.where.some((r) => r.field.trim() && (r.test === 'atLeast' || r.test === 'atMost') && !Number.isFinite(Number(r.text.trim() || 'x'))))
+    e.where = 'At least and at most need a number.';
   if (opts.fresh) {
     const why = nameReason(opts.name, opts.taken);
     if (why) e.name = why;
@@ -805,26 +1076,82 @@ export function formErrors(f: DutyForm, opts: { fresh: boolean; name: string; ta
   return e;
 }
 
-/* ---------- the answers of the front ---------- */
+/* ---------- the problems of the front ---------- */
 
-/** problemText is a problem of a dry run as one sentence. */
-export function problemText(p: DutyProblem): string {
-  if (typeof p === 'string') return p;
-  return String(p.message || p.detail || '');
+/** The first parts of a path that a problem can name: the fields of a duty, of the notifications, and of a playbook. */
+const ROOTS = ['name', 'agent', 'pool', 'owner', 'when', 'checkFirst', 'do', 'limits', 'whileAway', 'notify', 'runAs', 'paused', 'revision', 'ntfy', 'send', 'quietHours', 'goal', 'placement', 'seats', 'members', 'caps', 'delegation'];
+
+/** A problem of the front: the dotted path of its field, or "", and its words. */
+export interface Problem {
+  path: string;
+  text: string;
 }
 
-/** problemField is the field that a problem names, or "". */
-export const problemField = (p: DutyProblem): string => (typeof p === 'string' ? '' : String(p.field || p.path || ''));
-
 /**
- * whenProblems keeps the problems that concern the start of a duty: those
- * that name a field of when. A problem without a field concerns when only
- * when the front read back no schedule.
+ * splitProblem reads a problem of the front. A problem that concerns a
+ * field starts with the dotted path of the field and a colon, such as
+ * "when.schedule: Pick a time.". The text after the colon shows beside
+ * the field, with a capital. A problem with no path shows at the top.
  */
-export function whenProblems(ps: DutyProblem[] | null | undefined, readback: string): string[] {
-  const list = ps || [];
-  const named = list.filter((p) => /^when\b/.test(problemField(p)));
-  if (named.length) return named.map(problemText).filter(Boolean);
-  if (readback) return [];
-  return list.filter((p) => !problemField(p)).map(problemText).filter(Boolean);
+export function splitProblem(p: DutyProblem | unknown): Problem {
+  const s = String(p === null || p === undefined ? '' : p).trim();
+  const m = /^([A-Za-z][\w-]*(?:\.[\w-]+|\[\d+\])*):\s*([\s\S]+)$/.exec(s);
+  if (m && ROOTS.includes(m[1].split(/[.[]/)[0])) return { path: m[1], text: cap(m[2].trim()) };
+  return { path: '', text: s };
+}
+
+/** problemsBy sorts the problems of the front by the place that shows them. slot names the place of a path, and "top" is the top of the form. */
+export function problemsBy<S extends string>(ps: unknown[] | null | undefined, slot: (path: string) => S | 'top'): Partial<Record<S | 'top', string[]>> {
+  const out: Partial<Record<S | 'top', string[]>> = {};
+  for (const p of ps || []) {
+    const { path, text } = splitProblem(p);
+    if (!text) continue;
+    const k = path ? slot(path) : 'top';
+    (out[k] = out[k] || []).push(text);
+  }
+  return out;
+}
+
+/** The places of the editor of a duty that show a problem of the front beside them. */
+export type DutySlot = 'name' | 'agent' | 'when' | 'check' | 'message' | 'bridge' | 'to' | 'playbook' | 'goal' | 'what' | 'cost' | 'turns' | 'perDay' | 'limits' | 'away' | 'tell';
+
+/** dutySlot names the place of the editor that shows a problem of a path, or top for a path that the form does not show. */
+export function dutySlot(path: string): DutySlot | 'top' {
+  const parts = path.replace(/\[\d+\]/g, '').split('.');
+  const leaf = parts[parts.length - 1];
+  switch (parts[0]) {
+    case 'name':
+      return 'name';
+    case 'agent':
+      return 'agent';
+    case 'when':
+      return 'when';
+    case 'checkFirst':
+      return 'check';
+    case 'do':
+      if (leaf === 'message') return 'message';
+      if (leaf === 'bridge' || leaf === 'to' || leaf === 'playbook' || leaf === 'goal') return leaf;
+      return 'what';
+    case 'limits':
+      if (parts[1] === 'budget') return parts[2] === 'maxTurns' ? 'turns' : 'cost';
+      if (parts[1] === 'perDayUSD') return 'perDay';
+      return 'limits';
+    case 'whileAway':
+      return 'away';
+    case 'notify':
+      return 'tell';
+  }
+  return 'top';
+}
+
+/** dutyProblems sorts the problems of a dry run or a save by the place of the editor that shows them. */
+export const dutyProblems = (ps: unknown[] | null | undefined) => problemsBy(ps, dutySlot);
+
+/** elapsedWords says how long a wait took so far, such as 45 seconds so far, or 1 minute 5 seconds so far. */
+export function elapsedWords(s: number): string {
+  const n = Math.max(0, Math.floor(s));
+  if (n < 60) return n + (n === 1 ? ' second' : ' seconds') + ' so far.';
+  const m = Math.floor(n / 60);
+  const r = n % 60;
+  return m + (m === 1 ? ' minute' : ' minutes') + (r ? ' ' + r + (r === 1 ? ' second' : ' seconds') : '') + ' so far.';
 }

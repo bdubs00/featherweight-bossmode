@@ -15,23 +15,28 @@ import type {
   Duty,
   DutyDryRun,
   DutyList,
+  DutyOptions,
   DutyRecord,
   DutyStarted,
   Entry,
   FaceMeta,
   FileView,
   Fleet,
+  InboxItem,
   Marketplace,
   Member,
   MessagePage,
   NewProfile,
   NewRun,
+  NotifyRead,
+  NotifySettings,
   OrphanList,
   OrphanRemoval,
   Page,
   PageMeta,
   PageVersion,
   Placement,
+  Playbook,
   Pool,
   ReactionKind,
   Result,
@@ -76,6 +81,9 @@ export interface NewBridge {
   caps?: Partial<Caps>;
 }
 
+/** The body of PUT /v1/playbooks/{name}: the body of POST /v1/bridges without the title, with the revision that the person read on a change. */
+export type PlaybookBody = Omit<NewBridge, 'title'> & { revision?: number };
+
 /** A message of the person to a channel. to names the seats, and a slash command goes as skill. */
 export interface NewMessage {
   text: string;
@@ -101,7 +109,9 @@ const pool = (name: string) => '/v1/pools/' + enc(name);
 const duty = (name: string) => '/v1/duties/' + enc(name);
 
 /** dutyCall calls a route of the duties with X-Time-Zone, the zone of the browser, in which the front reads a time that a person says. */
-const dutyCall = <T>(path: string, opts: { method?: string; body?: unknown } = {}) => call<T>(path, { ...opts, headers: { 'X-Time-Zone': browserZone() } });
+const dutyCall = <T>(path: string, opts: { method?: string; body?: unknown; signal?: AbortSignal } = {}) => call<T>(path, { ...opts, headers: { 'X-Time-Zone': browserZone() } });
+
+const playbook = (name: string) => '/v1/playbooks/' + enc(name);
 
 export const api = {
   whoami: () => call<Whoami>('/v1/whoami'),
@@ -265,10 +275,33 @@ export const api = {
   deleteDuty: (name: string) => dutyCall<null>(duty(name), { method: 'DELETE' }),
   /** runDuty starts a duty now, out of its schedule: the run, or why it skipped. */
   runDuty: (name: string) => dutyCall<DutyStarted>(duty(name) + '/run', { method: 'POST', body: {} }),
-  /** writeCheck asks the agent of a duty for a check from the words of a person. A 422 says why it could not. */
-  writeCheck: (name: string, words: string) => dutyCall<WrittenCheck>(duty(name) + '/write-check', { method: 'POST', body: { words } }),
+  /**
+   * writeCheck asks an agent for a check from the words of a person. agent
+   * is the agent of the editor, which a duty that is not saved yet needs. For
+   * a saved duty, the agent of the duty wins. A 422 says why it could not,
+   * and a 504 says that two minutes passed. signal lets the person cancel.
+   */
+  writeCheck: (name: string, words: string, agent: string, signal?: AbortSignal) =>
+    dutyCall<WrittenCheck>(duty(name) + '/write-check', { method: 'POST', body: { words, agent }, signal }),
+  /** dutyOptions names what the front serves now: the secrets of a check, the events, the actions, and the looks. */
+  dutyOptions: () => dutyCall<DutyOptions>('/v1/duties/options'),
   /** pauseAllDuties is the switch that pauses or resumes every duty, for an admin. */
   pauseAllDuties: (paused: boolean, reason?: string) => dutyCall<unknown>('/v1/duties', { method: 'PATCH', body: reason ? { paused, reason } : { paused } }),
+
+  /** inbox lists what needs the person: approvals, questions, failures, and paused duties. */
+  inbox: () => call<{ items: InboxItem[] }>('/v1/inbox').then((r) => (r && r.items) || []),
+
+  /** The notification settings of the person who is signed in. */
+  notifications: () => call<NotifyRead>('/v1/notifications'),
+  putNotifications: (body: NotifySettings) => call<NotifyRead>('/v1/notifications', { method: 'PUT', body }),
+  /** testNotification sends a test notification to the person: {"sent": true}, or 502 with the reason in error. */
+  testNotification: () => call<{ sent: boolean }>('/v1/notifications/test', { method: 'POST', body: {} }),
+
+  /** The playbooks: the list without caps and delegation, one playbook whole, a save, and a delete. */
+  playbooks: () => call<{ playbooks: Playbook[] }>('/v1/playbooks').then((r) => (r && r.playbooks) || []),
+  playbook: (name: string) => call<Playbook>(playbook(name)),
+  putPlaybook: (name: string, body: PlaybookBody) => call<Playbook>(playbook(name), { method: 'PUT', body }),
+  deletePlaybook: (name: string) => call<null>(playbook(name), { method: 'DELETE' }),
 
   faces: () => call<{ faces: FaceMeta[] }>('/v1/faces').then((r) => (r && r.faces) || []),
   /** faceBlob reads a face as SVG bytes behind the token. */

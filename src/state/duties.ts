@@ -4,11 +4,15 @@
 // what it changed, and a reset of the stream reads the list again. The
 // stream carries no event of a duty, so the duty page also reads its duty
 // again when a run of its history changes its state in the store.
+//
+// It also keeps what the front serves now for the editor, GET
+// /v1/duties/options, and the items of GET /v1/inbox that Activity shows
+// beside the bridges: the failures and the paused duties.
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
 import { ApiError } from '../api/client';
-import type { Duty, DutyRecord, DutyStarted } from '../api/types';
+import type { Duty, DutyOptions, DutyRecord, DutyStarted, InboxItem } from '../api/types';
 import { store } from './store';
 
 export interface DutiesState {
@@ -24,9 +28,20 @@ export interface DutiesState {
   error: string;
   /** True when the front answers 404 to the list: it keeps no duties. */
   off: boolean;
+  /** What the front serves now, or null before the read. */
+  options: DutyOptions | null;
+  /** The items of GET /v1/inbox, or null before the first read. */
+  inbox: InboxItem[] | null;
 }
 
-const initial: DutiesState = { list: null, paused: false, byName: {}, gone: {}, error: '', off: false };
+const initial: DutiesState = { list: null, paused: false, byName: {}, gone: {}, error: '', off: false, options: null, inbox: null };
+
+/**
+ * FALLBACK is what an older front serves, which has no route of the
+ * options: the action ask and a check of an address or of a tool, as the
+ * first wave of the page offered. It names no secret and no event.
+ */
+export const FALLBACK: DutyOptions = { secrets: [], events: [], actions: ['ask'], looks: ['http', 'tool'] };
 
 let state: DutiesState = initial;
 const listeners = new Set<() => void>();
@@ -49,6 +64,8 @@ export const duties = {
 export function forgetDuties(): void {
   state = initial;
   listing = null;
+  optioning = null;
+  inboxing = null;
   reading.clear();
   if (unwatch) unwatch();
   unwatch = null;
@@ -180,6 +197,51 @@ export async function pauseAll(paused: boolean, reason?: string): Promise<void> 
   await loadDuties();
 }
 
+/* ---------- the options and the inbox ---------- */
+
+let optioning: Promise<DutyOptions> | null = null;
+
+/** loadDutyOptions reads what the front serves now, once per page load. A front without the route, or a failed read, gives FALLBACK. */
+export function loadDutyOptions(): Promise<DutyOptions> {
+  if (state.options) return Promise.resolve(state.options);
+  if (!optioning)
+    optioning = api.dutyOptions().then(
+      (o) => {
+        const options: DutyOptions = {
+          secrets: (o && o.secrets) || [],
+          events: (o && o.events) || [],
+          actions: o && o.actions && o.actions.length ? o.actions : ['ask'],
+          looks: (o && o.looks) || [],
+        };
+        set({ ...state, options });
+        return options;
+      },
+      () => {
+        set({ ...state, options: FALLBACK });
+        return FALLBACK;
+      },
+    );
+  return optioning;
+}
+
+let inboxing: Promise<void> | null = null;
+
+/** loadInbox reads what needs the person. A front without the route gives no item. */
+export function loadInbox(): Promise<void> {
+  watchStream();
+  if (!inboxing)
+    inboxing = api
+      .inbox()
+      .then(
+        (items) => set({ ...state, inbox: items }),
+        (e) => {
+          if (e instanceof ApiError && (e.status === 404 || e.status === 501)) set({ ...state, inbox: [] });
+        },
+      )
+      .finally(() => (inboxing = null));
+  return inboxing;
+}
+
 /* ---------- the stream ---------- */
 
 let watching: number | null = null;
@@ -194,5 +256,6 @@ function watchStream(): void {
     if (n === watching) return;
     watching = n;
     if (state.list) loadDuties().catch(() => {});
+    if (state.inbox) loadInbox().catch(() => {});
   });
 }

@@ -939,7 +939,12 @@ export interface Schedule {
   end?: string;
 }
 
-/** An event of the fleet that starts a duty. Phase 1 of the page shows it and keeps it. */
+/**
+ * An event of the fleet that starts a duty: kind is one of the events of
+ * GET /v1/duties/options, such as bridge.closed. agent narrows it to one
+ * agent, after is how long a question waits, and path is a path of the
+ * wiki for page.changed.
+ */
 export interface DutyEvent {
   kind: string;
   agent?: string;
@@ -988,7 +993,7 @@ export interface CheckFirst {
   wake?: CheckWake;
 }
 
-/** What a duty does: exactly one action. Phase 1 has ask. */
+/** What a duty does: exactly one of ask, post (in a bridge that stays open), open (a bridge from a playbook), and manager. */
 export interface DutyDo {
   ask?: { message: string; [k: string]: unknown };
   post?: { bridge: string; to?: string[]; message: string };
@@ -1034,6 +1039,26 @@ export interface DutyRun {
   /** False when the check found no work, so the agent slept. */
   woke?: boolean;
   /** Why the time started no run, in words, such as a skip. */
+  reason?: string;
+  /** When the run started, and its attempt from 1 when a failed run went again. */
+  start?: string;
+  attempt?: number;
+  /** The title of the run. */
+  title?: string;
+  /** The questions of the run that somebody decided while the person was away, oldest first. */
+  decided?: DutyDecided[];
+}
+
+/**
+ * A decision on a question of a run of a duty. by is manager, timeout (the
+ * default of the duty after its wait), or the subject of a person. verdict
+ * is allow, deny, or cancel.
+ */
+export interface DutyDecided {
+  at: string;
+  by: string;
+  verdict: 'allow' | 'deny' | 'cancel' | string;
+  tool: string;
   reason?: string;
 }
 
@@ -1091,8 +1116,12 @@ export interface CheckFound {
   wakes: boolean;
 }
 
-/** A problem of a dry run: a sentence, or a sentence with the field that it concerns. */
-export type DutyProblem = string | { field?: string; path?: string; message?: string; detail?: string };
+/**
+ * A problem of a dry run, in words. A problem that concerns a field starts
+ * with the dotted path of the field and a colon, such as
+ * "when.schedule: Pick a time.". A problem with no path concerns the whole.
+ */
+export type DutyProblem = string;
 
 /** The answer of PUT /v1/duties/{name}?dryRun=true: the record that a save keeps, its readback, the next times, and every problem. */
 export interface DutyDryRun {
@@ -1115,4 +1144,75 @@ export interface WrittenCheck {
 export interface DutyStarted {
   run?: string;
   skipped?: string;
+}
+
+/** A secret of the front that a check can use, with the hosts that it may go to. The page never sees its value. */
+export interface DutySecret {
+  name: string;
+  hosts: string[];
+}
+
+/**
+ * The answer of GET /v1/duties/options: what the front serves now. The
+ * editor offers no other choice. events are kinds such as bridge.closed,
+ * actions are among ask, post, open, and manager, and looks are among http
+ * and tool.
+ */
+export interface DutyOptions {
+  secrets: DutySecret[];
+  events: string[];
+  actions: string[];
+  looks: string[];
+}
+
+/** One item of GET /v1/inbox: what needs the person. kind is approval, question, failure, or paused. */
+export interface InboxItem {
+  kind: 'approval' | 'question' | 'failure' | 'paused' | string;
+  run?: string;
+  duty?: string;
+  agent?: string;
+  bridge?: string;
+  text?: string;
+  since?: string;
+}
+
+/* ---------- notifications ---------- */
+
+/**
+ * The notification settings of the person who is signed in. A read
+ * answers token "set" or "", never the token. A write with "set" keeps
+ * the stored token, "" clears it, and another value replaces it.
+ */
+export interface NotifySettings {
+  ntfy: { server: string; topic: string; token: string };
+  send: { questions: boolean; failures: boolean; digest: boolean };
+  quietHours: { from: string; to: string; timeZone: string };
+}
+
+/** The answer of GET /v1/notifications: the settings, the server of the front for an empty server, and why the front sends nothing, if it does not. */
+export interface NotifyRead extends NotifySettings {
+  serverDefault?: string;
+  off?: string;
+}
+
+/* ---------- playbooks ---------- */
+
+/** A seat of a playbook. */
+export interface PlaybookSeat {
+  handle: string;
+  agent: string;
+  task: string;
+}
+
+/** A playbook: the form of New bridge without a title, saved under a name. GET /v1/playbooks leaves out caps and delegation. */
+export interface Playbook {
+  name: string;
+  goal: string;
+  placement: Placement;
+  seats: PlaybookSeat[];
+  caps?: Partial<Caps>;
+  delegation?: Partial<Delegation>;
+  revision?: number;
+  owner?: string;
+  updatedAt?: string;
 }

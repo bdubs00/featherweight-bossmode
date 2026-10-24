@@ -29,9 +29,19 @@ import {
   toWords,
   whenError,
   whenFormOf,
-  whenProblems,
   awayWords,
   tellWords,
+  checkTools,
+  decidedWords,
+  dutyProblems,
+  eventOf,
+  eventWords,
+  secretsFor,
+  seededForm,
+  splitProblem,
+  startWords,
+  whereOf,
+  whereRowsOf,
 } from './duties';
 
 const duty = (over: Partial<Duty> = {}): Duty => ({
@@ -165,7 +175,7 @@ describe('the form of a duty', () => {
     expect(r.notify).toEqual({ failure: ['owner'], needsYou: ['owner'] });
     expect(r.limits.catchUp).toBe('1h');
     expect('revision' in r).toBe(false);
-    const opts = { fresh: true, name: 'draft-the-notes', taken: ['other'], keepsWhen: false, keepsDo: false };
+    const opts = { fresh: true, name: 'draft-the-notes', taken: ['other'], keepsWhen: false };
     expect(formErrors(f, opts)).toEqual({ cost: 'A duty needs a budget. Write the most a run can cost, such as 0.50.' });
     expect(formErrors({ ...f, cost: '0' }, opts).cost).toBe('Write an amount above 0, such as 0.50.');
     expect(formErrors({ ...f, cost: '$0.50' }, opts)).toEqual({});
@@ -174,7 +184,7 @@ describe('the form of a duty', () => {
 
   it('asks for an agent, a message, a free name, and a whole count of items', () => {
     const f = { ...emptyForm('UTC'), cost: '1', check: { ...checkFormOf(null), url: 'https://q.example/api', wake: 'atLeast' as const, count: 'x' } };
-    const e = formErrors(f, { fresh: true, name: 'taken', taken: ['taken'], keepsWhen: false, keepsDo: false });
+    const e = formErrors(f, { fresh: true, name: 'taken', taken: ['taken'], keepsWhen: false });
     expect(e).toEqual({ agent: 'Pick the agent that does the duty.', message: 'Write what the agent does.', count: 'Write a whole number of items.', name: 'A duty of this name exists. Pick another name.' });
     expect(nameReason('Daily Report', [])).toBe('A name holds 1 to 63 of a to z, 0 to 9, hyphens, and underscores.');
     expect(nameReason('', [])).toBe('Give the duty a name.');
@@ -245,9 +255,121 @@ describe('a duty in words', () => {
     expect(tellWords({ failure: [], needsYou: [] })).toBe('Nothing.');
   });
 
-  it('keeps the problems of a dry run that concern when', () => {
-    expect(whenProblems([{ field: 'when.say', message: 'After lunch is not a time: pick one.' }, { field: 'limits.budget', message: 'A duty needs a budget.' }], 'x')).toEqual(['After lunch is not a time: pick one.']);
-    expect(whenProblems(['Every Tuesday is clear. After lunch is not a time: pick one.'], '')).toEqual(['Every Tuesday is clear. After lunch is not a time: pick one.']);
-    expect(whenProblems(['A duty needs a budget.'], 'Every weekday at 9:00 AM.')).toEqual([]);
+  it('says who decided a question while the person was away', () => {
+    expect(decidedWords({ at: '', by: 'manager', verdict: 'allow', tool: 'shell.exec', reason: 'it only reads the disk' })).toBe('The manager allowed shell.exec: it only reads the disk');
+    expect(decidedWords({ at: '', by: 'manager', verdict: 'deny', tool: 'shell.exec' })).toBe('The manager denied shell.exec.');
+    expect(decidedWords({ at: '', by: 'timeout', verdict: 'deny', tool: 'git.push' })).toBe('Nobody answered in time, so git.push was denied.');
+    expect(decidedWords({ at: '', by: 'timeout', verdict: 'cancel', tool: 'git.push' })).toBe('Nobody answered in time, so the run stopped at git.push.');
+    expect(decidedWords({ at: '', by: 'bob@example.com', verdict: 'cancel', tool: 'bash', reason: 'wrong host' })).toBe('Bob stopped the run at bash: wrong host');
+    expect(decidedWords({ at: '', by: 'alice@example.com', verdict: 'allow', tool: 'bash' }, 'alice@example.com')).toBe('You allowed bash.');
+  });
+});
+
+describe('the problems of the front', () => {
+  it('read the path of a field before the colon, and keep a problem with no path whole', () => {
+    expect(splitProblem('when.schedule: pick a time of the day.')).toEqual({ path: 'when.schedule', text: 'Pick a time of the day.' });
+    expect(splitProblem('do.post.bridge: The bridge is closed.')).toEqual({ path: 'do.post.bridge', text: 'The bridge is closed.' });
+    expect(splitProblem('when.schedule.times[1]: 25:00 is not a time.')).toEqual({ path: 'when.schedule.times[1]', text: '25:00 is not a time.' });
+    expect(splitProblem('The agent cannot run at night.')).toEqual({ path: '', text: 'The agent cannot run at night.' });
+    // A sentence with a colon is no path.
+    expect(splitProblem('Note: the agent sleeps.')).toEqual({ path: '', text: 'Note: the agent sleeps.' });
+  });
+
+  it('sort by the place of the editor that shows them', () => {
+    expect(
+      dutyProblems([
+        'when.say: After lunch is not a time: pick one.',
+        'limits.budget: A duty needs a budget.',
+        'limits.budget.maxTurns: Write a whole number.',
+        'limits.perDayUSD: Too much.',
+        'do.ask.message: Write what the agent does.',
+        'do.post.to[0]: No such member.',
+        'do.open.playbook: No such playbook.',
+        'checkFirst.look.http.url: The address starts with https://.',
+        'runAs: Only the owner sets this.',
+        'The front is busy.',
+      ]),
+    ).toEqual({
+      when: ['After lunch is not a time: pick one.'],
+      cost: ['A duty needs a budget.'],
+      turns: ['Write a whole number.'],
+      perDay: ['Too much.'],
+      message: ['Write what the agent does.'],
+      to: ['No such member.'],
+      playbook: ['No such playbook.'],
+      check: ['The address starts with https://.'],
+      top: ['Only the owner sets this.', 'The front is busy.'],
+    });
+  });
+});
+
+describe('events and actions', () => {
+  it('say an event in words and write only the fields of its kind', () => {
+    expect(eventWords({ kind: 'bridge.closed' })).toBe('When a bridge closes');
+    expect(eventWords({ kind: 'bridge.closed', agent: 'triage' }, (a) => a.toUpperCase())).toBe('When a bridge of TRIAGE closes');
+    expect(eventWords({ kind: 'question.waiting', after: '2h' })).toBe('When a question waits longer than 2 hours');
+    expect(eventWords({ kind: 'page.changed', path: 'homelab/' })).toBe('When a page under homelab/ changes');
+    expect(eventWords({ kind: 'something.new' })).toBe('When something happens in the fleet');
+    expect(startWords({ when: { event: { kind: 'run.failed', agent: 'backup' } } })).toBe('When a run of backup fails');
+    expect(eventOf({ kind: 'page.changed', agent: 'triage', after: '1h', path: ' homelab/ ' })).toEqual({ kind: 'page.changed', path: 'homelab/' });
+    expect(eventOf({ kind: 'question.waiting', agent: '', after: '30m', path: '' })).toEqual({ kind: 'question.waiting', after: '30m' });
+  });
+
+  it('read and write each action, and start a new duty from what Make this a duty brought', () => {
+    const post = duty({ do: { post: { bridge: 'b1', to: ['reviewer'], message: 'Review {date}.' } } });
+    const f = formOf(post, 'UTC');
+    expect([f.act, f.bridge, f.to, f.message]).toEqual(['post', 'b1', ['reviewer'], "Review [Today's date]."]);
+    expect(recordOf(f, post, post.name).do).toEqual(post.do);
+    expect(recordOf({ ...f, to: [] }, post, post.name).do).toEqual({ post: { bridge: 'b1', message: "Review {date}." } });
+    const open = duty({ do: { open: { playbook: 'weekly-patching', goal: 'Patch on {date}.' } } });
+    const g = formOf(open, 'UTC');
+    expect([g.act, g.playbook, g.goal]).toEqual(['open', 'weekly-patching', "Patch on [Today's date]."]);
+    expect(recordOf(g, open, open.name).do).toEqual(open.do);
+    expect(recordOf({ ...g, goal: '' }, open, open.name).do).toEqual({ open: { playbook: 'weekly-patching' } });
+    expect(recordOf({ ...g, act: 'manager', message: 'Sum up the week.' }, open, open.name).do).toEqual({ manager: { message: 'Sum up the week.' } });
+    const ev = duty({ when: { event: { kind: 'bridge.closed', agent: 'triage' } } });
+    const h = formOf(ev, 'UTC');
+    expect([h.start, h.event.kind, h.event.agent]).toEqual(['event', 'bridge.closed', 'triage']);
+    expect(recordOf(h, ev, ev.name).when).toEqual({ event: { kind: 'bridge.closed', agent: 'triage' } });
+    const s = seededForm({ agent: 'manager', act: 'manager', message: 'Check the backups.' }, 'UTC');
+    expect([s.agent, s.act, s.message, s.cost]).toEqual(['manager', 'manager', 'Check the backups.', '']);
+    expect(seededForm({ act: 'nonsense' as never }, 'UTC').act).toBe('ask');
+    const opts = { fresh: false, name: 'x', taken: [], keepsWhen: false };
+    expect(formErrors({ ...s, act: 'post', cost: '1' }, opts)).toEqual({ bridge: 'Pick the bridge.' });
+    expect(formErrors({ ...s, act: 'open', message: '', cost: '1' }, opts)).toEqual({ playbook: 'Pick a playbook.' });
+    expect(formErrors({ ...s, start: 'event', cost: '1' }, opts)).toEqual({ when: 'Pick what starts the duty.' });
+    expect(formErrors({ ...s, cost: '1', when: { ...s.when, start: '2026-12-01', end: '2026-11-01' } }, opts)).toEqual({ dates: 'The last day comes before the first day.' });
+  });
+});
+
+describe('the check by hand', () => {
+  it('edits the filters, and keeps the kind of a value that did not change', () => {
+    const rows = whereRowsOf([{ field: 'priority', oneOf: [1, 2] }, { field: 'active', is: true }, { field: 'age', atLeast: 3 }]);
+    expect(rows.map((r) => [r.field, r.test, r.text])).toEqual([
+      ['priority', 'oneOf', '1, 2'],
+      ['active', 'is', 'true'],
+      ['age', 'atLeast', '3'],
+    ]);
+    expect(whereOf(rows)).toEqual([{ field: 'priority', oneOf: [1, 2] }, { field: 'active', is: true }, { field: 'age', atLeast: 3 }]);
+    const changed = [{ ...rows[0], text: '1, 2, P3' }, { ...rows[1], test: 'contains' as const, text: 'yes' }, { ...rows[2], text: '5' }, { field: ' ', test: 'is' as const, text: 'x' }];
+    expect(whereOf(changed)).toEqual([{ field: 'priority', oneOf: [1, 2, 'P3'] }, { field: 'active', contains: 'yes' }, { field: 'age', atLeast: 5 }]);
+  });
+
+  it('offers the secrets of the host of the address, and the tools of the agent', () => {
+    const secrets = [
+      { name: 'QUEUE_TOKEN', hosts: ['q.example.com'] },
+      { name: 'WIDE', hosts: ['*.example.com'] },
+      { name: 'PORTED', hosts: ['api.lab:8443'] },
+    ];
+    expect(secretsFor(secrets, 'https://q.example.com/api').map((s) => s.name)).toEqual(['QUEUE_TOKEN', 'WIDE']);
+    expect(secretsFor(secrets, 'https://api.lab:8443/x').map((s) => s.name)).toEqual(['PORTED']);
+    expect(secretsFor(secrets, 'not an address')).toEqual([]);
+    const catalog = [
+      { name: 'query_incidents', source: 'servicenow' },
+      { name: 'get_incident', source: 'servicenow' },
+      { name: 'bash', origin: 'builtin' as const, source: 'builtin' },
+    ];
+    expect(checkTools(['servicenow.*', 'bash', 'github.*'], catalog)).toEqual(['servicenow.query_incidents', 'servicenow.get_incident', 'bash']);
+    expect(checkTools(undefined, catalog)).toEqual(['bash', 'servicenow.get_incident', 'servicenow.query_incidents']);
   });
 });

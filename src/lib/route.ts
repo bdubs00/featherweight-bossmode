@@ -6,6 +6,55 @@
 // add none. docs/DESIGN.md, section 11, lists them.
 
 export type BridgeTab = 'posts' | 'wiki' | 'decisions';
+
+/**
+ * What Make this a duty brings to New duty: the agent, the action, and its
+ * message, bridge, or playbook. The address holds it as a short query,
+ * #duties/new?agent=scribe&do=ask&message=..., so a reload keeps it.
+ */
+export interface DutySeed {
+  agent?: string;
+  act?: 'ask' | 'post' | 'open' | 'manager';
+  message?: string;
+  bridge?: string;
+  playbook?: string;
+}
+
+/** The longest message that the address of a new duty carries. */
+export const SEED_MESSAGE = 2000;
+
+const SEED_KEYS: [keyof DutySeed, string][] = [
+  ['agent', 'agent'],
+  ['act', 'do'],
+  ['bridge', 'bridge'],
+  ['playbook', 'playbook'],
+  ['message', 'message'],
+];
+
+/** seedOf reads the query of #duties/new, or undefined for none. */
+function seedOf(q: string): DutySeed | undefined {
+  if (!q) return undefined;
+  const p = new URLSearchParams(q);
+  const out: DutySeed = {};
+  for (const [k, name] of SEED_KEYS) {
+    const v = p.get(name);
+    if (v) (out as Record<string, string>)[k] = v;
+  }
+  if (out.act && !['ask', 'post', 'open', 'manager'].includes(out.act)) delete out.act;
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** seedQuery writes a seed as the query of #duties/new. */
+function seedQuery(seed: DutySeed | undefined): string {
+  if (!seed) return '';
+  const p = new URLSearchParams();
+  for (const [k, name] of SEED_KEYS) {
+    const v = seed[k];
+    if (v) p.set(name, k === 'message' ? String(v).slice(0, SEED_MESSAGE) : String(v));
+  }
+  const s = p.toString();
+  return s ? '?' + s : '';
+}
 export type MemberTab = 'chat' | 'run' | 'files';
 export type RoutineTab = 'steps' | 'evidence' | 'runbook';
 
@@ -28,7 +77,7 @@ export type Route =
   | { place: 'appearance' }
   | { place: 'skills'; item?: SkillItem; add?: boolean }
   | { place: 'routines'; agent?: string; name?: string; tab?: RoutineTab; details?: boolean }
-  | { place: 'duties'; name?: string; edit?: boolean; fresh?: boolean }
+  | { place: 'duties'; name?: string; edit?: boolean; fresh?: boolean; seed?: DutySeed }
   | { place: 'pages'; path?: string; mode: 'tree' | 'read' | 'history' | 'edit' | 'create'; version?: number };
 
 /** The places of the app bar. */
@@ -90,10 +139,14 @@ export function parseRoute(hash: string): Route {
     }
     // #duties is the list, #duties/new a new duty, #duties/<name> a duty,
     // and #duties/<name>/edit its editor. A duty named new opens at
-    // #duties/new/, with the slash, so it never meets the new duty.
+    // #duties/new/, with the slash, so it never meets the new duty. A query
+    // after #duties/new holds what Make this a duty brought.
     case 'duties': {
       if (!rest[0]) return { place: 'duties' };
-      if (rest[0] === 'new' && rest.length === 1) return { place: 'duties', fresh: true };
+      if (/^new(\?|$)/.test(rest[0]) && rest.length === 1) {
+        const seed = seedOf(rest[0].slice(4));
+        return seed ? { place: 'duties', fresh: true, seed } : { place: 'duties', fresh: true };
+      }
       const name = dec(rest[0]);
       return rest[1] === 'edit' ? { place: 'duties', name, edit: true } : { place: 'duties', name };
     }
@@ -167,7 +220,7 @@ export function hrefOf(r: Route): string {
       return r.tab === 'evidence' || r.tab === 'runbook' ? base + '/' + r.tab : base;
     }
     case 'duties':
-      if (r.fresh) return '#duties/new';
+      if (r.fresh) return '#duties/new' + seedQuery(r.seed);
       if (!r.name) return '#duties';
       return '#duties/' + encodeURIComponent(r.name) + (r.edit ? '/edit' : r.name === 'new' ? '/' : '');
     case 'bridge': {

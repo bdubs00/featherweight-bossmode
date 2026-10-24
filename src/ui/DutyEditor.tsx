@@ -1,27 +1,33 @@
 // New duty and Edit, at #duties/new and #duties/<name>/edit. The form goes
 // in the order of the design: Who, When, Check first, What, Limits, While
 // you are away, and Tell me about. When is a sentence with choices,
-// presets, and a box for plain words. The front reads the schedule back:
-// the page sends the form with PUT ?dryRun=true and shows the readback and
-// the next five times, and Save duty shows them again before it saves. A
-// message holds its placeholders as words in brackets, such as [Today's
-// date], and nobody types a brace. A duty needs a budget: the page never
-// fills one.
+// presets, a box for plain words, and two optional dates, or an event of
+// the fleet in words. The front reads the start back: the page sends the
+// form with PUT ?dryRun=true and shows the readback and the next five
+// times, and Save duty shows them again before it saves. What asks the
+// agent, posts in a bridge that stays open, opens a bridge from a
+// playbook, or asks the manager. A message holds its placeholders as words
+// in brackets, such as [Today's date], and nobody types a brace. A duty
+// needs a budget: the page never fills one.
 //
-// The sections hold one action, Ask the agent, and the starts of a
-// schedule. A duty of another action or start keeps it, so the actions and
-// the starts of a later phase slot in as more choices.
+// GET /v1/duties/options names the events, the actions, the looks of a
+// check, and the secrets that the front serves now, and the editor offers
+// nothing else. A duty keeps a choice that it holds, so an edit never drops
+// it. A problem of the front that names a field shows beside the field,
+// and one with no field shows at the top. Make this a duty opens the form
+// with the agent and the message of a chat or a bridge, from the address.
 
 import type { RefObject } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
 import { ApiError, browserZone } from '../api/client';
-import type { CheckFound, Day, Duty, DutyDryRun } from '../api/types';
-import { go, hrefOf } from '../lib/route';
+import type { Day, Duty, DutyDryRun } from '../api/types';
+import { go, hrefOf, type DutySeed } from '../lib/route';
 import {
   AT_TIMES,
   CATCH_UPS,
   DAYS,
+  EVENT_FIELDS,
   EVERY_WEEKS,
   MONTH_DAYS,
   PLACEHOLDERS,
@@ -29,57 +35,69 @@ import {
   REPEATS,
   SPANS,
   TIMEOUTS,
+  WAITS,
+  actOf,
   applyPreset,
-  checkFormOf,
   checkOf,
   checkWords,
   chipText,
   domOf,
-  emptyCheck,
-  emptyForm,
+  dutyProblems,
+  eventLabel,
+  eventOf,
+  eventWords,
   formErrors,
   formOf,
-  foundWords,
   hasCheck,
-  itemWords,
   limitWords,
   monthDayOf,
   nameOf,
   nextWords,
   presetOf,
-  problemText,
   recordOf,
   scheduleOf,
+  seededForm,
   sortDays,
   spanText,
+  splitProblem,
   startWords,
   whenError,
   whenFormOf,
-  whenProblems,
-  whereWords,
   withChoice,
   zoneWords,
   zonesOf,
-  type CheckForm,
+  type Act,
   type DutyForm,
+  type DutySlot,
+  type EventForm,
   type FormErrors,
   type Placeholder,
   type WhenForm,
 } from '../lib/duties';
 import { useSelect } from '../state/store';
-import { useProfile } from '../state/profiles';
-import { loadDuties, loadDuty, saveDuty, useDuties } from '../state/duties';
+import { membersOf } from '../state/reducer';
+import { loadBridge } from '../state/actions';
+import { FALLBACK, loadDuties, loadDutyOptions, loadDuty, saveDuty, useDuties } from '../state/duties';
 import { showError } from './notice';
 import { Confirm } from './common';
-import { Glyph } from './icons';
 import { Picker } from './Picker';
-import { Button, Choices, Field, Help, IconButton, Input, Mark, PaneHeader, TextArea, buttonClass } from './primitives';
+import { CheckFirst } from './DutyCheck';
+import { PlaybookPick, PlaybookShelf } from './Playbooks';
+import { Button, Choices, Field, IconButton, Input, Mark, PaneHeader, TextArea, buttonClass } from './primitives';
 
 /** The wait after a change of When before the page asks the front to read it back. A test sets it to 0. */
 export const timing = { preview: 400 };
 
 /** The name of the route of a dry run for a new duty that has no name yet. A dry run saves nothing. */
 const DRAFT = 'new-duty';
+
+/** The words of each action, as the choice of What says them. */
+const ACT_WORDS: Record<Act, string> = {
+  ask: 'Ask the agent',
+  post: 'Post in a bridge',
+  open: 'Open a bridge from a playbook',
+  manager: 'Ask the manager',
+};
 
 /** useAgentName is the name of an agent as its face names it. */
 export function useAgentName(agent: string): string {
@@ -88,6 +106,21 @@ export function useAgentName(agent: string): string {
 
 /** messageOf is the sentence of a failed call. */
 const messageOf = (e: unknown) => (e instanceof Error && e.message ? e.message : 'The action failed. Try it again.');
+
+/** Said lists the problems of the front for one place of the form. */
+function Said({ list }: { list?: string[] }) {
+  if (!list || list.length === 0) return null;
+  return (
+    <ul class="duty-problems" role="alert">
+      {list.map((x) => (
+        <li>{x}</li>
+      ))}
+    </ul>
+  );
+}
+
+/** joinError is the error of a field: the error of the form, else the problems of the front, as one text. */
+const joinError = (own: string | undefined, said: string[] | undefined) => own || (said && said.length ? said.join(' ') : undefined);
 
 /* ---------- When ---------- */
 
@@ -207,34 +240,112 @@ function Sentence({ f, onChange }: { f: WhenForm; onChange: (f: WhenForm) => voi
   );
 }
 
-/** What the front said of the schedule: the answer of a dry run, a call that runs, or a failed call. */
+/** Dates are the first and the last day of a schedule, behind one switch. A duty with no dates runs from now on. */
+function Dates({ f, onChange, error }: { f: WhenForm; onChange: (f: WhenForm) => void; error?: string }) {
+  const [on, setOn] = useState(() => !!(f.start || f.end));
+  const turn = (v: boolean) => {
+    setOn(v);
+    if (!v) onChange({ ...f, start: undefined, end: undefined });
+  };
+  return (
+    <div class="duty-dates">
+      <label class="check">
+        <input type="checkbox" checked={on} onChange={(e) => turn((e.target as HTMLInputElement).checked)} />
+        <span>Only between two dates</span>
+      </label>
+      {on && (
+        <div class="field-row">
+          <Field label="First day">
+            <Input type="date" value={f.start || ''} invalid={!!error} onInput={(e) => onChange({ ...f, start: (e.target as HTMLInputElement).value || undefined })} />
+          </Field>
+          <Field label="Last day" error={error}>
+            <Input type="date" value={f.end || ''} invalid={!!error} onInput={(e) => onChange({ ...f, end: (e.target as HTMLInputElement).value || undefined })} />
+          </Field>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** EventFields are the event of the fleet that starts a duty, in words, with its agent, its wait, or its path. */
+function EventFields({ e, kinds, onChange, error }: { e: EventForm; kinds: string[]; onChange: (e: EventForm) => void; error?: string }) {
+  const agents = useSelect((s) => s.agents);
+  const faces = useSelect((s) => s.faces);
+  const fields = EVENT_FIELDS[e.kind] || [];
+  const names = (agents || []).map((a) => a.name);
+  if (e.agent && !names.includes(e.agent)) names.push(e.agent);
+  return (
+    <>
+      <Field label="What happens" error={error} class="duty-narrow">
+        <select class="recess" value={e.kind} aria-invalid={error ? true : undefined} onChange={(x) => onChange({ ...e, kind: (x.target as HTMLSelectElement).value })}>
+          <option value="">Pick what happens</option>
+          {kinds.map((k) => (
+            <option value={k}>{eventLabel(k)}</option>
+          ))}
+        </select>
+      </Field>
+      {fields.includes('agent') && (
+        <Field label="Of the agent" class="duty-narrow">
+          <select class="recess" value={e.agent} onChange={(x) => onChange({ ...e, agent: (x.target as HTMLSelectElement).value })}>
+            <option value="">Any agent</option>
+            {names.map((n) => (
+              <option value={n}>{(faces[n] && faces[n].displayName) || n}</option>
+            ))}
+          </select>
+        </Field>
+      )}
+      {fields.includes('after') && (
+        <Field label="Waits longer than" class="duty-narrow">
+          <select class="recess" value={e.after || '1h'} onChange={(x) => onChange({ ...e, after: (x.target as HTMLSelectElement).value })}>
+            {withChoice(WAITS, e.after, spanText).map(([v, w]) => (
+              <option value={v}>{w}</option>
+            ))}
+          </select>
+        </Field>
+      )}
+      {fields.includes('path') && (
+        <Field label="Pages under" class="duty-narrow">
+          <Input value={e.path} spellcheck={false} placeholder="Every page" onInput={(x) => onChange({ ...e, path: (x.target as HTMLInputElement).value })} />
+        </Field>
+      )}
+    </>
+  );
+}
+
+/** What the front said of the start: the answer of a dry run, a call that runs, or a failed call. */
 interface Preview {
   answer: DutyDryRun | null;
   busy: boolean;
   error: string;
 }
 
-/** Readback shows the schedule in words and the next five times, in the zone of the browser, or the problems of the schedule in words. */
-function Readback({ p, zone }: { p: Preview; zone: string }) {
+/**
+ * Readback shows the start in words: the readback of the front, else the
+ * words of an event, and the next five times, in the zone of the browser.
+ * The problems of the front that name When show in their place.
+ */
+function Readback({ p, zone, fallback, said }: { p: Preview; zone: string; fallback?: string; said?: string[] }) {
   const a = p.answer;
   const readback = (a && a.readback) || '';
-  const problems = a ? whenProblems(a.problems, readback) : [];
+  // The problems of a save come first. Else those of the last read back.
+  const problems = said && said.length ? said : a ? dutyProblems(a.problems).when || [] : [];
   const next = ((a && a.next) || []).slice(0, 5);
+  const words = readback || fallback || '';
   return (
     <div class="duty-readback-box" aria-live="polite">
       {p.error ? (
         <p class="field-error">{p.error}</p>
-      ) : !a ? (
-        <p class="t-meta">{p.busy ? 'Reading it back.' : ''}</p>
-      ) : problems.length && !readback ? (
+      ) : problems.length ? (
         <ul class="duty-problems" role="alert">
           {problems.map((x) => (
             <li>{x}</li>
           ))}
         </ul>
+      ) : !a && !fallback ? (
+        <p class="t-meta">{p.busy ? 'Reading it back.' : ''}</p>
       ) : (
         <>
-          <p class="duty-readback">{readback}</p>
+          {words && <p class="duty-readback">{words}</p>}
           {next.length > 0 && (
             <>
               <p class="t-meta">Next, in your time ({zoneWords(zone)})</p>
@@ -253,263 +364,62 @@ function Readback({ p, zone }: { p: Preview; zone: string }) {
   );
 }
 
-/* ---------- Check first ---------- */
+/* ---------- What ---------- */
 
-interface CheckProps {
-  check: CheckForm;
-  onChange: (c: CheckForm) => void;
-  /** The agent of the duty, which writes the check and holds its tools. */
-  agent: string;
-  agentName: string;
-  /** The name of the duty in the routes of a dry run and of Write the check. */
-  pathName: string;
-  /** The record of the whole form, for Try the check. */
-  record: () => ReturnType<typeof recordOf>;
-  /** The error of the count of items. */
-  error?: string;
-  open: boolean;
-  onToggle: (open: boolean) => void;
-}
-
-/** The fields of a check by hand: what to look at, where the list is, what makes an item new, and when the agent wakes. */
-function CheckFields({ check, onChange, agent, error }: Pick<CheckProps, 'check' | 'onChange' | 'agent' | 'error'>) {
-  const set = (p: Partial<CheckForm>) => onChange({ ...check, ...p });
-  const profile = useProfile(agent);
-  const tools = useMemo(() => ((profile && profile.tools) || []).filter((t) => !t.includes('*')), [profile]);
+/** BridgeFields are the bridge of the action post, among the open bridges, and the members that the message goes to. None is everyone. */
+function BridgeFields({ bridge, to, onChange, error, toError }: { bridge: string; to: string[]; onChange: (p: { bridge?: string; to?: string[] }) => void; error?: string; toError?: string }) {
+  const bridges = useSelect((s) => s.bridges);
+  const roster = useSelect((s) => (bridge ? s.rosters[bridge] : undefined));
+  const open = useMemo(() => bridges.order.map((id) => bridges.byId[id]).filter((b) => b && b.state === 'open'), [bridges]);
+  useEffect(() => {
+    if (bridge && !roster) loadBridge(bridge).catch(() => {});
+  }, [bridge]);
+  const members = membersOf(roster).filter((m) => m && !m.fired);
+  const other = bridge && !open.some((b) => b.id === bridge) ? bridges.byId[bridge] : undefined;
   return (
     <>
-      <Choices
-        name="duty-look"
-        legend="Look at"
-        value={check.look}
-        options={[
-          { id: 'http', label: 'A website or API' },
-          { id: 'tool', label: 'A tool of the agent' },
-        ]}
-        onChange={(look) => set({ look })}
-      />
-      {check.look === 'http' ? (
-        <div class="field-row">
-          <Field label="Address">
-            <Input type="url" value={check.url} spellcheck={false} placeholder="https://example.com/api/queue" onInput={(e) => set({ url: (e.target as HTMLInputElement).value })} />
-          </Field>
-          <Field
-            label={
-              <>
-                Secret{' '}
-                <Help label="What the secret is">The name of a setting of the front that holds the token of the address. The page never sees the token.</Help>
-              </>
-            }
-            class="narrow"
-          >
-            <Input value={check.secret} spellcheck={false} placeholder="Optional" onInput={(e) => set({ secret: (e.target as HTMLInputElement).value })} />
-          </Field>
-        </div>
-      ) : (
-        <>
-          <Field label="Tool">
-            <Input value={check.tool} list="duty-tools" spellcheck={false} placeholder="servicenow.query_incidents" onInput={(e) => set({ tool: (e.target as HTMLInputElement).value })} />
-          </Field>
-          <datalist id="duty-tools">
-            {tools.map((t) => (
-              <option value={t} />
+      <Field label="Bridge" error={error} class="duty-narrow">
+        <select class="recess" value={bridge} aria-invalid={error ? true : undefined} onChange={(e) => onChange({ bridge: (e.target as HTMLSelectElement).value, to: [] })}>
+          <option value="">{open.length ? 'Pick a bridge' : 'No bridge is open'}</option>
+          {open.map((b) => (
+            <option value={b.id}>{b.title}</option>
+          ))}
+          {bridge && !open.some((b) => b.id === bridge) && <option value={bridge}>{other ? other.title + ', closed' : 'A bridge that you cannot see'}</option>}
+        </select>
+      </Field>
+      {bridge && members.length > 0 && (
+        <fieldset class="duty-to">
+          <legend>Send to</legend>
+          <div class="checks">
+            {members.map((m) => (
+              <label class="check">
+                <input type="checkbox" checked={to.includes(m.handle)} onChange={(e) => onChange({ to: (e.target as HTMLInputElement).checked ? [...to, m.handle] : to.filter((h) => h !== m.handle) })} />
+                <span>{m.handle}</span>
+              </label>
             ))}
-          </datalist>
-          <div class="duty-input" role="group" aria-label="What the tool gets">
-            {check.input.map((r, i) => (
-              <div class="duty-input-row">
-                <Input aria-label={'Name ' + (i + 1)} value={r.name} spellcheck={false} placeholder="query" onInput={(e) => set({ input: check.input.map((x, j) => (j === i ? { ...x, name: (e.target as HTMLInputElement).value } : x)) })} />
-                <Input aria-label={'Value ' + (i + 1)} value={r.text} spellcheck={false} placeholder="priority<=2" onInput={(e) => set({ input: check.input.map((x, j) => (j === i ? { ...x, text: (e.target as HTMLInputElement).value } : x)) })} />
-                <IconButton icon="close" label={'Remove value ' + (i + 1)} onClick={() => set({ input: check.input.filter((_, j) => j !== i) })} />
-              </div>
-            ))}
-            <Button size="s" kind="quiet" icon="plus" onClick={() => set({ input: [...check.input, { name: '', text: '' }] })}>
-              Add a value
-            </Button>
           </div>
-        </>
-      )}
-      <div class="field-row">
-        <Field label="Where the list is">
-          <Input value={check.items} spellcheck={false} placeholder="result.records" onInput={(e) => set({ items: (e.target as HTMLInputElement).value })} />
-        </Field>
-        <Field label="What makes an item new">
-          <Input value={check.key} spellcheck={false} placeholder="number" onInput={(e) => set({ key: (e.target as HTMLInputElement).value })} />
-        </Field>
-      </div>
-      {check.where.length > 0 && (
-        <p class="duty-where">
-          <span>Keeps the items where {check.where.map(whereWords).join(', and ')}.</span>
-          <Button size="s" kind="quiet" onClick={() => set({ where: [] })}>
-            Remove the filters
-          </Button>
-        </p>
-      )}
-      <Choices
-        name="duty-wake"
-        legend="Wake the agent"
-        value={check.wake}
-        options={[
-          { id: 'new', label: 'For new items' },
-          { id: 'any', label: 'For any item' },
-          { id: 'atLeast', label: 'At a count' },
-        ]}
-        onChange={(wake) => set({ wake })}
-      />
-      {check.wake === 'atLeast' && (
-        <Field label="How many items" error={error} class="duty-narrow">
-          <Input type="number" min={1} inputMode="numeric" value={check.count} invalid={!!error} onInput={(e) => set({ count: (e.target as HTMLInputElement).value })} />
-        </Field>
+          <p class="t-meta">{to.length ? (to.length === 1 ? '1 member reads it.' : to.length + ' members read it.') : 'Everyone on the bridge reads it.'}</p>
+          {toError && (
+            <span class="field-error" role="alert">
+              {toError}
+            </span>
+          )}
+        </fieldset>
       )}
     </>
   );
 }
 
-/** What Try the check found, or why it failed. */
-type Tried = { found: CheckFound } | { error: string } | null;
-
-/**
- * CheckFirst is the check before the duty wakes the agent, closed by
- * default. Write the check asks the agent for one from the words of the
- * person. Where the front has no such route, the key goes and the fields
- * by hand show. Try the check runs it once and says what it finds now.
- */
-function CheckFirst(p: CheckProps) {
-  const { check, onChange, agent, agentName, pathName, record, open, onToggle } = p;
-  const [words, setWords] = useState('');
-  const [writer, setWriter] = useState(true);
-  const [writing, setWriting] = useState(false);
-  const [wrote, setWrote] = useState('');
-  const [writeError, setWriteError] = useState('');
-  const [manual, setManual] = useState(() => hasCheck(check));
-  const [tried, setTried] = useState<Tried>(null);
-  const [trying, setTrying] = useState(false);
-  const on = hasCheck(check);
-  const write = async () => {
-    if (!words.trim()) {
-      setWriteError('Write what the agent waits for.');
-      return;
-    }
-    if (!agent) {
-      setWriteError('Pick the agent first. It writes the check.');
-      return;
-    }
-    setWriting(true);
-    setWriteError('');
-    try {
-      const w = await api.writeCheck(pathName, words.trim());
-      onChange(checkFormOf(w.checkFirst));
-      setWrote(w.readback || '');
-      setTried(w.check ? { found: w.check } : null);
-      setManual(true);
-    } catch (e) {
-      if (e instanceof ApiError && (e.status === 404 || e.status === 501)) {
-        // The front has no route that writes a check: the fields by hand take its place.
-        setWriter(false);
-        setManual(true);
-      } else setWriteError(messageOf(e));
-    }
-    setWriting(false);
-  };
-  const tryCheck = async () => {
-    setTrying(true);
-    try {
-      const a = await api.dryRunDuty(pathName, record(), true);
-      if (a.check) setTried({ found: a.check });
-      else setTried({ error: ((a.problems || []).map(problemText).filter(Boolean)[0] as string) || 'The front ran no check.' });
-    } catch (e) {
-      setTried({ error: messageOf(e) });
-    }
-    setTrying(false);
-  };
-  const written = checkOf(check);
-  // A change by hand makes the readback of the agent and the last try stale.
-  const change = (c: CheckForm) => {
-    setWrote('');
-    setTried(null);
-    onChange(c);
-  };
-  return (
-    <details class="advanced duty-check" open={open} onToggle={(e) => onToggle((e.target as HTMLDetailsElement).open)}>
-      <summary>
-        <Glyph name="back" size={16} />
-        Check first
-      </summary>
-      <div class="advanced-body">
-        {writer && (
-          <div class="duty-write">
-            <Field label="Wake the agent only when" error={writeError}>
-              <TextArea rows={2} value={words} invalid={!!writeError} placeholder="there is a new P1 or P2 in the Platform Ops queue" onInput={(e) => setWords((e.target as HTMLTextAreaElement).value)} />
-            </Field>
-            <div class="duty-actions">
-              <Button size="s" disabled={writing} onClick={write}>
-                {writing ? 'Writing the check' : 'Write the check'}
-              </Button>
-              {!manual && (
-                <Button size="s" kind="quiet" onClick={() => setManual(true)}>
-                  Set it up by hand
-                </Button>
-              )}
-            </div>
-          </div>
-        )}
-        {(manual || !writer) && <CheckFields check={check} onChange={change} agent={agent} error={p.error} />}
-        {on && written && <p class="duty-readback">{wrote || checkWords(written, agentName)}</p>}
-        {(manual || !writer) && (
-          <div class="duty-actions">
-            <Button size="s" disabled={!on || trying} onClick={tryCheck}>
-              Try the check
-            </Button>
-            {on && (
-              <Button
-                size="s"
-                kind="quiet"
-                onClick={() => change(emptyCheck())}
-              >
-                Remove the check
-              </Button>
-            )}
-          </div>
-        )}
-        {tried && 'found' in tried && (
-          <div class="duty-found" role="status">
-            <p>{foundWords(tried.found, agentName)}</p>
-            {tried.found.found && tried.found.found.length > 0 && (
-              <ul class="duty-items">
-                {tried.found.found.slice(0, 20).map((it) => (
-                  <li>{itemWords(it, check.key)}</li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
-        {tried && 'error' in tried && (
-          <p class="field-error" role="alert">
-            {tried.error}
-          </p>
-        )}
-      </div>
-    </details>
-  );
-}
-
 /* ---------- the editor ---------- */
 
-/** The words of an action of a later phase, which the editor keeps as it is. */
-function doWords(d: Duty): string {
-  if (d.do.post) return 'This duty posts in a bridge.';
-  if (d.do.open) return 'This duty opens a bridge from the playbook ' + d.do.open.playbook + '.';
-  if (d.do.manager) return 'This duty asks the manager.';
-  return '';
-}
-
-/** DutyEditor is New duty, without a name, and Edit, with the name of the duty. */
-export function DutyEditor({ name }: { name?: string }) {
+/** DutyEditor is New duty, without a name, and Edit, with the name of the duty. A seed fills New duty from Make this a duty. */
+export function DutyEditor({ name, seed }: { name?: string; seed?: DutySeed }) {
   const fresh = !name;
   const base = useDuties((s) => (name ? s.byName[name] : undefined));
   const gone = useDuties((s) => (name ? !!s.gone[name] : false));
   const [failed, setFailed] = useState('');
   useEffect(() => {
+    loadDutyOptions().catch(() => {});
     if (name) loadDuty(name).catch((e) => setFailed(messageOf(e)));
     else loadDuties().catch(() => {});
   }, [name]);
@@ -525,17 +435,21 @@ export function DutyEditor({ name }: { name?: string }) {
       </section>
     );
   }
-  return <EditorForm key={name || ''} name={name} base={base || null} heading={heading} back={back} />;
+  return <EditorForm key={(name || '') + '\n' + JSON.stringify(seed || {})} name={name} seed={seed} base={base || null} heading={heading} back={back} />;
 }
 
 interface FormProps {
   name?: string;
+  seed?: DutySeed;
   base: Duty | null;
   heading: string;
   back: { href: string; label: string; to: 'list' | 'here' };
 }
 
-function EditorForm({ name, base: read, heading, back }: FormProps) {
+/** The problems of the front by the place of the form that shows them. */
+type Problems = Partial<Record<DutySlot | 'top', string[]>>;
+
+function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
   const fresh = !name;
   // The form keeps the duty that it opened with, so a later read of the duty
   // never changes the revision that a save names: a change in the meantime
@@ -543,9 +457,11 @@ function EditorForm({ name, base: read, heading, back }: FormProps) {
   const [base] = useState(read);
   const zone = useMemo(browserZone, []);
   const list = useDuties((s) => s.list);
-  const [f, setF] = useState<DutyForm>(() => (base ? formOf(base, zone) : emptyForm(zone)));
+  const options = useDuties((s) => s.options) || FALLBACK;
+  const loaded = useDuties((s) => !!s.options);
+  const [f, setF] = useState<DutyForm>(() => (base ? formOf(base, zone) : seededForm(seed, zone)));
   const [errors, setErrors] = useState<FormErrors | null>(null);
-  const [problems, setProblems] = useState<string[]>([]);
+  const [problems, setProblems] = useState<Problems>({});
   const [review, setReview] = useState<DutyDryRun | null>(null);
   const [busy, setBusy] = useState(false);
   const [picking, setPicking] = useState(false);
@@ -558,29 +474,42 @@ function EditorForm({ name, base: read, heading, back }: FormProps) {
   const box = useRef<HTMLTextAreaElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const agentName = useAgentName(f.agent);
+  const faces = useSelect((s) => s.faces);
   const tagline = useSelect((s) => (f.agent && s.faces[f.agent] ? s.faces[f.agent].tagline : ''));
-  const keepsWhen = !!(base && base.when && (base.when.event || base.when.webhook));
-  const keepsDo = !!(base && base.do && !base.do.ask && (base.do.post || base.do.open || base.do.manager));
-  const shownName = f.nameOwn ? f.name : nameOf(f.message);
+  const keepsWhen = !!(base && base.when && base.when.webhook);
+  const shownName = f.nameOwn ? f.name : nameOf(f.act === 'open' ? f.goal || f.playbook : f.message);
   const pathName = name || shownName.trim() || DRAFT;
   const record = () => recordOf(f, base, pathName);
+  const nameOfAgent = (a: string) => (faces[a] && faces[a].displayName) || a;
+
+  // The choices that the front serves, and the choice that the duty holds, so an edit keeps it.
+  const baseEvent = base && base.when && base.when.event ? base.when.event.kind : '';
+  const kinds = useMemo(() => [...options.events, ...(baseEvent && !options.events.includes(baseEvent) ? [baseEvent] : [])], [options, baseEvent]);
+  const baseAct = base ? actOf(base.do) : '';
+  const acts = useMemo(() => (['ask', 'post', 'open', 'manager'] as Act[]).filter((a) => options.actions.includes(a) || a === baseAct || a === 'ask'), [options, baseAct]);
+  const lookOn = options.looks.length > 0 || hasCheck(f.check);
+
+  // An action that Make this a duty brought and that the front does not serve becomes Ask the agent, with the same message.
+  useEffect(() => {
+    if (loaded && !acts.includes(f.act)) setF((x) => ({ ...x, act: 'ask' }));
+  }, [loaded]);
 
   const patch = (p: Partial<DutyForm>) => {
     setF((x) => ({ ...x, ...p }));
     if (errors) setErrors(null);
-    if (problems.length) setProblems([]);
+    if (Object.keys(problems).length) setProblems({});
   };
   // A change of the sentence drops the words that the front read back without a schedule.
   const setWhen = (when: WhenForm) => patch({ when, say: '' });
 
-  // The front reads the schedule back a moment after each change of When.
-  const whenKey = JSON.stringify(scheduleOf(f.when)) + '\n' + f.say;
+  // The front reads the start back a moment after each change of When.
+  const whenKey = f.start === 'event' ? 'event\n' + JSON.stringify(eventOf(f.event)) : JSON.stringify(scheduleOf(f.when)) + '\n' + f.say;
   const asked = useRef('');
   const seq = useRef(0);
   useEffect(() => {
     if (keepsWhen) return;
     const n = ++seq.current;
-    if (!f.say && whenError(f.when)) {
+    if (f.start === 'event' ? !f.event.kind : !f.say && whenError(f.when)) {
       setPreview({ answer: null, busy: false, error: '' });
       return;
     }
@@ -616,7 +545,8 @@ function EditorForm({ name, base: read, heading, back }: FormProps) {
       const a = await api.dryRunDuty(pathName, { ...record(), when: { say: said } });
       const sched = a.duty && a.duty.when && a.duty.when.schedule;
       if (sched) {
-        const when = whenFormOf(sched, zone);
+        // The dates of the form stay when the words name none.
+        const when = whenFormOf({ ...sched, start: sched.start || f.when.start, end: sched.end || f.when.end }, zone);
         asked.current = JSON.stringify(scheduleOf(when)) + '\n';
         setF((x) => ({ ...x, when, say: '' }));
         setPreview({ answer: a, busy: false, error: '' });
@@ -625,8 +555,8 @@ function EditorForm({ name, base: read, heading, back }: FormProps) {
         setF((x) => ({ ...x, say: said }));
         setPreview({ answer: a, busy: false, error: '' });
       } else {
-        const ps = whenProblems(a.problems, '');
-        setWordsProblems(ps.length ? ps : (a.problems || []).map(problemText).filter(Boolean));
+        const ps = dutyProblems(a.problems);
+        setWordsProblems(ps.when || (a.problems || []).map((x) => splitProblem(x).text).filter(Boolean));
         if (n === seq.current) setPreview((p) => ({ ...p, busy: false }));
       }
     } catch (e) {
@@ -635,14 +565,15 @@ function EditorForm({ name, base: read, heading, back }: FormProps) {
     setWordsBusy(false);
   };
 
-  /** insert puts the words of a placeholder at the caret of the message. */
+  /** insert puts the words of a placeholder at the caret of the message, or of the goal of a playbook. */
   const insert = (p: Placeholder) => {
     const el = box.current;
+    const field = f.act === 'open' ? 'goal' : 'message';
+    const now = f[field];
     const text = chipText(p);
-    const start = el ? el.selectionStart : f.message.length;
+    const start = el ? el.selectionStart : now.length;
     const end = el ? el.selectionEnd : start;
-    const message = f.message.slice(0, start) + text + f.message.slice(end);
-    patch({ message });
+    patch({ [field]: now.slice(0, start) + text + now.slice(end) });
     setTimeout(() => {
       if (!el) return;
       el.focus();
@@ -650,25 +581,37 @@ function EditorForm({ name, base: read, heading, back }: FormProps) {
     }, 0);
   };
 
+  /** showFirst brings the first error or problem of the form into sight, and the focus to its field. */
+  const showFirst = () =>
+    setTimeout(() => {
+      const bad = formRef.current && (formRef.current.querySelector('[aria-invalid="true"], .field-error, .duty-problems') as HTMLElement | null);
+      if (bad && typeof bad.scrollIntoView === 'function') bad.scrollIntoView({ block: 'center' });
+      if (bad && bad.matches('input, textarea, select')) bad.focus();
+    }, 0);
+
+  /** takeProblems shows the problems of the front beside their fields, and opens Check first for one of its own. */
+  const takeProblems = (ps: unknown[] | null | undefined): boolean => {
+    const by = dutyProblems(ps);
+    setProblems(by);
+    if (by.check) setCheckOpen(true);
+    const any = Object.keys(by).length > 0;
+    if (any) showFirst();
+    return any;
+  };
+
   const submit = async (e: Event) => {
     e.preventDefault();
-    const errs = formErrors(f, { fresh, name: pathName === DRAFT && !shownName ? '' : pathName, taken: fresh && list ? list.map((d) => d.name) : [], keepsWhen, keepsDo });
+    const errs = formErrors(f, { fresh, name: pathName === DRAFT && !shownName ? '' : pathName, taken: fresh && list ? list.map((d) => d.name) : [], keepsWhen });
     if (Object.keys(errs).length) {
       setErrors(errs);
-      if (errs.count) setCheckOpen(true);
-      setTimeout(() => {
-        const bad = formRef.current && (formRef.current.querySelector('[aria-invalid="true"], .field-error') as HTMLElement | null);
-        if (bad && typeof bad.scrollIntoView === 'function') bad.scrollIntoView({ block: 'center' });
-        if (bad && bad.matches('input, textarea')) bad.focus();
-      }, 0);
+      if (errs.count || errs.where) setCheckOpen(true);
+      showFirst();
       return;
     }
     setBusy(true);
     try {
       const a = await api.dryRunDuty(pathName, record());
-      const ps = (a.problems || []).map(problemText).filter(Boolean);
-      setProblems(ps);
-      if (!ps.length) setReview(a);
+      if (!takeProblems(a.problems)) setReview(a);
     } catch (err) {
       showError(err);
     }
@@ -685,20 +628,37 @@ function EditorForm({ name, base: read, heading, back }: FormProps) {
       return;
     } catch (err) {
       setReview(null);
-      if (err instanceof ApiError && err.status === 409) setProblems(['This duty changed since you opened it. Open it again, then make your change.']);
+      if (err instanceof ApiError && err.status === 409) {
+        setProblems({ top: ['This duty changed since you opened it. Open it again, then make your change.'] });
+        showFirst();
+      } else if (err instanceof ApiError && err.status === 400 && err.problem && Array.isArray(err.problem.problems) && err.problem.problems.length) takeProblems(err.problem.problems as unknown[]);
       else showError(err);
     }
     setBusy(false);
   };
 
   const err = errors || {};
-  const chips = PLACEHOLDERS.filter((p) => p.chip && (p.key !== 'found' || hasCheck(f.check)));
+  const pr = problems;
+  const chips = PLACEHOLDERS.filter((p) => p.chip && (p.key !== 'found' || hasCheck(f.check)) && (p.key !== 'event' || f.start === 'event'));
   const reviewed = review ? (review.duty && review.duty.checkFirst) || checkOf(f.check) : null;
+  const eventSaid = f.start === 'event' && f.event.kind ? eventWords(eventOf(f.event), nameOfAgent) + '.' : '';
+  const messageLabel = f.act === 'post' ? 'Message' : f.act === 'manager' ? 'Ask the manager' : 'Ask ' + (agentName || 'the agent');
   return (
     <section class="screen duty-edit" aria-labelledby="duty-edit-title">
       <PaneHeader id="duty-edit-title" title={heading} size="title" level={1} back={back} />
       <form class="scroll pad" ref={formRef} onSubmit={submit} noValidate>
         <div class="make duty-form">
+          {pr.top && pr.top.length > 0 && (
+            <div class="duty-problems-box" role="alert">
+              <p>The duty cannot save yet.</p>
+              <ul class="duty-problems">
+                {pr.top.map((x) => (
+                  <li>{x}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <section class="duty-sec" aria-labelledby="duty-who-head">
             <h2 class="t-sub duty-sec-head" id="duty-who-head">
               Who
@@ -713,7 +673,7 @@ function EditorForm({ name, base: read, heading, back }: FormProps) {
               </p>
             )}
             <span class="pick-anchor">
-              <Button ref={pickKey} size="s" icon={f.agent ? undefined : 'plus'} aria-haspopup="dialog" aria-expanded={picking} aria-invalid={err.agent ? true : undefined} onClick={() => setPicking(!picking)}>
+              <Button ref={pickKey} size="s" icon={f.agent ? undefined : 'plus'} aria-haspopup="dialog" aria-expanded={picking} aria-invalid={err.agent || pr.agent ? true : undefined} onClick={() => setPicking(!picking)}>
                 {f.agent ? 'Change the agent' : 'Pick an agent'}
               </Button>
               {picking && (
@@ -737,6 +697,7 @@ function EditorForm({ name, base: read, heading, back }: FormProps) {
                 {err.agent}
               </span>
             )}
+            <Said list={pr.agent} />
           </section>
 
           <section class="duty-sec" aria-labelledby="duty-when-head">
@@ -747,89 +708,127 @@ function EditorForm({ name, base: read, heading, back }: FormProps) {
               <p class="duty-readback">{startWords(base!)}. The page keeps this start.</p>
             ) : (
               <>
-                <div class="duty-presets" role="group" aria-label="Start from">
-                  {PRESETS.map((p) => (
-                    <Button size="s" aria-pressed={presetOf(f.when) === p.id && !f.say} onClick={() => setWhen(applyPreset(p, f.when))}>
-                      {p.label}
-                    </Button>
-                  ))}
-                </div>
-                <Sentence f={f.when} onChange={setWhen} />
-                {err.when && (
-                  <span class="field-error" role="alert">
-                    {err.when}
-                  </span>
+                {kinds.length > 0 && (
+                  <Choices
+                    name="duty-start"
+                    label="What starts the duty"
+                    value={f.start}
+                    options={[
+                      { id: 'schedule', label: 'On a schedule' },
+                      { id: 'event', label: 'When something happens' },
+                    ]}
+                    onChange={(start) => patch({ start })}
+                  />
                 )}
-                <Field label="Time zone" class="duty-narrow">
-                  <select class="recess" value={f.when.timeZone} onChange={(e) => setWhen({ ...f.when, timeZone: (e.target as HTMLSelectElement).value })}>
-                    {zonesOf([zone, f.when.timeZone]).map((z) => (
-                      <option value={z}>{zoneWords(z) + (z === zone ? ', your time' : '')}</option>
-                    ))}
-                  </select>
-                </Field>
-                <div class="duty-say">
-                  <Field label="Say it in your own words" error={wordsProblems.length === 1 ? wordsProblems[0] : undefined}>
-                    <Input
-                      value={words}
-                      placeholder="every other Tuesday at 3pm"
-                      invalid={wordsProblems.length > 0}
-                      onInput={(e) => setWords((e.target as HTMLInputElement).value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          readWords();
-                        }
-                      }}
-                    />
-                  </Field>
-                  <Button size="s" disabled={wordsBusy} onClick={readWords}>
-                    Read it back
-                  </Button>
-                </div>
-                {wordsProblems.length > 1 && (
-                  <ul class="duty-problems" role="alert">
-                    {wordsProblems.map((x) => (
-                      <li>{x}</li>
-                    ))}
-                  </ul>
+                {f.start === 'event' ? (
+                  <EventFields e={f.event} kinds={kinds} onChange={(event) => patch({ event })} error={err.when} />
+                ) : (
+                  <>
+                    <div class="duty-presets" role="group" aria-label="Start from">
+                      {PRESETS.map((p) => (
+                        <Button size="s" aria-pressed={presetOf(f.when) === p.id && !f.say} onClick={() => setWhen(applyPreset(p, f.when))}>
+                          {p.label}
+                        </Button>
+                      ))}
+                    </div>
+                    <Sentence f={f.when} onChange={setWhen} />
+                    {err.when && (
+                      <span class="field-error" role="alert">
+                        {err.when}
+                      </span>
+                    )}
+                    <Field label="Time zone" class="duty-narrow">
+                      <select class="recess" value={f.when.timeZone} onChange={(e) => setWhen({ ...f.when, timeZone: (e.target as HTMLSelectElement).value })}>
+                        {zonesOf([zone, f.when.timeZone]).map((z) => (
+                          <option value={z}>{zoneWords(z) + (z === zone ? ', your time' : '')}</option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Dates f={f.when} onChange={setWhen} error={err.dates} />
+                    <div class="duty-say">
+                      <Field label="Say it in your own words" error={wordsProblems.length === 1 ? wordsProblems[0] : undefined}>
+                        <Input
+                          value={words}
+                          placeholder="every other Tuesday at 3pm"
+                          invalid={wordsProblems.length > 0}
+                          onInput={(e) => setWords((e.target as HTMLInputElement).value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              readWords();
+                            }
+                          }}
+                        />
+                      </Field>
+                      <Button size="s" disabled={wordsBusy} onClick={readWords}>
+                        Read it back
+                      </Button>
+                    </div>
+                    {wordsProblems.length > 1 && (
+                      <ul class="duty-problems" role="alert">
+                        {wordsProblems.map((x) => (
+                          <li>{x}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </>
                 )}
-                <Readback p={preview} zone={zone} />
+                <Readback p={preview} zone={zone} fallback={eventSaid} said={pr.when} />
               </>
             )}
           </section>
 
-          <CheckFirst
-            check={f.check}
-            onChange={(check) => patch({ check })}
-            agent={f.agent}
-            agentName={agentName || 'the agent'}
-            pathName={pathName}
-            record={record}
-            error={err.count}
-            open={checkOpen}
-            onToggle={setCheckOpen}
-          />
+          {lookOn && (
+            <CheckFirst
+              check={f.check}
+              onChange={(check) => patch({ check })}
+              agent={f.agent}
+              agentName={agentName || 'the agent'}
+              pathName={pathName}
+              record={record}
+              options={options}
+              error={err.count}
+              whereError={err.where}
+              problems={pr.check}
+              open={checkOpen}
+              onToggle={setCheckOpen}
+            />
+          )}
 
           <section class="duty-sec" aria-labelledby="duty-what-head">
             <h2 class="t-sub duty-sec-head" id="duty-what-head">
               What
             </h2>
-            {keepsDo ? (
-              <p class="duty-readback">{doWords(base!)} The page keeps it.</p>
-            ) : (
+            {acts.length > 1 && <Choices name="duty-do" label="What the duty does" value={f.act} options={acts.map((a) => ({ id: a, label: ACT_WORDS[a] }))} onChange={(act) => patch({ act })} />}
+            {f.act === 'post' && <BridgeFields bridge={f.bridge} to={f.to} onChange={(p) => patch(p)} error={joinError(err.bridge, pr.bridge)} toError={joinError(undefined, pr.to)} />}
+            {f.act === 'open' ? (
               <>
-                <Field label={'Ask ' + (agentName || 'the agent')} error={err.message}>
-                  <TextArea ref={box} rows={4} value={f.message} invalid={!!err.message} placeholder="Write the report of [Today's date] to the wiki." onInput={(e) => patch({ message: (e.target as HTMLTextAreaElement).value })} />
+                <PlaybookPick value={f.playbook} onChange={(playbook) => patch({ playbook })} error={joinError(err.playbook, pr.playbook)} />
+                <PlaybookShelf />
+                <Field label="Goal" error={joinError(undefined, pr.goal)}>
+                  <TextArea ref={box} rows={3} value={f.goal} placeholder="The goal of the playbook" onInput={(e) => patch({ goal: (e.target as HTMLTextAreaElement).value })} />
                 </Field>
-                <div class="duty-chips" role="group" aria-label="Words that change each run">
-                  {chips.map((p) => (
-                    <Button size="s" icon="plus" aria-label={'Insert ' + p.words} onClick={() => insert(p)}>
-                      {p.words}
-                    </Button>
-                  ))}
-                </div>
               </>
+            ) : (
+              <Field label={messageLabel} error={joinError(err.message, pr.message)}>
+                <TextArea
+                  ref={box}
+                  rows={4}
+                  value={f.message}
+                  invalid={!!(err.message || pr.message)}
+                  placeholder={f.act === 'post' ? 'Review what changed since [The last run].' : f.act === 'manager' ? "Check the backups of [Today's date] and tell me what failed." : "Write the report of [Today's date] to the wiki."}
+                  onInput={(e) => patch({ message: (e.target as HTMLTextAreaElement).value })}
+                />
+              </Field>
             )}
+            <div class="duty-chips" role="group" aria-label="Words that change each run">
+              {chips.map((p) => (
+                <Button size="s" icon="plus" aria-label={'Insert ' + p.words} onClick={() => insert(p)}>
+                  {p.words}
+                </Button>
+              ))}
+            </div>
+            <Said list={pr.what} />
           </section>
 
           <section class="duty-sec" aria-labelledby="duty-limits-head">
@@ -837,19 +836,19 @@ function EditorForm({ name, base: read, heading, back }: FormProps) {
               Limits
             </h2>
             <div class="field-row">
-              <Field label="The most a run can cost" error={err.cost}>
+              <Field label="The most a run can cost" error={joinError(err.cost, pr.cost)}>
                 <span class="duty-money">
                   <span aria-hidden="true">$</span>
-                  <Input inputMode="decimal" value={f.cost} invalid={!!err.cost} placeholder="0.50" onInput={(e) => patch({ cost: (e.target as HTMLInputElement).value })} />
+                  <Input inputMode="decimal" value={f.cost} invalid={!!(err.cost || pr.cost)} placeholder="0.50" onInput={(e) => patch({ cost: (e.target as HTMLInputElement).value })} />
                 </span>
               </Field>
-              <Field label="Most turns" error={err.turns}>
-                <Input type="number" min={1} inputMode="numeric" value={f.turns} invalid={!!err.turns} placeholder="Optional" onInput={(e) => patch({ turns: (e.target as HTMLInputElement).value })} />
+              <Field label="Most turns" error={joinError(err.turns, pr.turns)}>
+                <Input type="number" min={1} inputMode="numeric" value={f.turns} invalid={!!(err.turns || pr.turns)} placeholder="Optional" onInput={(e) => patch({ turns: (e.target as HTMLInputElement).value })} />
               </Field>
-              <Field label="The most per day" error={err.perDay}>
+              <Field label="The most per day" error={joinError(err.perDay, pr.perDay)}>
                 <span class="duty-money">
                   <span aria-hidden="true">$</span>
-                  <Input inputMode="decimal" value={f.perDay} invalid={!!err.perDay} placeholder="Optional" onInput={(e) => patch({ perDay: (e.target as HTMLInputElement).value })} />
+                  <Input inputMode="decimal" value={f.perDay} invalid={!!(err.perDay || pr.perDay)} placeholder="Optional" onInput={(e) => patch({ perDay: (e.target as HTMLInputElement).value })} />
                 </span>
               </Field>
             </div>
@@ -871,6 +870,7 @@ function EditorForm({ name, base: read, heading, back }: FormProps) {
                 ))}
               </select>
             </Field>
+            <Said list={pr.limits} />
           </section>
 
           <section class="duty-sec" aria-labelledby="duty-away-head">
@@ -900,6 +900,7 @@ function EditorForm({ name, base: read, heading, back }: FormProps) {
                 <option value="cancel">Stop the run</option>
               </select>
             </p>
+            <Said list={pr.away} />
           </section>
 
           <section class="duty-sec" aria-labelledby="duty-tell-head">
@@ -916,23 +917,13 @@ function EditorForm({ name, base: read, heading, back }: FormProps) {
                 <span>Questions</span>
               </label>
             </div>
+            <Said list={pr.tell} />
           </section>
 
           {fresh && (
-            <Field label="Name" error={err.name} class="duty-narrow">
-              <Input value={shownName} maxLength={63} spellcheck={false} invalid={!!err.name} placeholder="daily-report" onInput={(e) => patch({ name: (e.target as HTMLInputElement).value.toLowerCase(), nameOwn: true })} />
+            <Field label="Name" error={joinError(err.name, pr.name)} class="duty-narrow">
+              <Input value={shownName} maxLength={63} spellcheck={false} invalid={!!(err.name || pr.name)} placeholder="daily-report" onInput={(e) => patch({ name: (e.target as HTMLInputElement).value.toLowerCase(), nameOwn: true })} />
             </Field>
-          )}
-
-          {problems.length > 0 && (
-            <div class="duty-problems-box" role="alert">
-              <p>The duty cannot save yet.</p>
-              <ul class="duty-problems">
-                {problems.map((x) => (
-                  <li>{x}</li>
-                ))}
-              </ul>
-            </div>
           )}
 
           <div class="form-end">
@@ -945,7 +936,7 @@ function EditorForm({ name, base: read, heading, back }: FormProps) {
       </form>
       {review && (
         <Confirm title="Save this duty?" confirm="Save duty" busy={busy} onCancel={() => setReview(null)} onConfirm={save}>
-          <p class="duty-readback">{review.readback || (base ? startWords(base) : '')}</p>
+          <p class="duty-readback">{review.readback || startWords(record(), nameOfAgent) || (base ? startWords(base, nameOfAgent) : '')}</p>
           {(review.next || []).length > 0 && (
             <>
               <p class="t-meta">Next, in your time</p>

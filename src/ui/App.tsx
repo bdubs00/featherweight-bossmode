@@ -141,7 +141,7 @@ function panesOf(r: Route): Panes {
         details: r.agent && r.name ? <RoutineAgent agent={r.agent} name={r.name} /> : null,
       };
     case 'duties':
-      return { list: <DutyList current={r.name} />, main: <DutyMain name={r.name} edit={r.edit} fresh={r.fresh} />, details: null };
+      return { list: <DutyList current={r.name} />, main: <DutyMain name={r.name} edit={r.edit} fresh={r.fresh} seed={r.seed} />, details: null };
     case 'pages': {
       let main: ComponentChildren;
       if (r.mode === 'create') main = <PageEditor path={r.path} create />;
