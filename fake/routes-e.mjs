@@ -12,8 +12,18 @@
 //   PATCH  /v1/duties/{name}                {"paused"}
 //   DELETE /v1/duties/{name}                204
 //   POST   /v1/duties/{name}/run            202 {"run"}, or 200 {"skipped"} while the last run works
-//   POST   /v1/duties/{name}/write-check    {"words"}: {"checkFirst", "readback", "check"}, or 422 with the reason
+//   POST   /v1/duties/{name}/write-check    {"words", "agent"}: {"checkFirst", "readback", "check"} after a few
+//                                           seconds, 422 with the reason, or 504 for words that hold "slow"
 //   PATCH  /v1/duties                       {"paused", "reason"}, for an admin
+//   GET    /v1/duties/options               {"secrets": [{"name", "hosts"}], "events", "actions", "looks"}
+//   GET    /v1/notifications                the settings of the person, with "token": "set" or "", serverDefault, and off
+//   PUT    /v1/notifications                the same body: "set" keeps the token, "" clears it. 400 {"problems"}
+//   POST   /v1/notifications/test           {"sent": true}, or 502 {"error"} for no topic or a topic that holds "fail"
+//   GET    /v1/playbooks                    {"playbooks": [...]}, without caps and delegation
+//   GET    /v1/playbooks/{name}             the playbook whole
+//   PUT    /v1/playbooks/{name}             the body of POST /v1/bridges without the title, and revision: 201, 200, 400, or 409
+//   DELETE /v1/playbooks/{name}             204
+//   GET    /v1/inbox                        {"items": [{"kind", "run", "duty", "agent", "bridge", "text", "since"}]}
 //
 // The header X-Time-Zone gives the zone of a schedule that names none. The
 // fake reads the words of a person with a small grammar, as the front
@@ -21,12 +31,16 @@
 // Thursday at 8:00, every other Tuesday at 3pm, on the first of the month
 // at 10am, on the last day of the month, on the first Monday of the month
 // at 9, every 2 hours between 8am and 6pm, every 15 minutes, and hourly on
-// weekdays. A problem of a dry run is {"field", "message"}.
+// weekdays. A problem is a string. A problem of a field starts with the
+// dotted path of the field and a colon, such as "when.schedule: ...".
 //
-// The data: a report every weekday, a nightly restore test, a watch of the
-// incident queue with a check that mostly sleeps, a monthly summary that
-// paused itself after three failed runs, and a duty of the settings that
-// another app starts.
+// The data: a report every weekday, a nightly restore test that waits for
+// an answer, a watch of the incident queue with a check that mostly sleeps
+// and a question that the manager allowed, a monthly summary that paused
+// itself after three failed runs, a duty of the settings that another app
+// starts and whose last run failed, a duty that posts in a bridge when
+// another bridge closes, and a playbook of weekly patching. A run that Run now starts carries the
+// metadata workbench.duty.
 
 const MIN = 60_000;
 const DAY = 24 * 60 * MIN;
@@ -260,7 +274,7 @@ function parseSay(words, zone) {
 /** problemsOf checks a record as the front does and turns say into a schedule. It answers the record that a save keeps and every problem. */
 function problemsOf(body, zone) {
   const problems = [];
-  const p = (field, message) => problems.push({ field, message });
+  const p = (field, message) => problems.push(field ? field + ': ' + message : message);
   const d = JSON.parse(JSON.stringify(body || {}));
   delete d.owner;
   if (!d.agent) p('agent', 'A duty needs an agent.');
@@ -286,10 +300,21 @@ function problemsOf(body, zone) {
     if (s.repeat === 'every' && !(spanOf(s.every) >= 15 && spanOf(s.every) <= 24 * 60)) p('when.schedule.every', 'A span is 15 minutes to 24 hours.');
     if (s.between && (s.between.length !== 2 || s.between.some((t) => hhmm(t) < 0))) p('when.schedule.between', 'Pick two times of the day.');
   }
+  if (d.when && d.when.event && !EVENTS.includes(d.when.event.kind)) p('when.event.kind', 'Pick what starts the duty.');
   const x = d.do || {};
   const actions = ['ask', 'post', 'open', 'manager'].filter((k) => x[k]);
   if (actions.length !== 1) p('do', 'A duty does exactly one thing.');
   if (x.ask && !String(x.ask.message || '').trim()) p('do.ask.message', 'Write what the agent does.');
+  if (x.post) {
+    const b = ctx.bridges.get(x.post.bridge);
+    if (!b) p('do.post.bridge', 'Pick the bridge.');
+    else if (b.state !== 'open') p('do.post.bridge', 'The bridge ' + b.title + ' is closed. Pick an open bridge.');
+    const handles = b ? b.members.filter((m) => !m.fired).map((m) => m.handle) : [];
+    for (const h of x.post.to || []) if (b && !handles.includes(h)) p('do.post.to', h + ' has no seat on this bridge.');
+    if (!String(x.post.message || '').trim()) p('do.post.message', 'Write the message for the bridge.');
+  }
+  if (x.open && !ctx.playbooks.has(x.open.playbook)) p('do.open.playbook', 'There is no playbook ' + (x.open.playbook || '') + '. Pick one.');
+  if (x.manager && !String(x.manager.message || '').trim()) p('do.manager.message', 'Write what the manager does.');
   const b = (d.limits && d.limits.budget) || {};
   if (!['maxCostUSD', 'maxTurns', 'maxTokens', 'maxToolCalls'].some((k) => Number(b[k]) > 0)) p('limits.budget', 'A duty needs a budget: the most a run can cost, or its turns, tokens, or tool calls.');
   const l = d.limits || {};
@@ -299,9 +324,46 @@ function problemsOf(body, zone) {
     const look = d.checkFirst.look || {};
     if (!!look.http === !!look.tool) p('checkFirst.look', 'A check looks at an address or a tool, one of the two.');
     if (look.http && !/^https?:\/\/\S+$/.test(look.http.url || '')) p('checkFirst.look.http.url', 'The address of a check starts with http:// or https://.');
+    else if (look.http && look.http.secret) {
+      const secret = SECRETS.find((x) => x.name === look.http.secret);
+      const host = new URL(look.http.url).host;
+      if (!secret) p('checkFirst.look.http.secret', 'The front has no secret ' + look.http.secret + '.');
+      else if (!secret.hosts.some((h) => h === host || (h.startsWith('*.') && host.endsWith(h.slice(1))))) p('checkFirst.look.http.secret', 'The secret ' + secret.name + ' does not go to ' + host + '.');
+    }
   }
   return { duty: d, problems };
 }
+
+/** What the fake serves now, as GET /v1/duties/options answers it. */
+const EVENTS = ['bridge.closed', 'run.failed', 'question.waiting', 'page.changed', 'routine.ready', 'cap.reached'];
+const SECRETS = [
+  { name: 'QUEUE_TOKEN', hosts: ['queue.example.com'] },
+  { name: 'GITHUB_TOKEN', hosts: ['api.github.com'] },
+  { name: 'LAB_API', hosts: ['*.lab.example.org'] },
+];
+
+/** eventWords reads an event back in words, as the page does. */
+function eventWords(e) {
+  const who = e.agent || '';
+  switch (e.kind) {
+    case 'bridge.closed':
+      return who ? `When a bridge of ${who} closes.` : 'When a bridge closes.';
+    case 'run.failed':
+      return who ? `When a run of ${who} fails.` : 'When a run of an agent fails.';
+    case 'question.waiting':
+      return `When a question waits longer than ${span(spanOf(e.after || '1h'))}.`;
+    case 'page.changed':
+      return e.path ? `When a page under ${e.path} changes.` : 'When a page changes.';
+    case 'routine.ready':
+      return 'When a routine is ready.';
+    case 'cap.reached':
+      return 'When a cap is reached.';
+  }
+  return 'When something happens in the fleet.';
+}
+
+/** The bridges and the playbooks that problemsOf checks a duty against. register fills them. */
+const ctx = { bridges: new Map(), playbooks: new Map() };
 
 /** The sample items that a check finds now. */
 const INCIDENTS = [
@@ -318,8 +380,9 @@ function checkNow(c) {
   return { found, count: found.length, wakes };
 }
 
-export function register({ on, refuse, readJson, now, AGENTS, admin }) {
+export function register({ on, refuse, readJson, now, AGENTS, admin, S, publish }) {
   const T0 = Date.now();
+  ctx.bridges = S.bridges;
   const ago = (min) => new Date(T0 - min * MIN).toISOString();
   const zoneOf = (c) => {
     const z = String(c.req.headers['x-time-zone'] || '');
@@ -364,7 +427,9 @@ export function register({ on, refuse, readJson, now, AGENTS, admin }) {
       revision: 3,
     },
     runsOf(15, 12, (i, at) =>
-      i === 3 ? { at, slot: at, run: 'duty-watch-' + i, state: 'completed', costUSD: 0.04, found: 2, woke: true } : i === 7 ? { at, slot: at, run: '', state: 'failed', found: 0, woke: false, reason: 'The check failed: ServiceNow answered 503.' } : { at, slot: at, run: '', state: 'completed', found: 0, woke: false },
+      i === 3
+        ? { at, slot: at, run: 'duty-watch-' + i, state: 'completed', costUSD: 0.04, found: 2, woke: true, decided: [{ at, by: 'manager', verdict: 'allow', tool: 'servicenow.update_incident', reason: 'It only adds a work note to INC0012.' }, { at, by: 'timeout', verdict: 'deny', tool: 'servicenow.close_incident' }] }
+        : i === 7 ? { at, slot: at, run: '', state: 'failed', found: 0, woke: false, reason: 'The check failed: ServiceNow answered 503.' } : { at, slot: at, run: '', state: 'completed', found: 0, woke: false },
     ),
   );
   add(
@@ -389,8 +454,42 @@ export function register({ on, refuse, readJson, now, AGENTS, admin }) {
       do: { ask: { message: 'Renew the certificate that the call names: {event}' } },
       limits: { budget: { maxCostUSD: 0.3 }, overlap: 'skip' },
     },
-    [{ at: ago(3000), run: 'duty-cert-0', state: 'completed', costUSD: 0.05 }],
+    [
+      { at: ago(600), run: 'duty-cert-1', state: 'failed', costUSD: 0.02, reason: 'The certificate authority refused the request.' },
+      { at: ago(3000), run: 'duty-cert-0', state: 'completed', costUSD: 0.05 },
+    ],
   );
+  add(
+    {
+      name: 'review-after-close',
+      agent: 'reviewer',
+      when: { event: { kind: 'bridge.closed', agent: 'migrator' } },
+      do: { post: { bridge: [...S.bridges.keys()][0], to: [], message: 'A bridge of the migrator closed: {event}. Review what it changed.' } },
+      limits: { budget: { maxCostUSD: 0.3, maxTurns: 30 }, overlap: 'queue', catchUp: '1h' },
+      revision: 2,
+    },
+    [],
+  );
+  // The run of the restore test waits for an answer, on no bridge, so Activity shows its card.
+  const waiting = D.get('nightly-restore-test').history[0];
+  S.runs.set(waiting.run, {
+    id: waiting.run,
+    agent: 'backup',
+    title: 'Restore the backup of last night',
+    state: 'input-required',
+    input: 'Restore last night’s backup into the scratch cluster.',
+    seq: 3,
+    origin: 'duty',
+    principal: 'duty:nightly-restore-test',
+    metadata: { 'workbench.duty': 'nightly-restore-test', 'workbench.dutySlot': waiting.slot, 'fw.batch': 'duty:nightly-restore-test', 'fw.title': 'Restore the backup of last night' },
+    pending: { id: 'ap-restore', tool: 'bash', input: { command: 'restic restore latest --target /scratch' }, reason: 'rule: ask bash: restic restore*', requestedAt: waiting.at },
+    createdAt: waiting.at,
+    updatedAt: waiting.at,
+    member: 'default/backup-0',
+    usage: { turns: 2, toolCalls: 1, costUSD: 0.07 },
+  });
+  S.transcripts.set(waiting.run, [{ seq: 1, time: waiting.at, kind: 'user', text: 'Restore last night’s backup into the scratch cluster.', who: 'duty:nightly-restore-test' }]);
+  S.results.set(waiting.run, { runId: waiting.run, title: 'Restore the backup of last night', agent: 'backup', status: 'needs-you', started: waiting.at, changed: waiting.at, next: [] });
   let allPaused = false;
   let runN = 0;
 
@@ -401,7 +500,7 @@ export function register({ on, refuse, readJson, now, AGENTS, admin }) {
     const today = (h || []).filter((r) => Date.now() - Date.parse(r.at) < DAY).reduce((n, r) => n + (r.costUSD || 0), 0);
     const out = {
       ...rec,
-      readback: s ? readbackOf(s) : rec.when.webhook ? 'When another app calls.' : '',
+      readback: s ? readbackOf(s) : rec.when.webhook ? 'When another app calls.' : rec.when.event ? eventWords(rec.when.event) : '',
       next: s && !rec.paused ? nextOf(s) : [],
       state: { lastRun: (h && h[0]) || null, todayUSD: Math.round(today * 100) / 100, failuresInRow: (h || []).findIndex((r) => r.state !== 'failed') < 0 ? (h || []).length : (h || []).findIndex((r) => r.state !== 'failed'), pausedReason: (st && st.pausedReason) || '' },
     };
@@ -417,6 +516,9 @@ export function register({ on, refuse, readJson, now, AGENTS, admin }) {
   const canChange = (c, d) => admin() || (AGENTS.find((a) => a.name === d.agent) || {}).role === 'owner' || d.owner === c.person.subject;
 
   on('GET', '/v1/duties', () => ({ duties: [...D.values()].map((d) => view(d)), paused: allPaused }));
+
+  // Before the route of one duty, so the word options never reads as the name of a duty.
+  on('GET', '/v1/duties/options', () => ({ secrets: SECRETS, events: EVENTS, actions: ['ask', 'post', 'open', 'manager'], looks: ['http', 'tool'] }));
 
   on('PATCH', '/v1/duties', async (c) => {
     if (!admin()) refuse(403, 'only an admin can pause every duty');
@@ -440,16 +542,16 @@ export function register({ on, refuse, readJson, now, AGENTS, admin }) {
     const { duty, problems } = problemsOf({ ...body, name }, zone);
     const dry = c.url.searchParams.get('dryRun') === 'true';
     const s = duty.when && duty.when.schedule;
-    const readback = s && !problems.some((p) => p.field.startsWith('when')) ? readbackOf(s) : duty.when && duty.when.webhook ? 'When another app calls.' : '';
+    const readback = s && !problems.some((p) => p.startsWith('when')) ? readbackOf(s) : duty.when && duty.when.webhook ? 'When another app calls.' : duty.when && duty.when.event && !problems.some((p) => p.startsWith('when')) ? eventWords(duty.when.event) : '';
     if (dry) {
       const out = { duty: { ...duty, owner: old ? old.owner : c.person.subject }, readback, next: readback && s ? nextOf(s) : [], problems };
       if (c.url.searchParams.get('test') === 'true') {
-        if (duty.checkFirst && !problems.some((p) => p.field.startsWith('checkFirst'))) out.check = checkNow(duty.checkFirst);
-        else if (!duty.checkFirst) problems.push({ field: 'checkFirst', message: 'The duty has no check to try.' });
+        if (duty.checkFirst && !problems.some((p) => p.startsWith('checkFirst'))) out.check = checkNow(duty.checkFirst);
+        else if (!duty.checkFirst) problems.push('checkFirst: The duty has no check to try.');
       }
       return out;
     }
-    if (problems.length) refuse(400, problems[0].message, { problems });
+    if (problems.length) refuse(400, problems[0].replace(/^[\w.[\]]+: /, ''), { problems });
     if (old && body.revision !== undefined && body.revision !== old.revision) refuse(409, `the duty changed: revision ${old.revision} is newer than ${body.revision}`);
     const rec = { ...duty };
     delete rec.revision;
@@ -486,25 +588,184 @@ export function register({ on, refuse, readJson, now, AGENTS, admin }) {
     const last = d.history[0];
     if ((d.limits.overlap || 'skip') === 'skip' && last && ['running', 'queued', 'input-required'].includes(last.state)) return { skipped: 'The last run still works.' };
     const id = 'duty-run-' + ++runN + '-' + Date.now().toString(36);
-    const entry = { at: now(), slot: now(), run: id, state: 'running', costUSD: 0 };
+    const at = now();
+    const entry = { at, slot: at, run: id, state: 'running', costUSD: 0 };
     d.history.unshift(entry);
+    const x = d.do || {};
+    const input = (x.ask && x.ask.message) || (x.post && x.post.message) || (x.manager && x.manager.message) || (x.open && x.open.goal) || d.name;
+    const title = d.name + ': ' + at.slice(0, 10);
+    const run = {
+      id,
+      agent: d.agent,
+      title,
+      state: 'running',
+      input,
+      seq: 1,
+      origin: 'duty',
+      principal: 'duty:' + d.name,
+      metadata: { 'workbench.duty': d.name, 'workbench.dutySlot': at, 'fw.batch': 'duty:' + d.name, 'fw.title': title },
+      createdAt: at,
+      updatedAt: at,
+      member: 'default/' + d.agent + '-0',
+    };
+    S.runs.set(id, run);
+    S.transcripts.set(id, [{ seq: 1, time: at, kind: 'user', text: input, who: 'duty:' + d.name }]);
+    S.results.set(id, { runId: id, title, agent: d.agent, status: 'working', started: at, changed: at, next: [] });
+    publish('run', run);
     // The run of the fake finishes after a few seconds, with a small cost.
-    setTimeout(() => Object.assign(entry, { state: 'completed', costUSD: 0.03 }), 4000);
+    setTimeout(() => {
+      Object.assign(entry, { state: 'completed', costUSD: 0.03 });
+      Object.assign(run, { state: 'completed', output: 'Done.', seq: 2, updatedAt: now(), usage: { turns: 1, costUSD: 0.03 } });
+      S.transcripts.get(id).push({ seq: 2, time: now(), kind: 'assistant', text: 'Done.' });
+      Object.assign(S.results.get(id), { status: 'ready', changed: now() });
+      publish('run', run);
+    }, 4000);
     c.status = 202;
     return { run: id };
   });
 
   on('POST', '/v1/duties/([^/]+)/write-check', async (c, raw) => {
     const d = D.get(decodeURIComponent(raw));
-    if (!d) refuse(404, `no duty ${decodeURIComponent(raw)}: save the duty first, so its agent can write the check`);
     const body = await readJson(c.req);
+    // For a saved duty, the agent of the duty wins. A duty that is not saved yet names its agent.
+    const agent = d ? d.agent : String(body.agent || '');
+    if (!agent) refuse(400, 'name the agent that writes the check: the duty is not saved yet');
     const words = String(body.words || '').trim();
     if (!words) refuse(400, 'write what the agent waits for');
+    // The agent of the fake thinks for a few seconds, and words that hold slow wait until the front gives up.
+    await new Promise((r) => setTimeout(r, /slow/i.test(words) ? 8000 : 2500));
+    if (/slow/i.test(words)) refuse(504, 'the agent did not answer within 120 seconds');
     const url = /(https?:\/\/\S+)/.exec(words);
     let check;
     if (url) check = { look: { http: { url: url[1] } }, items: 'items', key: 'id', wake: { when: 'new' } };
     else if (/incident|p1|p2|servicenow/i.test(words)) check = { look: { tool: 'servicenow.query_incidents', input: { query: 'priority<=2^active=true' } }, items: 'result.records', key: 'number', where: [{ field: 'priority', oneOf: [1, 2] }], wake: { when: 'new' } };
-    else refuse(422, `${d.agent} has no tool that reads that. Name the address of the list, or set the check up by hand`);
-    return { checkFirst: check, readback: (check.look.tool ? 'Call the tool ' + check.look.tool : 'Look at ' + check.look.http.url) + '. Wake ' + d.agent + ' only for items that it did not see before.', check: checkNow(check) };
+    else refuse(422, `${agent} has no tool that reads that. Name the address of the list, or set the check up by hand`);
+    return { checkFirst: check, readback: (check.look.tool ? 'Call the tool ' + check.look.tool : 'Look at ' + check.look.http.url) + '. Wake ' + agent + ' only for items that it did not see before.', check: checkNow(check) };
+  });
+
+  /* ---------- notifications ---------- */
+
+  /** The settings of each person, with the token itself, which no read answers. */
+  const notes = new Map();
+  const settingsOf = (c) => {
+    const who = c.person.subject;
+    if (!notes.has(who)) notes.set(who, { ntfy: { server: '', topic: '', token: '' }, send: { questions: true, failures: true, digest: false }, quietHours: { from: '', to: '', timeZone: zoneOf(c) } });
+    return notes.get(who);
+  };
+  const SERVER = 'https://ntfy.sh';
+  const notifyView = (n) => {
+    const out = { ...n, ntfy: { ...n.ntfy, token: n.ntfy.token ? 'set' : '' }, serverDefault: SERVER };
+    if (!n.ntfy.topic) out.off = 'Nothing goes out until you name a topic.';
+    return out;
+  };
+
+  on('GET', '/v1/notifications', (c) => notifyView(settingsOf(c)));
+
+  on('PUT', '/v1/notifications', async (c) => {
+    const old = settingsOf(c);
+    const body = await readJson(c.req);
+    const n = body.ntfy || {};
+    const send = body.send || {};
+    const q = body.quietHours || {};
+    const problems = [];
+    if (n.server && !/^https?:\/\/[^\s/]+/.test(n.server)) problems.push('ntfy.server: The address of a server starts with https://.');
+    if (n.topic && !/^[A-Za-z0-9_-]{1,64}$/.test(n.topic)) problems.push('ntfy.topic: A topic holds 1 to 64 of letters, digits, hyphens, and underscores.');
+    if ((q.from || q.to) && (hhmm(q.from) < 0 || hhmm(q.to) < 0)) problems.push('quietHours.from: Quiet hours need two times of the day.');
+    if (q.timeZone && !zoneOk(q.timeZone)) problems.push('quietHours.timeZone: ' + q.timeZone + ' is not a time zone.');
+    if (problems.length) refuse(400, problems[0].replace(/^[\w.]+: /, ''), { problems });
+    const token = n.token === 'set' ? old.ntfy.token : String(n.token || '');
+    const next = {
+      ntfy: { server: String(n.server || ''), topic: String(n.topic || ''), token },
+      send: { questions: !!send.questions, failures: !!send.failures, digest: !!send.digest },
+      quietHours: { from: String(q.from || ''), to: String(q.to || ''), timeZone: String(q.timeZone || zoneOf(c)) },
+    };
+    notes.set(c.person.subject, next);
+    return notifyView(next);
+  });
+
+  on('POST', '/v1/notifications/test', (c) => {
+    const n = settingsOf(c);
+    if (!n.ntfy.topic) refuse(502, 'no topic is set, so the test went nowhere', { error: 'no topic is set, so the test went nowhere' });
+    if (/fail/i.test(n.ntfy.topic)) refuse(502, 'the ntfy server answered 401 unauthorized', { error: 'the ntfy server answered 401 unauthorized' });
+    return { sent: true };
+  });
+
+  /* ---------- playbooks ---------- */
+
+  const books = ctx.playbooks;
+  books.set('weekly-patching', {
+    name: 'weekly-patching',
+    goal: 'Patch the lab hosts, reboot the ones that need it, and report what changed.',
+    placement: 'queue',
+    seats: [
+      { handle: 'patcher', agent: 'migrator', task: 'Patch each host and reboot it when the kernel changed.' },
+      { handle: 'checker', agent: 'tester', task: 'Check that each host answers after the patch.' },
+    ],
+    caps: { maxMessages: 200, maxTurns: 400 },
+    delegation: { approve: true, budget: false, members: false, report: true },
+    revision: 3,
+    owner: 'alice@example.com',
+    updatedAt: ago(3 * 24 * 60),
+  });
+  const brief = ({ caps: _c, delegation: _d, ...p }) => p;
+  const book = (raw) => {
+    const name = decodeURIComponent(raw);
+    const p = books.get(name);
+    if (!p) refuse(404, `no playbook ${name}`);
+    return p;
+  };
+
+  on('GET', '/v1/playbooks', () => ({ playbooks: [...books.values()].map(brief) }));
+  on('GET', '/v1/playbooks/([^/]+)', (c, raw) => book(raw));
+
+  on('PUT', '/v1/playbooks/([^/]+)', async (c, raw) => {
+    const name = decodeURIComponent(raw);
+    if (!NAME.test(name)) refuse(400, `a playbook name holds 1 to 63 of a-z, 0-9, - and _, not "${name}"`);
+    const body = await readJson(c.req);
+    const old = books.get(name);
+    if (old && body.revision !== undefined && body.revision !== old.revision) refuse(409, `the playbook changed: revision ${old.revision} is newer than ${body.revision}`);
+    const seats = Array.isArray(body.members) ? body.members : Array.isArray(body.seats) ? body.seats : [];
+    const problems = [];
+    if (!String(body.goal || '').trim()) problems.push('goal: Write the goal of the playbook.');
+    if (!seats.length) problems.push('members: A playbook needs at least one seat.');
+    seats.forEach((m, i) => {
+      if (!AGENTS.some((a) => a.name === m.agent)) problems.push(`members[${i}].agent: There is no agent ${m.agent || ''}.`);
+    });
+    if (problems.length) refuse(400, problems[0].replace(/^[\w.[\]]+: /, ''), { problems });
+    const p = {
+      name,
+      goal: String(body.goal).trim(),
+      placement: body.placement === 'spawn' ? 'spawn' : 'queue',
+      seats: seats.map((m) => ({ handle: m.handle, agent: m.agent, task: m.task || '' })),
+      caps: body.caps || {},
+      delegation: { approve: false, budget: false, members: false, report: true, ...(body.delegation || {}) },
+      revision: old ? old.revision + 1 : 1,
+      owner: old ? old.owner : c.person.subject,
+      updatedAt: now(),
+    };
+    books.set(name, p);
+    c.status = old ? 200 : 201;
+    return p;
+  });
+
+  on('DELETE', '/v1/playbooks/([^/]+)', (c, raw) => {
+    const p = book(raw);
+    books.delete(p.name);
+    c.status = 204;
+  });
+
+  /* ---------- the inbox ---------- */
+
+  // What needs the person from the duties: a paused duty, a failed last run, and a run of a duty that waits for an answer.
+  on('GET', '/v1/inbox', () => {
+    const items = [];
+    for (const d of D.values()) {
+      const last = d.history[0];
+      if (d.paused) items.push({ kind: 'paused', duty: d.name, agent: d.agent, text: (d.state && d.state.pausedReason) || 'Someone paused this duty.', since: last ? last.at : now() });
+      else if (last && last.state === 'failed') items.push({ kind: 'failure', run: last.run || '', duty: d.name, agent: d.agent, text: last.reason || 'The run failed.', since: last.at });
+      const run = last && last.run ? S.runs.get(last.run) : null;
+      if (run && run.state === 'input-required') items.push({ kind: run.pending && run.pending.schema ? 'question' : 'approval', run: run.id, duty: d.name, agent: d.agent, bridge: '', text: d.agent + ' waits for your answer.', since: last.at });
+    }
+    return { items };
   });
 }
