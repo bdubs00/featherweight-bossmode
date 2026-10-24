@@ -97,7 +97,7 @@ function openCheck(el: HTMLElement): HTMLDetailsElement {
 
 describe('New duty', () => {
   it('asks Who, When, Check first (closed), What, Limits, While you are away, and Tell me about, and reads the default schedule back', async () => {
-    api = fakeApi({ 'GET /v1/duties': { duties: [], paused: false }, 'PUT /v1/duties/new-duty?dryRun=true': dry({ problems: ['A duty needs a budget.'] }) });
+    api = fakeApi({ 'GET /v1/duties': { duties: [], paused: false }, 'PUT /v1/duties/new?dryRun=true': dry({ problems: ['A duty needs a budget.'] }) });
     const el = mount(<DutyEditor />);
     await settle();
     expect(text(el.querySelector('h1'))).toBe('New duty');
@@ -106,7 +106,7 @@ describe('New duty', () => {
     expect(keyNamed(el, 'Pick an agent')).toBeTruthy();
     // The front reads the schedule back: every weekday at 9:00 AM in the zone of the browser.
     const put = lastPut();
-    expect(put.path).toBe('/v1/duties/new-duty?dryRun=true');
+    expect(put.path).toBe('/v1/duties/new?dryRun=true');
     expect(put.headers['X-Time-Zone']).toBe(ZONE);
     expect((put.body as DutyRecord).when).toEqual({ schedule: WEEKDAYS });
     // No silent cost: the record goes out with no budget of its own.
@@ -130,7 +130,7 @@ describe('New duty', () => {
   });
 
   it('starts the sentence from a preset and marks the preset that it matches', async () => {
-    api = fakeApi({ 'GET /v1/duties': { duties: [], paused: false }, 'PUT /v1/duties/new-duty?dryRun=true': dry() });
+    api = fakeApi({ 'GET /v1/duties': { duties: [], paused: false }, 'PUT /v1/duties/new?dryRun=true': dry() });
     const el = mount(<DutyEditor />);
     await settle();
     expect(keyNamed(el, 'Every weekday')!.getAttribute('aria-pressed')).toBe('true');
@@ -155,7 +155,7 @@ describe('New duty', () => {
   });
 
   it('builds the schedule from the choices of the sentence: the days, the weeks, the times, the day of the month, the span, and the zone', async () => {
-    api = fakeApi({ 'GET /v1/duties': { duties: [], paused: false }, 'PUT /v1/duties/new-duty?dryRun=true': dry() });
+    api = fakeApi({ 'GET /v1/duties': { duties: [], paused: false }, 'PUT /v1/duties/new?dryRun=true': dry() });
     const el = mount(<DutyEditor />);
     await settle();
     change(select(el, 'Repeat'), 'weekly');
@@ -198,7 +198,7 @@ describe('New duty', () => {
     const said: string[] = [];
     api = fakeApi({
       'GET /v1/duties': { duties: [], paused: false },
-      'PUT /v1/duties/new-duty?dryRun=true': (c: Call) => {
+      'PUT /v1/duties/new?dryRun=true': (c: Call) => {
         const b = c.body as DutyRecord;
         if (b.when.say) said.push(b.when.say);
         if (b.when.say === 'every other tuesday at 3pm')
@@ -236,7 +236,7 @@ describe('New duty', () => {
   it('refuses a duty without a budget, then shows the readback and the next five times before it saves', async () => {
     api = fakeApi({
       'GET /v1/duties': { duties: [{ name: 'taken' }], paused: false },
-      'PUT /v1/duties/new-duty?dryRun=true': dry(),
+      'PUT /v1/duties/new?dryRun=true': dry(),
       'PUT /v1/duties/draft-the-notes?dryRun=true': dry(),
       'PUT /v1/duties/draft-the-notes': (c: Call) => ({ status: 201, body: { ...(c.body as object), owner: 'alice@example.com', revision: 1, readback: READBACK, next: NEXT } }),
       'GET /v1/duties/draft-the-notes': (c: Call) => ({ body: { name: 'draft-the-notes', agent: 'migrator', when: { schedule: WEEKDAYS }, do: { ask: { message: 'x' } }, limits: { budget: { maxCostUSD: 0.5 } }, history: [], path: c.path } }),
@@ -299,7 +299,7 @@ describe('New duty', () => {
   it('shows the problems of the front in words and saves nothing', async () => {
     api = fakeApi({
       'GET /v1/duties': { duties: [], paused: false },
-      'PUT /v1/duties/new-duty?dryRun=true': dry(),
+      'PUT /v1/duties/new?dryRun=true': dry(),
       'PUT /v1/duties/sum-up?dryRun=true': dry({ problems: ['The agent migrator cannot run at night.'] }),
     });
     const el = mount(<DutyEditor />);
@@ -421,8 +421,8 @@ describe('Check first', () => {
   it('takes the fields by hand when the front cannot write a check, reads the check back, and tries it', async () => {
     api = fakeApi({
       'GET /v1/duties': { duties: [], paused: false },
-      'PUT /v1/duties/new-duty?dryRun=true': dry(),
-      'PUT /v1/duties/new-duty?dryRun=true&test=true': dry({ check: FOUND }),
+      'PUT /v1/duties/new?dryRun=true': dry(),
+      'PUT /v1/duties/new?dryRun=true&test=true': dry({ check: FOUND }),
     });
     const el = mount(<DutyEditor />);
     await settle();
@@ -433,7 +433,7 @@ describe('Check first', () => {
     click(keyNamed(el, 'Write the check for me'));
     await settle();
     const write = api.calls.find((c) => c.method === 'POST')!;
-    expect(write.path).toBe('/v1/duties/new-duty/write-check');
+    expect(write.path).toBe('/v1/duties/new/write-check');
     expect(write.body).toEqual({ words: 'there is a new P1 in the queue', agent: 'migrator' });
     expect(write.headers['X-Time-Zone']).toBe(ZONE);
     // The route answered 404: the key goes, and the fields by hand show.
@@ -448,7 +448,7 @@ describe('Check first', () => {
     click(keyNamed(el, 'Try the check'));
     await settle();
     const tried = lastPut();
-    expect(tried.path).toBe('/v1/duties/new-duty?dryRun=true&test=true');
+    expect(tried.path).toBe('/v1/duties/new?dryRun=true&test=true');
     expect((tried.body as DutyRecord).checkFirst).toEqual({ look: { http: { url: 'https://example.com/api/queue' } }, items: 'result.records', key: 'number', wake: { when: 'new' } });
     expect(text(el.querySelector('.duty-found > p'))).toBe('Now: 2 items. They would wake migrator.');
     expect([...el.querySelectorAll('.duty-items li')].map(text)).toEqual(['INC0012', 'INC0019']);
@@ -466,8 +466,8 @@ describe('Check first', () => {
   it('hides Write the check when the front answers 501', async () => {
     api = fakeApi({
       'GET /v1/duties': { duties: [], paused: false },
-      'PUT /v1/duties/new-duty?dryRun=true': dry(),
-      'POST /v1/duties/new-duty/write-check': () => problem(501, 'the front cannot write a check'),
+      'PUT /v1/duties/new?dryRun=true': dry(),
+      'POST /v1/duties/new/write-check': () => problem(501, 'the front cannot write a check'),
     });
     const el = mount(<DutyEditor />);
     await settle();
@@ -484,8 +484,8 @@ describe('Check first', () => {
     let n = 0;
     api = fakeApi({
       'GET /v1/duties': { duties: [], paused: false },
-      'PUT /v1/duties/new-duty?dryRun=true': dry(),
-      'POST /v1/duties/new-duty/write-check': () =>
+      'PUT /v1/duties/new?dryRun=true': dry(),
+      'POST /v1/duties/new/write-check': () =>
         ++n === 1
           ? problem(422, 'The agent has no tool that reads the queue.')
           : {

@@ -188,6 +188,10 @@ describe('the form of a duty', () => {
     expect(e).toEqual({ agent: 'Pick the agent that does the duty.', message: 'Write what the agent does.', count: 'Write a whole number of items.', name: 'A duty of this name exists. Pick another name.' });
     expect(nameReason('Daily Report', [])).toBe('A name holds 1 to 63 of a to z, 0 to 9, hyphens, and underscores.');
     expect(nameReason('', [])).toBe('Give the duty a name.');
+    // new is the draft of a duty without a name, and options is a route of the front.
+    expect(nameReason('new', [])).toBe('The names new and options are kept for the page. Pick another name.');
+    expect(nameReason('options', [])).toBe('The names new and options are kept for the page. Pick another name.');
+    expect(nameReason('new-report', [])).toBe('');
   });
 
   it('makes a name from what the duty does', () => {

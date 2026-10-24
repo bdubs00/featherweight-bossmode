@@ -9,6 +9,7 @@
 //   GET    /v1/duties/{name}                the view with history, the last 50 runs, newest first
 //   PUT    /v1/duties/{name}                create (201) or change (200). ?dryRun=true saves nothing and answers
 //                                           {"duty", "readback", "next", "problems"}. &test=true adds "check".
+//                                           The draft of a duty without a name is new. A save refuses new and options.
 //   PATCH  /v1/duties/{name}                {"paused"}
 //   DELETE /v1/duties/{name}                204
 //   POST   /v1/duties/{name}/run            202 {"run"}, or 200 {"skipped"} while the last run works
@@ -551,6 +552,8 @@ export function register({ on, refuse, readJson, now, AGENTS, admin, S, publish 
       }
       return out;
     }
+    // new is the draft of a duty without a name, and options is a route: a dry run takes them, and a save refuses them.
+    if (name === 'new' || name === 'options') problems.push('name: The names new and options are kept for the page. Pick another name.');
     if (problems.length) refuse(400, problems[0].replace(/^[\w.[\]]+: /, ''), { problems });
     if (old && body.revision !== undefined && body.revision !== old.revision) refuse(409, `the duty changed: revision ${old.revision} is newer than ${body.revision}`);
     const rec = { ...duty };

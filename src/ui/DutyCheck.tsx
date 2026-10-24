@@ -50,8 +50,10 @@ export interface CheckProps {
   /** The agent of the duty, which writes the check and holds its tools. */
   agent: string;
   agentName: string;
-  /** The name of the duty in the routes of a dry run and of Write the check. */
+  /** The name of the duty in the route of a dry run, for Try the check. */
   pathName: string;
+  /** The name of the duty in the route of Write the check: new for a duty that is not saved yet. */
+  writeName: string;
   /** The record of the whole form, for Try the check. */
   record: () => DutyRecord;
   /** What the front serves now. */
@@ -218,7 +220,7 @@ type Tried = { found: CheckFound } | { error: string } | null;
  * the check runs it once and says what it finds now.
  */
 export function CheckFirst(p: CheckProps) {
-  const { check, onChange, agent, agentName, pathName, record, options, open, onToggle } = p;
+  const { check, onChange, agent, agentName, pathName, writeName, record, options, open, onToggle } = p;
   const [words, setWords] = useState('');
   const [writer, setWriter] = useState(true);
   const [writing, setWriting] = useState(false);
@@ -252,7 +254,7 @@ export function CheckFirst(p: CheckProps) {
     setWriteError('');
     setStopped(false);
     try {
-      const w = await api.writeCheck(pathName, words.trim(), agent, ctl.signal);
+      const w = await api.writeCheck(writeName, words.trim(), agent, ctl.signal);
       onChange(checkFormOf(w.checkFirst));
       setWrote(w.readback || '');
       setTried(w.check ? { found: w.check } : null);

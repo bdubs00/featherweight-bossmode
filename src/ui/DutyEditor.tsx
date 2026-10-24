@@ -52,6 +52,7 @@ import {
   limitWords,
   monthDayOf,
   nameOf,
+  nameReason,
   nextWords,
   presetOf,
   recordOf,
@@ -88,8 +89,13 @@ import { Button, Choices, Field, IconButton, Input, Mark, PaneHeader, TextArea, 
 /** The wait after a change of When before the page asks the front to read it back. A test sets it to 0. */
 export const timing = { preview: 400 };
 
-/** The name of the route of a dry run for a new duty that has no name yet. A dry run saves nothing. */
-const DRAFT = 'new-duty';
+/**
+ * The name of a draft: a new duty that has no name yet, or a name that
+ * cannot name a duty. Its dry run goes to PUT /v1/duties/new?dryRun=true,
+ * and the front skips the problem of the name there. Write the check for
+ * me of a duty that is not saved yet goes to /v1/duties/new/write-check.
+ */
+const DRAFT = 'new';
 
 /** The words of each action, as the choice of What says them. */
 const ACT_WORDS: Record<Act, string> = {
@@ -478,7 +484,9 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
   const tagline = useSelect((s) => (f.agent && s.faces[f.agent] ? s.faces[f.agent].tagline : ''));
   const keepsWhen = !!(base && base.when && base.when.webhook);
   const shownName = f.nameOwn ? f.name : nameOf(f.act === 'open' ? f.goal || f.playbook : f.message);
-  const pathName = name || shownName.trim() || DRAFT;
+  // The reason of a name that cannot name a duty, shown as the person types, before a save.
+  const nameWhy = fresh && shownName.trim() ? nameReason(shownName.trim(), []) : '';
+  const pathName = name || (shownName.trim() && !nameWhy ? shownName.trim() : DRAFT);
   const record = () => recordOf(f, base, pathName);
   const nameOfAgent = (a: string) => (faces[a] && faces[a].displayName) || a;
 
@@ -601,7 +609,7 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
 
   const submit = async (e: Event) => {
     e.preventDefault();
-    const errs = formErrors(f, { fresh, name: pathName === DRAFT && !shownName ? '' : pathName, taken: fresh && list ? list.map((d) => d.name) : [], keepsWhen });
+    const errs = formErrors(f, { fresh, name: shownName.trim(), taken: fresh && list ? list.map((d) => d.name) : [], keepsWhen });
     if (Object.keys(errs).length) {
       setErrors(errs);
       if (errs.count || errs.where) setCheckOpen(true);
@@ -785,6 +793,7 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
               agent={f.agent}
               agentName={agentName || 'the agent'}
               pathName={pathName}
+              writeName={name || DRAFT}
               record={record}
               options={options}
               error={err.count}
@@ -921,8 +930,8 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
           </section>
 
           {fresh && (
-            <Field label="Name" error={joinError(err.name, pr.name)} class="duty-narrow">
-              <Input value={shownName} maxLength={63} spellcheck={false} invalid={!!(err.name || pr.name)} placeholder="daily-report" onInput={(e) => patch({ name: (e.target as HTMLInputElement).value.toLowerCase(), nameOwn: true })} />
+            <Field label="Name" error={joinError(err.name || nameWhy, pr.name)} class="duty-narrow">
+              <Input value={shownName} maxLength={63} spellcheck={false} invalid={!!(err.name || nameWhy || pr.name)} placeholder="daily-report" onInput={(e) => patch({ name: (e.target as HTMLInputElement).value.toLowerCase(), nameOwn: true })} />
             </Field>
           )}
 

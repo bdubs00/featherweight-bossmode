@@ -590,6 +590,9 @@ export function tellWords(n: DutyRecord['notify'] | undefined): string {
 
 const NAME = /^[a-z0-9_-]{1,63}$/;
 
+/** The names that the routes keep: new is the draft of a duty that has no name yet, and options is a route of the front. No duty takes them. */
+export const RESERVED = ['new', 'options'];
+
 /** nameOf makes a name from what a duty does: the first words, in lower case, joined by hyphens. */
 export function nameOf(message: string): string {
   const words = String(message || '')
@@ -612,6 +615,7 @@ export function nameOf(message: string): string {
 export function nameReason(name: string, taken: string[]): string {
   if (!name) return 'Give the duty a name.';
   if (!NAME.test(name)) return 'A name holds 1 to 63 of a to z, 0 to 9, hyphens, and underscores.';
+  if (RESERVED.includes(name)) return 'The names new and options are kept for the page. Pick another name.';
   if (taken.includes(name)) return 'A duty of this name exists. Pick another name.';
   return '';
 }

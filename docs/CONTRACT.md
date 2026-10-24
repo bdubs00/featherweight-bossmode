@@ -1328,8 +1328,16 @@ The rules of the page:
   with its port, or under `*.domain`. Nobody types a secret. The filters of
   `where` are rows of a field, a test, and a value, which the person adds,
   changes, and removes.
-- Until the message or the field Name gives a name, a dry run of a new duty
-  goes to `/v1/duties/new-duty`. A dry run saves nothing.
+- **New:** `new` is the draft of a duty without a name. Until the message
+  or the field Name gives a valid name, a dry run of a new duty goes to
+  `PUT /v1/duties/new?dryRun=true`, with `&test=true` for Try the check,
+  and the front skips the problem of the name there. Write the check for
+  me of a duty that is not saved yet posts to
+  `/v1/duties/new/write-check`, with the agent of the editor, whatever name
+  the person typed. A dry run saves nothing. The front refuses to save a
+  duty named `new` or `options`, so the field Name says, as the person
+  types and before any save, `The names new and options are kept for the
+  page. Pick another name.`
 - **New:** a problem of a dry run, and of a 400 of a save, is a string. A
   problem that concerns a field starts with its dotted path and a colon,
   such as `when.schedule: ...` or `do.post.bridge: ...`. The page shows the
@@ -1405,9 +1413,6 @@ A duty with `paused` true, or every duty under the switch, shows `paused`.
 The list puts the duties in this order: a duty that needs you, a failed
 duty, a duty that works, and then the rest by their next time. A paused duty
 comes last.
-
-**Open:** a duty named `options` meets the route `GET /v1/duties/options`.
-The front can refuse that name, or the route can move.
 
 **Open:** the shape of the notifications names no way to turn quiet hours
 off. The page sends two empty times.

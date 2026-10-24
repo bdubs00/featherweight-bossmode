@@ -818,6 +818,7 @@ template, payload, webhook, and JSON. A word in brackets, such as
 | new | add | `Bridge` with `Pick a bridge`, `No bridge is open`, `<title>, closed`, and `A bridge that you cannot see`. `Send to` with a handle per seat, and `Everyone on the bridge reads it.`, `1 member reads it.`, or `<n> members read it.` | done |
 | new | add | `Message` with the placeholder `Review what changed since [The last run].`, and the errors `Pick the bridge.` and `Write the message for the bridge.` | done |
 | new | add | `Goal` with the placeholder `The goal of the playbook`, and the error `Pick a playbook.` | done |
+| new | add | `The names new and options are kept for the page. Pick another name.` under Name, as the person types | done |
 | new | add | `Ask the manager` with the placeholder `Check the backups of [Today's date] and tell me what failed.`, and the error `Write what the manager does.` | done |
 | `[What happened]` with no chip | change | the chip `What happened`, once an event starts the duty | done |
 | `The duty cannot save yet.` above Save duty | change | the same box at the top of the form, for a problem of the front with no field. A problem of a field shows beside the field, with the text after its path. | done |

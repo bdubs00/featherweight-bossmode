@@ -99,7 +99,7 @@ function fill(el: HTMLElement): void {
 
 describe('what the front serves', () => {
   it('offers no event, no other action, and no other look when the front serves none', async () => {
-    api = fakeApi({ 'GET /v1/duties': { duties: [], paused: false }, 'GET /v1/duties/options': { secrets: [], events: [], actions: ['ask'], looks: ['http'] }, 'PUT /v1/duties/new-duty?dryRun=true': dry() });
+    api = fakeApi({ 'GET /v1/duties': { duties: [], paused: false }, 'GET /v1/duties/options': { secrets: [], events: [], actions: ['ask'], looks: ['http'] }, 'PUT /v1/duties/new?dryRun=true': dry() });
     const el = mount(<DutyEditor />);
     await settle();
     expect(radio(el, 'duty-start', 'event')).toBeNull();
@@ -111,7 +111,7 @@ describe('what the front serves', () => {
   });
 
   it('offers each start, action, and look that the front serves, in words', async () => {
-    api = fakeApi({ 'GET /v1/duties': { duties: [], paused: false }, 'GET /v1/duties/options': ALL, 'PUT /v1/duties/new-duty?dryRun=true': dry() });
+    api = fakeApi({ 'GET /v1/duties': { duties: [], paused: false }, 'GET /v1/duties/options': ALL, 'PUT /v1/duties/new?dryRun=true': dry() });
     const el = mount(<DutyEditor />);
     await settle();
     expect([...el.querySelectorAll('input[name="duty-start"]')].map((i) => i.closest('label')!.textContent)).toEqual(['On a schedule', 'When something happens']);
@@ -123,7 +123,7 @@ describe('what the front serves', () => {
 
 describe('When', () => {
   it('starts a duty from an event, with its agent, and offers the chip of what happened', async () => {
-    api = fakeApi({ 'GET /v1/duties': { duties: [], paused: false }, 'GET /v1/duties/options': ALL, 'PUT /v1/duties/new-duty?dryRun=true': dry({ readback: '' }) });
+    api = fakeApi({ 'GET /v1/duties': { duties: [], paused: false }, 'GET /v1/duties/options': ALL, 'PUT /v1/duties/new?dryRun=true': dry({ readback: '' }) });
     const el = mount(<DutyEditor />);
     await settle();
     expect(keyNamed(el, 'What happened')).toBeUndefined();
@@ -168,7 +168,7 @@ describe('When', () => {
   });
 
   it('takes a first and a last day, and refuses a last day before the first', async () => {
-    api = fakeApi({ 'GET /v1/duties': { duties: [], paused: false }, 'GET /v1/duties/options': ALL, 'PUT /v1/duties/new-duty?dryRun=true': dry() });
+    api = fakeApi({ 'GET /v1/duties': { duties: [], paused: false }, 'GET /v1/duties/options': ALL, 'PUT /v1/duties/new?dryRun=true': dry() });
     const el = mount(<DutyEditor />);
     await settle();
     expect(fieldOf(el, 'First day')).toBeNull();
@@ -197,7 +197,7 @@ describe('What', () => {
     api = fakeApi({
       'GET /v1/duties': { duties: [], paused: false },
       'GET /v1/duties/options': ALL,
-      'PUT /v1/duties/new-duty?dryRun=true': dry(),
+      'PUT /v1/duties/new?dryRun=true': dry(),
       'PUT /v1/duties/review-what-changed-since?dryRun=true': dry(),
     });
     const el = mount(<DutyEditor />);
@@ -231,7 +231,7 @@ describe('What', () => {
       'GET /v1/duties/options': ALL,
       'GET /v1/playbooks': { playbooks: [{ name: 'weekly-patching', goal: 'Patch the lab hosts and report.', placement: 'queue', seats: [{ handle: 'patcher', agent: 'migrator', task: 'Patch.' }], revision: 3, updatedAt: '2026-10-20T10:00:00Z' }] },
       'DELETE /v1/playbooks/weekly-patching': del,
-      'PUT /v1/duties/new-duty?dryRun=true': dry(),
+      'PUT /v1/duties/new?dryRun=true': dry(),
       'PUT /v1/duties/patch-on?dryRun=true': dry(),
     });
     const el = mount(<DutyEditor />);
@@ -265,7 +265,7 @@ describe('What', () => {
   });
 
   it('asks the manager with a message', async () => {
-    api = fakeApi({ 'GET /v1/duties': { duties: [], paused: false }, 'GET /v1/duties/options': ALL, 'PUT /v1/duties/new-duty?dryRun=true': dry(), 'PUT /v1/duties/sum-up-the-week?dryRun=true': dry() });
+    api = fakeApi({ 'GET /v1/duties': { duties: [], paused: false }, 'GET /v1/duties/options': ALL, 'PUT /v1/duties/new?dryRun=true': dry(), 'PUT /v1/duties/sum-up-the-week?dryRun=true': dry() });
     const el = mount(<DutyEditor />);
     await settle();
     fill(el);
@@ -280,7 +280,7 @@ describe('What', () => {
   });
 
   it('opens with what Make this a duty brought, and asks the agent when the front does not serve the action', async () => {
-    api = fakeApi({ 'GET /v1/duties': { duties: [], paused: false }, 'GET /v1/duties/options': ALL, 'PUT /v1/duties/new-duty?dryRun=true': dry(), 'PUT /v1/duties/check-the-backups?dryRun=true': dry() });
+    api = fakeApi({ 'GET /v1/duties': { duties: [], paused: false }, 'GET /v1/duties/options': ALL, 'PUT /v1/duties/new?dryRun=true': dry(), 'PUT /v1/duties/check-the-backups?dryRun=true': dry() });
     let el = mount(<DutyEditor seed={{ agent: 'migrator', act: 'manager', message: 'Check the backups.' }} />);
     await settle();
     expect(text(el.querySelector('.duty-who'))).toContain('migrator');
@@ -307,7 +307,7 @@ describe('Check first', () => {
       'GET /v1/agents/migrator': { name: 'migrator', role: 'owner', tools: ['servicenow.*', 'bash'] },
       'GET /v1/tools': { tools: [{ name: 'query_incidents', source: 'servicenow', text: 'Find incidents' }, { name: 'get_incident', source: 'servicenow' }, { name: 'bash', origin: 'builtin', source: 'builtin' }] },
       'PUT /v1/duties/triage?dryRun=true': dry(),
-      'PUT /v1/duties/new-duty?dryRun=true': dry(),
+      'PUT /v1/duties/new?dryRun=true': dry(),
     });
     const el = mount(<DutyEditor />);
     await settle();
@@ -342,7 +342,7 @@ describe('Check first', () => {
   });
 
   it('offers only the secrets of the front for the host of the address', async () => {
-    api = fakeApi({ 'GET /v1/duties': { duties: [], paused: false }, 'GET /v1/duties/options': ALL, 'PUT /v1/duties/new-duty?dryRun=true': dry() });
+    api = fakeApi({ 'GET /v1/duties': { duties: [], paused: false }, 'GET /v1/duties/options': ALL, 'PUT /v1/duties/new?dryRun=true': dry() });
     const el = mount(<DutyEditor />);
     await settle();
     openCheck(el);
@@ -361,7 +361,7 @@ describe('Check first', () => {
   });
 
   it('writes the check with the agent of the editor, says how long it waits, and stops on Cancel', async () => {
-    api = fakeApi({ 'GET /v1/duties': { duties: [], paused: false }, 'GET /v1/duties/options': ALL, 'PUT /v1/duties/new-duty?dryRun=true': dry() });
+    api = fakeApi({ 'GET /v1/duties': { duties: [], paused: false }, 'GET /v1/duties/options': ALL, 'PUT /v1/duties/new?dryRun=true': dry() });
     let seen: RequestInit | undefined;
     const under: FetchLike = setFetch(((input: string, init?: RequestInit) => {
       if (!String(input).endsWith('/write-check')) return under(input, init);
@@ -398,8 +398,8 @@ describe('Check first', () => {
     api = fakeApi({
       'GET /v1/duties': { duties: [], paused: false },
       'GET /v1/duties/options': ALL,
-      'PUT /v1/duties/new-duty?dryRun=true': dry(),
-      'POST /v1/duties/new-duty/write-check': () => ({ status: 504, body: { detail: 'gateway timeout' } }),
+      'PUT /v1/duties/new?dryRun=true': dry(),
+      'POST /v1/duties/new/write-check': () => ({ status: 504, body: { detail: 'gateway timeout' } }),
     });
     const el = mount(<DutyEditor />);
     await settle();
@@ -417,7 +417,7 @@ describe('the problems of the front', () => {
     api = fakeApi({
       'GET /v1/duties': { duties: [], paused: false },
       'GET /v1/duties/options': ALL,
-      'PUT /v1/duties/new-duty?dryRun=true': dry(),
+      'PUT /v1/duties/new?dryRun=true': dry(),
       'PUT /v1/duties/sum-up?dryRun=true': dry({
         problems: ['do.ask.message: the message names no file.', 'limits.budget: A run of migrator costs at least $1.', 'whileAway.timeout: Too long.', 'checkFirst.look.http.url: The front cannot reach this host.', 'The agent migrator cannot run at night.'],
       }),
@@ -436,5 +436,50 @@ describe('the problems of the front', () => {
     const top = el.querySelector('.duty-form > .duty-problems-box')!;
     expect(text(top)).toBe('The duty cannot save yet. The agent migrator cannot run at night.');
     expect(document.querySelector('dialog.confirm')).toBeNull();
+  });
+});
+
+describe('the name of a draft', () => {
+  it('reads a draft back as new, says before a save that new and options name no duty, and writes the check of a draft as new', async () => {
+    api = fakeApi({
+      'GET /v1/duties': { duties: [], paused: false },
+      'GET /v1/duties/options': ALL,
+      'PUT /v1/duties/new?dryRun=true': dry(),
+      'PUT /v1/duties/sum-up-the-week?dryRun=true': dry(),
+      'POST /v1/duties/new/write-check': { checkFirst: { look: { http: { url: 'https://queue.example.com/x' } }, wake: { when: 'new' } }, readback: 'Look at the queue.' },
+    });
+    const el = mount(<DutyEditor />);
+    await settle();
+    expect(lastPut().path).toBe('/v1/duties/new?dryRun=true');
+    fill(el);
+    const nameField = () => fieldOf(el, 'Name')!;
+    const why = () => text(nameField().closest('label')!.querySelector('.field-error'));
+    typeIn(nameField(), 'options');
+    // The reason shows as the person types, before any save.
+    expect(why()).toBe('The names new and options are kept for the page. Pick another name.');
+    expect(nameField().getAttribute('aria-invalid')).toBe('true');
+    change(select(el, 'Repeat'), 'daily');
+    await settle();
+    // A name that cannot name a duty reads back as the draft, never as the route of the options.
+    expect(lastPut().path).toBe('/v1/duties/new?dryRun=true');
+    typeIn(nameField(), 'new');
+    expect(why()).toBe('The names new and options are kept for the page. Pick another name.');
+    typeIn(fieldOf(el, 'Ask migrator'), 'Sum up the week.');
+    click(keyNamed(el, 'Save duty'));
+    await settle();
+    expect(document.querySelector('dialog.confirm')).toBeNull();
+    typeIn(nameField(), 'sum-up-the-week');
+    expect(nameField().closest('label')!.querySelector('.field-error')).toBeNull();
+    // Write the check for me of a duty that is not saved yet goes to the draft, with the agent.
+    openCheck(el);
+    typeIn(fieldOf(el, 'Wake the agent only when'), 'the queue has new items');
+    click(keyNamed(el, 'Write the check for me'));
+    await settle();
+    const write = api.calls.find((c) => c.method === 'POST')!;
+    expect(write.path).toBe('/v1/duties/new/write-check');
+    expect(write.body).toEqual({ words: 'the queue has new items', agent: 'migrator' });
+    click(keyNamed(el, 'Save duty'));
+    await settle();
+    expect(lastPut().path).toBe('/v1/duties/sum-up-the-week?dryRun=true');
   });
 });
