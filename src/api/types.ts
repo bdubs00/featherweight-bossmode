@@ -1180,21 +1180,84 @@ export interface InboxItem {
 
 /* ---------- notifications ---------- */
 
-/**
- * The notification settings of the person who is signed in. A read
- * answers token "set" or "", never the token. A write with "set" keeps
- * the stored token, "" clears it, and another value replaces it.
- */
-export interface NotifySettings {
-  ntfy: { server: string; topic: string; token: string };
-  send: { questions: boolean; failures: boolean; digest: boolean };
-  quietHours: { from: string; to: string; timeZone: string };
+/** The kinds of a channel that the page knows. */
+export type ChannelKind = 'ntfy' | 'slack' | 'discord' | 'teams' | 'webhook' | 'email' | 'agent' | 'shared';
+
+/** What goes to a channel: the questions that wait, the failures, and a daily digest. */
+export interface NotifySend {
+  questions: boolean;
+  failures: boolean;
+  digest: boolean;
 }
 
-/** The answer of GET /v1/notifications: the settings, the server of the front for an empty server, and why the front sends nothing, if it does not. */
+/**
+ * One place that the front reaches: a channel of one kind with its own
+ * switches. It holds only the fields of its kind. url, secret, and
+ * ntfy.token are write only: a read answers "set" or "". A write with
+ * "set" keeps the stored value, "" clears it, and another value replaces
+ * it. A channel without an id gets one from the front.
+ */
+export interface NotifyChannel {
+  id?: string;
+  kind: ChannelKind | string;
+  label: string;
+  send: NotifySend;
+  ntfy?: { server: string; topic: string; token: string };
+  /** The address of slack, discord, teams, and webhook. */
+  url?: string;
+  /** The secret that signs the body of a webhook. */
+  secret?: string;
+  email?: { to: string };
+  agent?: { agent: string; how: string; budget: { maxCostUSD?: number; [limit: string]: number | undefined } };
+  /** The name of a shared channel of the operator. */
+  shared?: string;
+}
+
+/** The quiet hours of the person. Off is two empty times. */
+export interface QuietHours {
+  from: string;
+  to: string;
+  timeZone: string;
+}
+
+/** The notification settings of the person who is signed in, as a write sends them. */
+export interface NotifySettings {
+  channels: NotifyChannel[];
+  quietHours: QuietHours;
+}
+
+/** A kind that the front serves now, with its name. */
+export interface OfferedKind {
+  kind: ChannelKind | string;
+  label: string;
+}
+
+/** A channel of the operator that a person picks by name. The page never sees its address. */
+export interface SharedChannel {
+  name: string;
+  kind: ChannelKind | string;
+  label: string;
+}
+
+/**
+ * The answer of GET /v1/notifications: the settings, and what a write
+ * leaves out. offered names the kinds that the front serves now, shared the
+ * channels of the operator, off the reason in words when no channel reaches
+ * the person, and serverDefault the ntfy server of the front for an empty
+ * server.
+ */
 export interface NotifyRead extends NotifySettings {
-  serverDefault?: string;
+  offered?: OfferedKind[];
+  shared?: SharedChannel[];
   off?: string;
+  serverDefault?: string;
+}
+
+/** What a test did for one channel: sent, or the reason in words. */
+export interface NotifyTestResult {
+  channel: string;
+  sent: boolean;
+  error?: string;
 }
 
 /* ---------- playbooks ---------- */

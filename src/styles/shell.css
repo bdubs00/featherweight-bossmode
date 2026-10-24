@@ -97,7 +97,8 @@
   font-weight: 700;
 }
 
-/* Notifications: a form in the dialog of the page, which scrolls on a short screen. */
+/* Where to reach me, and the dialog of one place: a form in the dialog of
+   the page, which scrolls on a short screen. */
 dialog.confirm.notify-dialog {
   max-height: calc(100dvh - 32px);
   overflow-y: auto;
@@ -140,6 +141,46 @@ dialog.confirm .notify-said {
 }
 dialog.confirm .notify-said.field-error {
   color: var(--word-red);
+}
+/* A place is a row with a line edge: its name and where it reaches, the
+   three switches, which wrap on a phone, and its keys. */
+.notify-places {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.notify-place {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  min-width: 0;
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.notify-place-head {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.notify-place-send {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: var(--s-4);
+}
+.notify-place-do,
+.notify-add,
+.notify-saved-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+}
+.notify-sign {
+  overflow-wrap: anywhere;
 }
 
 /* ---------- the panes ---------- */

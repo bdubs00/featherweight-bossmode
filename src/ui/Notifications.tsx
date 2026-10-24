@@ -1,20 +1,27 @@
-// Notifications, the dialog of the account menu: where the front sends
-// what needs the person while the page is closed, by ntfy. It holds the
-// server, which the front fills when it is empty, the topic, a token that
-// the page writes and never reads, three switches, and quiet hours in the
-// time zone of the browser. Send a test saves a change first, then says
-// what happened. docs/CONTRACT.md, section 16, names the routes.
+// Where to reach me, the dialog of the account menu: the places where the
+// front reaches the person while the page is closed. Each place is a
+// channel of one kind, such as ntfy, Slack, an app, or an agent, with three
+// switches, Send a test, Edit, and Remove. Add a place offers the kinds that
+// the front serves. The quiet hours stay one setting of the person, in the
+// time zone of the browser.
+//
+// Save writes the switches and the quiet hours. Add place, Save in a place,
+// and Remove write the whole list at once, as it stands. Send a test saves
+// a change first, then says what happened to that place. docs/CONTRACT.md,
+// section 16, names the routes.
 
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
 import { ApiError, browserZone, oneSentence } from '../api/client';
-import type { NotifyRead } from '../api/types';
-import { notifyBodyOf, notifyErrors, notifyFormOf, notifyProblems, type NotifyErrors, type NotifyForm, type NotifySlot } from '../lib/notifications';
+import type { NotifyChannel, NotifyRead, NotifySend } from '../api/types';
+import { KIND_ORDER, MAX_CHANNELS, kindName, masked, notifyBodyOf, notifyFormOf, notifyProblems, placeLine, problemTexts, quietError, testWords, type NotifyForm, type NotifyProblems } from '../lib/notifications';
 import { zoneWords, zonesOf } from '../lib/duties';
+import { useSelect } from '../state/store';
+import { ChannelDialog, SendSwitches, Switch, type SaveOutcome } from './ChannelDialog';
 import { Confirm } from './common';
-import { Button, Field, Help, Input, LineLed } from './primitives';
+import { Button, Field, Input, LineLed } from './primitives';
 
-/** messageOf is the sentence of a failed call. A failed test names its reason in error. */
+/** messageOf is the sentence of a failed call. */
 function messageOf(e: unknown): string {
   if (e instanceof ApiError && e.problem && typeof e.problem.error === 'string' && e.problem.error.trim()) return oneSentence(e.problem.error);
   return e instanceof Error && e.message ? e.message : 'The action failed. Try it again.';
@@ -23,17 +30,20 @@ function messageOf(e: unknown): string {
 /** The state of the read of the settings. */
 type Load = 'loading' | 'ready' | 'none' | 'failed';
 
-/** What Send a test said. */
-type Tested = { ok: boolean; words: string } | null;
+/** What Send a test said for one place. */
+type Tested = { busy: boolean; ok: boolean; words: string };
 
-/** Switch is a checkbox with the role of a switch, in a row with its label. */
-function Switch({ label, on, onChange }: { label: string; on: boolean; onChange: (on: boolean) => void }) {
-  return (
-    <label class="check">
-      <input type="checkbox" role="switch" checked={on} onChange={(e) => onChange((e.target as HTMLInputElement).checked)} />
-      <span>{label}</span>
-    </label>
-  );
+/** What a write did: the settings after it, or the problems of a 400 by the index of the list that it sent, or the reason in words. */
+type Wrote = { ok: true; read: NotifyRead } | { ok: false; problems?: NotifyProblems; message?: string };
+
+const NONE: NotifyProblems = { top: [], quiet: [], channels: {} };
+
+/** labeled lists the problems of a write in words. A problem of a place follows its name, for a list that the dialog does not show as it was sent. */
+function labeled(p: NotifyProblems, sent: NotifyChannel[], skip = -1): string[] {
+  const named = Object.entries(p.channels)
+    .filter(([k]) => Number(k) !== skip)
+    .flatMap(([k, v]) => problemTexts(v).map((t) => ((sent[Number(k)] && sent[Number(k)].label) || 'A place') + ': ' + t));
+  return [...p.top, ...p.quiet.map((t) => 'Quiet hours: ' + t), ...named];
 }
 
 export function Notifications({ onClose }: { onClose: () => void }) {
@@ -42,11 +52,17 @@ export function Notifications({ onClose }: { onClose: () => void }) {
   const [failed, setFailed] = useState('');
   const [read, setRead] = useState<NotifyRead | null>(null);
   const [f, setF] = useState<NotifyForm>(() => notifyFormOf(null, zone));
-  const [errors, setErrors] = useState<NotifyErrors>({});
-  const [problems, setProblems] = useState<Partial<Record<NotifySlot | 'top', string[]>>>({});
+  const [quietErr, setQuietErr] = useState('');
+  const [problems, setProblems] = useState<NotifyProblems>(NONE);
   const [busy, setBusy] = useState(false);
-  const [testing, setTesting] = useState(false);
-  const [tested, setTested] = useState<Tested>(null);
+  const [tests, setTests] = useState<Record<number, Tested>>({});
+  const [editing, setEditing] = useState<{ index: number | null } | null>(null);
+  const [removing, setRemoving] = useState<number | null>(null);
+  const [full, setFull] = useState(false);
+  const [refocus, setRefocus] = useState(0);
+  const addKey = useRef<HTMLButtonElement>(null);
+  const faces = useSelect((s) => s.faces);
+  const agentName = (a: string) => (faces[a] && faces[a].displayName) || a;
   useEffect(() => {
     let live = true;
     api
@@ -69,162 +85,274 @@ export function Notifications({ onClose }: { onClose: () => void }) {
       live = false;
     };
   }, []);
+  // A removed place takes its keys with it, so the focus goes to Add a place.
+  useEffect(() => {
+    if (refocus && addKey.current) addKey.current.focus();
+  }, [refocus]);
+
+  const dirty = !!read && JSON.stringify(notifyBodyOf(f)) !== JSON.stringify(notifyBodyOf(notifyFormOf(read, zone)));
   const set = (p: Partial<NotifyForm>) => {
     setF((x) => ({ ...x, ...p }));
-    setErrors({});
-    setProblems({});
-    setTested(null);
+    setQuietErr('');
+    setProblems(NONE);
+    setTests({});
+    setFull(false);
   };
-  const dirty = !!read && JSON.stringify(notifyBodyOf(f)) !== JSON.stringify(notifyBodyOf(notifyFormOf(read, zone)));
+  const setSend = (i: number, p: Partial<NotifySend>) => set({ channels: f.channels.map((c, j) => (j === i ? { ...c, send: { ...c.send, ...p } } : c)) });
 
-  /** put saves the settings. It answers false and shows why when it cannot. */
-  const put = async (): Promise<boolean> => {
-    const errs = notifyErrors(f);
-    if (Object.keys(errs).length) {
-      setErrors(errs);
-      return false;
-    }
+  /** write saves a form. A front that answers without the channels gets a read, so each place has its id. */
+  const write = async (next: NotifyForm): Promise<Wrote> => {
+    const body = notifyBodyOf(next);
     try {
-      const body = notifyBodyOf(f);
-      const r = await api.putNotifications(body);
-      // The answer reads as a read does. A front that answers no settings keeps what the page sent, with a token as set.
-      const next: NotifyRead = r && r.ntfy ? r : { ...body, ntfy: { ...body.ntfy, token: body.ntfy.token ? 'set' : '' }, serverDefault: read?.serverDefault, off: read?.off };
-      setRead(next);
-      setF(notifyFormOf(next, zone));
-      return true;
+      let r = await api.putNotifications(body);
+      if (!r || !Array.isArray(r.channels)) r = await api.notifications().catch(() => ({ ...read, ...masked(body) }));
+      // offered, shared, and the server of the front stay when the answer leaves them out.
+      const kept: NotifyRead = { ...(read || {}), ...r };
+      setRead(kept);
+      setF(notifyFormOf(kept, zone));
+      setProblems(NONE);
+      setQuietErr('');
+      setFull(false);
+      return { ok: true, read: kept };
     } catch (e) {
       const ps = e instanceof ApiError && e.problem && Array.isArray(e.problem.problems) ? (e.problem.problems as unknown[]) : null;
-      setProblems(ps && ps.length ? notifyProblems(ps) : { top: [messageOf(e)] });
-      return false;
+      return ps && ps.length ? { ok: false, problems: notifyProblems(ps) } : { ok: false, message: messageOf(e) };
     }
   };
-  const save = async () => {
-    setBusy(true);
-    const ok = await put();
-    setBusy(false);
-    if (ok) onClose();
+  const refused = (r: Wrote, sent?: NotifyChannel[]) => {
+    if (r.ok) return;
+    if (!r.problems) setProblems({ ...NONE, top: [r.message || 'The action failed. Try it again.'] });
+    else setProblems(sent ? { ...NONE, top: labeled(r.problems, sent) } : r.problems);
   };
-  const test = async () => {
-    setTesting(true);
-    setTested(null);
-    if (dirty && !(await put())) {
-      setTesting(false);
+
+  const save = async () => {
+    const qe = quietError(f);
+    if (qe) {
+      setQuietErr(qe);
       return;
     }
-    try {
-      const r = await api.testNotification();
-      setTested(r && r.sent ? { ok: true, words: 'Sent. Look for it on your phone.' } : { ok: false, words: 'The front sent nothing. Check the topic and the server.' });
-    } catch (e) {
-      setTested({ ok: false, words: 'The test failed. ' + messageOf(e) });
+    if (!dirty) {
+      onClose();
+      return;
     }
-    setTesting(false);
+    setBusy(true);
+    const r = await write(f);
+    setBusy(false);
+    if (r.ok) onClose();
+    else refused(r);
   };
-  const err = (slot: NotifySlot, own?: string) => own || (problems[slot] && problems[slot]!.length ? problems[slot]!.join(' ') : undefined);
-  const ready = load === 'ready';
+
+  /** saveChannel adds a place or changes one, and saves the list. A refusal goes back to the dialog of the place. */
+  const saveChannel = async (index: number | null, c: NotifyChannel): Promise<SaveOutcome> => {
+    const channels = index === null ? [...f.channels, c] : f.channels.map((x, i) => (i === index ? c : x));
+    const at = index === null ? channels.length - 1 : index;
+    const next = { ...f, channels };
+    const qe = quietError(next);
+    if (qe) return { ok: false, top: ['Quiet hours: ' + qe] };
+    setBusy(true);
+    const r = await write(next);
+    setBusy(false);
+    if (r.ok) {
+      setTests({});
+      setEditing(null);
+      return { ok: true };
+    }
+    if (r.problems) return { ok: false, problems: r.problems.channels[at] || {}, top: labeled(r.problems, channels, at) };
+    return { ok: false, top: [r.message || 'The action failed. Try it again.'] };
+  };
+
+  const remove = async (index: number) => {
+    const channels = f.channels.filter((_, i) => i !== index);
+    setBusy(true);
+    const r = await write({ ...f, channels });
+    setBusy(false);
+    setRemoving(null);
+    if (r.ok) {
+      setTests({});
+      setRefocus((n) => n + 1);
+    } else refused(r, channels);
+  };
+
+  const test = async (i: number) => {
+    const c = f.channels[i];
+    const said = (t: Tested | null) =>
+      setTests((x) => {
+        const out = { ...x };
+        if (t) out[i] = t;
+        else delete out[i];
+        return out;
+      });
+    let id = c.id || '';
+    if (dirty || !id) {
+      const qe = quietError(f);
+      if (qe) {
+        setQuietErr(qe);
+        return;
+      }
+      said({ busy: true, ok: true, words: '' });
+      const r = await write(f);
+      if (!r.ok) {
+        said(null);
+        refused(r);
+        return;
+      }
+      id = (r.read.channels[i] && r.read.channels[i].id) || '';
+    }
+    // Without an id, the test would go to every place.
+    if (!id) {
+      said({ busy: false, ok: false, words: 'The test failed. The front gave this place no id.' });
+      return;
+    }
+    said({ busy: true, ok: true, words: '' });
+    try {
+      const results = await api.testNotification(id);
+      const res = results.find((x) => x.channel === id) || (results.length === 1 ? results[0] : undefined);
+      said({ busy: false, ...testWords(res, c.label) });
+    } catch (e) {
+      said({ busy: false, ok: false, words: 'The test failed. ' + messageOf(e) });
+    }
+  };
+
+  // The keys that open a dialog stay enabled while a save runs, because a
+  // dialog that closes gives the focus back to its key before the key
+  // turns on again. Their actions wait for the save instead.
+  const add = () => {
+    if (busy) return;
+    if (f.channels.length >= MAX_CHANNELS) setFull(true);
+    else setEditing({ index: null });
+  };
+
+  const ready = load === 'ready' && !!read;
+  const nameOf = (c: NotifyChannel) => c.label || kindName(c.kind, read);
+  const quietSaid = quietErr || (problems.quiet.length ? problems.quiet.join(' ') : '');
+  const gone = removing !== null ? f.channels[removing] : undefined;
   return (
-    <Confirm title="Notifications" confirm="Save" busy={busy || !ready} class="notify-dialog" onCancel={onClose} onConfirm={save}>
-      {load === 'loading' && <p>Loading your settings.</p>}
-      {load === 'none' && <p>This workbench sends no notifications.</p>}
-      {load === 'failed' && <p role="alert">{failed}</p>}
-      {ready && (
-        <div class="notify-form">
-          {read && read.off && (
-            <p class="notify-off" role="status">
-              <LineLed tone="grey" /> {read.off}
-            </p>
-          )}
-          {problems.top && (
-            <ul class="duty-problems" role="alert">
-              {problems.top.map((x) => (
-                <li>{x}</li>
-              ))}
-            </ul>
-          )}
-          <Field label="Server" error={err('server', errors.server)}>
-            <Input type="url" value={f.server} spellcheck={false} invalid={!!err('server', errors.server)} placeholder={(read && read.serverDefault) || 'https://ntfy.sh'} onInput={(e) => set({ server: (e.target as HTMLInputElement).value })} />
-          </Field>
-          <Field
-            label={
-              <>
-                Topic <Help label="What the topic is">The name that the ntfy app on your phone follows. Pick a name that is hard to guess.</Help>
-              </>
-            }
-            error={err('topic', errors.topic)}
-          >
-            <Input value={f.topic} spellcheck={false} autocomplete="off" invalid={!!err('topic', errors.topic)} placeholder="alice-duties" onInput={(e) => set({ topic: (e.target as HTMLInputElement).value })} />
-          </Field>
-          {f.saved ? (
-            <div class="notify-token">
-              <span>A token is saved.</span>
-              <Button size="s" kind="quiet" onClick={() => set({ saved: false, token: '' })}>
-                Remove
+    <>
+      <Confirm title="Where to reach me" confirm="Save" busy={busy || !ready} class="notify-dialog" onCancel={onClose} onConfirm={save}>
+        {load === 'loading' && <p>Loading your settings.</p>}
+        {load === 'none' && <p>This workbench sends no notifications.</p>}
+        {load === 'failed' && <p role="alert">{failed}</p>}
+        {ready && (
+          <div class="notify-form">
+            {read!.off && (
+              <p class="notify-off" role="status">
+                <LineLed tone="grey" /> {read!.off}
+              </p>
+            )}
+            {problems.top.length > 0 && (
+              <ul class="duty-problems" role="alert">
+                {problems.top.map((x) => (
+                  <li>{x}</li>
+                ))}
+              </ul>
+            )}
+            {f.channels.length ? (
+              <ul class="notify-places" aria-label="Your places">
+                {f.channels.map((c, i) => {
+                  const name = nameOf(c);
+                  const said = problemTexts(problems.channels[i]);
+                  const t = tests[i];
+                  return (
+                    <li class="notify-place">
+                      <div class="notify-place-head">
+                        <span class="t-sub clip">{name}</span>
+                        <span class="t-meta clip">{placeLine(c, read, agentName)}</span>
+                      </div>
+                      <div class="notify-place-send" role="group" aria-label={'What goes to ' + name}>
+                        <SendSwitches f={c.send} disabled={busy} onChange={(p) => setSend(i, p)} />
+                      </div>
+                      {said.length > 0 && (
+                        <ul class="duty-problems" role="alert">
+                          {said.map((x) => (
+                            <li>{x}</li>
+                          ))}
+                        </ul>
+                      )}
+                      <div class="notify-place-do">
+                        <Button size="s" disabled={busy || (!!t && t.busy)} aria-label={'Send a test to ' + name} onClick={() => test(i)}>
+                          Send a test
+                        </Button>
+                        {(KIND_ORDER as string[]).includes(c.kind) && (
+                          <Button size="s" kind="quiet" aria-label={'Edit ' + name} onClick={() => !busy && setEditing({ index: i })}>
+                            Edit
+                          </Button>
+                        )}
+                        <Button size="s" kind="quiet" aria-label={'Remove ' + name} onClick={() => !busy && setRemoving(i)}>
+                          Remove
+                        </Button>
+                      </div>
+                      {t &&
+                        (t.busy ? (
+                          <p class="t-meta" role="status">
+                            Sending.
+                          </p>
+                        ) : (
+                          <p class={t.ok ? 'notify-said' : 'notify-said field-error'} role="status">
+                            {t.words}
+                          </p>
+                        ))}
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p class="notify-empty">Nothing goes out until you add a place. Activity always shows what needs you.</p>
+            )}
+            <div class="notify-add">
+              <Button ref={addKey} size="s" icon="plus" onClick={add}>
+                Add a place
               </Button>
+              {full && (
+                <span class="field-error" role="alert">
+                  You keep {MAX_CHANNELS} places, the most there is. Remove one to add another.
+                </span>
+              )}
             </div>
-          ) : (
-            <Field label="Token" error={err('token')}>
-              <Input type="password" value={f.token} spellcheck={false} autocomplete="off" placeholder="Optional" onInput={(e) => set({ token: (e.target as HTMLInputElement).value })} />
-            </Field>
-          )}
-          {!f.saved && read && read.ntfy && read.ntfy.token === 'set' && (
-            <p class="notify-token">
-              <span class="t-meta">The saved token goes when you save.</span>
-              <Button size="s" kind="quiet" onClick={() => set({ saved: true, token: '' })}>
-                Keep it
-              </Button>
-            </p>
-          )}
-          <fieldset>
-            <legend>Tell me about</legend>
-            <Switch label="Questions" on={f.questions} onChange={(questions) => set({ questions })} />
-            <Switch label="Failures" on={f.failures} onChange={(failures) => set({ failures })} />
-            <Switch label="A daily digest" on={f.digest} onChange={(digest) => set({ digest })} />
-            {problems.send && (
-              <span class="field-error" role="alert">
-                {problems.send.join(' ')}
-              </span>
-            )}
-          </fieldset>
-          <fieldset>
-            <legend>Quiet hours</legend>
-            <Switch label="Hold notifications at night" on={f.quiet} onChange={(quiet) => set({ quiet })} />
-            {f.quiet && (
-              <>
-                <div class="field-row">
-                  <Field label="From">
-                    <Input type="time" step={60} value={f.from} onInput={(e) => set({ from: (e.target as HTMLInputElement).value })} />
+            <fieldset>
+              <legend>Quiet hours</legend>
+              <Switch label="Hold notifications at night" on={f.quiet} onChange={(quiet) => set({ quiet })} />
+              {f.quiet && (
+                <>
+                  <div class="field-row">
+                    <Field label="From">
+                      <Input type="time" step={60} value={f.from} onInput={(e) => set({ from: (e.target as HTMLInputElement).value })} />
+                    </Field>
+                    <Field label="To">
+                      <Input type="time" step={60} value={f.to} onInput={(e) => set({ to: (e.target as HTMLInputElement).value })} />
+                    </Field>
+                  </div>
+                  <Field label="Time zone">
+                    <select class="recess" value={f.timeZone} onChange={(e) => set({ timeZone: (e.target as HTMLSelectElement).value })}>
+                      {zonesOf([zone, f.timeZone]).map((z) => (
+                        <option value={z}>{zoneWords(z) + (z === zone ? ', your time' : '')}</option>
+                      ))}
+                    </select>
                   </Field>
-                  <Field label="To">
-                    <Input type="time" step={60} value={f.to} onInput={(e) => set({ to: (e.target as HTMLInputElement).value })} />
-                  </Field>
-                </div>
-                <Field label="Time zone">
-                  <select class="recess" value={f.timeZone} onChange={(e) => set({ timeZone: (e.target as HTMLSelectElement).value })}>
-                    {zonesOf([zone, f.timeZone]).map((z) => (
-                      <option value={z}>{zoneWords(z) + (z === zone ? ', your time' : '')}</option>
-                    ))}
-                  </select>
-                </Field>
-              </>
-            )}
-            {err('quiet', errors.quiet) && (
-              <span class="field-error" role="alert">
-                {err('quiet', errors.quiet)}
-              </span>
-            )}
-          </fieldset>
-          <div class="notify-test">
-            <Button size="s" disabled={testing || busy} onClick={test}>
-              Send a test
-            </Button>
-            {testing && <span class="t-meta">Sending.</span>}
+                </>
+              )}
+              {quietSaid && (
+                <span class="field-error" role="alert">
+                  {quietSaid}
+                </span>
+              )}
+            </fieldset>
           </div>
-          {tested && (
-            <p class={tested.ok ? 'notify-said' : 'notify-said field-error'} role="status">
-              {tested.words}
-            </p>
-          )}
-        </div>
+        )}
+      </Confirm>
+      {editing && read && (
+        <ChannelDialog
+          read={read}
+          base={editing.index === null ? null : f.channels[editing.index]}
+          problems={editing.index === null ? undefined : problems.channels[editing.index]}
+          onSave={(c) => saveChannel(editing.index, c)}
+          onCancel={() => setEditing(null)}
+        />
       )}
-    </Confirm>
+      {gone && (
+        <Confirm title={'Remove ' + nameOf(gone) + '?'} confirm="Remove" danger busy={busy} onCancel={() => setRemoving(null)} onConfirm={() => remove(removing!)}>
+          <p>Nothing goes to {nameOf(gone)} after this.</p>
+        </Confirm>
+      )}
+    </>
   );
 }

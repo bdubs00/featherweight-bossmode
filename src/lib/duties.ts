@@ -1084,7 +1084,7 @@ export function formErrors(f: DutyForm, opts: { fresh: boolean; name: string; ta
 /* ---------- the problems of the front ---------- */
 
 /** The first parts of a path that a problem can name: the fields of a duty, of the notifications, and of a playbook. */
-const ROOTS = ['name', 'agent', 'words', 'pool', 'owner', 'when', 'checkFirst', 'do', 'limits', 'whileAway', 'notify', 'runAs', 'paused', 'revision', 'ntfy', 'send', 'quietHours', 'goal', 'placement', 'seats', 'members', 'caps', 'delegation'];
+const ROOTS = ['name', 'agent', 'words', 'pool', 'owner', 'when', 'checkFirst', 'do', 'limits', 'whileAway', 'notify', 'runAs', 'paused', 'revision', 'channels', 'quietHours', 'goal', 'placement', 'seats', 'members', 'caps', 'delegation'];
 
 /** A problem of the front: the dotted path of its field, or "", and its words. */
 export interface Problem {

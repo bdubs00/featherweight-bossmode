@@ -87,10 +87,10 @@ const THEMES: [ThemeChoice, string][] = [
 
 /**
  * AccountMenu is the account key at the foot of the app bar: the name of
- * the person, the theme, Notifications, Connections, and Sign out. ArrowUp
- * and ArrowDown move in the menu, and Escape closes it and gives the focus
- * back. Notifications opens a dialog, which gives the focus back to the
- * account key when it closes.
+ * the person, the theme, Where to reach me, Connections, and Sign out.
+ * ArrowUp and ArrowDown move in the menu, and Escape closes it and gives the
+ * focus back. Where to reach me opens a dialog, which gives the focus back
+ * to the account key when it closes.
  */
 function AccountMenu({ onSignOut }: { onSignOut: () => void }) {
   const me = useSelect((s) => s.me);
@@ -169,7 +169,7 @@ function AccountMenu({ onSignOut }: { onSignOut: () => void }) {
               setNotify(true);
             }}
           >
-            <span class="t">Notifications</span>
+            <span class="t">Where to reach me</span>
           </button>
           <a role="menuitem" href="/ui#connections">
             <span class="t">Connections</span>

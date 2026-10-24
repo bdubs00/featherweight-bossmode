@@ -30,6 +30,7 @@ import type {
   NewRun,
   NotifyRead,
   NotifySettings,
+  NotifyTestResult,
   OrphanList,
   OrphanRemoval,
   Page,
@@ -302,11 +303,16 @@ export const api = {
   /** inbox lists what needs the person: approvals, questions, failures, and paused duties. */
   inbox: () => call<{ items: InboxItem[] }>('/v1/inbox').then((r) => (r && r.items) || []),
 
-  /** The notification settings of the person who is signed in. */
+  /** The notification settings of the person who is signed in: the channels, the quiet hours, and what the front offers. */
   notifications: () => call<NotifyRead>('/v1/notifications'),
   putNotifications: (body: NotifySettings) => call<NotifyRead>('/v1/notifications', { method: 'PUT', body }),
-  /** testNotification sends a test notification to the person: {"sent": true}, or 502 with the reason in error. */
-  testNotification: () => call<{ sent: boolean }>('/v1/notifications/test', { method: 'POST', body: {} }),
+  /**
+   * testNotification sends a test to one channel, or to every channel
+   * without one. A failed send is a result with sent false and the reason
+   * in error. An unknown channel answers 400.
+   */
+  testNotification: (channel?: string) =>
+    call<{ results: NotifyTestResult[] }>('/v1/notifications/test', { method: 'POST', body: channel ? { channel } : {} }).then((r) => (r && r.results) || []),
 
   /** The playbooks: the list without caps and delegation, one playbook whole, a save, and a delete. */
   playbooks: () => call<{ playbooks: Playbook[] }>('/v1/playbooks').then((r) => (r && r.playbooks) || []),
