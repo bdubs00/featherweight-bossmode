@@ -495,20 +495,24 @@ export function register({ on, refuse, readJson, now, AGENTS, admin, S, publish 
     },
     runsOf(60, 3, (i, at) => ({ at, slot: at, run: 'duty-summary-' + i, state: 'failed', costUSD: 0.02, reason: 'The run reached its limit of turns.' })),
   );
-  add(
-    {
-      name: 'renew-certificates',
-      agent: 'ops',
-      source: 'file',
-      when: { webhook: { auth: { mode: 'bearer', secret: 'CERT_HOOK' } } },
-      do: { ask: { message: 'Renew the certificate that the call names: {event}' } },
-      limits: { budget: { maxCostUSD: 0.3 }, overlap: 'skip' },
-    },
-    [
-      { at: ago(600), run: 'duty-cert-1', state: 'failed', costUSD: 0.02, reason: 'The certificate authority refused the request.' },
-      { at: ago(3000), run: 'duty-cert-0', state: 'completed', costUSD: 0.05 },
-    ],
-  );
+  // The entries of workbench.sources, as the front reads them: an agent, a
+  // start, and a readback, with no action, empty limits, no decisions while
+  // away, and no notifications. The routes never change them.
+  const WHERE = ' An operator sets it in the settings of the front, so it changes there.';
+  const source = (d) => D.set(d.name, { source: 'file', revision: 0, runAs: 'duty', do: {}, limits: { budget: {} }, ...d, history: [] });
+  source({
+    name: 'renew-certificates',
+    agent: 'ops',
+    when: { webhook: { auth: { mode: 'bearer', secret: 'CERT_HOOK' } } },
+    readback: 'When another app calls the address of this source, each new event starts a run of ops.' + WHERE,
+  });
+  source({
+    name: 'helpdesk-tickets',
+    agent: 'triage',
+    when: {},
+    checkFirst: { look: { http: { url: 'https://helpdesk.example.com/api/tickets' } }, items: 'tickets', wake: { when: 'new' } },
+    readback: 'Every 5m, it looks at helpdesk.example.com/api/tickets, and each new item starts a run of triage.' + WHERE,
+  });
   add(
     {
       name: 'review-after-close',
@@ -550,7 +554,7 @@ export function register({ on, refuse, readJson, now, AGENTS, admin, S, publish 
     const today = (h || []).filter((r) => Date.now() - Date.parse(r.at) < DAY).reduce((n, r) => n + (r.costUSD || 0), 0);
     const out = {
       ...rec,
-      readback: s ? readbackOf(s) : rec.when.webhook ? 'When another app calls.' : rec.when.event ? eventWords(rec.when.event) : '',
+      readback: rec.source === 'file' ? rec.readback : s ? readbackOf(s) : rec.when.webhook ? 'When another app calls.' : rec.when.event ? eventWords(rec.when.event) : '',
       next: s && !rec.paused ? nextOf(s) : [],
       state: { lastRun: (h && h[0]) || null, todayUSD: Math.round(today * 100) / 100, failuresInRow: (h || []).findIndex((r) => r.state !== 'failed') < 0 ? (h || []).length : (h || []).findIndex((r) => r.state !== 'failed'), pausedReason: (st && st.pausedReason) || '' },
     };
