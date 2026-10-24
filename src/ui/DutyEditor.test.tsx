@@ -129,6 +129,16 @@ describe('New duty', () => {
     expect(fieldOf(el, 'Time zone')!.value).toBe(ZONE);
   });
 
+  it('lists the agents of the picker of Who with no header, because they make one group', async () => {
+    api = fakeApi({ 'GET /v1/duties': { duties: [], paused: false }, 'PUT /v1/duties/new?dryRun=true': dry() });
+    const el = mount(<DutyEditor />);
+    await settle();
+    click(keyNamed(el, 'Pick an agent'));
+    expect(el.querySelectorAll('.picker .pick-row').length).toBeGreaterThan(0);
+    expect(el.querySelector('.picker .pick-group')).toBeNull();
+    expect(el.querySelector('.picker [role="group"]')).toBeNull();
+  });
+
   it('starts the sentence from a preset and marks the preset that it matches', async () => {
     api = fakeApi({ 'GET /v1/duties': { duties: [], paused: false }, 'PUT /v1/duties/new?dryRun=true': dry() });
     const el = mount(<DutyEditor />);

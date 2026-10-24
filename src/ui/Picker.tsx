@@ -1,9 +1,10 @@
 // The picker of Add: one field, Who, and the agents in two groups, On this
-// bridge and Everyone else. Each agent shows its mark, its tagline, and its
-// workers: N free with a green light, or waiting for a worker with a grey
-// one. A click puts a new seat row at the top of the members, and the
-// picker stays open for another add. Advanced opens the full form, and New
-// agent opens the screen that makes one.
+// bridge and Everyone else, with a header only when both hold an agent.
+// Each agent shows its mark, its tagline, and its workers: N free with a
+// green light, or waiting for a worker with a grey one. A click puts a new
+// seat row at the top of the members, and the picker stays open for
+// another add. Advanced opens the full form, and New agent opens the
+// screen that makes one.
 //
 // The picker is a layer over the members pane, or below the key Add of the
 // new-bridge screen, for a bridge that does not exist yet. There the seats
@@ -200,6 +201,7 @@ export function Picker({ bridge, drafts, draftHandles, onPick, onClose, anchor, 
   };
 
   const none = groups.here.length === 0 && groups.others.length === 0;
+  const both = groups.here.length > 0 && groups.others.length > 0;
   return (
     <div
       class={'picker' + (place === 'key' ? ' picker-key' : '')}
@@ -230,25 +232,28 @@ export function Picker({ bridge, drafts, draftHandles, onPick, onClose, anchor, 
             />
           </div>
           <div class="pick-list">
-            {groups.here.length > 0 && (
-              <div role="group" aria-labelledby="pick-here">
-                <div class="pick-group" id="pick-here">
-                  On this bridge
+            {/* A header tells two groups apart. A lone group needs none. */}
+            {both ? (
+              <>
+                <div role="group" aria-labelledby="pick-here">
+                  <div class="pick-group" id="pick-here">
+                    On this bridge
+                  </div>
+                  {groups.here.map((r) => (
+                    <Row r={r} onPick={onPick} />
+                  ))}
                 </div>
-                {groups.here.map((r) => (
-                  <Row r={r} onPick={onPick} />
-                ))}
-              </div>
-            )}
-            {groups.others.length > 0 && (
-              <div role="group" aria-labelledby="pick-others">
-                <div class="pick-group" id="pick-others">
-                  Everyone else
+                <div role="group" aria-labelledby="pick-others">
+                  <div class="pick-group" id="pick-others">
+                    Everyone else
+                  </div>
+                  {groups.others.map((r) => (
+                    <Row r={r} onPick={onPick} />
+                  ))}
                 </div>
-                {groups.others.map((r) => (
-                  <Row r={r} onPick={onPick} />
-                ))}
-              </div>
+              </>
+            ) : (
+              [...groups.here, ...groups.others].map((r) => <Row r={r} onPick={onPick} />)
             )}
             {none && agents && <div class="pick-none" />}
           </div>
