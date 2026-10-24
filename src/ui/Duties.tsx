@@ -15,9 +15,11 @@ import {
   awayWords,
   checkLine,
   checkWords,
+  decidedWords,
   dutyLight,
   dutyTitle,
   limitWords,
+  listWords,
   nextShort,
   nextWords,
   runLight,
@@ -294,6 +296,8 @@ function DutyView({ name }: { name: string }) {
   const allPaused = useDuties((s) => s.paused);
   const canChange = useCanChange(d);
   const agentName = useAgentName(d ? d.agent : '');
+  const faces = useSelect((s) => s.faces);
+  const nameOfAgent = (a: string) => (faces[a] && faces[a].displayName) || a;
   const [failed, setFailed] = useState('');
   const [said, setSaid] = useState<Said>(null);
   const [busy, setBusy] = useState(false);
@@ -395,7 +399,7 @@ function DutyView({ name }: { name: string }) {
           <h2 class="t-sub duty-sec-head" id="duty-when">
             When
           </h2>
-          <p class="duty-readback">{d.readback || startWords(d) || 'No schedule.'}</p>
+          <p class="duty-readback">{d.readback || startWords(d, nameOfAgent) || 'No schedule.'}</p>
           {next.length > 0 && !d.paused && !allPaused && (
             <>
               <p class="t-meta">Next, in your time</p>
@@ -413,14 +417,7 @@ function DutyView({ name }: { name: string }) {
           <h2 class="t-sub duty-sec-head" id="duty-what">
             What it does
           </h2>
-          <p class="duty-who">
-            <Mark agent={d.agent} size={24} />
-            <span>
-              {d.do && d.do.ask ? 'Ask ' : ''}
-              <a href={hrefOf({ place: 'fleet', agent: d.agent, profile: true })}>{agentName}</a>
-            </span>
-          </p>
-          {d.do && d.do.ask ? <MessageWords text={d.do.ask.message} /> : <p>{title}</p>}
+          <DoWords d={d} agentName={agentName} title={title} />
         </section>
         {d.checkFirst && (
           <section class="duty-sec" aria-labelledby="duty-check">
@@ -481,13 +478,81 @@ function DutyView({ name }: { name: string }) {
   );
 }
 
-/** History lists the runs of a duty, newest first: the time, the light, what the check found, the cost, and the run. */
+/**
+ * DoWords says what a duty does: it asks its agent, posts in a bridge to
+ * some members, opens a bridge from a playbook, or asks the manager, with
+ * its message or its goal.
+ */
+function DoWords({ d, agentName, title }: { d: Duty; agentName: string; title: string }) {
+  const x = d.do || {};
+  const bridge = useSelect((s) => (x.post && x.post.bridge ? s.bridges.byId[x.post.bridge] : undefined));
+  const agent = <a href={hrefOf({ place: 'fleet', agent: d.agent, profile: true })}>{agentName}</a>;
+  if (x.post) {
+    return (
+      <>
+        <p class="duty-who">
+          <Mark agent={d.agent} size={24} />
+          <span>
+            {agent} posts in{' '}
+            {bridge ? <a href={hrefOf({ place: 'bridge', id: x.post.bridge, pane: 'none' })}>{bridge.title}</a> : 'a bridge that you cannot see'}
+            {x.post.to && x.post.to.length ? ' to ' + listWords(x.post.to) : ''}
+          </span>
+        </p>
+        <MessageWords text={x.post.message} />
+      </>
+    );
+  }
+  if (x.open) {
+    return (
+      <>
+        <p class="duty-who">
+          <Mark agent={d.agent} size={24} />
+          <span>
+            {agent} opens a bridge from the playbook {titleOfName(x.open.playbook)}
+          </span>
+        </p>
+        {x.open.goal && <MessageWords text={x.open.goal} />}
+      </>
+    );
+  }
+  if (x.manager) {
+    return (
+      <>
+        <p class="duty-who">
+          <Mark agent={d.agent} size={24} />
+          <span>Ask the manager</span>
+        </p>
+        <MessageWords text={x.manager.message} />
+      </>
+    );
+  }
+  return (
+    <>
+      <p class="duty-who">
+        <Mark agent={d.agent} size={24} />
+        <span>
+          {x.ask ? 'Ask ' : ''}
+          {agent}
+        </span>
+      </p>
+      {x.ask ? <MessageWords text={x.ask.message} /> : <p>{title}</p>}
+    </>
+  );
+}
+
+/**
+ * History lists the runs of a duty, newest first: the time, the light,
+ * what the check found, the cost, and the run. Under a run come the
+ * questions that somebody decided while the person was away.
+ */
 function History({ runs }: { runs: DutyRun[] }) {
+  const me = useSelect((s) => (s.me && s.me.principal ? s.me.principal.subject : ''));
   return (
     <ol class="duty-runs">
       {runs.map((r) => {
         const light = runLight(r);
         const found = checkLine(r);
+        const decided = r.decided || [];
         return (
           <li class="duty-run">
             <span class="duty-run-at">
@@ -501,6 +566,18 @@ function History({ runs }: { runs: DutyRun[] }) {
               <a class="duty-run-link" href={runHref(r.run)}>
                 Open the run
               </a>
+            )}
+            {decided.length > 0 && (
+              <ul class="duty-decided" aria-label="Decided while you were away">
+                {decided.map((x) => (
+                  <li>
+                    <span class="duty-decided-at">
+                      <When at={x.at} />
+                    </span>
+                    <span>{decidedWords(x, me)}</span>
+                  </li>
+                ))}
+              </ul>
             )}
           </li>
         );

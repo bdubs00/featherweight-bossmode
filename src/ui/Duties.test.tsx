@@ -220,6 +220,57 @@ describe('the page of a duty', () => {
     expect(text(el.querySelector('#duty-history'))).toContain('3');
   });
 
+  it('says in the history who decided a question while you were away', async () => {
+    const decided: DutyRun = {
+      at: ago(20),
+      run: '01KASK',
+      state: 'completed',
+      costUSD: 0.05,
+      decided: [
+        { at: ago(19), by: 'manager', verdict: 'allow', tool: 'shell.exec', reason: 'it only reads the disk' },
+        { at: ago(18), by: 'timeout', verdict: 'deny', tool: 'git.push' },
+        { at: ago(17), by: 'alice@example.com', verdict: 'cancel', tool: 'bash', reason: 'wrong host' },
+      ],
+    };
+    api = fakeApi(one(REPORT, [decided]));
+    const el = mount(<DutyMain name="daily-report" />);
+    await settle();
+    const list = el.querySelector('.duty-run ul.duty-decided')!;
+    expect(list.getAttribute('aria-label')).toBe('Decided while you were away');
+    expect([...list.querySelectorAll('li')].map((li) => text(li.querySelector('span:last-child')))).toEqual([
+      'The manager allowed shell.exec: it only reads the disk',
+      'Nobody answered in time, so git.push was denied.',
+      'You stopped the run at bash: wrong host',
+    ]);
+    expect(list.querySelectorAll('time').length).toBe(3);
+  });
+
+  it('says what a duty of each action does', async () => {
+    act(() => store.dispatch({ type: 'bridges', bridges: [{ id: 'b1', title: 'Homelab operations', goal: '', operator: '', state: 'open', placement: 'queue', createdAt: ago(900), closedAt: null, delegation: { approve: false, budget: false, members: false, report: true }, caps: { maxMessages: 1, maxFanoutPerMinute: 1, maxPairMessages: 1 }, lastSeq: 0, read: 0, unread: 0 }] }));
+    const post = base({ name: 'post-review', do: { post: { bridge: 'b1', to: ['reviewer', 'tester'], message: 'Review {date}.' } }, readback: 'Every weekday at 9:00 AM, New York time.' });
+    api = fakeApi(one(post));
+    let el = mount(<DutyMain name="post-review" />);
+    await settle();
+    const what = () => text(el.querySelector('section[aria-labelledby="duty-what"]'));
+    expect(what()).toBe("What it does scribe posts in Homelab operations to reviewer and tester Review Today's date.");
+    expect(el.querySelector('section[aria-labelledby="duty-what"] a[href="#bridge/b1"]')).toBeTruthy();
+    unmountAll();
+    api.restore();
+    const open = base({ name: 'patching', do: { open: { playbook: 'weekly-patching', goal: 'Patch on {date}.' } }, when: { event: { kind: 'bridge.closed', agent: 'triage' } } });
+    api = fakeApi(one(open));
+    el = mount(<DutyMain name="patching" />);
+    await settle();
+    expect(what()).toBe("What it does scribe opens a bridge from the playbook Weekly patching Patch on Today's date.");
+    expect(text(el.querySelector('.duty-readback'))).toBe('When a bridge of triage closes');
+    unmountAll();
+    api.restore();
+    const manager = base({ name: 'ask-boss', do: { manager: { message: 'Sum up the week.' } } });
+    api = fakeApi(one(manager));
+    el = mount(<DutyMain name="ask-boss" />);
+    await settle();
+    expect(what()).toBe('What it does Ask the manager Sum up the week.');
+  });
+
   it('starts a run now and links it, and says why a duty skipped', async () => {
     let n = 0;
     api = fakeApi({ ...one(REPORT), 'POST /v1/duties/daily-report/run': () => (++n === 1 ? { status: 202, body: { run: '01KNEW' } } : { body: { skipped: 'The last run still works.' } }) });
