@@ -3,7 +3,7 @@
 // draw the primitives of src/ui/primitives under the names of the screens.
 
 import type { ComponentChildren, JSX } from 'preact';
-import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { useEffect, useId, useMemo, useRef, useState } from 'preact/hooks';
 import { renderInline, renderMarkdown } from '../lib/markdown';
 import { pageReason } from '../lib/pagepath';
 import { quotedTexts, refCandidates, type Refs } from '../lib/refs';
@@ -130,6 +130,8 @@ export function When({ at }: { at: string }) {
  * Confirm is the confirmation of the page: a modal dialog element, never a
  * browser dialog. It traps the focus, Escape closes it, and the first
  * button is Cancel, so Enter on the dialog does not destroy by accident.
+ * Each dialog names itself by its own title, so a dialog that opens over
+ * another one keeps its name.
  */
 export function Confirm(props: {
   title: string;
@@ -144,6 +146,7 @@ export function Confirm(props: {
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const back = useRef<Element | null>(null);
+  const titleId = 'confirm-' + useId();
   useEffect(() => {
     back.current = document.activeElement;
     const d = ref.current;
@@ -169,7 +172,7 @@ export function Confirm(props: {
     <dialog
       ref={ref}
       class={'confirm' + (props.class ? ' ' + props.class : '')}
-      aria-labelledby="confirm-title"
+      aria-labelledby={titleId}
       onCancel={(e) => {
         e.preventDefault();
         props.onCancel();
@@ -184,7 +187,7 @@ export function Confirm(props: {
     >
       <GrooveBand on="card" />
       <div class="confirm-body">
-        <h2 id="confirm-title">{props.title}</h2>
+        <h2 id={titleId}>{props.title}</h2>
         {props.children}
         <div class="do">
           <button type="button" class={buttonClass('secondary')} data-cancel onClick={props.onCancel}>
