@@ -13,6 +13,9 @@
 // Where the main pane shows beside the list and no row is picked, it shows
 // the row that needs you and waits longest. The address names a picked
 // row, #activity/<key>, so a narrow window opens it and a link reaches it.
+// A run of a duty shows the name of its duty as a chip that opens the
+// duty. GET /v1/inbox adds the failed runs and the paused duties, and the
+// questions of the runs of duties that sit on no bridge.
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { Member } from '../api/types';
@@ -32,6 +35,8 @@ import { attempt } from './notice';
 import { Empty, Markdown, When } from './common';
 import { SeatAgainKey, continueSeat, seatAgain } from './SeatAgain';
 import { markDone, madeOf, settledOf, useMade } from '../state/done';
+import { loadInbox, useDuties } from '../state/duties';
+import { titleOfName } from '../lib/duties';
 import { EmptyPane } from './Shell';
 import { Avatar, Button, Led, Mark, PaneHeader } from './primitives';
 
@@ -168,10 +173,25 @@ export function useInbox(): { rows: InboxRow[]; loaded: boolean } {
   const facts = useSelect(selectFacts);
   const results = useResults();
   const entries = useEntries();
+  const items = useDuties((s) => s.inbox);
   const open = useMemo(() => bridges.order.map((id) => bridges.byId[id]).filter((b) => b.state === 'open'), [bridges]);
   useEffect(() => {
     if (bridges.loaded) ensureRosters();
   }, [bridges]);
+  // The stream carries no event of a duty, so the inbox of the duties reads again each minute while Activity shows.
+  useEffect(() => {
+    loadInbox().catch(() => {});
+    const t = setInterval(() => loadInbox().catch(() => {}), 60_000);
+    return () => clearInterval(t);
+  }, []);
+  // The run of a question of a duty that sits on no bridge, so its card shows.
+  const asking = (items || [])
+    .filter((it) => (it.kind === 'approval' || it.kind === 'question') && !it.bridge && it.run)
+    .map((it) => it.run!)
+    .join(',');
+  useEffect(() => {
+    if (asking) ensureRuns(asking.split(','));
+  }, [asking]);
   // The newest run of a seat that needs you, that failed, or that rests, so a stop shows.
   const want = open
     .flatMap((b) => {
@@ -199,7 +219,7 @@ export function useInbox(): { rows: InboxRow[]; loaded: boolean } {
   useEffect(() => {
     if (unread) ensureChannels(unread.split(','));
   }, [unread]);
-  const rows = sortInbox(inboxRows({ bridges: open, rosters, runs, channels, results, me, facts, entries }));
+  const rows = sortInbox(inboxRows({ bridges: open, rosters, runs, channels, results, me, facts, entries, items }));
   // A question that waits and whose entry the page does not hold yet is read alone.
   const missing = rows
     .filter((r) => r.kind === 'asked' && !r.entry && r.seq)
@@ -219,8 +239,24 @@ export function useInbox(): { rows: InboxRow[]; loaded: boolean } {
   return { rows, loaded: bridges.loaded && open.every((b) => !!rosters[b.id]) };
 }
 
-/** openRow goes to the place of a row: the conversation of the seat, or the channel of the bridge. */
+/** dutyHref is the address of the page of a duty. */
+const dutyHref = (name: string) => hrefOf({ place: 'duties', name });
+
+/** DutyChip names the duty of a run, and opens it. */
+function DutyChip({ name }: { name: string }) {
+  return (
+    <a class="chip chip-plain duty-chip" href={dutyHref(name)} title={'Open the duty ' + name}>
+      {titleOfName(name)}
+    </a>
+  );
+}
+
+/** openRow goes to the place of a row: the conversation of the seat, the channel of the bridge, or the duty of a row that sits on no bridge. */
 function openRow(r: InboxRow, focusComposer = false): void {
+  if (!r.bridge) {
+    if (r.duty) go({ place: 'duties', name: r.duty });
+    return;
+  }
   if (r.handle && (r.kind !== 'message' || r.entry?.from.kind === 'agent')) go({ place: 'member', bridge: r.bridge, handle: r.handle, tab: 'chat' });
   else go({ place: 'bridge', id: r.bridge, pane: 'none' });
   if (focusComposer) {
@@ -239,6 +275,8 @@ function RowFace({ r }: { r: InboxRow }) {
 /** RowStatus is the light and the word of a row. */
 function RowStatus({ r }: { r: InboxRow }) {
   if (r.status === 'needs-you') return <Led tone="amber" word="needs you" />;
+  if (r.kind === 'duty-paused') return <Led tone="grey" word="paused" />;
+  if (r.kind === 'duty-failed') return <Led tone="red" word="failed" />;
   if (r.kind === 'stopped') return <Led tone="grey" word="stopped" />;
   if (r.kind === 'limit') return <Led tone="grey" word="at its limit" />;
   if (r.status === 'error') return <Led tone="red" word="error" />;
@@ -262,8 +300,12 @@ function rowText(r: InboxRow): string {
 
 function rowName(r: InboxRow): string {
   if (r.kind === 'message' && r.entry) return senderName(r.entry.from);
+  if (r.kind === 'duty-failed' || r.kind === 'duty-paused' || r.kind === 'duty-waits') return r.duty ? titleOfName(r.duty) : r.agent || 'A duty';
   return r.handle || '';
 }
+
+/** isDutyRow reports whether a row is an item of the inbox of the duties, with no seat behind it. */
+const isDutyRow = (r: InboxRow) => r.kind === 'duty-failed' || r.kind === 'duty-paused' || r.kind === 'duty-waits';
 
 /** InboxItem is one row of the inbox. */
 function InboxItem({ r, on, rows }: { r: InboxRow; on: boolean; rows: InboxRow[] }) {
@@ -302,7 +344,12 @@ function InboxItem({ r, on, rows }: { r: InboxRow; on: boolean; rows: InboxRow[]
           {rowText(r)}
         </div>
         {brief && (brief.code ? <code class="inbox-cmd clip">{brief.text}</code> : <div class="inbox-text clip">{brief.text}</div>)}
-        <div class="inbox-where clip">{r.bridgeTitle}</div>
+        {(r.bridgeTitle || r.duty) && (
+          <div class="inbox-where">
+            {r.bridgeTitle && <span class="clip">{r.bridgeTitle}</span>}
+            {r.duty && <DutyChip name={r.duty} />}
+          </div>
+        )}
         {(r.kind === 'failed' || r.kind === 'stopped' || r.kind === 'limit') && m && (
           <div class="inbox-do">
             <SeatAgainKey bridge={r.bridge} m={m} label={'Seat ' + m.handle + ' again'} />
@@ -414,18 +461,24 @@ export function ActivityMain({ item }: { item?: string }) {
     );
   }
   const where = (
-    <span class="meta clip member-where">
-      in <a href={hrefOf({ place: 'bridge', id: r.bridge, pane: 'none' })}>{r.bridgeTitle}</a>
-    </span>
+    <>
+      {r.bridge && (
+        <span class="meta clip member-where">
+          in <a href={hrefOf({ place: 'bridge', id: r.bridge, pane: 'none' })}>{r.bridgeTitle || 'a bridge'}</a>
+        </span>
+      )}
+      {r.duty && <DutyChip name={r.duty} />}
+    </>
   );
   const name = rowName(r);
   // The card shows the decision of the stream, and on the settled row the decision that the person just made.
   const decision = r.decision ? settledOf(r.decision, card, settledRow === r ? made : undefined, me) : undefined;
   // A decided card waits for nobody, so the head no longer says needs you.
   const waits = r.status === 'needs-you' && !(decision && decision.state !== 'pending');
-  const tone = waits ? 'amber' : r.kind === 'stopped' || r.kind === 'limit' ? 'grey' : r.status === 'error' ? 'red' : undefined;
-  const word = waits ? 'needs you' : r.kind === 'stopped' ? 'stopped' : r.kind === 'limit' ? 'at its limit' : r.status === 'error' ? 'error' : '';
-  const convo = r.handle && (r.kind !== 'message' || (r.entry && r.entry.from.kind === 'agent')) ? hrefOf({ place: 'member', bridge: r.bridge, handle: r.handle, tab: 'chat' }) : '';
+  const tone = waits ? 'amber' : r.kind === 'stopped' || r.kind === 'limit' || r.kind === 'duty-paused' ? 'grey' : r.status === 'error' ? 'red' : undefined;
+  const word = waits ? 'needs you' : r.kind === 'stopped' ? 'stopped' : r.kind === 'limit' ? 'at its limit' : r.kind === 'duty-paused' ? 'paused' : r.kind === 'duty-failed' ? 'failed' : r.status === 'error' ? 'error' : '';
+  const convo = r.bridge && r.handle && (r.kind !== 'message' || (r.entry && r.entry.from.kind === 'agent')) ? hrefOf({ place: 'member', bridge: r.bridge, handle: r.handle, tab: 'chat' }) : '';
+  const duty = !r.bridge && r.duty ? dutyHref(r.duty) : '';
   const asked = r.kind === 'asked' && r.handle ? { entry: r.entry, handle: r.handle } : null;
   return (
     <section class="screen inbox-main-pane" aria-labelledby="inbox-title">
@@ -437,12 +490,17 @@ export function ActivityMain({ item }: { item?: string }) {
         back={{ href: '#activity', label: 'Activity', to: 'list' }}
         lead={r.kind === 'message' && r.entry && r.entry.from.kind === 'person' ? <Avatar subject={r.entry.from.name || ''} display={r.entry.from.display} size={36} /> : <Mark agent={r.agent || name} size={36} label={name} halo={tone ? { tone, word } : undefined} />}
         actions={
-          convo || doneOf(r) ? (
+          convo || duty || doneOf(r) ? (
             <>
               {doneOf(r) && <DoneKey r={r} rows={rows} fromMain />}
               {convo && (
                 <Button size="s" href={convo}>
                   Open conversation
+                </Button>
+              )}
+              {duty && (
+                <Button size="s" href={duty}>
+                  Open the duty
                 </Button>
               )}
             </>
@@ -459,6 +517,19 @@ export function ActivityMain({ item }: { item?: string }) {
       ) : (
         <div class="scroll pad">
           {decision && <DecisionCard d={decision} who={r.handle || name} onDecide={() => afterDecision(r, rows)} />}
+          {isDutyRow(r) && (
+            <div class="inbox-stop">
+              <p class="inbox-stop-line">
+                {word && <Led tone={tone || 'grey'} word={word} />}
+                {r.reason && <span class="inbox-reason">{r.reason}</span>}
+              </p>
+              {r.run && (
+                <p>
+                  <a href={'/ui#run/' + encodeURIComponent(r.run)}>Open the run</a>
+                </p>
+              )}
+            </div>
+          )}
           {(r.kind === 'failed' || r.kind === 'stopped' || r.kind === 'limit') && (
             <div class="inbox-stop">
               <p class="inbox-stop-line">

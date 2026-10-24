@@ -176,3 +176,46 @@ describe('the inbox', () => {
     expect(['a', 'd', 'r'].map((k) => keyAction(k, message))).toEqual([null, null, 'reply']);
   });
 });
+
+describe('the items of the inbox of the duties', () => {
+  const base = (): InboxInput => ({
+    bridges: [bridge('b1')],
+    rosters: { b1: roster([seat('broke', 'error')]) },
+    runs: { 'run-broke': run('run-broke', 'failed', { error: 'The run reached its limit.', metadata: { 'workbench.duty': 'nightly-check' } }) },
+    channels: {},
+    results: {},
+    me: 'alice@example.com',
+  });
+
+  it('name the duty of a run of a seat from its metadata', () => {
+    const rows = inboxRows(base());
+    expect(rows.map((r) => [r.key, r.kind, r.duty])).toEqual([['s:b1/broke', 'failed', 'nightly-check']]);
+  });
+
+  it('add a failed run and a paused duty, and a question of a duty on no bridge, and show a question of a bridge once', () => {
+    const s = base();
+    s.runs['run-ask'] = run('run-ask', 'input-required', { agent: 'backup', pending: { id: 'ap-1', tool: 'bash', input: { command: 'restic restore' }, reason: 'ask', requestedAt: at(3) } });
+    s.items = [
+      { kind: 'failure', run: 'run-x', duty: 'daily-report', agent: 'scribe', text: 'The run reached its limit of turns.', since: at(1) },
+      { kind: 'paused', duty: 'monthly-summary', agent: 'writer', text: 'Three runs in a row failed.', since: at(2) },
+      { kind: 'approval', run: 'run-ask', duty: 'restore-test', agent: 'backup', text: 'backup wants to run a command.', since: at(3) },
+      { kind: 'approval', run: 'run-seat', bridge: 'b1', agent: 'migrator', text: 'In a bridge.' },
+      { kind: 'question', run: 'run-later', duty: 'restore-test', agent: 'backup', text: 'Which snapshot?', since: at(4) },
+      // A failure that the row of a seat shows gives it its duty, and no second row.
+      { kind: 'failure', run: 'run-broke', duty: 'other-duty', text: 'Failed.' },
+    ];
+    const rows = sortInbox(inboxRows(s));
+    expect(rows.map((r) => [r.key, r.kind, r.status, r.duty || ''])).toEqual([
+      ['d:run-ask/ap-1', 'decision', 'needs-you', 'restore-test'],
+      ['w:run-later', 'duty-waits', 'needs-you', 'restore-test'],
+      ['s:b1/broke', 'failed', 'error', 'nightly-check'],
+      ['u:failure/daily-report', 'duty-failed', 'error', 'daily-report'],
+      ['u:paused/monthly-summary', 'duty-paused', 'limit', 'monthly-summary'],
+    ]);
+    const ask = rows[0];
+    expect([ask.bridge, ask.handle, ask.decision!.tool]).toEqual(['', 'backup', 'bash']);
+    expect(rows[3].reason).toBe('The run reached its limit of turns.');
+    expect(keyAction('a', ask)).toBe('allow');
+    expect(keyAction('s', rows[3])).toBeNull();
+  });
+});

@@ -830,9 +830,30 @@ a.file {
   max-width: 100%;
 }
 .inbox-where {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-width: 0;
   font-size: var(--t-caption);
   line-height: var(--t-caption-lh);
   color: var(--muted);
+}
+/* The duty of a run: a chip that opens the duty. A long name ends in an ellipsis. */
+.duty-chip {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--muted);
+  text-decoration: none;
+}
+.duty-chip:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+.inbox-main-pane .pane-head .duty-chip {
+  flex: 0 1 auto;
+  min-width: 0;
 }
 .inbox-do {
   display: flex;

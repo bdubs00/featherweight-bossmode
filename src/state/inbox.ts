@@ -1,9 +1,12 @@
 // The inbox of the Activity place: one row per decision, question, failed
 // seat, stopped seat, seat at its limit, message that asks you, and new
-// message, across every open bridge, in the order of attention. The functions here are pure, so the tests read them
-// without a page.
+// message, across every open bridge, in the order of attention. The items
+// of GET /v1/inbox add a row for each failed run and each paused duty, and
+// for a question of a run of a duty that sits on no bridge. A question of
+// a bridge has its row already, so it never shows twice. The functions
+// here are pure, so the tests read them without a page.
 
-import type { Bridge, Decision, Entry, Member, Result, Run } from '../api/types';
+import type { Bridge, Decision, Entry, InboxItem, Member, Result, Run } from '../api/types';
 import type { Channel, Roster, State } from './reducer';
 import { newestRun } from './people';
 import { decisionOf } from '../lib/decision';
@@ -15,7 +18,7 @@ import { seatPresence, type Facts } from '../lib/status';
  * the channel: it needs you, and it is no card, so you answer it in the
  * bridge.
  */
-export type InboxKind = 'decision' | 'question' | 'asked' | 'failed' | 'stopped' | 'limit' | 'message';
+export type InboxKind = 'decision' | 'question' | 'asked' | 'failed' | 'stopped' | 'limit' | 'message' | 'duty-failed' | 'duty-paused' | 'duty-waits';
 
 /** The statuses of the inbox, in the order of attention. A seat at its limit did nothing wrong, and it waits for you to continue it. */
 export const INBOX_ORDER = ['needs-you', 'error', 'limit', 'working', 'idle', 'asleep'] as const;
@@ -43,7 +46,15 @@ export interface InboxRow {
   toYou?: boolean;
   /** The seq of the entry of a question, also before the page holds the entry. */
   seq?: number;
+  /** The duty whose run the row is about, from the metadata workbench.duty of the run or from the item of the inbox. */
+  duty?: string;
 }
+
+/** The key of the metadata of a run that names its duty. */
+export const DUTY_KEY = 'workbench.duty';
+
+/** dutyOfRun names the duty of a run, or "". */
+export const dutyOfRun = (r: Run | undefined): string => (r && r.metadata && r.metadata[DUTY_KEY]) || '';
 
 export interface InboxInput {
   /** The open bridges. */
@@ -59,6 +70,8 @@ export interface InboxInput {
   facts?: Facts;
   /** The entries that the page read alone, such as a question older than the loaded part of its channel, by bridge/seq. */
   entries?: Record<string, Entry>;
+  /** The items of GET /v1/inbox. */
+  items?: InboxItem[] | null;
 }
 
 /** cardOf finds the card of a decision in a loaded channel. */
@@ -214,7 +227,8 @@ export function inboxRows(s: InboxInput): InboxRow[] {
     for (const m of members) {
       const id = newestRun(m);
       const run = s.runs[id];
-      const base = { bridge: b.id, bridgeTitle: b.title, handle: m.handle, agent: m.agent, run: id };
+      const duty = dutyOfRun(run);
+      const base = { bridge: b.id, bridgeTitle: b.title, handle: m.handle, agent: m.agent, run: id, ...(duty ? { duty } : {}) };
       const p = presence(m);
       if (p === 'needs-you' && run && run.state === 'input-required' && run.pending) {
         const d = decisionOf(run, s.results[run.id], cardOf(s.channels[b.id], run.id, run.pending.id));
@@ -256,7 +270,47 @@ export function inboxRows(s: InboxInput): InboxRow[] {
       });
     }
   }
-  return rows;
+  return [...rows, ...itemRows(s, rows)];
+}
+
+/**
+ * itemRows builds the rows of the items of GET /v1/inbox that no row of a
+ * bridge shows: a failed run, a paused duty, and a question of a run of a
+ * duty that sits on no bridge. A question shows as its card once the page
+ * holds its run, and as a line that waits until then. A failed run that a
+ * row of a seat shows gives that row its duty instead.
+ */
+function itemRows(s: InboxInput, seats: InboxRow[]): InboxRow[] {
+  const out: InboxRow[] = [];
+  const titles = new Map(s.bridges.map((b) => [b.id, b.title]));
+  for (const it of s.items || []) {
+    const duty = it.duty || '';
+    const where = { bridge: it.bridge || '', bridgeTitle: (it.bridge && titles.get(it.bridge)) || '', agent: it.agent || undefined, run: it.run || undefined, ...(duty ? { duty } : {}) };
+    if (it.kind === 'failure' || it.kind === 'paused') {
+      const seat = it.run ? seats.find((r) => r.run === it.run) : undefined;
+      if (seat) {
+        if (duty && !seat.duty) seat.duty = duty;
+        continue;
+      }
+      const failed = it.kind === 'failure';
+      out.push({ ...where, key: 'u:' + it.kind + '/' + (duty || it.run || it.text || ''), kind: failed ? 'duty-failed' : 'duty-paused', status: failed ? 'error' : 'limit', reason: it.text || '', at: it.since || '' });
+      continue;
+    }
+    // A question of a bridge has its row in the bridge.
+    if ((it.kind !== 'approval' && it.kind !== 'question') || it.bridge || !it.run) continue;
+    const run = s.runs[it.run];
+    const agent = it.agent || (run ? run.agent : '');
+    if (run && run.state === 'input-required' && run.pending) {
+      const d = decisionOf(run, s.results[run.id]);
+      if (d) {
+        out.push({ ...where, agent, handle: agent, key: 'd:' + run.id + '/' + d.id, kind: d.question || d.schema ? 'question' : 'decision', status: 'needs-you', decision: d, at: run.pending.requestedAt || it.since || run.updatedAt });
+        continue;
+      }
+    }
+    if (run && !['input-required', 'queued', 'running', 'suspended'].includes(run.state)) continue;
+    out.push({ ...where, agent, key: 'w:' + it.run, kind: 'duty-waits', status: 'needs-you', reason: it.text || '', at: it.since || '' });
+  }
+  return out;
 }
 
 const ms = (iso: string): number => {
