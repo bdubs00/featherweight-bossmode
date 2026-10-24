@@ -1324,8 +1324,14 @@ The rules of the page:
   profile names whole, such as `servicenow.*`, gives each tool of the
   catalog of `GET /v1/tools` under it. The input is a list of names and
   values. A secret of an address is a choice among the secrets of
-  `options.secrets` whose `hosts` hold the host of the address, by name,
-  with its port, or under `*.domain`. Nobody types a secret. The filters of
+  `options.secrets` with a pattern in `hosts` that matches the host of the
+  address. A pattern follows `path.Match` of Go, as the front does, against
+  the host name in lower case, without the port: `*` matches any run of
+  characters, dots too, so `*.example.com` matches `a.b.example.com` and
+  not `example.com`. `?` matches one character, and `[...]` one character
+  of a class, with `^` first for a class that negates. A pattern that Go
+  calls bad matches nothing. `src/lib/glob.ts` follows the code of Go step
+  by step. Nobody types a secret. The filters of
   `where` are rows of a field, a test, and a value, which the person adds,
   changes, and removes.
 - **New:** `new` is the draft of a duty without a name. Until the message

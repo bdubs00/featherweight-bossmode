@@ -10,6 +10,7 @@ import type { Light } from './presence';
 import { costText } from './cost';
 import { personName } from './words';
 import type { DutySeed } from './route';
+import { globMatch } from './glob';
 
 /* ---------- placeholders ---------- */
 
@@ -908,27 +909,27 @@ export function checkOf(c: CheckForm): CheckFirst | null {
   return out;
 }
 
-/** urlHost is the host of an address, with and without its port, or null for an address that does not read. */
-export function urlHost(url: string): { host: string; hostname: string } | null {
+/** hostOfUrl is the host name of an address in lower case, without its port and without the brackets of an IPv6 address, or "" for an address that does not read. */
+export function hostOfUrl(url: string): string {
   try {
     const u = new URL(String(url || '').trim());
-    if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
-    return { host: u.host.toLowerCase(), hostname: u.hostname.toLowerCase() };
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return '';
+    return u.hostname.toLowerCase().replace(/^\[(.*)\]$/, '$1');
   } catch {
-    return null;
+    return '';
   }
 }
 
-/** secretsFor keeps the secrets of the front that may go to the host of an address: a host by name, with its port, or a host under *.domain. */
+/**
+ * secretsFor keeps the secrets of the front that may go to the host of an
+ * address. A pattern of hosts follows Match of the package path of Go, as
+ * the front does, against the host name in lower case, without the port:
+ * *.example.com matches a.b.example.com, and not example.com.
+ */
 export function secretsFor(secrets: DutySecret[], url: string): DutySecret[] {
-  const h = urlHost(url);
-  if (!h) return [];
-  const fits = (pattern: string) => {
-    const p = String(pattern || '').toLowerCase();
-    if (p === h.host || p === h.hostname) return true;
-    return p.startsWith('*.') && (h.hostname.endsWith(p.slice(1)) || h.host.endsWith(p.slice(1)));
-  };
-  return secrets.filter((s) => (s.hosts || []).some(fits));
+  const host = hostOfUrl(url);
+  if (!host) return [];
+  return secrets.filter((s) => (s.hosts || []).some((p) => globMatch(String(p || ''), host)));
 }
 
 /**

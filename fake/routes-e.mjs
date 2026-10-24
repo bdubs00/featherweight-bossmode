@@ -327,12 +327,54 @@ function problemsOf(body, zone) {
     if (look.http && !/^https?:\/\/\S+$/.test(look.http.url || '')) p('checkFirst.look.http.url', 'The address of a check starts with http:// or https://.');
     else if (look.http && look.http.secret) {
       const secret = SECRETS.find((x) => x.name === look.http.secret);
-      const host = new URL(look.http.url).host;
+      const host = new URL(look.http.url).hostname.toLowerCase();
       if (!secret) p('checkFirst.look.http.secret', 'The front has no secret ' + look.http.secret + '.');
-      else if (!secret.hosts.some((h) => h === host || (h.startsWith('*.') && host.endsWith(h.slice(1))))) p('checkFirst.look.http.secret', 'The secret ' + secret.name + ' does not go to ' + host + '.');
+      else if (!secret.hosts.some((h) => hostGlob(h, host))) p('checkFirst.look.http.secret', 'The secret ' + secret.name + ' does not go to ' + host + '.');
     }
   }
   return { duty: d, problems };
+}
+
+/**
+ * hostGlob matches the host name of an address, without its port, against
+ * a pattern of a secret, as path.Match of Go does for a name without a
+ * slash: * is any run of characters, ? one character, and [...] a class,
+ * with ^ for one that negates. A bad pattern matches nothing.
+ */
+function hostGlob(pattern, host) {
+  const esc = (c) => c.replace(/[\\^$.*+?()[\]{}|\/-]/g, '\\$&');
+  let re = '';
+  for (let i = 0; i < pattern.length; i++) {
+    const c = pattern[i];
+    if (c === '*') re += '[^/]*';
+    else if (c === '?') re += '[^/]';
+    else if (c === '\\') {
+      if (++i >= pattern.length) return false;
+      re += esc(pattern[i]);
+    } else if (c === '[') {
+      let j = i + 1;
+      let cls = '';
+      if (pattern[j] === '^') {
+        cls = '^';
+        j++;
+      }
+      const start = j;
+      // As in Go, a class takes no bare ] or - first.
+      if (pattern[j] === ']' || pattern[j] === '-') return false;
+      for (; j < pattern.length && !(pattern[j] === ']' && j > start); j++) {
+        if (pattern[j] === '\\') j++;
+        cls += pattern[j] === '-' && j > start ? '-' : esc(pattern[j] || '');
+      }
+      if (j >= pattern.length) return false;
+      re += '[' + cls + ']';
+      i = j;
+    } else re += esc(c);
+  }
+  try {
+    return new RegExp('^' + re + '$').test(host);
+  } catch {
+    return false;
+  }
 }
 
 /** What the fake serves now, as GET /v1/duties/options answers it. */
@@ -340,7 +382,7 @@ const EVENTS = ['bridge.closed', 'run.failed', 'question.waiting', 'page.changed
 const SECRETS = [
   { name: 'QUEUE_TOKEN', hosts: ['queue.example.com'] },
   { name: 'GITHUB_TOKEN', hosts: ['api.github.com'] },
-  { name: 'LAB_API', hosts: ['*.lab.example.org'] },
+  { name: 'LAB_API', hosts: ['*.lab.example.org', 'node[0-9].lab.example.org'] },
 ];
 
 /** eventWords reads an event back in words, as the page does. */

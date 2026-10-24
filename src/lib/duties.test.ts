@@ -363,10 +363,18 @@ describe('the check by hand', () => {
     const secrets = [
       { name: 'QUEUE_TOKEN', hosts: ['q.example.com'] },
       { name: 'WIDE', hosts: ['*.example.com'] },
+      { name: 'NODES', hosts: ['node[0-9].lab', 'api?.lab'] },
       { name: 'PORTED', hosts: ['api.lab:8443'] },
     ];
     expect(secretsFor(secrets, 'https://q.example.com/api').map((s) => s.name)).toEqual(['QUEUE_TOKEN', 'WIDE']);
-    expect(secretsFor(secrets, 'https://api.lab:8443/x').map((s) => s.name)).toEqual(['PORTED']);
+    // The host name, in lower case and without the port, is what the pattern matches.
+    expect(secretsFor(secrets, 'https://Q.Example.COM:8443/api').map((s) => s.name)).toEqual(['QUEUE_TOKEN', 'WIDE']);
+    expect(secretsFor(secrets, 'https://a.b.example.com/').map((s) => s.name)).toEqual(['WIDE']);
+    expect(secretsFor(secrets, 'https://example.com/').map((s) => s.name)).toEqual([]);
+    expect(secretsFor(secrets, 'http://node4.lab:9000/q').map((s) => s.name)).toEqual(['NODES']);
+    expect(secretsFor(secrets, 'http://api1.lab/q').map((s) => s.name)).toEqual(['NODES']);
+    // A pattern with a port never matches, because the host name has none.
+    expect(secretsFor(secrets, 'https://api.lab:8443/x').map((s) => s.name)).toEqual([]);
     expect(secretsFor(secrets, 'not an address')).toEqual([]);
     const catalog = [
       { name: 'query_incidents', source: 'servicenow' },
