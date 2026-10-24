@@ -21,6 +21,7 @@ import {
   dutyTitle,
   limitWords,
   listWords,
+  retryWords,
   nextShort,
   nextWords,
   runLight,
@@ -56,11 +57,12 @@ function OffWords() {
 
 /* ---------- the list ---------- */
 
-/** rank orders the duties: what needs you, what failed, what works, then the rest, and a paused duty last. Within a rank, the next time first. */
+/** rank orders the duties: what needs you, what failed, what works or goes again, then the rest, and a paused duty last. Within a rank, the next time first. */
 function rank(d: Duty): number {
   if (d.paused) return 5;
-  const tone = dutyLight(d).tone;
-  return tone === 'amber' ? 0 : tone === 'red' ? 1 : tone === 'green' ? 2 : 3;
+  const light = dutyLight(d);
+  if (light.tone === 'amber') return light.still ? 2 : 0;
+  return light.tone === 'red' ? 1 : light.tone === 'green' ? 2 : 3;
 }
 
 /** sortDuties puts the duties in the order of the list. */
@@ -87,7 +89,7 @@ function DutyRow({ d, on, allPaused }: { d: Duty; on: boolean; allPaused: boolea
       <span class="duty-row-main">
         <span class="duty-row-top">
           <span class="duty-row-title">{dutyTitle(d)}</span>
-          <Led tone={light.tone} word={light.word} label={light.label} />
+          <Led tone={light.tone} word={light.word} label={light.label} still={light.still} />
         </span>
         {when && <span class="duty-row-when">{when}</span>}
         <span class="duty-row-meta">
@@ -371,7 +373,7 @@ function DutyView({ name }: { name: string }) {
   return (
     <section class="screen duty" aria-labelledby="duty-title">
       <PaneHeader id="duty-title" title={<span title={title}>{title}</span>} size="title" level={1} back={back}>
-        <Led tone={light.tone} word={light.word} label={light.label} class="duty-status" />
+        <Led tone={light.tone} word={light.word} label={light.label} still={light.still} class="duty-status" />
       </PaneHeader>
       <div class="scroll pad duty-body">
         <div class="duty-keys">
@@ -608,7 +610,7 @@ function History({ runs }: { runs: DutyRun[] }) {
             <Led tone={light.tone} word={light.word} label={light.label} still />
             {found && <span class="duty-run-found">{found}</span>}
             {typeof r.costUSD === 'number' && r.costUSD > 0 && <span class="duty-run-cost">{costText(r.costUSD)}</span>}
-            {r.reason && <span class="duty-run-why">{r.reason}</span>}
+            {r.state === 'retrying' ? <span class="duty-run-why">{retryWords(r)}</span> : r.reason && <span class="duty-run-why">{r.reason}</span>}
             {r.run && (
               <a class="duty-run-link" href={runHref(r.run)}>
                 Open the run

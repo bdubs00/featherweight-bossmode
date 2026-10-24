@@ -14,6 +14,8 @@ export interface Light {
   tone: Tone;
   /** True when the word shows struck through. */
   struck?: boolean;
+  /** True when an amber light holds still, for a status that waits for nothing from the person. */
+  still?: boolean;
   /** A sentence for a tooltip and a screen reader. */
   label: string;
 }

@@ -123,6 +123,30 @@ describe('the list of duties', () => {
     expect(keyNamed(el, 'Pause all duties')).toBeUndefined();
   });
 
+  it('shows a start that goes again as retrying, with a still amber light, among the duties that work', async () => {
+    const retry: DutyRun = { at: ago(5), slot: ago(5), run: '', state: 'retrying', reason: 'The run failed: the model answered 529. It goes again.' };
+    const RETRY = base({ name: 'retry-me', readback: 'Every day at 9:00 AM, UTC.', next: NEXT, state: { lastRun: retry, todayUSD: 0, failuresInRow: 0 } });
+    api = fakeApi(listOf([REPORT, RETRY, WATCH]));
+    const el = mount(<DutyList />);
+    await settle();
+    const rows = [...el.querySelectorAll('.duty-row')];
+    // What failed comes first. A start that goes again needs nothing from the person.
+    expect(rows.map((r) => r.getAttribute('href'))).toEqual(['#duties/watch-p1', '#duties/retry-me', '#duties/daily-report']);
+    const led = rows[1].querySelector('.led')!;
+    expect(led.className).toBe('led led-amber');
+    expect(text(rows[1].querySelector('.status'))).toBe('retrying');
+    unmountAll();
+    api.restore();
+    api = fakeApi({ ...listOf([RETRY]), 'GET /v1/duties/retry-me': { ...RETRY, history: [retry, { ...retry, reason: 'The queue of scribe did not answer. It goes again.' }] } });
+    const page = mount(<DutyMain name="retry-me" />);
+    await settle();
+    expect([...page.querySelectorAll('.duty-run')].map((r) => text(r).replace(/^.*?(retrying)/, '$1'))).toEqual([
+      'retrying The run failed: the model answered 529. It goes again.',
+      'retrying The run failed: the queue of scribe did not answer. It goes again.',
+    ]);
+    expect(page.querySelector('.duty-run a')).toBeNull();
+  });
+
   it('finds a duty by its words', async () => {
     api = fakeApi(listOf([REPORT, WATCH]));
     const el = mount(<DutyList />);

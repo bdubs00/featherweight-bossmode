@@ -21,6 +21,7 @@ import {
   nameReason,
   presetOf,
   recordOf,
+  retryWords,
   runLight,
   scheduleOf,
   seconds,
@@ -244,6 +245,11 @@ describe('the check', () => {
 describe('a duty in words', () => {
   it('gives each run its light and what its check found', () => {
     expect(runLight(null).word).toBe('not run yet');
+    // A start that goes again holds a still amber light: it waits for nothing from the person.
+    expect(runLight({ at: '', state: 'retrying', run: '', reason: 'The run failed: the model answered 529. It goes again.' })).toEqual({ word: 'retrying', tone: 'amber', still: true, label: 'The run failed: the model answered 529. It goes again.' });
+    expect(retryWords({ reason: 'The queue of triage did not answer. It goes again.' })).toBe('The run failed: the queue of triage did not answer. It goes again.');
+    expect(retryWords({ reason: 'The run failed: no worker' })).toBe('The run failed: no worker. It goes again.');
+    expect(retryWords({})).toBe('The run failed, and it goes again.');
     expect(runLight({ at: '', state: 'completed', run: 'r1' })).toMatchObject({ word: 'finished', tone: 'grey' });
     expect(runLight({ at: '', state: 'failed', reason: 'The model refused.' })).toMatchObject({ word: 'failed', tone: 'red', label: 'The model refused.' });
     expect(runLight({ at: '', state: 'running' })).toMatchObject({ word: 'working', tone: 'green' });

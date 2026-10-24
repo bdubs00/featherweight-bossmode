@@ -403,13 +403,28 @@ const cut = (s: string) => (s.length > 80 ? s.slice(0, 79) + '…' : s);
 
 /* ---------- a run and a duty in words ---------- */
 
-/** runLight is the light of a run of a duty: what the time did. */
+/**
+ * retryWords says that a start failed and goes again, with the reason of
+ * the front, which already ends in It goes again. A start whose run never
+ * existed still reads as a failed run, so the person reads one story.
+ */
+export function retryWords(r: Pick<DutyRun, 'reason'>): string {
+  let why = (r.reason || '').trim();
+  if (!why) return 'The run failed, and it goes again.';
+  if (!/failed/i.test(why)) why = 'The run failed: ' + why[0].toLowerCase() + why.slice(1);
+  if (!/goes again/i.test(why)) why = why.replace(/\.?$/, '.') + ' It goes again.';
+  return why;
+}
+
+/** runLight is the light of a run of a duty: what the time did. A start that retries holds an amber light still: it waits for nothing from the person. */
 export function runLight(r: DutyRun | null | undefined): Light {
   if (!r) return { word: 'not run yet', tone: 'grey', label: 'This duty has not run yet.' };
   const why = r.reason ? r.reason : '';
   switch (r.state) {
     case 'failed':
       return { word: 'failed', tone: 'red', label: why || 'The run failed.' };
+    case 'retrying':
+      return { word: 'retrying', tone: 'amber', still: true, label: retryWords(r) };
     case 'input-required':
       return { word: 'needs you', tone: 'amber', label: 'The run waits for an answer.' };
     case 'queued':
