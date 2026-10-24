@@ -228,7 +228,8 @@ export function channelErrors(f: ChannelForm, serverDefault?: string): ChannelEr
       const start = URL_START[f.kind];
       if (!u && secretValue(f.url) !== 'set') e.url = f.kind === 'webhook' ? 'Paste the address of the app.' : 'Paste the address from ' + KINDS[f.kind].name + '.';
       else if (u && start && !start.test(u)) e.url = f.kind === 'slack' ? 'A Slack address starts with https://hooks.slack.com/.' : 'A Discord address starts with https://discord.com/api/webhooks/.';
-      else if (u && !/^https:\/\/[^\s/]+/i.test(u)) e.url = 'The address starts with https://.';
+      // The front allows http on a host that the operator lists, so the page asks for a web address and leaves that rule to the front.
+      else if (u && !/^https?:\/\/[^\s/]+/i.test(u)) e.url = 'The address starts with https://.';
       break;
     }
     case 'email': {

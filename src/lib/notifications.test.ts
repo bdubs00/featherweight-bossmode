@@ -107,7 +107,9 @@ describe('the form of a place', () => {
     expect(channelErrors({ ...f, kind: 'slack' })).toEqual({ url: 'Paste the address from Slack.' });
     expect(channelErrors({ ...f, kind: 'slack', url: { ...f.url, typed: 'https://example.com/x' } })).toEqual({ url: 'A Slack address starts with https://hooks.slack.com/.' });
     expect(channelErrors({ ...f, kind: 'discord', url: { ...f.url, typed: 'https://discordapp.com/api/webhooks/1/abc' } })).toEqual({});
-    expect(channelErrors({ ...f, kind: 'teams', url: { ...f.url, typed: 'http://teams.example.com/x' } })).toEqual({ url: 'The address starts with https://.' });
+    expect(channelErrors({ ...f, kind: 'teams', url: { ...f.url, typed: 'teams.example.com/x' } })).toEqual({ url: 'The address starts with https://.' });
+    // The front decides http: it allows it on a host that the operator lists.
+    expect(channelErrors({ ...f, kind: 'webhook', url: { ...f.url, typed: 'http://notify-sink.lab.internal:8080/hook' } })).toEqual({});
     expect(channelErrors({ ...f, kind: 'webhook' })).toEqual({ url: 'Paste the address of the app.' });
     // A saved address needs nothing new.
     expect(channelErrors({ ...channelFormOf(HA) })).toEqual({});

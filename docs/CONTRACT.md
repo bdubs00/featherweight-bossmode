@@ -1461,8 +1461,8 @@ A place, as a read answers it. Each kind holds only its own fields:
 | `ntfy` | `Server` (`ntfy.server`, with `serverDefault` as its placeholder), `Topic`, and `Token` (`ntfy.token`) | A topic, with no space and no slash. A server is an address. With `serverDefault` `""`, the front has no server, so the place needs one. |
 | `slack` | `Address` (`url`) | The address starts with `https://hooks.slack.com/`. |
 | `discord` | `Address` (`url`) | The address starts with `https://discord.com/api/webhooks/` or `https://discordapp.com/api/webhooks/`. |
-| `teams` | `Address` (`url`) | The address starts with `https://`. |
-| `webhook` | `Address` (`url`) and `Secret` (`secret`), with the header of the signature | The address starts with `https://`. |
+| `teams` | `Address` (`url`) | The address starts with `https://`, or with `http://` on a host that the operator lists. The front decides the second case. |
+| `webhook` | `Address` (`url`) and `Secret` (`secret`), with the header of the signature | The address starts with `https://`, or with `http://` on a host that the operator lists. The front decides the second case. |
 | `email` | `Email address` (`email.to`) | An email address. |
 | `agent` | `Agent` (`agent.agent`), `How should it reach you?` (`agent.how`), and `The most a message can cost` (`agent.budget.maxCostUSD`) | An agent that the person can run: an owner or an operator of it, or a role that the page cannot tell. The words. A budget above 0, which the person writes. The page fills no amount, and keeps the other limits of `agent.budget`. |
 | `shared` | `Channel` (`shared`), a choice of `shared` by label | A pick. The label of the channel fills an empty name. |
