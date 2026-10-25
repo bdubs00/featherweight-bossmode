@@ -14,6 +14,33 @@
   flex: none;
 }
 
+/* ---------- the past conversations ---------- */
+/* The dialog of the Manager screen and of a conversation with an agent. Its list scrolls, and the rows are keys. */
+dialog.confirm.past-dialog {
+  max-height: calc(100dvh - 32px);
+}
+.past-list {
+  max-height: min(56dvh, 480px);
+  overflow-y: auto;
+  margin: 0 calc(-1 * var(--s-2));
+  padding: 0 var(--s-2);
+}
+.past-list .chat-day:first-child .people-head {
+  padding-top: 0;
+}
+button.brow {
+  appearance: none;
+  width: 100%;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+button.brow:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+}
+
 /* ---------- the picks of a new chat ---------- */
 .chat-picks-scroll {
   display: flex;

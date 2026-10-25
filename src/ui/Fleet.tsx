@@ -33,6 +33,7 @@ import { Confirm, Menu } from './common';
 import { askOfRun } from '../lib/duties';
 import { Button, Chip, Find, Help, IconButton, Led, Mark, PaneHeader } from './primitives';
 import { Glyph } from './icons';
+import { PastConversations } from './History';
 import type { Tone } from '../lib/presence';
 
 /** The width from which two panes show side by side, as App names it. */
@@ -413,6 +414,12 @@ export function AgentChat({ agent }: { agent: string }) {
   // The end of the conversation: its newest item, the live answer, and a card that waits.
   const end = [t.items.length ? t.items[t.items.length - 1].seq : 0, live.text.length, live.tool, run && run.pending ? run.pending.id : ''].join(':');
   const stopped = !!run && ['failed', 'canceled'].includes(run.state);
+  const [past, setPast] = useState(false);
+  // open shows a conversation in this tab, or an empty one with "", and the tab remembers it.
+  const open = (id: string) => {
+    setRunId(id);
+    keepRun(agent, id);
+  };
   const send = async (text: string, files: Attachment[]): Promise<boolean> => {
     const fresh = !runId || stopped;
     const skill = fresh ? null : parseSlash(text, names);
@@ -453,16 +460,35 @@ export function AgentChat({ agent }: { agent: string }) {
         back={{ href: '#fleet', label: 'Fleet', to: 'list' }}
         lead={<ProfileLink href={hrefOf({ place: 'fleet', agent, profile: true })} agent={agent} label={name} light={light} />}
         actions={
-          runId ? (
-            // A conversation that did a job once becomes a duty of this agent that does it again.
-            <Menu label="More" items={[{ label: 'Make this a duty', onSelect: () => go({ place: 'duties', fresh: true, seed: { agent, act: 'ask', message: askOfRun(run, t.items) } }) }]} />
-          ) : undefined
+          <>
+            <IconButton icon="history" label="Past conversations" onClick={() => setPast(true)} />
+            <Button size="s" disabled={!runId} onClick={() => open('')}>
+              New conversation
+            </Button>
+            {runId && (
+              // A conversation that did a job once becomes a duty of this agent that does it again.
+              <Menu label="More" items={[{ label: 'Make this a duty', onSelect: () => go({ place: 'duties', fresh: true, seed: { agent, act: 'ask', message: askOfRun(run, t.items) } }) }]} />
+            )}
+          </>
         }
       />
       <FollowBox end={end}>
         {runId ? <Conversation run={run} result={res} t={t} agentLabel={agent} live={live} /> : <div class="thread" />}
       </FollowBox>
       <Composer draft={'agent:' + agent} label={'Message to ' + agent} placeholder={'Message ' + agent} disabled={member ? '' : 'Keep 0'} commands={commands} attach onSend={(text, _to, files) => send(text, files)} />
+      {past && (
+        <PastConversations
+          agent={agent}
+          label={name}
+          current={runId}
+          onClose={() => setPast(false)}
+          onPick={(r) => {
+            store.dispatch({ type: 'run', run: r });
+            open(r.id);
+            setPast(false);
+          }}
+        />
+      )}
     </section>
   );
 }

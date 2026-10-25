@@ -27,7 +27,8 @@ import { AttachedFiles } from './AttachedFiles';
 import { Avatar, Menu } from './common';
 import { go } from '../lib/route';
 import { askOfRun } from '../lib/duties';
-import { Button, Help, Led, Mark, PaneHeader } from './primitives';
+import { Button, Help, IconButton, Led, Mark, PaneHeader } from './primitives';
+import { PastConversations } from './History';
 import { Composer } from './Composer';
 import { Conversation, POLL_MS, usePoll, useTranscript } from './Conversation';
 import { FollowBox, Msg, Quiet } from './Thread';
@@ -64,6 +65,7 @@ export function Manager() {
   const loadable = useSelect((s) => (agent ? s.agentSkills[agent] : undefined));
   const [sent, setSent] = useState<{ text: string; run: string; users: number; files: AttachedFile[] } | null>(null);
   const [res, setRes] = useState<Result | null>(null);
+  const [past, setPast] = useState(false);
 
   useEffect(() => {
     if (agent) loadAgentSkills(agent).catch(() => {});
@@ -157,6 +159,7 @@ export function Manager() {
         lead={<Mark agent={agent} size={36} />}
         actions={
           <>
+            <IconButton icon="history" label="Past conversations" onClick={() => setPast(true)} />
             <Button size="s" disabled={!runId && !sent} onClick={() => setManagerRun('')}>
               New conversation
             </Button>
@@ -171,6 +174,19 @@ export function Manager() {
         {!runId && !sent ? <p class="thread-empty">Ask about the fleet, or ask for a bridge.</p> : <Conversation run={run} result={res} t={t} agentLabel={agent} tail={tail} live={live} />}
       </FollowBox>
       <Composer draft="manager" label="Message to the manager" placeholder="Ask the manager" commands={commands} attach onSend={(text, _to, files) => send(text, files)} />
+      {past && (
+        <PastConversations
+          agent={agent}
+          label="the manager"
+          current={runId}
+          onClose={() => setPast(false)}
+          onPick={(r) => {
+            store.dispatch({ type: 'run', run: r });
+            setManagerRun(r.id);
+            setPast(false);
+          }}
+        />
+      )}
     </section>
   );
 }
