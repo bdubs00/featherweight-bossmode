@@ -8,7 +8,8 @@
 // It also keeps what the front serves now for the editor, GET
 // /v1/duties/options, the shared channels of the operator from GET
 // /v1/notifications, and the items of GET /v1/inbox that Activity shows
-// beside the bridges: the failures and the paused duties.
+// beside the bridges: the failures and the paused duties. The count on the
+// app bar counts these items too, so the page reads them on every place.
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
@@ -265,6 +266,33 @@ export function loadInbox(): Promise<void> {
       )
       .finally(() => (inboxing = null));
   return inboxing;
+}
+
+/** INBOX_MS is how often the page reads the inbox again while a screen follows it. The stream carries no event of a duty. */
+export const INBOX_MS = 60_000;
+
+let followers = 0;
+let ticker: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * followInbox reads the inbox now, and again each INBOX_MS while a screen
+ * follows it. The app bar follows it on every place, and Activity follows
+ * it too, so Activity reads it again when it opens. The screens share one
+ * timer. followInbox returns the end of the follow.
+ */
+export function followInbox(): () => void {
+  loadInbox().catch(() => {});
+  followers++;
+  if (!ticker) ticker = setInterval(() => loadInbox().catch(() => {}), INBOX_MS);
+  let ended = false;
+  return () => {
+    if (ended) return;
+    ended = true;
+    followers--;
+    if (followers > 0 || !ticker) return;
+    clearInterval(ticker);
+    ticker = null;
+  };
 }
 
 /* ---------- the stream ---------- */

@@ -15,7 +15,7 @@ import { themeOf, setChoice, useChoice, type ThemeChoice } from '../lib/theme';
 import { personName } from '../lib/words';
 import { LAMP_ORDER, readoutOf, type Lamp, type LampKind, type Readout } from '../lib/status';
 import { selectFacts } from '../state/reducer';
-import { selectAttention } from '../state/inbox';
+import { useAttention } from '../state/activity';
 import { Glyph, type GlyphName } from './icons';
 import { Avatar, Chip, LogoWell, Led, countText } from './primitives';
 import { Notifications } from './Notifications';
@@ -202,8 +202,8 @@ export function placesOf(config: BossConfig | null): PlaceItem[] {
 export function AppBar({ route, onSignOut, onReach }: { route: Route; onSignOut: () => void; onReach: () => void }) {
   const place = placeOf(route);
   const config = useSelect((s) => s.config);
-  // The count on Activity is the number of members that need you, over the open bridges.
-  const attention = useSelect(selectAttention);
+  // The count on Activity counts the rows of Activity that need you: the same rows as its list, less the new messages.
+  const attention = useAttention();
   const theme = themeOf(config);
   const logo = useLogo(theme.logo);
   return (
@@ -218,7 +218,7 @@ export function AppBar({ route, onSignOut, onReach }: { route: Route; onSignOut:
               <Glyph name={it.glyph} size={22} />
               <span class="place-label">{it.label}</span>
               {count > 0 && (
-                <Chip tone="ink" class="place-count" label={count === 1 ? '1 member needs you' : count + ' members need you'}>
+                <Chip tone="ink" class="place-count" label={count === 1 ? '1 item needs you' : count + ' items need you'}>
                   {countText(count)}
                 </Chip>
               )}

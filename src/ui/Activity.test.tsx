@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'preact/test-utils';
 import { store } from '../state/store';
 import { ActivityList, ActivityMain, pick } from './Activity';
-import { selectAttention } from '../state/inbox';
+import { AppBar } from './Shell';
 import { currentNotice } from './notice';
 import { at, fakeFetch, mount, run, seat, bridge, unmountAll, type Call } from './testkit-b';
 
@@ -30,6 +30,13 @@ afterEach(() => {
 });
 
 const rows = (el: HTMLElement) => [...el.querySelectorAll('.inbox-row')] as HTMLElement[];
+
+/** badge is the count on Activity in the app bar, as a screen reader says it. */
+function badge(): string {
+  const el = mount(<AppBar route={{ place: 'activity' }} onSignOut={() => {}} onReach={() => {}} />);
+  const sr = el.querySelector('.place-count .sr');
+  return sr ? sr.textContent || '' : '';
+}
 const key = (el: HTMLElement, k: string) =>
   act(() => {
     el.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true }));
@@ -41,9 +48,9 @@ describe('the inbox', () => {
     expect(rows(el).map((r) => r.querySelector('b')!.textContent)).toEqual(['early', 'late', 'broke']);
     expect(rows(el)[0].querySelector('.status-word')!.textContent).toBe('needs you');
     expect(rows(el)[2].querySelector('.status-word')!.textContent).toBe('error');
-    // The chip counts what the list shows; the app bar counts what needs you.
+    // The chip counts what the list shows. The app bar counts what needs you: the decisions and the error too.
     expect(el.querySelector('header .chip .sr')!.textContent).toBe('3 items');
-    expect(selectAttention(store.get())).toBe(2);
+    expect(badge()).toBe('3 items need you');
   });
 
   it('offers no key in the row of a decision: the row names the action and its command, and its card decides', () => {
@@ -184,8 +191,8 @@ describe('a message that asks you', () => {
     expect(row.querySelector('.status-word')!.textContent).toBe('needs you');
     expect(row.querySelector('.inbox-text')!.textContent).toBe('migrator asks: The module keeps 52 copies in logrotate_rotate. Please say whether 14 is enough.');
     expect(row.querySelectorAll('button').length).toBe(0);
-    expect(el.querySelector('header .chip .sr')!.textContent).toBe(rows(el).length + ' items');
-    expect(selectAttention(store.get())).toBe(3);
+    expect(el.querySelector('header .chip .sr')!.textContent).toBe('4 items');
+    expect(badge()).toBe('4 items need you');
   });
 
   it('shows its card, and answers in the bridge, to that member, in reply to the message', async () => {
@@ -241,8 +248,8 @@ describe('a question that the front names on a seat', () => {
       await vi.waitFor(() => expect(row().querySelector('.inbox-text')!.textContent).toBe('reviewer asks: Do you consent to restarting sshd on both hosts?'));
       const pane = el.querySelector('.inbox-main-pane')!;
       await vi.waitFor(() => expect([...pane.querySelectorAll('.pick button')].map((b) => b.textContent)).toEqual(['Yes', 'No']));
-      // needsYou of the bridge counts the seat, so the question counts once.
-      expect(selectAttention(store.get())).toBe(3);
+      // The row of the question counts once, and the needsYou of the bridge does not count on top.
+      expect(badge()).toBe('4 items need you');
       // The seat no longer names it: the row leaves.
       act(() => store.dispatch({ type: 'member', bridge: 'b3', member: { ...seat('reviewer', 'reviewer', 'idle'), question: 0 } }));
       expect(rows(el).some((r) => r.getAttribute('data-key') === 'q:b3/7')).toBe(false);

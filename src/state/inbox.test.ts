@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Bridge, Entry, Member, Result, Run } from '../api/types';
 import type { Channel, Roster } from './reducer';
-import { asksOf, asksYou, inboxRows, keyAction, questionWaits, questionsOf, reasonOf, selectAttention, sortInbox, type InboxInput, type InboxRow } from './inbox';
-import { initialState, type State } from './reducer';
+import { asksOf, asksYou, attentionOf, inboxRows, keyAction, needsPerson, questionWaits, questionsOf, reasonOf, sortInbox, type InboxInput, type InboxRow } from './inbox';
 import { decisionOf } from '../lib/decision';
 
 const at = (min: number) => new Date(Date.UTC(2026, 9, 21, 20, min)).toISOString();
@@ -108,6 +107,26 @@ describe('the inbox', () => {
     expect(reasonOf(run('r', 'failed', { error: raw }), undefined)).toBe('The conversation is too long for the model');
   });
 
+  it('counts on the app bar each row that needs you, a failure, a stop, and a limit too, and no new message', () => {
+    const s = input();
+    s.rosters.b1.byHandle.fine = { ...s.rosters.b1.byHandle.fine, presence: 'limit' };
+    s.runs['run-fine'] = run('run-fine', 'completed', { updatedAt: at(35) });
+    const rows = sortInbox(inboxRows(s));
+    expect(rows.map((r) => [r.key, needsPerson(r)])).toEqual([
+      ['d:run-early/a2', true],
+      ['d:run-asker/q1', true],
+      ['d:run-late/a1', true],
+      ['s:b1/stop', true],
+      ['s:b1/broke', true],
+      ['s:b1/fine', true],
+      ['m:b1', false],
+    ]);
+    expect(attentionOf(s, rows)).toBe(6);
+    // An open bridge whose record the page has not read yet counts by the needsYou of the list. A closed bridge never counts.
+    const more = { ...s, bridges: [...s.bridges, bridge('b4', { needsYou: 2 }), bridge('b5', { state: 'closed', needsYou: 4 })] };
+    expect(attentionOf(more, sortInbox(inboxRows(more)))).toBe(8);
+  });
+
   it('makes a row that needs you of a message that asks you, after your read mark, until you answer it or the seat posts again, for a front that names no question', () => {
     const s = input();
     const ask = (seq: number, min: number, handle: string, text: string, to: string[] = []): Entry => ({ seq, at: at(min), from: { kind: 'agent', handle }, text, to });
@@ -155,9 +174,9 @@ describe('the inbox', () => {
     expect(questionWaits(s.rosters.b2, s.channels.b2.bySeq[7])).toBe(true);
     expect(questionWaits(roster([seat('asker', 'idle', { question: 0 })]), s.channels.b2.bySeq[7])).toBe(false);
     expect(questionWaits(s.rosters.b2, s.channels.b2.bySeq[8])).toBe(false);
-    // The count of the app bar is the needsYou of the bridge, which counts the questions already.
-    const st: State = { ...initialState, bridges: { order: ['b2'], byId: { b2: s.bridges[1] }, loaded: true }, rosters: { b2: s.rosters.b2 }, channels: { b2: s.channels.b2 } };
-    expect(selectAttention(st)).toBe(2);
+    // The count of the app bar takes the row of each question, and not the needsYou of the bridge on top.
+    const b2: InboxInput = { ...s, bridges: [s.bridges[1]], runs: { ...s.runs, 'run-asker': run('run-asker', 'running') } };
+    expect(attentionOf(b2, inboxRows(b2))).toBe(2);
   });
 
   it('reads a message as asking you when the front marks it, its to holds operator, or its text holds the word @operator anywhere', () => {
@@ -212,6 +231,9 @@ describe('the items of the inbox of the duties', () => {
       ['u:failure/daily-report', 'duty-failed', 'error', 'daily-report'],
       ['u:paused/monthly-summary', 'duty-paused', 'limit', 'monthly-summary'],
     ]);
+    // The count of the app bar takes every row that needs you: the failures and the paused duty too.
+    expect(rows.filter(needsPerson).length).toBe(5);
+    expect(attentionOf(s, rows)).toBe(5);
     const ask = rows[0];
     expect([ask.bridge, ask.handle, ask.decision!.tool]).toEqual(['', 'backup', 'bash']);
     expect(rows[3].reason).toBe('The run reached its limit of turns.');

@@ -105,7 +105,7 @@ Capacity shows where seating happens:
 | `Activity`, `Bridges`, `Fleet`, `Skills`, `Wiki`, `Manager` | keep | | done |
 | `Chat` (the place between Activity and Bridges, with a speech bubble) | add | the quick chat of section 7 | done |
 | `Routines` (the place between Skills and Wiki, with two arrows that turn back into each other) | add | the Routines place of section 8 | done |
-| `1 member needs you`, `N members need you` (count of Activity) | keep | | done |
+| `1 member needs you`, `N members need you` (count of Activity) | change | `1 item needs you`, `N items need you`: the count takes the rows of Activity that need you, also the failed runs and the paused duties, which are no members | done |
 | `<name>, account` (account key) | keep | | done |
 | `Match the system`, `Light`, `Graphite` | keep | | done |
 | `Connections`, `Sign out` | keep | | done |
@@ -427,7 +427,7 @@ Capacity shows where seating happens:
 
 | Now | Verdict | New text | Who |
 |---|---|---|---|
-| `Activity` with the count chip | change | the chip counts the rows of the list, `1 item` and `N items` for a screen reader, so it never says 0 beside three rows. What needs you shows by its lights, and the count on the app bar, `N members need you`, counts it, also the seats whose messages ask you, once the page reads their channel | done |
+| `Activity` with the count chip | change | the chip counts the rows of the list, `1 item` and `N items` for a screen reader, so it never says 0 beside three rows. What needs you shows by its lights, and the count on the app bar, `N items need you`, counts it from the same rows: every row less the new messages, which take Done and need nobody | done |
 | `Thumb up: <label>`, `Thumb down: Deny`, `Always allow` (the keys of a decision in its row) | remove | a thumb means a reaction to a result elsewhere. The row of a decision has no key: a click shows its card, which says what the action does, with Deny and the verb of the action. a and d still decide from the list. | done |
 | the command of a decision under its row | change | the one line of its plan: the command or the path as code, the title of a bridge or the task of a hand-off as words | done |
 | `<handle> asks: <text>` | change | the row of a question of a seat, which the front names on the seat (`question`), whatever the read mark says: the status `needs you`, without an `@operator` that opens it, and `<handle> asks you` until the page holds the entry. The main pane shows the card of the question, as the channel does, which answers in the bridge, to that member, in reply to the question. The row leaves once you answer, or the seat posts again. With a front that names no question, the row of a message of an agent to `operator`, or with the word `@operator`, after the read mark | done |

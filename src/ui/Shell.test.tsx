@@ -62,8 +62,8 @@ describe('Shell', () => {
     act(() => store.dispatch({ type: 'config', config: { manager: null, placement: 'queue', maxMembers: 16, routines: true } }));
     expect(labels()).toEqual(['Activity', 'Chat', 'Bridges', 'Fleet', 'Duties', 'Skills', 'Routines', 'Wiki', 'Manager']);
     act(() => store.dispatch({ type: 'config', config: null }));
-    // The count of Activity is the number of members that need you.
-    expect(el.querySelector('.place-count .sr')!.textContent).toBe('2 members need you');
+    // The count of Activity counts what needs you. The page has not read the record of the bridge yet, so its needsYou counts.
+    expect(el.querySelector('.place-count .sr')!.textContent).toBe('2 items need you');
   });
 
   it('gives the main pane the focus of a place without a list', () => {

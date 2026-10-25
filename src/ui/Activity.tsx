@@ -17,25 +17,24 @@
 // duty. GET /v1/inbox adds the failed runs and the paused duties, and the
 // questions of the runs of duties that sit on no bridge.
 
-import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import type { Member } from '../api/types';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { go, hrefOf, parseRoute } from '../lib/route';
 import { decisionTitle, excerpt, personName, plainText, senderName, since } from '../lib/words';
 import { briefOf, planOf } from '../lib/decision';
 import { decide } from '../state/actions';
-import { ensureChannels, ensureEntries, ensureResults, ensureRosters, ensureRuns, useEntries, useResults } from '../state/fetchers';
-import { cardOf, inboxRows, keyAction, sortInbox, type InboxRow } from '../state/inbox';
-import { newestRun } from '../state/people';
+import { useInboxRows, type InboxView } from '../state/activity';
+import { ensureChannels, ensureEntries, ensureResults } from '../state/fetchers';
+import { cardOf, keyAction, type InboxRow } from '../state/inbox';
 import { useSelect } from '../state/store';
 import { selectFacts } from '../state/reducer';
-import { awakeFor, seatPresence } from '../lib/status';
+import { awakeFor } from '../lib/status';
 import { AskCard, DecisionCard } from './Decision';
 import { useRoving } from './keys';
 import { attempt } from './notice';
 import { Empty, Markdown, When } from './common';
 import { SeatAgainKey, continueSeat, seatAgain } from './SeatAgain';
 import { markDone, madeOf, settledOf, useMade } from '../state/done';
-import { loadInbox, useDuties } from '../state/duties';
+import { loadInbox } from '../state/duties';
 import { titleOfName } from '../lib/duties';
 import { EmptyPane } from './Shell';
 import { Avatar, Button, Led, Mark, PaneHeader } from './primitives';
@@ -163,55 +162,16 @@ function DoneKey({ r, rows, fromMain, label }: { r: InboxRow; rows: InboxRow[]; 
 
 /* ---------- the rows ---------- */
 
-/** useInbox builds the rows of the inbox from the store, and loads the runs, the results, and the channels that they need. */
-export function useInbox(): { rows: InboxRow[]; loaded: boolean; settled: boolean } {
-  const bridges = useSelect((s) => s.bridges);
-  const rosters = useSelect((s) => s.rosters);
+/**
+ * useInbox gives the rows of the inbox, the same rows that the count on the
+ * app bar reads, and reads what the rows show: the channels with new
+ * entries, the entries of questions, and the results of runs that wait.
+ */
+export function useInbox(): InboxView {
+  const inbox = useInboxRows();
+  const { rows, open } = inbox;
   const runs = useSelect((s) => s.runs);
-  const channels = useSelect((s) => s.channels);
-  const me = useSelect((s) => (s.me && s.me.principal ? s.me.principal.subject : ''));
   const facts = useSelect(selectFacts);
-  const results = useResults();
-  const entries = useEntries();
-  const items = useDuties((s) => s.inbox);
-  const open = useMemo(() => bridges.order.map((id) => bridges.byId[id]).filter((b) => b.state === 'open'), [bridges]);
-  useEffect(() => {
-    if (bridges.loaded) ensureRosters();
-  }, [bridges]);
-  // The stream carries no event of a duty, so the inbox of the duties reads again each minute while Activity shows.
-  useEffect(() => {
-    loadInbox().catch(() => {});
-    const t = setInterval(() => loadInbox().catch(() => {}), 60_000);
-    return () => clearInterval(t);
-  }, []);
-  // The run of a question of a duty that sits on no bridge and names no approval, so its card shows. An item with its approval needs no read.
-  const asking = (items || [])
-    .filter((it) => (it.kind === 'approval' || it.kind === 'question') && !it.bridge && it.run && !it.approval)
-    .map((it) => it.run!)
-    .join(',');
-  useEffect(() => {
-    if (asking) ensureRuns(asking.split(','));
-  }, [asking]);
-  // The newest run of a seat that needs you, that failed, or that rests, so a stop shows.
-  const want = open
-    .flatMap((b) => {
-      const r = rosters[b.id];
-      return r
-        ? r.order
-            .map((h) => r.byHandle[h])
-            .filter((m: Member) => {
-              // A run that no worker holds answers 404, so the page does not ask for it.
-              if (!m || m.fired || m.gone || !m.runs.length) return false;
-              const p = seatPresence(facts, m);
-              return p !== 'working' && p !== 'asleep';
-            })
-        : [];
-    })
-    .map((m) => newestRun(m))
-    .join(',');
-  useEffect(() => {
-    if (want) ensureRuns(want.split(','));
-  }, [want]);
   const unread = open
     .filter((b) => b.unread > 0)
     .map((b) => b.id)
@@ -219,8 +179,6 @@ export function useInbox(): { rows: InboxRow[]; loaded: boolean; settled: boolea
   useEffect(() => {
     if (unread) ensureChannels(unread.split(','));
   }, [unread]);
-  const lost = useSelect((s) => s.lost);
-  const rows = sortInbox(inboxRows({ bridges: open, rosters, runs, channels, results, me, facts, entries, items }));
   // A question that waits and whose entry the page does not hold yet is read alone.
   const missing = rows
     .filter((r) => r.kind === 'asked' && !r.entry && r.seq)
@@ -237,10 +195,7 @@ export function useInbox(): { rows: InboxRow[]; loaded: boolean; settled: boolea
   useEffect(() => {
     if (waiting) ensureResults(waiting.split(','));
   }, [waiting, runs]);
-  const loaded = bridges.loaded && open.every((b) => !!rosters[b.id]);
-  // The rows have settled once the items of the duties and the runs of their questions are in too.
-  const asked = asking ? asking.split(',').every((id) => !!runs[id] || !!lost[id]) : true;
-  return { rows, loaded, settled: loaded && items !== null && asked };
+  return inbox;
 }
 
 /** dutyHref is the address of the page of a duty. */
@@ -436,7 +391,7 @@ export function ActivityList({ item }: { item?: string }) {
   };
   return (
     <section class="screen activity" aria-labelledby="activity-title">
-      {/* The chip counts what the list shows. What needs you shows by its lights and by the count on the app bar. */}
+      {/* The chip counts what the list shows. What needs you shows by its lights and by the count on the app bar, which counts the same rows less the new messages. */}
       <PaneHeader id="activity-title" title="Activity" count={loaded ? rows.length : undefined} countLabel={rows.length === 1 ? '1 item' : rows.length + ' items'} />
       <div class="scroll" ref={list} onKeyDown={onKey}>
         <div class="inbox" role="list" aria-label="Activity">

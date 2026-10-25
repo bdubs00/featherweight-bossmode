@@ -3,6 +3,7 @@ import { act } from 'preact/test-utils';
 import { store } from '../state/store';
 import { forgetDuties } from '../state/duties';
 import { ActivityList, ActivityMain, pick } from './Activity';
+import { Shell } from './Shell';
 import { at, bridge, run, seat } from './testkit-b';
 import { fakeApi, keyNamed, mount, settle, unmountAll } from './testkit-c';
 import { currentNotice } from './notice';
@@ -58,6 +59,25 @@ describe('Activity and the duties', () => {
     ]);
     expect(rows(el)[1].querySelector('a.duty-chip')!.getAttribute('href')).toBe('#duties/daily-report');
     expect(el.querySelector('header .chip .sr')!.textContent).toBe('3 items');
+  });
+
+  it('counts on the app bar each row that needs you, with the failed runs and the paused duties, and no new message', async () => {
+    api = fakeApi({ 'GET /v1/inbox': ITEMS });
+    act(() => {
+      const extra = { needsYou: 1, unread: 1, lastSeq: 1 };
+      store.dispatch({ type: 'bridges', bridges: [bridge('b1', 'Homelab operations', undefined, extra)] });
+      store.dispatch({ type: 'bridge', bridge: bridge('b1', 'Homelab operations', [seat('checker', 'migrator', 'error'), seat('asker', 'migrator', 'needs-you'), seat('scribe', 'scribe', 'idle')], extra) });
+      store.dispatch({ type: 'run', run: run('run-asker', 'migrator', 'input-required', { pending: { id: 'ap-1', tool: 'bash', input: { command: 'git push' }, reason: 'default', requestedAt: at(3) } }) });
+      store.dispatch({ type: 'run', run: run('run-scribe', 'scribe', 'completed') });
+      store.dispatch({ type: 'channel', bridge: 'b1', page: { bridge: 'b1', messages: [{ seq: 1, at: at(4), from: { kind: 'agent', handle: 'scribe', run: 'run-scribe' }, text: 'The report is in the wiki.' }], next: 0, prev: 0 }, mode: 'latest' });
+    });
+    const el = mount(<Shell route={{ place: 'activity' }} list={<ActivityList />} main={<p>main</p>} details={null} onSignOut={() => {}} />);
+    await settle();
+    // The list holds a decision, a failed seat, a failed run of a duty, a paused duty, and a finished seat whose message takes Done.
+    expect(rows(el).map((r) => r.getAttribute('data-key'))).toEqual(['d:run-asker/ap-1', 's:b1/checker', 'u:failure/daily-report', 'u:paused/monthly-summary', 'm:b1']);
+    expect(el.querySelector('header .chip .sr')!.textContent).toBe('5 items');
+    // The app bar counts the same rows. Only the new message needs nobody.
+    expect(el.querySelector('.place-count .sr')!.textContent).toBe('4 items need you');
   });
 
   it('shows a failed run of a duty in the main pane, with the chip of the duty and the run', async () => {

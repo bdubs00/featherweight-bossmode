@@ -7,7 +7,7 @@
 // here are pure, so the tests read them without a page.
 
 import type { Bridge, Decision, Entry, InboxItem, Member, Result, Run } from '../api/types';
-import type { Channel, Roster, State } from './reducer';
+import type { Channel, Roster } from './reducer';
 import { newestRun } from './people';
 import { decisionOf } from '../lib/decision';
 import { plainError, providerMessage } from '../lib/runerror';
@@ -184,25 +184,6 @@ export function asksOf(b: Bridge, ch: Channel | undefined, me: string): Entry[] 
 
 const statusOfPresence = (p: string | undefined): InboxStatus => (p === 'working' || p === 'needs-you' ? 'working' : p === 'asleep' ? 'asleep' : 'idle');
 
-/**
- * selectAttention counts the members that need you, over the open bridges:
- * the seats that wait for a decision, from the bridges, and the seats whose
- * messages ask you, from the channels that the page holds. The list of the
- * bridges carries no count of the messages that ask you, so those count
- * once the page reads the channel.
- */
-export function selectAttention(s: State): number {
-  const me = s.me && s.me.principal ? s.me.principal.subject : '';
-  let n = 0;
-  for (const id of s.bridges.order) {
-    const b = s.bridges.byId[id];
-    if (!b || b.state !== 'open') continue;
-    // A front that names the questions of the seats counts them in needsYou.
-    n += (b.needsYou || 0) + (tracksQuestions(s.rosters[id]) ? 0 : asksOf(b, s.channels[id], me).length);
-  }
-  return n;
-}
-
 /** messageOf is the newest entry of a bridge that counts as new: a message of a person or an agent after the read mark, not of the person, and not a question that waits for you, which has a row of its own. */
 function messageOf(b: Bridge, ch: Channel | undefined, me: string, asked: Set<number>): Entry | undefined {
   if (!ch || !b.unread) return undefined;
@@ -321,6 +302,26 @@ function itemRows(s: InboxInput, seats: InboxRow[]): InboxRow[] {
     out.push({ ...where, agent, key: 'w:' + it.run, kind: 'duty-waits', status: 'needs-you', reason: it.text || '', at: it.since || '' });
   }
   return out;
+}
+
+/**
+ * needsPerson reports whether a row of the inbox needs the person: a
+ * decision, a question, a message that asks you, a failed or a stopped
+ * seat, a seat at its limit, a failed run of a duty, and a paused duty. A
+ * new message needs nobody. Done clears it.
+ */
+export const needsPerson = (r: InboxRow): boolean => r.status === 'needs-you' || r.status === 'error' || r.status === 'limit';
+
+/**
+ * attentionOf is the count on the app bar: the rows of Activity that need
+ * the person, from the same rows as the list. An open bridge whose record
+ * the page has not read yet gives no row of a seat, so until then it
+ * counts by the needsYou of the list of the bridges.
+ */
+export function attentionOf(s: Pick<InboxInput, 'bridges' | 'rosters'>, rows: InboxRow[]): number {
+  let n = rows.filter(needsPerson).length;
+  for (const b of s.bridges) if (b.state === 'open' && !s.rosters[b.id]) n += b.needsYou || 0;
+  return n;
 }
 
 const ms = (iso: string): number => {
