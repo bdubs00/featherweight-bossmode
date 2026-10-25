@@ -38,6 +38,8 @@ export interface BossConfig {
   chat?: QuickChat | null;
   /** False when the front keeps no routines, so the page shows no place Routines. An older front leaves it out. */
   routines?: boolean;
+  /** True when the deployment has a package mirror, so the profile of an agent that a pool runs shows Packages. An older front leaves it out. */
+  packages?: boolean;
 }
 
 /** A child Task whose parent Task is gone, from GET /v1/fleet/orphans. */
@@ -586,6 +588,10 @@ export interface Agent {
   tools?: string[];
   skills?: string[] | null;
   policy?: Rules | null;
+  /** The pool whose workers run the profile. A profile of the front itself has none. */
+  pool?: string;
+  /** True for a profile of the front itself, which no worker of a pool runs. */
+  front?: boolean;
 }
 
 /** The display of an agent: GET /v1/faces and PATCH /v1/faces/{agent}. */
@@ -1290,4 +1296,65 @@ export interface Playbook {
   revision?: number;
   owner?: string;
   updatedAt?: string;
+}
+
+/** One package of the setting of a pool: who added it and when, and for an approval, the agent and the run that asked. */
+export interface PackageItem {
+  name: string;
+  by?: string;
+  at?: string;
+  agent?: string;
+  run?: string;
+}
+
+/** A package that a worker installed, with its version. */
+export interface InstalledPackage {
+  name: string;
+  version?: string;
+}
+
+/** Why the install of a worker failed: the step, the error, the end of the output of the manager, and the time of the next try. */
+export interface PackageFailure {
+  step?: string;
+  error?: string;
+  output?: string;
+  retryAt?: string;
+}
+
+/** The state of the packages of one worker. unknown means that the front has no event of the Task yet. */
+export type PackageState = 'pending' | 'materializing' | 'ready' | 'failed' | 'unknown';
+
+/** One worker of a pool, with the state of its packages. */
+export interface PackageWorker {
+  task: string;
+  state: PackageState;
+  at?: string;
+  digest?: string;
+  installed?: { python?: InstalledPackage[]; tools?: InstalledPackage[] };
+  failure?: PackageFailure | null;
+}
+
+/**
+ * The answer of GET and PUT /v1/pools/{name}/packages: the setting, the
+ * packages, and the state of each worker. python holds the Python
+ * packages, and tools holds the programs. applying is true while a worker
+ * runs an older configuration of the pool.
+ */
+export interface Packages {
+  pool: string;
+  available?: boolean;
+  on: boolean;
+  ask: boolean;
+  python: PackageItem[];
+  tools: PackageItem[];
+  applying?: boolean;
+  workers?: PackageWorker[];
+}
+
+/** The body of PUT /v1/pools/{name}/packages. It replaces the setting and both lists, which name the packages as the person wrote them. */
+export interface PackagesBody {
+  on: boolean;
+  ask: boolean;
+  python: string[];
+  tools: string[];
 }

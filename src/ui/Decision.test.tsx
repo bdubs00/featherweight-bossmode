@@ -368,3 +368,71 @@ describe('the card of a question of a seat', () => {
     }
   });
 });
+
+describe('the card of a package', () => {
+  const env = (input: Record<string, string>, extra: Partial<Decision> = {}): Decision => ({
+    run: 'run-p1',
+    id: 'ap-env',
+    tool: 'env',
+    label: 'Allow',
+    reason: 'rule: ask env: command=add',
+    effect: 'Runs uv add ansible-lint.',
+    input,
+    state: 'pending',
+    always: true,
+    ...extra,
+  });
+
+  it('says the Python package in plain words, what Allow does, and offers Deny and Allow only', () => {
+    const el = mount(<DecisionCard d={env({ command: 'add', manager: 'python', package: 'ansible-lint' })} who="proxmox-admin" />);
+    const card = el.querySelector('section.card')!;
+    expect(card.querySelector('.card-title h3')!.textContent).toBe('Needs your decision');
+    expect(card.textContent).toContain('proxmox-admin wants the Python package ansible-lint.');
+    expect(card.querySelector('.effect')!.textContent).toBe('Allow installs it now and keeps it for every worker of this agent.');
+    expect(keys(el)).toEqual(['Deny', 'Allow']);
+    expect(card.querySelector('.key-primary')!.textContent).toBe('Allow');
+    // No rule, no raw input, no command, and no word of the tools that install it.
+    expect(card.querySelector('.rule-row')).toBeNull();
+    expect(card.querySelector('.details-key')).toBeNull();
+    expect(card.querySelector('pre.command')).toBeNull();
+    expect(card.textContent!.toLowerCase()).not.toMatch(/\buv\b|pixi|conda|pypi|command=/);
+  });
+
+  it('says the program, and a remove', () => {
+    const add = mount(<DecisionCard d={env({ command: 'add', manager: 'tools', package: 'iproute2' })} who="reviewer" />);
+    expect(add.textContent).toContain('reviewer wants the program iproute2.');
+    const rm = mount(<DecisionCard d={env({ command: 'remove', manager: 'tools', package: 'jq' }, { reason: 'rule: ask env: command=remove' })} who="reviewer" />);
+    expect(rm.textContent).toContain('reviewer wants to remove the program jq.');
+    expect(rm.querySelector('.effect')!.textContent).toBe('Allow removes it now and from every worker of this agent.');
+    const py = mount(<DecisionCard d={env({ command: 'remove', manager: 'python', package: 'six' })} who="reviewer" />);
+    expect(py.textContent).toContain('reviewer wants to remove the Python package six.');
+    expect(keys(rm)).toEqual(['Deny', 'Allow']);
+  });
+
+  it('never offers Always allow for a package, whatever the front says', () => {
+    expect(canAlways(env({ command: 'add', manager: 'python', package: 'six' }))).toBe(false);
+    expect(canAlways(env({ command: 'add', manager: 'python', package: 'six' }, { always: undefined, reason: 'default' }))).toBe(false);
+  });
+
+  it('allows and denies the call as any card does', async () => {
+    const f = fakeFetch([['POST', /\/approvals\//, () => ({})]]);
+    try {
+      const el = mount(<DecisionCard d={env({ command: 'add', manager: 'python', package: 'ansible-lint' })} who="proxmox-admin" />);
+      act(() => (el.querySelector('.key-primary') as HTMLButtonElement).click());
+      await settle();
+      expect(f.seen[0]).toEqual({ method: 'POST', path: '/v1/runs/run-p1/approvals/ap-env', body: { decision: 'allow' } });
+      act(() => ([...el.querySelectorAll('button')].find((b) => b.textContent === 'Deny') as HTMLButtonElement).click());
+      await settle();
+      expect(f.seen[1].body).toEqual({ decision: 'deny' });
+    } finally {
+      f.restore();
+    }
+  });
+
+  it('turns quiet once decided, with the words of the package as its title and no line of what Allow does', () => {
+    const el = mount(<DecisionCard d={env({ command: 'add', manager: 'python', package: 'ansible-lint' }, { state: 'allow', decidedBy: 'alice@example.com', decidedAt: '2026-10-25T10:00:00Z' })} who="proxmox-admin" />);
+    expect(el.querySelector('.card-title h3')!.textContent).toBe('proxmox-admin wants the Python package ansible-lint');
+    expect(el.querySelector('.effect')).toBeNull();
+    expect(el.querySelector('.decided')!.textContent).toContain('allowed this');
+  });
+});

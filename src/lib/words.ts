@@ -135,15 +135,59 @@ export function commandOf(input: unknown): string {
 }
 
 /**
+ * A call of the tool env of the kernel: the command add, remove, or list,
+ * the manager python or tools, and the package as the agent wrote it.
+ */
+export interface EnvCall {
+  command: string;
+  manager: string;
+  name: string;
+}
+
+/** envCallOf reads a call of the tool env, or answers null for a call of any other tool. */
+export function envCallOf(tool: string | undefined, input: unknown): EnvCall | null {
+  if (toolBase(tool) !== 'env') return null;
+  const v = inputFields(input) || {};
+  const s = (x: unknown) => (typeof x === 'string' ? x.trim() : '');
+  return { command: s(v.command), manager: s(v.manager), name: s(v.package) };
+}
+
+/**
+ * envWhat names the package of a call in the words of a person: the Python
+ * package ansible-lint, or the program iproute2. The page never names the
+ * manager that installs it.
+ */
+export function envWhat(c: EnvCall): string {
+  const kind = c.manager === 'tools' ? 'program' : c.manager === 'python' ? 'Python package' : 'package';
+  return c.name ? 'the ' + kind + ' ' + c.name : 'a ' + kind;
+}
+
+/** envTitle says what a call of env asks: wants the Python package ansible-lint, or wants to remove the program jq. */
+export function envTitle(who: string, c: EnvCall): string {
+  if (c.command === 'add') return `${who} wants ${envWhat(c)}`;
+  if (c.command === 'remove') return `${who} wants to remove ${envWhat(c)}`;
+  return `${who} wants to list its packages`;
+}
+
+/** envEffect says what Allow does for a call of env, or "" for a command that changes nothing. */
+export function envEffect(c: EnvCall): string {
+  if (c.command === 'add') return 'Allow installs it now and keeps it for every worker of this agent.';
+  if (c.command === 'remove') return 'Allow removes it now and from every worker of this agent.';
+  return '';
+}
+
+/**
  * decisionTitle says what a call asks to do, without a tool name where the
- * page knows the tool: open a bridge, write a page, hand off a task, change
- * a file, or run a command. A label of the backend other than Allow names
- * the action. Any other tool goes by its name, and a call that the page
- * knows nothing of asks for a decision.
+ * page knows the tool: open a bridge, write a page, hand off a task, add or
+ * remove a package, change a file, or run a command. A label of the backend
+ * other than Allow names the action. Any other tool goes by its name, and a
+ * call that the page knows nothing of asks for a decision.
  */
 export function decisionTitle(who: string, d: Decision | ResultDecision): string {
   const base = toolBase(d.tool);
   const v = inputFields(d.input);
+  const env = envCallOf(d.tool, d.input);
+  if (env) return envTitle(who, env);
   if (base === 'bridge_open') return `${who} wants to open a bridge`;
   if (base === 'pages_write') return `${who} wants to write a page`;
   if (base === 'spawn_task') return v && typeof v.agent === 'string' && v.agent ? `${who} wants to hand off a task to ${v.agent}` : `${who} wants to hand off a task`;

@@ -38,6 +38,7 @@ const TITLES: Record<string, string> = {
   spawn_task: 'Hand work to other agents',
   await_task: 'Wait for the work that it handed off',
   send: 'Send messages to the message bus',
+  env: 'Add and remove packages',
 };
 
 /** The short nouns of the built-in tools, for the one line that sums up what a chat can use. */
@@ -227,6 +228,8 @@ export function ruleText(rule: string, catalog: Tool[] | null | undefined): stri
   }
   const [, tool, pattern] = m;
   const p = pattern.trim();
+  // The rules env: command=add and env: command=remove make a person approve each package.
+  if (baseOf(tool) === 'env' && /^command\s*=\s*(add|remove)$/i.test(p)) return 'Asks before it adds or removes a package';
   const eq = /^([a-z0-9_.-]+)\s*=\s*(.+)$/i.exec(p);
   if (eq) {
     const [, field, value] = eq;

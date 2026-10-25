@@ -923,3 +923,32 @@ stands for a value.
 |---|---|---|---|
 | new | add | in Tell me about, once the settings list a shared channel: `You`, then each shared channel as `The <label> channel`, each with `Failures` and `Questions` | done |
 | `Failures and questions.` (the readback of Tell me about on the page of a duty) | change | the same, then for each shared channel that the duty names `The <label> channel hears of failures.`, `of questions.`, or `of failures and questions.` | done |
+
+## 10. Packages
+
+The section uses the words package, Python package, and Program. These
+words never show: uv, pixi, conda-forge, PyPI, lock file, manifest, mirror,
+egress, and pool. The fold of a failed install shows the output of the
+install as it is, which can hold any word.
+
+### src/ui/Packages.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| new | add | the heading `Packages`, and for an owner the small key `Turn off` while packages are on | done |
+| new | add | off: `This agent uses only the programs of its image.`, and for an owner the key `Turn on packages` | done |
+| new | add | the add row: the field `Package name` with the placeholder `such as ansible-lint`, the choice `Kind of package` of `Python package` and `Program`, and the key `Add` | done |
+| new | add | the lists `Python packages` and `Programs`, each package with the key `Remove <name>` | done |
+| new | add | the state line: `Ready on <n> of <m> workers.`, `Installing on <n> of <m> workers.`, `Waiting for an idle worker.`, or `The install failed on <worker>.` with the fold `Show the output` | done |
+| new | add | the note `When a worker is idle, it gets the change. Work in progress does not stop.` | done |
+| new | add | the switch `The agent can ask for a package. You approve each one.` | done |
+| new | add | the errors `Write the name of a package.`, `A package name cannot start with a dash.`, `A package name cannot hold a control character.`, `A package name holds 200 characters at most.`, `<name> is in the list already.`, and `A list holds 100 packages at most.` | done |
+
+### src/ui/Decision.tsx and src/lib/words.ts: the card of a package
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `<agent> wants to run a command` (a call of env read as a shell call) | change | `<agent> wants the Python package <name>.`, `<agent> wants the program <name>.`, or `<agent> wants to remove the Python package <name>.` | done |
+| new | add | under it: `Allow installs it now and keeps it for every worker of this agent.`, or `Allow removes it now and from every worker of this agent.` The keys stay `Deny` and `Allow`, with no rule line and no Details. | done |
+| `Ran add` (the step of a call of env) | change | `Added the Python package <name>`, `Removed the program <name>`, or `Listed the packages` | done |
+| `Asks first when command is add` (the rule of env) | change | `Asks before it adds or removes a package` | done |

@@ -3,7 +3,7 @@
 // input names one. The kernel words a shell call and a file call itself,
 // such as Ran "ls" or Wrote a.yml, so those keep its words.
 
-import { list } from './words';
+import { envCallOf, envWhat, list } from './words';
 
 function fields(input: unknown): Record<string, unknown> {
   let v = input;
@@ -61,6 +61,13 @@ export function stepWords(tool: string | undefined, input?: unknown, said?: stri
       return 'Closed the bridge';
     case 'ask_user':
       return 'Asked you';
+    case 'env': {
+      // The command of env, such as add, is no shell command: the step names the package.
+      const c = envCallOf(name, input)!;
+      if (c.command === 'add') return 'Added ' + envWhat(c);
+      if (c.command === 'remove') return 'Removed ' + envWhat(c);
+      return 'Listed the packages';
+    }
   }
   const s = String(said || '').trim();
   if (s && s !== tool && s !== name) return s;

@@ -4,7 +4,8 @@
 // the call in plain form, the rule, Details, the Note field, and the keys
 // Deny, Always allow, and the verb of the action, such as Run command or
 // Open bridge. The plan says what a click does before Details, which
-// holds the tool and the raw input. A question shows the form of its schema,
+// holds the tool and the raw input. A card of the tool env says the
+// package in plain words and what Allow does, with Deny and Allow only. A question shows the form of its schema,
 // because an answer is not a thumb. A decided card turns quiet. A card in
 // the state unknown shows its note and no key, and it can change in place.
 // A card that the person may not decide shows no key either: it says who
@@ -15,7 +16,7 @@ import type { ComponentChildren } from 'preact';
 import type { Decision, Entry, Run } from '../api/types';
 import { formOf, type Field as SchemaField } from '../lib/schema';
 import { PLAN_TEXT_LINES, alwaysByRule, planOf, verbOf, type PlanFiles, type PlanText } from '../lib/decision';
-import { commandOf, decisionTitle, editOf, rawInput, toolName, whyWords } from '../lib/words';
+import { commandOf, decisionTitle, editOf, envCallOf, envEffect, rawInput, toolName, whyWords } from '../lib/words';
 import { whoName } from '../lib/lines';
 import { useSelect } from '../state/store';
 import { alwaysAllow, answerQuestion, decide } from '../state/actions';
@@ -27,6 +28,8 @@ import { Glyph } from './icons';
 
 /** canAlways reports whether a card offers Always allow: as the front says, else by the rule of the front (alwaysByRule). */
 export function canAlways(d: Decision): boolean {
+  // A person approves each package, so a card of env never offers Always allow, whatever the front says.
+  if (envCallOf(d.tool, d.input)) return false;
   if (d.always !== undefined) return d.always;
   return alwaysByRule(d);
 }
@@ -250,7 +253,9 @@ export function ApprovalCard({ d, who, onDecide, settle }: { d: Decision; who: s
   const [note, setNote] = useState('');
   const [id] = useState(() => 'details-' + ++ids);
   const pending = d.state === 'pending';
-  const effect = effectLine(d);
+  // A card of env says the package in its sentence and what Allow does under it. It shows no rule and no raw input.
+  const env = envCallOf(d.tool, d.input);
+  const effect = env ? (pending ? envEffect(env) : '') : effectLine(d);
   const go = async (kind: 'allow' | 'deny' | 'always') => {
     setBusy(true);
     const ok = await attempt(() => (kind === 'always' ? alwaysAllow(d.run, d.id, note || undefined) : decide(d.run, d.id, kind, note || undefined)));
@@ -287,10 +292,12 @@ export function ApprovalCard({ d, who, onDecide, settle }: { d: Decision; who: s
       {pending && <p>{title}.</p>}
       <What d={d} />
       {effect && <p class="effect">{effect}</p>}
-      <div class="rule-row">
-        <RuleWords reason={d.reason} />
-        <Details d={d} id={id} />
-      </div>
+      {!env && (
+        <div class="rule-row">
+          <RuleWords reason={d.reason} />
+          <Details d={d} id={id} />
+        </div>
+      )}
       {pending ? (
         <Field label="Note">
           <Input value={note} maxLength={1024} placeholder="Optional" onInput={(e) => setNote((e.target as HTMLInputElement).value)} />

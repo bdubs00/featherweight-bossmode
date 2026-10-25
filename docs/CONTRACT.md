@@ -1513,3 +1513,36 @@ off. The page sends two empty times.
 still reads it for the placeholder of the server. Without it, the page
 cannot tell whether the front has a server, so it leaves that check to the
 front.
+
+## 17. Packages
+
+The Packages plan of 2026-10-25 (section 6.5) names these routes. The
+section Packages of the profile of an agent calls them.
+`src/ui/Packages.tsx` holds the section, and `src/lib/packages.ts` holds
+its rules.
+
+| Route | Answer |
+|---|---|
+| `GET /v1/bossmode` | **New:** `packages`. With a package mirror in the deployment, it is true. False or missing hides the section on every profile. |
+| `GET /v1/pools/{name}/packages` | `{"pool", "available", "on", "ask", "python", "tools", "applying", "workers"}`. Each item of `python` and `tools` is `{"name", "by", "at"}`, and an approval adds `agent` and `run`. Each worker is `{"task", "state", "at", "digest", "installed", "failure"}`, with the state `pending`, `materializing`, `ready`, `failed`, or `unknown`. A 404 or a 403 hides the section. |
+| `PUT /v1/pools/{name}/packages` | Takes `{"on", "ask", "python", "tools"}` and answers as GET. **Page choice:** both lists name the packages as strings, as the configuration of a pool writes them, such as `["ansible-lint", "pyyaml>=6"]`. The front keeps `by` and `at` of a package that stays. With `?dryRun=true`, the front checks the body and changes nothing. The roles of `PATCH /v1/pools/{name}` apply, so only an owner sees the controls. |
+
+The page finds the pool of an agent in this order. First it reads the
+field `pool` of `GET /v1/agents`. Next it reads `pool` of
+`GET /v1/agents/{name}`. Last it takes the pool of the fleet view that runs
+the agent. A profile with `front` true has no section. An agent that no
+pool runs has no section either.
+
+When the section opens, it reads the route once. While `applying` is true,
+or while packages are on and a worker is not `ready`, it reads the route
+again every 5 seconds. The page accepts an answer with missing fields: a
+missing list is empty, and a missing `on`, `ask`, or `applying` is false.
+An item that is a plain string stands for an item of that name.
+
+The input of a call of the tool `env` is `{"command", "manager",
+"package"}`. Its card says the package in plain words and offers Deny and
+Allow. It never offers Always allow, because a person approves each
+package.
+
+**Open:** section 6.3 of the plan names `GET /v1/bossmode/config`. The page
+reads `GET /v1/bossmode`, so the front must add `packages` to that answer.
