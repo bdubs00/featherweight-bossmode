@@ -236,7 +236,7 @@ describe('What', () => {
     expect(document.querySelector('dialog.confirm')).toBeTruthy();
   });
 
-  it('opens a bridge from a playbook, with a goal, and deletes a playbook after it asks', async () => {
+  it('opens a bridge from a playbook, with a goal and the turns of the bridge, and deletes a playbook after it asks', async () => {
     // A route of 204 answers no body.
     const del: Route = () => ({ status: 204 });
     api = fakeApi({
@@ -245,7 +245,8 @@ describe('What', () => {
       'GET /v1/playbooks': { playbooks: [{ name: 'weekly-patching', goal: 'Patch the lab hosts and report.', placement: 'queue', seats: [{ handle: 'patcher', agent: 'migrator', task: 'Patch.' }], revision: 3, updatedAt: '2026-10-20T10:00:00Z' }] },
       'DELETE /v1/playbooks/weekly-patching': del,
       'PUT /v1/duties/new?dryRun=true': dry(),
-      'PUT /v1/duties/patch?dryRun=true': dry(),
+      // The first save of the front finds the turns of the bridge too few, by its path.
+      'PUT /v1/duties/patch?dryRun=true': (c: Call, n: number) => ({ body: { duty: c.body, readback: READBACK, next: [], problems: n === 1 ? ['limits.budget.maxTurns: A bridge of this playbook needs at least 20 turns.'] : [] } }),
     });
     const el = mount(<DutyEditor />);
     await settle();
@@ -254,17 +255,34 @@ describe('What', () => {
     await settle();
     expect(fieldOf(el, 'Ask migrator')).toBeNull();
     expect(optionsOf(fieldOf(el, 'Playbook'))).toEqual(['Pick a playbook', 'Weekly patching: Patch the lab hosts and report.']);
+    // The budget of an open is the turns of the bridge, and nothing else.
+    expect(fieldOf(el, 'The most a run can cost')).toBeNull();
+    const turns = () => fieldOf(el, 'The most turns of the bridge')!;
+    const said = () => text(turns().closest('label')!.querySelector('.field-error'));
+    expect(turns().placeholder).toBe('Required, such as 40');
     click(keyNamed(el, 'Save duty'));
     await settle();
     expect(text(fieldOf(el, 'Playbook')!.closest('label')!.querySelector('.field-error'))).toBe('Pick a playbook.');
+    expect(said()).toBe('A duty that opens a bridge needs the most turns of the whole bridge, such as 40.');
+    expect(turns().getAttribute('aria-invalid')).toBe('true');
     change(fieldOf(el, 'Playbook'), 'weekly-patching');
     typeIn(fieldOf(el, 'Goal'), 'Patch on ');
     click(keyNamed(el, "Today's date"));
     // The name drops the joining word at its end.
     expect(fieldOf(el, 'Name')!.value).toBe('patch');
+    typeIn(turns(), '12');
+    click(keyNamed(el, 'Save duty'));
+    await settle();
+    // A problem of the front with the path limits.budget.maxTurns shows beside the turns of the bridge.
+    expect(said()).toBe('A bridge of this playbook needs at least 20 turns.');
+    expect(document.querySelector('dialog.confirm')).toBeNull();
+    typeIn(turns(), '40');
     click(keyNamed(el, 'Save duty'));
     await settle();
     expect((lastPut().body as DutyRecord).do).toEqual({ open: { playbook: 'weekly-patching', goal: 'Patch on {date}' } });
+    // The cost that fill typed for asking stays out of the record of an open.
+    expect((lastPut().body as DutyRecord).limits).toEqual({ budget: { maxTurns: 40 }, overlap: 'skip', catchUp: '1h' });
+    expect(text(document.querySelector('dialog.confirm'))).toContain('The bridge gets at most 40 turns.');
     click(keyNamed(document.querySelector('dialog.confirm')!, 'Cancel'));
     // The list of the playbooks, with Delete after a dialog that asks first.
     const shelf = el.querySelector('details.duty-books') as HTMLDetailsElement;
@@ -310,6 +328,68 @@ describe('What', () => {
     await settle();
     expect(radio(el, 'duty-do', 'manager')).toBeNull();
     expect((fieldOf(el, 'Ask migrator') as unknown as HTMLTextAreaElement).value).toBe('Check the backups.');
+  });
+});
+
+describe('Limits', () => {
+  const POST_WORDS = 'A post spends nothing of its own. The seats of the bridge spend from their own budgets.';
+  const limits = (el: HTMLElement) => el.querySelector('section[aria-labelledby="duty-limits-head"]')!;
+  const labels = (el: HTMLElement) => [...limits(el).querySelectorAll('.field-label')].map((l) => l.textContent);
+
+  it('follow the action at once: ask shows the budget, a post spends nothing of its own, and an open asks for the turns of the bridge', async () => {
+    api = fakeApi({ 'GET /v1/duties': { duties: [], paused: false }, 'GET /v1/duties/options': ALL, 'GET /v1/playbooks': { playbooks: [] }, 'PUT /v1/duties/new?dryRun=true': dry(), 'PUT /v1/duties/review-what-changed?dryRun=true': dry() });
+    const el = mount(<DutyEditor />);
+    await settle();
+    expect(labels(el)).toEqual(['The most a run can cost', 'Most turns', 'The most per day', 'Catch up a missed time']);
+    fill(el);
+    typeIn(fieldOf(el, 'Most turns'), '12');
+    typeIn(fieldOf(el, 'The most per day'), '2');
+    click(radio(el, 'duty-do', 'post'));
+    // A post hides the budget and the cap of a day, and says why in their place. Overlap and catch up stay.
+    expect(labels(el)).toEqual(['Catch up a missed time']);
+    expect(text(limits(el).querySelector('.duty-spends'))).toBe(POST_WORDS);
+    expect([...limits(el).querySelectorAll('legend')].map((l) => l.textContent)).toEqual(['If the last run still works']);
+    change(fieldOf(el, 'Bridge'), 'b1');
+    typeIn(fieldOf(el, 'Message'), 'Review what changed.');
+    click(keyNamed(el, 'Save duty'));
+    await settle();
+    // The record of a post holds no budget and no cap of a day, also after the person typed them for asking.
+    expect(lastPut().path).toBe('/v1/duties/review-what-changed?dryRun=true');
+    expect((lastPut().body as DutyRecord).limits).toEqual({ overlap: 'skip', catchUp: '1h' });
+    const dialog = document.querySelector('dialog.confirm')!;
+    expect(text(dialog)).toContain(POST_WORDS);
+    click(keyNamed(dialog, 'Cancel'));
+    click(radio(el, 'duty-do', 'open'));
+    await settle();
+    // An open shows one field, and the turns of a run do not carry over to the bridge.
+    expect(labels(el)).toEqual(['The most turns of the bridge', 'Catch up a missed time']);
+    expect(fieldOf(el, 'The most turns of the bridge')!.value).toBe('');
+    expect(limits(el).querySelector('.duty-spends')).toBeNull();
+    typeIn(fieldOf(el, 'The most turns of the bridge'), '40');
+    click(radio(el, 'duty-do', 'ask'));
+    // Back to ask, the budget that the person typed is still there.
+    expect(labels(el)).toEqual(['The most a run can cost', 'Most turns', 'The most per day', 'Catch up a missed time']);
+    expect([fieldOf(el, 'The most a run can cost')!.value, fieldOf(el, 'Most turns')!.value, fieldOf(el, 'The most per day')!.value]).toEqual(['0.40', '12', '2']);
+  });
+
+  it('keep Make this a duty working: a post from a bridge asks for no budget, and an open from a playbook asks for the turns of the bridge', async () => {
+    api = fakeApi({ 'GET /v1/duties': { duties: [], paused: false }, 'GET /v1/duties/options': ALL, 'GET /v1/playbooks': { playbooks: [] }, 'PUT /v1/duties/new?dryRun=true': dry(), 'PUT /v1/duties/review-the-bridge?dryRun=true': dry() });
+    let el = mount(<DutyEditor seed={{ agent: 'migrator', act: 'post', bridge: 'b1', message: 'Review the bridge.' }} />);
+    await settle();
+    expect(radio(el, 'duty-do', 'post')!.checked).toBe(true);
+    expect(text(limits(el).querySelector('.duty-spends'))).toBe(POST_WORDS);
+    click(keyNamed(el, 'Save duty'));
+    await settle();
+    expect(lastPut().path).toBe('/v1/duties/review-the-bridge?dryRun=true');
+    expect((lastPut().body as DutyRecord).do).toEqual({ post: { bridge: 'b1', message: 'Review the bridge.' } });
+    expect((lastPut().body as DutyRecord).limits).toEqual({ overlap: 'skip', catchUp: '1h' });
+    unmountAll();
+    el = mount(<DutyEditor seed={{ agent: 'migrator', act: 'open', playbook: 'weekly-patching' }} />);
+    await settle();
+    expect(radio(el, 'duty-do', 'open')!.checked).toBe(true);
+    // No silent limit: the turns of the bridge stay empty until the person writes them.
+    expect(labels(el)).toEqual(['The most turns of the bridge', 'Catch up a missed time']);
+    expect(fieldOf(el, 'The most turns of the bridge')!.value).toBe('');
   });
 });
 

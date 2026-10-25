@@ -322,9 +322,19 @@ function problemsOf(body, zone) {
   }
   if (x.open && !ctx.playbooks.has(x.open.playbook)) p('do.open.playbook', 'There is no playbook ' + (x.open.playbook || '') + '. Pick one.');
   if (x.manager && !String(x.manager.message || '').trim()) p('do.manager.message', 'Write what the manager does.');
-  const b = (d.limits && d.limits.budget) || {};
-  if (!['maxCostUSD', 'maxTurns', 'maxTokens', 'maxToolCalls'].some((k) => Number(b[k]) > 0)) p('limits.budget', 'A duty needs a budget: the most a run can cost, or its turns, tokens, or tool calls.');
+  // The budget follows the action. A post spends nothing of its own, so the
+  // front drops its budget and its cap of a day. The budget of an open is
+  // the turns of the whole bridge, and it has no cap of a day either.
   const l = d.limits || {};
+  const b = l.budget || {};
+  if (x.post) {
+    delete l.budget;
+    delete l.perDayUSD;
+  } else if (x.open) {
+    if (['maxCostUSD', 'maxTokens', 'maxToolCalls'].some((k) => Number(b[k]) > 0)) p('limits.budget', 'A bridge counts turns. Give maxTurns, such as 40, and leave out the other limits.');
+    else if (!(Number(b.maxTurns) > 0)) p('limits.budget.maxTurns', 'A duty that opens a bridge needs the most turns of the whole bridge, such as 40.');
+    delete l.perDayUSD;
+  } else if (!['maxCostUSD', 'maxTurns', 'maxTokens', 'maxToolCalls'].some((k) => Number(b[k]) > 0)) p('limits.budget', 'A duty needs a budget: the most a run can cost, or its turns, tokens, or tool calls.');
   if (l.overlap && !['skip', 'queue', 'allow'].includes(l.overlap)) p('limits.overlap', 'Overlap is skip, queue, or allow.');
   if (l.catchUp !== undefined && !(spanOf(l.catchUp) >= 0 && spanOf(l.catchUp) <= 24 * 60)) p('limits.catchUp', 'Catch up is 0 to 24 hours.');
   if (d.checkFirst) {
@@ -557,7 +567,7 @@ export function register({ on, refuse, readJson, now, AGENTS, admin, S, publish 
       agent: 'reviewer',
       when: { event: { kind: 'bridge.closed', agent: 'migrator' } },
       do: { post: { bridge: [...S.bridges.keys()][0], to: [], message: 'A bridge of the migrator closed: {event}. Review what it changed.' } },
-      limits: { budget: { maxCostUSD: 0.3, maxTurns: 30 }, overlap: 'queue', catchUp: '1h' },
+      limits: { overlap: 'queue', catchUp: '1h' },
       revision: 2,
     },
     // The queue never took the run of the last start, so the start and its failure name no run.

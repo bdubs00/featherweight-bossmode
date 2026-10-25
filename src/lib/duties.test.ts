@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Duty } from '../api/types';
 import {
+  OPEN_NEEDS_TURNS,
+  POST_SPENDS,
   PRESETS,
   applyPreset,
   checkFormOf,
@@ -150,7 +152,7 @@ describe('the form of a duty', () => {
     expect('owner' in r).toBe(false);
   });
 
-  it('keeps what the form does not show: an event start, another action, other people to tell, and the limits of tokens', () => {
+  it('keeps what the form does not show: an event start, another action, other people to tell, and the limits of tokens of a duty that asks', () => {
     const d = duty({
       when: { webhook: { auth: { mode: 'bearer', secret: 'HOOK' } } },
       do: { post: { bridge: 'b1', message: 'Hello' } },
@@ -163,7 +165,9 @@ describe('the form of a duty', () => {
     expect(r.when).toEqual(d.when);
     expect(r.do).toEqual(d.do);
     expect(r.notify).toEqual({ failure: ['bob@example.com'], needsYou: ['owner'] });
-    expect(r.limits.budget).toEqual({ maxCostUSD: 1, maxTokens: 9000 });
+    // A post spends nothing of its own, so the record holds no budget. A duty that asks keeps the limit of tokens.
+    expect(r.limits.budget).toBeUndefined();
+    expect(recordOf({ ...f, act: 'ask', message: 'Hello' }, d, d.name).limits.budget).toEqual({ maxCostUSD: 1, maxTokens: 9000 });
     expect(r.pool).toBe('crew');
   });
 
@@ -372,7 +376,7 @@ describe('events and actions', () => {
     expect(seededForm({ act: 'nonsense' as never }, 'UTC').act).toBe('ask');
     const opts = { fresh: false, name: 'x', taken: [], keepsWhen: false };
     expect(formErrors({ ...s, act: 'post', cost: '1' }, opts)).toEqual({ bridge: 'Pick the bridge.' });
-    expect(formErrors({ ...s, act: 'open', message: '', cost: '1' }, opts)).toEqual({ playbook: 'Pick a playbook.' });
+    expect(formErrors({ ...s, act: 'open', message: '', bridgeTurns: '40' }, opts)).toEqual({ playbook: 'Pick a playbook.' });
     expect(formErrors({ ...s, start: 'event', cost: '1' }, opts)).toEqual({ when: 'Pick what starts the duty.' });
     expect(formErrors({ ...s, cost: '1', when: { ...s.when, start: '2026-12-01', end: '2026-11-01' } }, opts)).toEqual({ dates: 'The last day comes before the first day.' });
   });
@@ -415,5 +419,57 @@ describe('the check by hand', () => {
     ];
     expect(checkTools(['servicenow.*', 'bash', 'github.*'], catalog)).toEqual(['servicenow.query_incidents', 'servicenow.get_incident', 'bash']);
     expect(checkTools(undefined, catalog)).toEqual(['bash', 'servicenow.get_incident', 'servicenow.query_incidents']);
+  });
+});
+
+describe('the limits of each action', () => {
+  const opts = { fresh: false, name: 'x', taken: [], keepsWhen: false };
+  const base = { ...emptyForm('UTC'), agent: 'scribe', message: 'Review [Today’s date].', bridge: 'b1', playbook: 'weekly-patching', cost: '0.40', turns: '12', perDay: '2', overlap: 'queue' as const, catchUp: '6h' };
+
+  it('keep the budget and the cap of a day of a duty that asks the agent or the manager', () => {
+    for (const act of ['ask', 'manager'] as const) {
+      expect(recordOf({ ...base, act }, null, 'x').limits).toEqual({ budget: { maxCostUSD: 0.4, maxTurns: 12 }, perDayUSD: 2, overlap: 'queue', catchUp: '6h' });
+      expect(formErrors({ ...base, act, cost: '' }, opts)).toEqual({ cost: 'A duty needs a budget. Write the most a run can cost, such as 0.50.' });
+    }
+  });
+
+  it('send no budget and no cap of a day for a post, and ask for neither', () => {
+    const d = duty({ do: { post: { bridge: 'b1', message: 'Review {date}.' } } });
+    // An older post held a budget and a cap of a day. The form reads them, and the record drops them.
+    const f = formOf(d, 'UTC');
+    expect([f.cost, f.turns, f.perDay]).toEqual(['0.50', '40', '2.00']);
+    expect(recordOf(f, d, d.name).limits).toEqual({ overlap: 'skip', catchUp: '1h', retries: 1 });
+    expect(recordOf({ ...base, act: 'post' }, null, 'x').limits).toEqual({ overlap: 'queue', catchUp: '6h' });
+    expect(formErrors({ ...base, act: 'post', cost: '', turns: 'x', perDay: 'x' }, opts)).toEqual({});
+    expect(limitWords(d.limits, true, 'post')).toEqual([POST_SPENDS, 'A time that comes while the last run works is skipped.', 'A missed time runs once, within 1 hour.']);
+    expect(POST_SPENDS).toBe('A post spends nothing of its own. The seats of the bridge spend from their own budgets.');
+  });
+
+  it('send only the turns of the bridge for an open, and require them', () => {
+    const d = duty({ do: { open: { playbook: 'weekly-patching' } }, limits: { budget: { maxTurns: 40 }, overlap: 'skip', catchUp: '1h' } });
+    const f = formOf(d, 'UTC');
+    // The turns of the bridge stay apart from the turns of a run.
+    expect([f.bridgeTurns, f.turns]).toEqual(['40', '']);
+    expect(recordOf(f, d, d.name).limits).toEqual({ budget: { maxTurns: 40 }, overlap: 'skip', catchUp: '1h' });
+    // An open sends no cost, tokens, tool calls, or cap of a day, also from an older duty that held them.
+    const older = duty({ do: { open: { playbook: 'weekly-patching' } }, limits: { budget: { maxCostUSD: 0.5, maxTokens: 9000, maxToolCalls: 20, maxTurns: 40 }, perDayUSD: 2 } });
+    expect(recordOf({ ...formOf(older, 'UTC'), cost: '0.50', perDay: '2' }, older, older.name).limits).toEqual({ budget: { maxTurns: 40 }, overlap: 'skip', catchUp: '1h' });
+    expect(recordOf({ ...base, act: 'open', bridgeTurns: '' }, null, 'x').limits).toEqual({ budget: {}, overlap: 'queue', catchUp: '6h' });
+    expect(formErrors({ ...base, act: 'open', bridgeTurns: '' }, opts)).toEqual({ turns: OPEN_NEEDS_TURNS });
+    expect(formErrors({ ...base, act: 'open', bridgeTurns: '0' }, opts)).toEqual({ turns: 'Write a whole number.' });
+    expect(formErrors({ ...base, act: 'open', cost: '', bridgeTurns: '40' }, opts)).toEqual({});
+    expect(OPEN_NEEDS_TURNS).toBe('A duty that opens a bridge needs the most turns of the whole bridge, such as 40.');
+    expect(limitWords(d.limits, false, 'open')).toEqual(['The bridge gets at most 40 turns.', 'A time that comes while the last run works is skipped.']);
+    expect(limitWords({ budget: { maxTurns: 1 } }, false, 'open')[0]).toBe('The bridge gets at most 1 turn.');
+  });
+
+  it('show a problem of the budget beside the turns of the bridge for an open, and at the top for a post', () => {
+    const ps = ['limits.budget: A bridge counts turns. Give maxTurns, such as 40, and leave out the other limits.', 'limits.budget.maxTurns: A duty that opens a bridge needs the most turns of the whole bridge, such as 40.', 'limits.perDayUSD: Too much.'];
+    expect(dutyProblems(ps, 'open')).toEqual({
+      turns: ['A bridge counts turns. Give maxTurns, such as 40, and leave out the other limits.', 'A duty that opens a bridge needs the most turns of the whole bridge, such as 40.'],
+      top: ['Too much.'],
+    });
+    expect(dutyProblems(ps, 'post')).toEqual({ top: ['A bridge counts turns. Give maxTurns, such as 40, and leave out the other limits.', 'A duty that opens a bridge needs the most turns of the whole bridge, such as 40.', 'Too much.'] });
+    expect(dutyProblems(ps, 'ask')).toEqual({ cost: ['A bridge counts turns. Give maxTurns, such as 40, and leave out the other limits.'], turns: ['A duty that opens a bridge needs the most turns of the whole bridge, such as 40.'], perDay: ['Too much.'] });
   });
 });

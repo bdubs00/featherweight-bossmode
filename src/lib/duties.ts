@@ -566,18 +566,35 @@ export function startWords(d: Pick<DutyRecord, 'when'>, name?: (agent: string) =
   return '';
 }
 
-/** limitWords reads the limits of a duty back in words. A missed time concerns a schedule only, so a duty without one leaves it out. */
-export function limitWords(l: DutyRecord['limits'] | undefined, schedule = true): string[] {
+/** POST_SPENDS says why a duty that posts in a bridge has no budget. */
+export const POST_SPENDS = 'A post spends nothing of its own. The seats of the bridge spend from their own budgets.';
+
+/** turnsText says a number of turns, such as 1 turn or 40 turns. */
+const turnsText = (n: number) => n + (n === 1 ? ' turn' : ' turns');
+
+/**
+ * limitWords reads the limits of a duty back in words. The budget follows
+ * the action: a post spends nothing of its own, and an open gives the
+ * turns of the whole bridge. Only ask and manager have a cap of a day. A
+ * missed time concerns a schedule only, so a duty without one leaves it
+ * out.
+ */
+export function limitWords(l: DutyRecord['limits'] | undefined, schedule = true, act: Act = 'ask'): string[] {
   if (!l) return [];
   const out: string[] = [];
   const b = l.budget || {};
-  const run: string[] = [];
-  if (b.maxCostUSD) run.push(costText(b.maxCostUSD));
-  if (b.maxTurns) run.push(b.maxTurns + (b.maxTurns === 1 ? ' turn' : ' turns'));
-  if (b.maxTokens) run.push(b.maxTokens.toLocaleString() + ' tokens');
-  if (b.maxToolCalls) run.push(b.maxToolCalls + (b.maxToolCalls === 1 ? ' tool call' : ' tool calls'));
-  if (run.length) out.push('A run gets at most ' + listWords(run) + '.');
-  if (l.perDayUSD) out.push('The duty spends at most ' + costText(l.perDayUSD) + ' a day.');
+  if (act === 'post') out.push(POST_SPENDS);
+  else if (act === 'open') {
+    if (b.maxTurns) out.push('The bridge gets at most ' + turnsText(b.maxTurns) + '.');
+  } else {
+    const run: string[] = [];
+    if (b.maxCostUSD) run.push(costText(b.maxCostUSD));
+    if (b.maxTurns) run.push(turnsText(b.maxTurns));
+    if (b.maxTokens) run.push(b.maxTokens.toLocaleString() + ' tokens');
+    if (b.maxToolCalls) run.push(b.maxToolCalls + (b.maxToolCalls === 1 ? ' tool call' : ' tool calls'));
+    if (run.length) out.push('A run gets at most ' + listWords(run) + '.');
+    if (l.perDayUSD) out.push('The duty spends at most ' + costText(l.perDayUSD) + ' a day.');
+  }
   const overlap = l.overlap || 'skip';
   out.push(overlap === 'queue' ? 'A time that comes while the last run works runs after it.' : overlap === 'allow' ? 'A time that comes while the last run works runs anyway.' : 'A time that comes while the last run works is skipped.');
   const c = l.catchUp === undefined ? '1h' : l.catchUp;
@@ -748,6 +765,8 @@ export interface DutyForm {
   cost: string;
   turns: string;
   perDay: string;
+  /** The most turns of the whole bridge that open starts. It stays apart from the turns of a run, so a switch of the action carries no limit over. */
+  bridgeTurns: string;
   overlap: 'skip' | 'queue' | 'allow';
   catchUp: string;
   decider: 'manager' | 'nobody';
@@ -787,6 +806,7 @@ export function emptyForm(zone: string): DutyForm {
     cost: '',
     turns: '',
     perDay: '',
+    bridgeTurns: '',
     overlap: 'skip',
     catchUp: '1h',
     decider: 'manager',
@@ -877,6 +897,7 @@ export function formOf(d: Duty, zone: string): DutyForm {
   const w = d.whileAway;
   const x = d.do || {};
   const e = d.when && d.when.event;
+  const opens = actOf(x) === 'open';
   return {
     ...f,
     name: d.name,
@@ -894,8 +915,9 @@ export function formOf(d: Duty, zone: string): DutyForm {
     playbook: (x.open && x.open.playbook) || '',
     goal: toWords((x.open && x.open.goal) || ''),
     cost: amount(b.maxCostUSD),
-    turns: num(b.maxTurns),
+    turns: opens ? '' : num(b.maxTurns),
     perDay: amount(l.perDayUSD),
+    bridgeTurns: opens ? num(b.maxTurns) : '',
     overlap: l.overlap || 'skip',
     catchUp: l.catchUp === undefined ? '1h' : l.catchUp,
     decider: w && w.decider === 'nobody' ? 'nobody' : 'manager',
@@ -1054,27 +1076,46 @@ export function doOf(f: DutyForm, base: Duty | null): DutyDo {
 }
 
 /**
+ * limitsOf writes the limits of the form. The budget follows the action. A
+ * post spends nothing of its own, so it sends no budget and no cap of a
+ * day. An open sends only the turns of the whole bridge. Ask and manager
+ * send the cost, the turns, and the cap of a day, and keep the limits of
+ * tokens and tool calls of the duty that the person edits. Overlap, catch
+ * up, and the retries stay for every action. No silent cost: an empty
+ * field sends no limit.
+ */
+export function limitsOf(f: DutyForm, base: Duty | null): DutyRecord['limits'] {
+  const old = (base && base.limits) || ({} as DutyRecord['limits']);
+  const limits: DutyRecord['limits'] = { overlap: f.overlap, catchUp: f.catchUp };
+  // turnsOf reads a count of turns that a person typed, or 0 for none.
+  const turnsOf = (text: string) => (text.trim() && Math.floor(Number(text)) > 0 ? Math.floor(Number(text)) : 0);
+  if (f.act === 'open') limits.budget = turnsOf(f.bridgeTurns) ? { maxTurns: turnsOf(f.bridgeTurns) } : {};
+  else if (f.act !== 'post') {
+    const budget: NonNullable<DutyRecord['limits']['budget']> = { ...(old.budget || {}) };
+    delete budget.maxCostUSD;
+    delete budget.maxTurns;
+    const cost = money(f.cost);
+    if (cost > 0) budget.maxCostUSD = cost;
+    if (turnsOf(f.turns)) budget.maxTurns = turnsOf(f.turns);
+    limits.budget = budget;
+    const perDay = money(f.perDay);
+    if (perDay > 0) limits.perDayUSD = perDay;
+  }
+  if (old.retries !== undefined) limits.retries = old.retries;
+  return limits;
+}
+
+/**
  * recordOf writes the record of PUT /v1/duties/{name}. A field that the
  * form does not show keeps its value from the duty that the person
  * edits: the pool, a start by another app, the limits of tokens and tool
- * calls, the retries, and runAs. The owner never goes out: the front
- * sets it.
+ * calls of ask and manager, the retries, and runAs. The owner never goes
+ * out: the front sets it.
  */
 export function recordOf(f: DutyForm, base: Duty | null, name: string): DutyRecord {
   const b = base;
   const keepWhen = !!(b && b.when && b.when.webhook);
-  const old = (b && b.limits) || ({} as DutyRecord['limits']);
-  const budget: DutyRecord['limits']['budget'] = { ...(old.budget || {}) };
-  delete budget.maxCostUSD;
-  delete budget.maxTurns;
-  const cost = money(f.cost);
-  if (cost > 0) budget.maxCostUSD = cost;
-  const turns = Math.floor(Number(f.turns));
-  if (f.turns.trim() && turns > 0) budget.maxTurns = turns;
-  const limits: DutyRecord['limits'] = { budget, overlap: f.overlap, catchUp: f.catchUp };
-  const perDay = money(f.perDay);
-  if (perDay > 0) limits.perDayUSD = perDay;
-  if (old.retries !== undefined) limits.retries = old.retries;
+  const limits = limitsOf(f, b);
   const when = keepWhen ? b!.when : f.start === 'event' ? { event: eventOf(f.event) } : f.say ? { say: f.say } : { schedule: scheduleOf(f.when) };
   const r: DutyRecord = {
     name,
@@ -1106,12 +1147,16 @@ export interface FormErrors {
   bridge?: string;
   playbook?: string;
   cost?: string;
+  /** The turns of a run, or for open the turns of the bridge. The form shows one of the two. */
   turns?: string;
   perDay?: string;
   count?: string;
   where?: string;
   name?: string;
 }
+
+/** OPEN_NEEDS_TURNS is the error of a duty that opens a bridge and gives no turns, in the words of the front. */
+export const OPEN_NEEDS_TURNS = 'A duty that opens a bridge needs the most turns of the whole bridge, such as 40.';
 
 /** formErrors says what is wrong with the form before a dry run. taken names the duties that exist, for a new one. */
 export function formErrors(f: DutyForm, opts: { fresh: boolean; name: string; taken: string[]; keepsWhen: boolean }): FormErrors {
@@ -1127,11 +1172,18 @@ export function formErrors(f: DutyForm, opts: { fresh: boolean; name: string; ta
   if (f.act === 'post' && !f.bridge) e.bridge = 'Pick the bridge.';
   if (f.act === 'open' && !f.playbook) e.playbook = 'Pick a playbook.';
   if (f.act !== 'open' && !f.message.trim()) e.message = f.act === 'post' ? 'Write the message for the bridge.' : f.act === 'manager' ? 'Write what the manager does.' : 'Write what the agent does.';
-  // No silent cost: a duty saves only with the most that a run can cost.
-  if (!f.cost.trim()) e.cost = 'A duty needs a budget. Write the most a run can cost, such as 0.50.';
-  else if (!(money(f.cost) > 0)) e.cost = 'Write an amount above 0, such as 0.50.';
-  if (f.turns.trim() && !(Number.isInteger(Number(f.turns)) && Number(f.turns) > 0)) e.turns = 'Write a whole number.';
-  if (f.perDay.trim() && !(money(f.perDay) > 0)) e.perDay = 'Write an amount above 0, such as 2.00.';
+  // The budget follows the action. A post spends nothing of its own, so it needs no limit.
+  const whole = (text: string) => Number.isInteger(Number(text)) && Number(text) > 0;
+  if (f.act === 'open') {
+    if (!f.bridgeTurns.trim()) e.turns = OPEN_NEEDS_TURNS;
+    else if (!whole(f.bridgeTurns)) e.turns = 'Write a whole number.';
+  } else if (f.act !== 'post') {
+    // No silent cost: a duty saves only with the most that a run can cost.
+    if (!f.cost.trim()) e.cost = 'A duty needs a budget. Write the most a run can cost, such as 0.50.';
+    else if (!(money(f.cost) > 0)) e.cost = 'Write an amount above 0, such as 0.50.';
+    if (f.turns.trim() && !whole(f.turns)) e.turns = 'Write a whole number.';
+    if (f.perDay.trim() && !(money(f.perDay) > 0)) e.perDay = 'Write an amount above 0, such as 2.00.';
+  }
   if (hasCheck(f.check) && f.check.wake === 'atLeast' && !(Number.isInteger(Number(f.check.count)) && Number(f.check.count) > 0)) e.count = 'Write a whole number of items.';
   if (hasCheck(f.check) && f.check.where.some((r) => r.field.trim() && (r.test === 'atLeast' || r.test === 'atMost') && !Number.isFinite(Number(r.text.trim() || 'x'))))
     e.where = 'At least and at most need a number.';
@@ -1181,8 +1233,13 @@ export function problemsBy<S extends string>(ps: unknown[] | null | undefined, s
 /** The places of the editor of a duty that show a problem of the front beside them. */
 export type DutySlot = 'name' | 'agent' | 'when' | 'check' | 'message' | 'bridge' | 'to' | 'playbook' | 'goal' | 'what' | 'cost' | 'turns' | 'perDay' | 'limits' | 'away' | 'tell';
 
-/** dutySlot names the place of the editor that shows a problem of a path, or top for a path that the form does not show. */
-export function dutySlot(path: string): DutySlot | 'top' {
+/**
+ * dutySlot names the place of the editor that shows a problem of a path,
+ * or top for a path that the form does not show. The limits follow the
+ * action: for open, a problem of the budget shows beside the turns of the
+ * bridge, and for post, the form shows no budget and no cap of a day.
+ */
+export function dutySlot(path: string, act: Act = 'ask'): DutySlot | 'top' {
   const parts = path.replace(/\[\d+\]/g, '').split('.');
   const leaf = parts[parts.length - 1];
   switch (parts[0]) {
@@ -1199,8 +1256,8 @@ export function dutySlot(path: string): DutySlot | 'top' {
       if (leaf === 'bridge' || leaf === 'to' || leaf === 'playbook' || leaf === 'goal') return leaf;
       return 'what';
     case 'limits':
-      if (parts[1] === 'budget') return parts[2] === 'maxTurns' ? 'turns' : 'cost';
-      if (parts[1] === 'perDayUSD') return 'perDay';
+      if (parts[1] === 'budget') return act === 'post' ? 'top' : act === 'open' || parts[2] === 'maxTurns' ? 'turns' : 'cost';
+      if (parts[1] === 'perDayUSD') return act === 'post' || act === 'open' ? 'top' : 'perDay';
       return 'limits';
     case 'whileAway':
       return 'away';
@@ -1210,8 +1267,8 @@ export function dutySlot(path: string): DutySlot | 'top' {
   return 'top';
 }
 
-/** dutyProblems sorts the problems of a dry run or a save by the place of the editor that shows them. */
-export const dutyProblems = (ps: unknown[] | null | undefined) => problemsBy(ps, dutySlot);
+/** dutyProblems sorts the problems of a dry run or a save by the place of the editor that shows them, for the action of the form. */
+export const dutyProblems = (ps: unknown[] | null | undefined, act: Act = 'ask') => problemsBy(ps, (path) => dutySlot(path, act));
 
 /** elapsedWords says how long a wait took so far, such as 45 seconds so far, or 1 minute 5 seconds so far. */
 export function elapsedWords(s: number): string {

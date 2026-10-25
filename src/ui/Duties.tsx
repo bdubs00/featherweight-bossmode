@@ -12,6 +12,7 @@ import { go, hrefOf, type DutySeed } from '../lib/route';
 import { costText } from '../lib/cost';
 import {
   PLACEHOLDERS,
+  actOf,
   awayWords,
   channelsIn,
   checkLine,
@@ -456,7 +457,7 @@ function DutyView({ name }: { name: string }) {
             Limits
           </h2>
           <ul class="duty-lines">
-            {limitWords(d.limits, !!(d.when && d.when.schedule)).map((w) => (
+            {limitWords(d.limits, !!(d.when && d.when.schedule), actOf(d.do)).map((w) => (
               <li>{w}</li>
             ))}
           </ul>

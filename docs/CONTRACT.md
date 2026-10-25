@@ -1298,16 +1298,24 @@ The rules of the page:
   the rest of the form. The schedule of the answer, `duty.when.schedule`,
   fills the sentence. If the answer has a readback but no schedule, the
   page keeps the words and saves them as `say`.
-- A new duty sends no budget. Before any call, Save duty refuses a form
-  without the most that a run can cost. The front never fills a budget for
-  the page.
+- **New:** the budget follows the action. A new duty that asks the agent
+  or the manager sends no budget of its own. Before any call, Save duty
+  refuses such a form without the most that a run can cost. A post spends
+  nothing of its own: the page sends no `limits.budget` and no
+  `limits.perDayUSD`, and asks for neither. An open sends only
+  `limits.budget.maxTurns`, the most turns of the whole bridge, and no
+  `limits.perDayUSD`. Before any call, Save duty refuses an open without
+  it, with the words of the front: `A duty that opens a bridge needs the
+  most turns of the whole bridge, such as 40.` Overlap, catch up, and
+  `retries` stay for every action. The front never fills a budget for the
+  page.
 - **New:** a change sends the `revision` of the duty that the person read.
   For a 409, the page says `This duty changed since you opened it. Open it
   again, then make your change.`
 - The page never sends `owner`. It keeps each field that the form does not
   show. These fields are `pool` and a start by a call of another app.
-  They are also `maxTokens`, `maxToolCalls`, `retries`, `runAs`, `paused`,
-  and other people in `notify`.
+  They are also `maxTokens` and `maxToolCalls` of a duty that asks,
+  `retries`, `runAs`, `paused`, and other people in `notify`.
 - **New:** When is a schedule or, where `options.events` lists one, an
   event: `{"event": {"kind", "agent", "after", "path"}}` with only the
   fields of its kind. `bridge.closed`, `run.failed`, and `routine.ready`
@@ -1353,9 +1361,11 @@ The rules of the page:
   `do.post.bridge`, `do.post.to`, `do.open.playbook`, and `do.open.goal`
   beside their fields, `limits.budget` beside the cost, `limits.budget.maxTurns`
   beside the turns, `limits.perDayUSD` beside the most per day, `whileAway`
-  and `notify` in their sections, and `name` beside the name. A problem with
-  no path, or with a path that the form does not show, shows at the top of
-  the form.
+  and `notify` in their sections, and `name` beside the name. For an open,
+  each problem of `limits.budget` shows beside the turns of the bridge. A
+  problem with no path, or with a path that the form does not show, shows
+  at the top of the form. A post shows no budget and an open no most per
+  day, so their problems show at the top.
 - **New:** Make this a duty, in the menu More of a quick chat, of the
   manager, of a conversation with an agent, and of a bridge, opens
   `#duties/new?agent=<agent>&do=<action>&message=<text>`, or with

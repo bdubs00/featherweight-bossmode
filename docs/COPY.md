@@ -830,6 +830,7 @@ stands for a value.
 | new | add | `Ask the manager` with the placeholder `Check the backups of [Today's date] and tell me what failed.`, and the error `Write what the manager does.` | done |
 | `[What happened]` with no chip | change | the chip `What happened`, once an event starts the duty | done |
 | `The duty cannot save yet.` above Save duty | change | the same box at the top of the form, for a problem of the front with no field. A problem of a field shows beside the field, with the text after its path. | done |
+| `The most a run can cost`, `Most turns`, and `The most per day` for every action | change | they show for Ask the agent and Ask the manager only. Post in a bridge shows `A post spends nothing of its own. The seats of the bridge spend from their own budgets.` in their place. Open a bridge from a playbook shows `The most turns of the bridge` with the placeholder `Required, such as 40`, and the error `A duty that opens a bridge needs the most turns of the whole bridge, such as 40.` | done |
 
 ### src/ui/DutyCheck.tsx
 
@@ -855,6 +856,7 @@ stands for a value.
 | `Run now`, `Pause`, `Edit`, More, Limits, While you are away, and Tell me about on a duty of the settings of the front | remove | only `This duty comes from the settings of the front. Change it there.`, When with the readback of the front, or `Another app starts it.` without one, and `Agent` with the name of the agent | done |
 | Check first beside a readback that says the check | remove | the readback says the check once. Check first shows only without a readback | done |
 | `Open the run` for a start with no run | remove | a start that the queue never took links no run, in the history and in Activity | done |
+| `A run gets at most <limits>.` under Limits of a post or an open | change | a post says `A post spends nothing of its own. The seats of the bridge spend from their own budgets.`, and an open says `The bridge gets at most <n> turns.` Neither says the most per day | done |
 
 ### src/ui/Playbooks.tsx, src/ui/Channel.tsx, src/ui/NewBridge.tsx
 

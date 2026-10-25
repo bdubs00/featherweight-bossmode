@@ -1095,6 +1095,13 @@ The work:
   goal, and the list of the playbooks with Delete), or Ask the manager.
   Each message holds its placeholders as words in brackets, and a chip
   inserts one. What happened shows once an event starts the duty.
+- Limits. They follow the action as soon as it changes. Ask the agent and
+  Ask the manager show the most a run can cost, which is required, the
+  most turns, and the most per day. Post in a bridge shows no budget and
+  says `A post spends nothing of its own. The seats of the bridge spend
+  from their own budgets.` Open a bridge from a playbook shows one field,
+  `The most turns of the bridge`, which is required. Overlap and catch up
+  stay for every action. The page of a duty says the same under Limits.
 - Problems. A problem of the front that names a field shows beside the
   field, and one with no field shows at the top of the form.
 - The page of a duty says what its action does and lists its history. Under

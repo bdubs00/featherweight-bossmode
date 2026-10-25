@@ -7,8 +7,11 @@
 // times, and Save duty shows them again before it saves. What asks the
 // agent, posts in a bridge that stays open, opens a bridge from a
 // playbook, or asks the manager. A message holds its placeholders as words
-// in brackets, such as [Today's date], and nobody types a brace. A duty
-// needs a budget: the page never fills one.
+// in brackets, such as [Today's date], and nobody types a brace. Limits
+// follow the action. A duty that asks the agent or the manager needs a
+// budget, and the page never fills one. A post spends nothing of its own,
+// so it shows no budget. An open asks only for the most turns of the
+// bridge that it opens.
 //
 // GET /v1/duties/options names the events, the actions, the looks of a
 // check, and the secrets that the front serves now, and the editor offers
@@ -33,6 +36,7 @@ import {
   EVERY_WEEKS,
   MONTH_DAYS,
   PLACEHOLDERS,
+  POST_SPENDS,
   PRESETS,
   REPEATS,
   SPANS,
@@ -613,7 +617,7 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
 
   /** takeProblems shows the problems of the front beside their fields, and opens Check first for one of its own. */
   const takeProblems = (ps: unknown[] | null | undefined): boolean => {
-    const by = dutyProblems(ps);
+    const by = dutyProblems(ps, f.act);
     setProblems(by);
     if (by.check) setCheckOpen(true);
     const any = Object.keys(by).length > 0;
@@ -859,23 +863,32 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
             <h2 class="t-sub duty-sec-head" id="duty-limits-head">
               Limits
             </h2>
-            <div class="field-row">
-              <Field label="The most a run can cost" error={joinError(err.cost, pr.cost)} class="duty-cost">
-                <span class="duty-money">
-                  <span aria-hidden="true">$</span>
-                  <Input inputMode="decimal" value={f.cost} invalid={!!(err.cost || pr.cost)} placeholder="Required, such as 0.50" onInput={(e) => patch({ cost: (e.target as HTMLInputElement).value })} />
-                </span>
+            {/* The budget follows the action, so the fields change as soon as the action does. */}
+            {f.act === 'post' ? (
+              <p class="duty-spends">{POST_SPENDS}</p>
+            ) : f.act === 'open' ? (
+              <Field label="The most turns of the bridge" error={joinError(err.turns, pr.turns)} class="duty-narrow">
+                <Input type="number" min={1} inputMode="numeric" value={f.bridgeTurns} invalid={!!(err.turns || pr.turns)} placeholder="Required, such as 40" onInput={(e) => patch({ bridgeTurns: (e.target as HTMLInputElement).value })} />
               </Field>
-              <Field label="Most turns" error={joinError(err.turns, pr.turns)}>
-                <Input type="number" min={1} inputMode="numeric" value={f.turns} invalid={!!(err.turns || pr.turns)} placeholder="Optional" onInput={(e) => patch({ turns: (e.target as HTMLInputElement).value })} />
-              </Field>
-              <Field label="The most per day" error={joinError(err.perDay, pr.perDay)}>
-                <span class="duty-money">
-                  <span aria-hidden="true">$</span>
-                  <Input inputMode="decimal" value={f.perDay} invalid={!!(err.perDay || pr.perDay)} placeholder="Optional" onInput={(e) => patch({ perDay: (e.target as HTMLInputElement).value })} />
-                </span>
-              </Field>
-            </div>
+            ) : (
+              <div class="field-row">
+                <Field label="The most a run can cost" error={joinError(err.cost, pr.cost)} class="duty-cost">
+                  <span class="duty-money">
+                    <span aria-hidden="true">$</span>
+                    <Input inputMode="decimal" value={f.cost} invalid={!!(err.cost || pr.cost)} placeholder="Required, such as 0.50" onInput={(e) => patch({ cost: (e.target as HTMLInputElement).value })} />
+                  </span>
+                </Field>
+                <Field label="Most turns" error={joinError(err.turns, pr.turns)}>
+                  <Input type="number" min={1} inputMode="numeric" value={f.turns} invalid={!!(err.turns || pr.turns)} placeholder="Optional" onInput={(e) => patch({ turns: (e.target as HTMLInputElement).value })} />
+                </Field>
+                <Field label="The most per day" error={joinError(err.perDay, pr.perDay)}>
+                  <span class="duty-money">
+                    <span aria-hidden="true">$</span>
+                    <Input inputMode="decimal" value={f.perDay} invalid={!!(err.perDay || pr.perDay)} placeholder="Optional" onInput={(e) => patch({ perDay: (e.target as HTMLInputElement).value })} />
+                  </span>
+                </Field>
+              </div>
+            )}
             <Choices
               name="duty-overlap"
               legend="If the last run still works"
@@ -998,7 +1011,7 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
           )}
           {/* The readback of the front holds the check already. Without it, the page says the check in its own words. */}
           {reviewed && !review.readback && <p>{checkWords(reviewed, agentName || 'the agent')}</p>}
-          <p>{limitWords(record().limits)[0]}</p>
+          <p>{limitWords(record().limits, true, f.act)[0]}</p>
         </Confirm>
       )}
     </section>

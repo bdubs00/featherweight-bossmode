@@ -1001,9 +1001,15 @@ export interface DutyDo {
   manager?: { message: string };
 }
 
-/** The limits of a duty. budget is required, with at least one limit above zero. */
+/**
+ * The limits of a duty. They follow the action. For ask and manager,
+ * budget is required, with at least one limit above zero. A post spends
+ * nothing of its own, so the front drops budget and perDayUSD. For open,
+ * budget holds only maxTurns, the turns of the whole bridge, and the front
+ * drops perDayUSD.
+ */
 export interface DutyLimits {
-  budget: { maxCostUSD?: number; maxTurns?: number; maxTokens?: number; maxToolCalls?: number };
+  budget?: { maxCostUSD?: number; maxTurns?: number; maxTokens?: number; maxToolCalls?: number };
   perDayUSD?: number;
   /** skip (the default), queue, or allow, for a time that comes while the last run still works. */
   overlap?: 'skip' | 'queue' | 'allow';
