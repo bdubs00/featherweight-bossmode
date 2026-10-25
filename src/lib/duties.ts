@@ -472,6 +472,14 @@ export function checkLine(r: DutyRun): string {
 export function decidedWords(d: DutyDecided, me = ''): string {
   const tool = d.tool || 'a tool';
   const why = d.reason && d.reason.trim() ? ': ' + d.reason.trim() : '.';
+  if (d.question) {
+    // A person answers or declines a question, as the digest says it.
+    if (d.by === 'timeout') return d.verdict === 'cancel' ? 'Nobody answered the question in time, so the run stopped.' : 'Nobody answered the question in time, so it was declined.';
+    const asker = d.by === 'manager' ? 'The manager' : me && d.by === me ? 'You' : cap(personName(d.by));
+    if (d.verdict === 'allow') return asker + ' answered the question.';
+    if (d.verdict === 'cancel') return asker + ' stopped the run at the question.';
+    return asker + ' declined the question.';
+  }
   if (d.by === 'timeout') {
     if (d.verdict === 'cancel') return 'Nobody answered in time, so the run stopped at ' + tool + why;
     if (d.verdict === 'allow') return 'Nobody answered in time, so ' + tool + ' went ahead' + why;

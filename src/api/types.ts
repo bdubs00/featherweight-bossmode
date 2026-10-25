@@ -1066,6 +1066,8 @@ export interface DutyDecided {
   verdict: 'allow' | 'deny' | 'cancel' | string;
   tool: string;
   reason?: string;
+  /** True for a question, which a person answers or declines. */
+  question?: boolean;
 }
 
 /** The state of a duty that the front keeps. */

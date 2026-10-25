@@ -301,6 +301,10 @@ describe('a duty in words', () => {
     expect(decidedWords({ at: '', by: 'timeout', verdict: 'deny', tool: 'git.push' })).toBe('Nobody answered in time, so git.push was denied.');
     expect(decidedWords({ at: '', by: 'timeout', verdict: 'cancel', tool: 'git.push' })).toBe('Nobody answered in time, so the run stopped at git.push.');
     expect(decidedWords({ at: '', by: 'bob@example.com', verdict: 'cancel', tool: 'bash', reason: 'wrong host' })).toBe('Bob stopped the run at bash: wrong host');
+    // A question is answered or declined.
+    expect(decidedWords({ at: '', by: 'token', verdict: 'allow', tool: 'ask_user', question: true }, 'token')).toBe('You answered the question.');
+    expect(decidedWords({ at: '', by: 'bob@example.com', verdict: 'deny', tool: 'ask_user', question: true })).toBe('Bob declined the question.');
+    expect(decidedWords({ at: '', by: 'timeout', verdict: 'deny', tool: 'ask_user', question: true })).toBe('Nobody answered the question in time, so it was declined.');
     expect(decidedWords({ at: '', by: 'alice@example.com', verdict: 'allow', tool: 'bash' }, 'alice@example.com')).toBe('You allowed bash.');
   });
 });
