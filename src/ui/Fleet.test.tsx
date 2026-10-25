@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { act } from 'preact/test-utils';
-import { FleetList } from './Fleet';
+import { FleetList, FOLDED_KEY } from './Fleet';
 import { Board } from './Board';
 import { FLEET, fakeFetch, mount, seedFleet, unmountAll } from './testkit-b';
 import { settle } from './testkit-a';
@@ -75,6 +75,68 @@ describe('the people list', () => {
       field.dispatchEvent(new Event('input', { bubbles: true }));
     });
     expect(handles(el)).toEqual(['reviewer']);
+  });
+});
+
+describe('folding a bridge in the people list', () => {
+  beforeEach(() => localStorage.clear());
+
+  const foldKey = (el: HTMLElement, i = 0) => el.querySelectorAll('.people-fold')[i] as HTMLButtonElement;
+  const click = (b: HTMLElement) => act(() => b.click());
+
+  it('hides the members of a bridge, says that one needs you, and remembers it in this browser', () => {
+    let el = mount(<FleetList />);
+    const key = foldKey(el);
+    expect(key.getAttribute('aria-expanded')).toBe('true');
+    expect(key.getAttribute('aria-label')).toBe('Hide the members of Migrate Puppet');
+    click(key);
+    expect(handles(el)).toEqual(['manager']);
+    expect(foldKey(el).getAttribute('aria-expanded')).toBe('false');
+    expect(foldKey(el).getAttribute('aria-label')).toBe('Show the members of Migrate Puppet');
+    // The count stays, and the hidden migrator-2 still asks for the person.
+    const head = el.querySelector('.people-head')!;
+    expect(head.querySelector('.people-count')!.textContent).toBe('3');
+    expect(head.querySelector('.status-word')!.textContent).toBe('needs you');
+    expect(JSON.parse(localStorage.getItem(FOLDED_KEY)!)).toEqual(['b1']);
+
+    unmountAll();
+    el = mount(<FleetList />);
+    expect(handles(el)).toEqual(['manager']);
+    click(foldKey(el));
+    expect(handles(el)).toEqual(['migrator-1', 'migrator-2', 'reviewer', 'manager']);
+    expect(el.querySelector('.people-head .status-word')).toBeNull();
+    expect(localStorage.getItem(FOLDED_KEY)).toBeNull();
+  });
+
+  it('keeps the open member in sight', () => {
+    const el = mount(<FleetList member="b1/migrator-1" />);
+    click(foldKey(el));
+    expect(handles(el)).toEqual(['migrator-1', 'manager']);
+  });
+
+  it('folds the members that sit on no bridge too', () => {
+    const el = mount(<FleetList />);
+    click(foldKey(el, 1));
+    expect(handles(el)).toEqual(['migrator-1', 'migrator-2', 'reviewer']);
+    expect(JSON.parse(localStorage.getItem(FOLDED_KEY)!)).toEqual(['none']);
+  });
+
+  it('shows every match while the person searches', () => {
+    localStorage.setItem(FOLDED_KEY, JSON.stringify(['b1']));
+    const el = mount(<FleetList />);
+    expect(handles(el)).toEqual(['manager']);
+    const field = el.querySelector('input[type="search"]') as HTMLInputElement;
+    act(() => {
+      field.value = 'migrator';
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(handles(el)).toEqual(['migrator-1', 'migrator-2']);
+  });
+
+  it('folds nothing when the storage of the browser holds something else', () => {
+    localStorage.setItem(FOLDED_KEY, '{"b1": true}');
+    const el = mount(<FleetList />);
+    expect(handles(el)).toEqual(['migrator-1', 'migrator-2', 'reviewer', 'manager']);
   });
 });
 

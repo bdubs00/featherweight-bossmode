@@ -32,6 +32,7 @@ import { EmptyPane } from './Shell';
 import { Confirm, Menu } from './common';
 import { askOfRun } from '../lib/duties';
 import { Button, Chip, Find, Help, IconButton, Led, Mark, PaneHeader } from './primitives';
+import { Glyph } from './icons';
 import type { Tone } from '../lib/presence';
 
 /** The width from which two panes show side by side, as App names it. */
@@ -177,6 +178,75 @@ export function OrphanNote() {
   );
 }
 
+/** FOLDED_KEY is the key under which this browser keeps the groups that the person folded. */
+export const FOLDED_KEY = 'fw.bossmode.fleet.folded';
+
+/** groupKey names a group in the folded list: the id of its bridge, or none for Not on a bridge. */
+const groupKey = (g: PeopleGroup): string => g.key || 'none';
+
+/** readFolded returns the folded groups of this browser. A browser without storage folds nothing. */
+export function readFolded(): Set<string> {
+  try {
+    const v = JSON.parse(localStorage.getItem(FOLDED_KEY) || '[]');
+    return new Set(Array.isArray(v) ? v.filter((k): k is string => typeof k === 'string') : []);
+  } catch {
+    return new Set();
+  }
+}
+
+/** keepFolded remembers the folded groups. The list of a browser without storage unfolds at the next load. */
+function keepFolded(keys: Set<string>): void {
+  try {
+    if (keys.size) localStorage.setItem(FOLDED_KEY, JSON.stringify([...keys]));
+    else localStorage.removeItem(FOLDED_KEY);
+  } catch {
+    // No storage.
+  }
+}
+
+/** PeopleGroupView is one group of the people list. A folded group shows its heading, and still the row that is open. */
+function PeopleGroupView({ g, sel, shut, onFold }: { g: PeopleGroup; sel: string; shut: boolean; onFold: () => void }) {
+  const key = groupKey(g);
+  const rows = shut ? g.rows.filter((r) => r.key === sel) : g.rows;
+  // A folded group still says when a member that it hides needs the person.
+  const waiting = shut ? g.rows.filter((r) => r.key !== sel && r.light && r.light.word === 'needs you') : [];
+  return (
+    <div class="people-group" role="group" aria-labelledby={'pg-' + key}>
+      <div class="people-head" id={'pg-' + key}>
+        <button
+          type="button"
+          class="people-fold"
+          aria-expanded={!shut}
+          aria-controls={'pl-' + key}
+          aria-label={(shut ? 'Show the members of ' : 'Hide the members of ') + g.title}
+          title={shut ? 'Show the members' : 'Hide the members'}
+          onClick={onFold}
+        >
+          <Glyph name="back" size={14} class={shut ? 'turn-right' : 'turn-down'} />
+        </button>
+        {g.href ? (
+          <a class="people-title clip" href={g.href}>
+            {g.title}
+          </a>
+        ) : (
+          <span class="people-title muted clip">{g.title}</span>
+        )}
+        {waiting.length > 0 && <Led tone={waiting[0].light!.tone} word="needs you" label={waiting.length === 1 ? '1 member needs you' : waiting.length + ' members need you'} />}
+        <span class="people-count" aria-label={g.count === 1 ? '1 member' : g.count + ' members'}>
+          {g.count}
+        </span>
+      </div>
+      <div role="list" id={'pl-' + key}>
+        {rows.map((r) => (
+          <div role="listitem">
+            <PersonLink r={r} on={r.key === sel} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** FleetList is the list pane of the Fleet place: the people grouped by bridge, then Not on a bridge. */
 export function FleetList({ current, member }: { current?: string; member?: string }) {
   const route = useHashRoute();
@@ -189,6 +259,15 @@ export function FleetList({ current, member }: { current?: string; member?: stri
   const list = useRoving<HTMLDivElement>();
   const count = peopleCount(groups);
   const sel = member ? 'seat:' + member : current ? 'agent:' + current : '';
+  // The folded groups of this browser. A search shows every match.
+  const [folded, setFolded] = useState(readFolded);
+  const fold = (key: string) => {
+    const next = new Set(folded);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    setFolded(next);
+    keepFolded(next);
+  };
   return (
     <section class="screen people" aria-labelledby="fleet-list-title">
       <PaneHeader
@@ -216,27 +295,7 @@ export function FleetList({ current, member }: { current?: string; member?: stri
       <OrphanNote />
       <div class="scroll" ref={list}>
         {shown.map((g) => (
-          <div class="people-group" role="group" aria-labelledby={'pg-' + (g.key || 'none')}>
-            <div class="people-head" id={'pg-' + (g.key || 'none')}>
-              {g.href ? (
-                <a class="people-title clip" href={g.href}>
-                  {g.title}
-                </a>
-              ) : (
-                <span class="people-title muted clip">{g.title}</span>
-              )}
-              <span class="people-count" aria-label={g.count === 1 ? '1 member' : g.count + ' members'}>
-                {g.count}
-              </span>
-            </div>
-            <div role="list">
-              {g.rows.map((r) => (
-                <div role="listitem">
-                  <PersonLink r={r} on={r.key === sel} />
-                </div>
-              ))}
-            </div>
-          </div>
+          <PeopleGroupView g={g} sel={sel} shut={!q.trim() && folded.has(groupKey(g))} onFold={() => fold(groupKey(g))} />
         ))}
         {!loaded && <p class="people-note">Loading the members.</p>}
         {loaded && groups.length === 0 && (

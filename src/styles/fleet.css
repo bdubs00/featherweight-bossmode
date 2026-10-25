@@ -18,6 +18,30 @@
   min-width: 0;
   padding: var(--s-4) var(--s-2) var(--s-1);
 }
+/* The key that folds a group sits before its title, as the toggle of the closed bridges does. */
+.people-fold {
+  appearance: none;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--h-small);
+  height: var(--h-small);
+  margin-left: calc(-1 * var(--s-2));
+  padding: 0;
+  border: 0;
+  border-radius: var(--r);
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+.people-fold:hover {
+  color: var(--ink);
+}
+.people-fold:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+}
 .people-title {
   font-size: var(--t-meta);
   line-height: var(--t-body-lh);
@@ -979,6 +1003,10 @@ a.file {
   .person,
   .file {
     min-height: var(--h-row);
+  }
+  .people-fold {
+    width: var(--h-row);
+    height: var(--h-row);
   }
   a.people-title,
   .prof-link,
