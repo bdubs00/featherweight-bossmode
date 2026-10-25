@@ -178,7 +178,7 @@ function memberRun({ id, agent, handle, bridge, task, shape, start }) {
 /**
  * The calls that the manager can wait on with FAKE_ASK, one per kind of
  * plan of a decision card: a bridge to open, a page to write, a task to
- * hand off, and a tool that the page does not know.
+ * hand off, a package to install, and a tool that the page does not know.
  */
 export const MANAGER_ASKS = {
   bridge_open: {
@@ -212,6 +212,12 @@ export const MANAGER_ASKS = {
     tool: 'spawn_task',
     reason: 'rule: ask spawn_task',
     input: { agent: 'tester', input: 'Time each step of the molecule run of roles/nginx on Debian 12, find the three slowest, and say how to make each faster. Return a short table and the commands that you ran.', max_turns: 20 },
+  },
+  env: {
+    text: 'Lint the new roles before the review.',
+    tool: 'env',
+    reason: 'rule: ask env: command=add',
+    input: { command: 'add', manager: 'python', package: 'ansible-lint' },
   },
   create_issue: {
     text: 'File an issue for the flaky idempotence check.',

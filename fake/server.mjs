@@ -21,7 +21,8 @@
 //   FAKE_LIVE_MS=120   the time between two pieces of a live answer, in milliseconds
 //   FAKE_LIVE_HOLD=1   a live answer stops near its middle and waits there, for a screenshot
 //   FAKE_ASLEEP=1      every worker of the fleet sleeps, as a fleet at night with no worker awake
-//   FAKE_ASK=<tool>    the manager waits for a decision on one call: bridge_open, pages_write, spawn_task, or create_issue
+//   FAKE_ASK=<tool>    the manager waits for a decision on one call: bridge_open, pages_write, spawn_task, create_issue, or env
+//   FAKE_PACKAGES=0    the settings say that the deployment has no package mirror, so no profile shows Packages
 
 import http from 'node:http';
 import fs from 'node:fs';
@@ -45,6 +46,7 @@ const ADMIN = process.env.FAKE_ADMIN === '1';
 const LIVE = process.env.FAKE_LIVE === '1';
 const LIVE_MS = Number(process.env.FAKE_LIVE_MS || 120);
 const LIVE_HOLD = process.env.FAKE_LIVE_HOLD === '1';
+const PACKAGES = process.env.FAKE_PACKAGES !== '0';
 
 const S = seed(process.env.FAKE_ASK || '');
 
@@ -482,6 +484,8 @@ function decide(runId, approvalId, body, person) {
   const seq = items.length ? items[items.length - 1].seq + 1 : 1;
   items.push({ seq, time: now(), kind: 'decided', id: approvalId, text: decision, who: person.subject, detail: body.note || '' });
   const pending = run.pending;
+  // packages.mjs adds the package of an allowed call of env to the list of its pool.
+  for (const f of S.decided || []) f(run, pending, decision, person);
   Object.assign(run, { pending: null, state: 'running', seq, updatedAt: now(), activity: { turn: 8, phrase: decision === 'allow' ? 'Went on after your decision' : 'Read your denial', since: now() } });
   const res = S.results.get(runId);
   if (res) Object.assign(res, { pending: null, status: 'working', next: [] });
@@ -828,6 +832,7 @@ on('GET', '/v1/bossmode', (c) => {
     theme: { accent: process.env.FAKE_ACCENT || '#FF4D00', name: THEME ? process.env.FAKE_ORG || 'Example Org' : '', logo: process.env.FAKE_LOGO === '1' ? '/v1/bossmode/logo' : '' },
     templates: TEMPLATES,
     chat: { agent: CHAT_AGENT, member: MANAGER_MEMBER },
+    packages: PACKAGES,
   };
 });
 on('GET', '/v1/bossmode/logo', (c) => {
@@ -1561,7 +1566,8 @@ function tick() {
 // skills.mjs serves the Skills place.
 // routes-d.mjs serves the Routines place, and writes the runbook of a
 // routine on a sign-off with writePage. routes-e.mjs serves the Duties place.
-for (const name of ['skills.mjs', 'routes-a.mjs', 'routes-b.mjs', 'routes-c.mjs', 'routes-chat.mjs', 'routes-d.mjs', 'routes-e.mjs']) {
+// packages.mjs serves the packages of the pools.
+for (const name of ['skills.mjs', 'routes-a.mjs', 'routes-b.mjs', 'routes-c.mjs', 'routes-chat.mjs', 'routes-d.mjs', 'routes-e.mjs', 'packages.mjs']) {
   const mod = await import('./' + name);
   mod.register({ on, refuse, readJson, readBody, publish, S, now, AGENTS, FLEET, admin: () => ADMIN, writePage });
 }
