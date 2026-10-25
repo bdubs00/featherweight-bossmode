@@ -460,16 +460,16 @@ export function AgentChat({ agent }: { agent: string }) {
         back={{ href: '#fleet', label: 'Fleet', to: 'list' }}
         lead={<ProfileLink href={hrefOf({ place: 'fleet', agent, profile: true })} agent={agent} label={name} light={light} />}
         actions={
-          <>
-            <IconButton icon="history" label="Past conversations" onClick={() => setPast(true)} />
-            <Button size="s" disabled={!runId} onClick={() => open('')}>
-              New conversation
-            </Button>
-            {runId && (
+          // The list pane of the Fleet place holds the members, so the past conversations open as a dialog from the menu.
+          <Menu
+            label="More"
+            items={[
+              ...(runId ? [{ label: 'New conversation', onSelect: () => open('') }] : []),
+              { label: 'Past conversations', onSelect: () => setPast(true) },
               // A conversation that did a job once becomes a duty of this agent that does it again.
-              <Menu label="More" items={[{ label: 'Make this a duty', onSelect: () => go({ place: 'duties', fresh: true, seed: { agent, act: 'ask', message: askOfRun(run, t.items) } }) }]} />
-            )}
-          </>
+              ...(runId ? [{ label: 'Make this a duty', onSelect: () => go({ place: 'duties', fresh: true, seed: { agent, act: 'ask', message: askOfRun(run, t.items) } }) }] : []),
+            ]}
+          />
         }
       />
       <FollowBox end={end}>

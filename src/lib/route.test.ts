@@ -7,6 +7,8 @@ describe('routes', () => {
     ['#activity', { place: 'activity' }],
     ['#activity/d:run-1/ap-2', { place: 'activity', item: 'd:run-1/ap-2' }],
     ['#manager', { place: 'manager' }],
+    ['#manager/new', { place: 'manager', fresh: true }],
+    ['#manager/run%201', { place: 'manager', run: 'run 1' }],
     ['#chat', { place: 'chat' }],
     ['#chat/new', { place: 'chat', fresh: true }],
     ['#chat/run%201', { place: 'chat', run: 'run 1' }],
@@ -95,6 +97,11 @@ describe('routes', () => {
     expect(parentOf({ place: 'fleet', agent: 'a', profile: true })).toEqual({ place: 'fleet', agent: 'a' });
     expect(parentOf({ place: 'activity', item: 'd:r/a' })).toEqual({ place: 'activity' });
     expect(parentOf({ place: 'skills', add: true })).toEqual({ place: 'skills' });
+    expect(parentOf({ place: 'manager', run: 'r' })).toEqual({ place: 'manager' });
+    expect(parentOf({ place: 'manager', fresh: true })).toEqual({ place: 'manager' });
+    expect(parentOf({ place: 'manager' })).toEqual({ place: 'home' });
+    expect(columnOf({ place: 'manager' })).toBe('list');
+    expect(columnOf({ place: 'manager', run: 'r' })).toBe('main');
     expect(columnOf({ place: 'pages', mode: 'tree' })).toBe('list');
     expect(parentOf({ place: 'bridge', id: 'b', pane: 'run', run: 'r' })).toEqual({ place: 'bridge', id: 'b', pane: 'roster' });
     expect(parentOf({ place: 'bridge', id: 'b', pane: 'none' })).toEqual({ place: 'home' });

@@ -75,12 +75,14 @@ describe('Make this a duty', () => {
     expect(parseRoute(location.hash)).toEqual({ place: 'duties', fresh: true, seed: { agent: 'backup', act: 'ask', message: 'Restore last night into the scratch cluster.' } });
   });
 
-  it('offers no key before a conversation exists', async () => {
+  it('offers no Make this a duty before a conversation exists', async () => {
     sessionStorage.clear();
     act(() => store.dispatch({ type: 'config', config: { ...CONFIG, manager: { ...CONFIG.manager!, run: '' } } }));
     api = fakeApi({});
     const el = mount(<AgentChat agent="backup" />);
     await settle();
-    expect(el.querySelector('.pane-head button[aria-label="More"]')).toBeNull();
+    // The menu holds only the past conversations.
+    click(el.querySelector('.pane-head button[aria-label="More"]'));
+    expect([...el.querySelectorAll('[role="menuitem"]')].map((x) => x.textContent)).toEqual(['Past conversations']);
   });
 });

@@ -129,12 +129,18 @@ describe('the conversation with an agent', () => {
     api = fakeApi({ ...listing(runs), 'GET /v1/runs/run-new': runs[0], 'GET /v1/runs/run-old': runs[1] });
     const el = mount(<AgentChat agent="reviewer" />);
     await settle();
-    const fresh = keyNamed(el, 'New conversation')!;
-    expect(fresh.hasAttribute('disabled')).toBe(false);
-    click(fresh);
+    const menu = () => {
+      click(el.querySelector('.pane-head button[aria-label="More"]'));
+      return [...document.querySelectorAll('[role="menuitem"]')] as HTMLElement[];
+    };
+    let items = menu();
+    expect(items.map((x) => x.textContent)).toEqual(['New conversation', 'Past conversations', 'Make this a duty']);
+    click(items[0]);
     expect(sessionStorage.getItem('fw.bossmode.agentrun.reviewer')).toBeNull();
-    expect(keyNamed(el, 'New conversation')!.hasAttribute('disabled')).toBe(true);
-    click(el.querySelector('button[aria-label="Past conversations"]'));
+    // A new conversation has nothing to start again or to make a duty of.
+    items = menu();
+    expect(items.map((x) => x.textContent)).toEqual(['Past conversations']);
+    click(items[0]);
     await settle();
     expect(rowTitles()).toEqual(['Now', 'Before']);
     click([...document.querySelectorAll('dialog.past-dialog .past-row')][1]);
