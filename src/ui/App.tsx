@@ -9,7 +9,7 @@
 
 import type { ComponentChildren } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { clearToken, getToken, setToken, setUnauthorizedHandler, type SigninNeeded } from '../api/client';
+import { clearToken, getToken, scheduleRenewal, setToken, setUnauthorizedHandler, stopRenewal, type SigninNeeded } from '../api/client';
 import { afterUnauthorized, clearSigninMarks, markSignedOut, sessionStore } from '../api/auth';
 import { api } from '../api/routes';
 import { store, useSelect } from '../state/store';
@@ -274,6 +274,7 @@ export function App() {
       const me = await api.whoami();
       tokenTry = false;
       clearSigninMarks();
+      scheduleRenewal();
       store.dispatch({ type: 'me', me });
       setAuth({ kind: 'ready' });
       const cfg = await api.config().catch(() => null);
@@ -312,11 +313,18 @@ export function App() {
     // keeps six connections per host, and the streams of a few reloads in a
     // row starved the reads of the next page.
     const onHide = () => stopStream();
+    // A browser slows the timers of a tab out of view, so the renewal of
+    // the token is planned again when the tab comes back.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') scheduleRenewal();
+    };
     addEventListener('pageshow', onShow);
     addEventListener('pagehide', onHide);
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
       removeEventListener('pageshow', onShow);
       removeEventListener('pagehide', onHide);
+      document.removeEventListener('visibilitychange', onVisible);
       stopStream();
     };
   }, []);
@@ -363,6 +371,7 @@ export function App() {
 
   const signOut = () => {
     stopStream();
+    void stopRenewal();
     clearToken();
     markSignedOut();
     forgetFaces();

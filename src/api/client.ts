@@ -133,6 +133,105 @@ export function setUnauthorizedHandler(f: (e: SigninNeeded) => void): void {
   onUnauthorized = f;
 }
 
+/** The route of the workbench that renews the token of a browser sign-in. */
+export const REFRESH_PATH = '/ui/refresh';
+
+/**
+ * RENEW_EARLY_MS is how long before its expiry the page renews a token. A
+ * token that lives less than twice as long renews at half of its life.
+ */
+export const RENEW_EARLY_MS = 60_000;
+
+/** MAX_WAIT_MS is the longest wait of one timer. A longer wait overflows it. */
+const MAX_WAIT_MS = 86_400_000;
+
+/**
+ * tokenExpiry returns the time when a JWT expires, in milliseconds, or 0
+ * when the token is not a JWT or names no expiry. The page reads the claim
+ * only to plan the renewal. The server checks the token.
+ */
+export function tokenExpiry(token: string): number {
+  const parts = token.split('.');
+  if (parts.length !== 3) return 0;
+  try {
+    const exp = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))).exp;
+    return typeof exp === 'number' && exp > 0 ? exp * 1000 : 0;
+  } catch {
+    return 0;
+  }
+}
+
+let renewing: Promise<boolean> | null = null;
+let renewTimer: ReturnType<typeof setTimeout> | undefined;
+let renewOn = true;
+
+/**
+ * renewToken asks the workbench for a new token of the browser sign-in and
+ * keeps it. It returns false when the browser has no sign-in to renew, or
+ * after stopRenewal. Calls at the same time share one request.
+ */
+export function renewToken(): Promise<boolean> {
+  if (!renewOn) return Promise.resolve(false);
+  if (!renewing) {
+    renewing = (async () => {
+      try {
+        const res = await fetchImpl(REFRESH_PATH, { method: 'POST', headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+        if (!res.ok) return false;
+        const v = (await res.json()) as { token?: unknown };
+        if (!renewOn || !v || typeof v.token !== 'string' || !v.token) return false;
+        setToken(v.token);
+        scheduleRenewal();
+        return true;
+      } catch {
+        return false;
+      }
+    })().finally(() => {
+      renewing = null;
+    });
+  }
+  return renewing;
+}
+
+/**
+ * scheduleRenewal plans the renewal of the token of this tab before it
+ * expires. A token with no known expiry, or one that the clock of the
+ * browser already calls expired, renews only after a 401.
+ */
+export function scheduleRenewal(now = Date.now()): void {
+  if (renewTimer !== undefined) clearTimeout(renewTimer);
+  renewTimer = undefined;
+  if (!renewOn) return;
+  const left = tokenExpiry(getToken()) - now;
+  if (left <= 0) return;
+  const wait = left - Math.min(RENEW_EARLY_MS, left / 2);
+  renewTimer = setTimeout(() => {
+    renewTimer = undefined;
+    if (wait > MAX_WAIT_MS) scheduleRenewal();
+    else void renewToken();
+  }, Math.min(wait, MAX_WAIT_MS));
+}
+
+/**
+ * stopRenewal ends the renewals of this tab and tells the workbench to
+ * forget the sign-in of the browser, as a sign-out does. A new load of the
+ * page starts them again.
+ */
+export async function stopRenewal(): Promise<void> {
+  renewOn = false;
+  if (renewTimer !== undefined) clearTimeout(renewTimer);
+  renewTimer = undefined;
+  try {
+    await fetchImpl(REFRESH_PATH, { method: 'DELETE', credentials: 'same-origin' });
+  } catch {
+    // The cookie then ends with the browser session or the refresh token.
+  }
+}
+
+/** resumeRenewal lets a test start the renewals again after stopRenewal. */
+export function resumeRenewal(): void {
+  renewOn = true;
+}
+
 export interface CallOptions {
   method?: string;
   /** A JSON body, or a string or Blob sent as it is. */
@@ -140,6 +239,8 @@ export interface CallOptions {
   headers?: Record<string, string>;
   accept?: string;
   signal?: AbortSignal;
+  /** Set on the second try after a renewal, so a 401 renews only once. */
+  renewed?: boolean;
 }
 
 /** authHeaders is the Authorization header of the token, or nothing. */
@@ -161,8 +262,10 @@ async function readProblem(res: Response): Promise<Problem | null> {
 }
 
 /**
- * send makes one call and returns the answer. A 401 throws SigninNeeded and
- * calls the handler of the app. Any other failure throws ApiError.
+ * send makes one call and returns the answer. After a 401 it renews the
+ * token of the browser sign-in and tries once more. A 401 that stays
+ * throws SigninNeeded and calls the handler of the app. Any other failure
+ * throws ApiError.
  */
 export async function send(path: string, opts: CallOptions = {}): Promise<Response> {
   if (!path.startsWith('/')) throw new Error('The page calls only its own origin.');
@@ -184,6 +287,7 @@ export async function send(path: string, opts: CallOptions = {}): Promise<Respon
     throw new ApiError(0, null);
   }
   if (res.status === 401) {
+    if (!opts.renewed && (await renewToken())) return send(path, { ...opts, renewed: true });
     const err = new SigninNeeded(await readProblem(res), path);
     onUnauthorized(err);
     throw err;

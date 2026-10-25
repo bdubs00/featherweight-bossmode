@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { SseParser, openStream, toEvent } from './stream';
 import type { StreamEvent } from './types';
 
@@ -168,6 +168,30 @@ describe('openStream', () => {
     expect(got).toBe('/ui/signin');
     expect(calls).toBe(1);
     expect(statuses[statuses.length - 1]).toBe('closed');
+  });
+
+  it('renews the token after a 401 and connects again', async () => {
+    let calls = 0;
+    const unauthorized = vi.fn();
+    const got = await new Promise<string>((resolve) => {
+      const h = openStream({
+        onEvent: (e) => {
+          resolve(e.kind);
+          h.close();
+        },
+        onUnauthorized: unauthorized,
+        renew: async () => true,
+        sleep: () => Promise.resolve(),
+        fetch: async () => {
+          calls++;
+          if (calls === 1) return new Response(JSON.stringify({ status: 401, signin: '/ui/signin' }), { status: 401 });
+          return stream(['event: hello\ndata: {}\n\n']);
+        },
+      });
+    });
+    expect(got).toBe('hello');
+    expect(calls).toBe(2);
+    expect(unauthorized).not.toHaveBeenCalled();
   });
 
   it('names the build of the page that the front serves at each start of the stream', async () => {

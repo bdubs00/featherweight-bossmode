@@ -12,6 +12,12 @@ import {
   setToken,
   setUnauthorizedHandler,
   TOKEN_KEY,
+  REFRESH_PATH,
+  renewToken,
+  resumeRenewal,
+  scheduleRenewal,
+  stopRenewal,
+  tokenExpiry,
   type FetchLike,
 } from './client';
 import { afterUnauthorized, signinAddress, SIGNIN_AT_KEY, SIGNED_OUT_KEY, LOOP_MS, type Storage } from './auth';
@@ -133,6 +139,110 @@ describe('call', () => {
   it('answers null for 204', async () => {
     answer = () => new Response(null, { status: 204 });
     expect(await call('/v1/bridges/x/read', { method: 'PUT', body: { seq: 1 } })).toBeNull();
+  });
+});
+
+/** jwt is a token with an exp claim in seconds and a fake signature. */
+function jwt(expSeconds: number): string {
+  const b64 = (v: string) => btoa(v).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return b64('{"alg":"RS256"}') + '.' + b64(JSON.stringify({ sub: 'carol', exp: expSeconds })) + '.c2ln';
+}
+
+describe('the renewal of the token', () => {
+  let seen: { url: string; method: string; auth: string }[] = [];
+  let answers: Record<string, () => Response>;
+  let old: FetchLike;
+
+  beforeEach(() => {
+    sessionStorage.clear();
+    seen = [];
+    answers = {};
+    setUnauthorizedHandler(() => {});
+    old = setFetch(async (url, init) => {
+      const method = (init && init.method) || 'GET';
+      const auth = String(((init && init.headers) as Record<string, string> | undefined)?.Authorization || '');
+      seen.push({ url, method, auth });
+      const a = answers[method + ' ' + url];
+      return a ? a() : json(404, { status: 404 });
+    });
+  });
+  afterEach(() => {
+    setFetch(old);
+    resumeRenewal();
+    vi.useRealTimers();
+  });
+
+  it('reads the expiry of a JWT, and nothing from another token', () => {
+    expect(tokenExpiry(jwt(1893456000))).toBe(1893456000_000);
+    expect(tokenExpiry('opaque')).toBe(0);
+    expect(tokenExpiry('a.b.c')).toBe(0);
+  });
+
+  it('renews after a 401 and tries the call once more with the new token', async () => {
+    const handler = vi.fn();
+    setUnauthorizedHandler(handler);
+    setToken('old');
+    let n = 0;
+    answers['GET /v1/bridges'] = () => (n++ === 0 ? json(401, { status: 401, signin: '/ui/signin' }) : json(200, { bridges: [] }));
+    answers['POST ' + REFRESH_PATH] = () => json(200, { token: 'new', expiresAt: '2030-01-01T00:00:00Z' });
+    expect(await call('/v1/bridges')).toEqual({ bridges: [] });
+    expect(getToken()).toBe('new');
+    expect(seen.map((s) => s.method + ' ' + s.url + ' ' + s.auth)).toEqual(['GET /v1/bridges Bearer old', 'POST /ui/refresh ', 'GET /v1/bridges Bearer new']);
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('renews once, and a 401 that stays reaches the handler', async () => {
+    const handler = vi.fn();
+    setUnauthorizedHandler(handler);
+    answers['GET /v1/whoami'] = () => json(401, { status: 401, signin: '/ui/signin' });
+    answers['POST ' + REFRESH_PATH] = () => json(200, { token: 'new' });
+    const err = await failure(call('/v1/whoami'));
+    expect(err).toBeInstanceOf(SigninNeeded);
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(seen.filter((s) => s.url === REFRESH_PATH)).toHaveLength(1);
+  });
+
+  it('sends one renewal for calls at the same time', async () => {
+    let n = 0;
+    answers['GET /v1/a'] = () => (n++ < 2 ? json(401, { status: 401 }) : json(200, {}));
+    answers['POST ' + REFRESH_PATH] = () => json(200, { token: 'new' });
+    await Promise.all([call('/v1/a'), call('/v1/a')]);
+    expect(seen.filter((s) => s.url === REFRESH_PATH)).toHaveLength(1);
+  });
+
+  it('gives up without a sign-in to renew', async () => {
+    answers['POST ' + REFRESH_PATH] = () => json(401, { status: 401, signin: '/ui/signin' });
+    expect(await renewToken()).toBe(false);
+    expect(getToken()).toBe('');
+  });
+
+  it('stops after a sign-out and tells the workbench to forget the sign-in', async () => {
+    answers['DELETE ' + REFRESH_PATH] = () => new Response(null, { status: 204 });
+    answers['POST ' + REFRESH_PATH] = () => json(200, { token: 'new' });
+    await stopRenewal();
+    expect(await renewToken()).toBe(false);
+    expect(seen.map((s) => s.method + ' ' + s.url)).toEqual(['DELETE /ui/refresh']);
+  });
+
+  it('renews a minute before the token expires', async () => {
+    vi.useFakeTimers();
+    const now = Date.now();
+    setToken(jwt(Math.floor(now / 1000) + 300));
+    answers['POST ' + REFRESH_PATH] = () => json(200, { token: 'renewed' });
+    scheduleRenewal(now);
+    await vi.advanceTimersByTimeAsync(230_000);
+    expect(seen).toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(seen.map((s) => s.method + ' ' + s.url)).toEqual(['POST /ui/refresh']);
+    expect(getToken()).toBe('renewed');
+  });
+
+  it('plans nothing for a token without an expiry', async () => {
+    vi.useFakeTimers();
+    setToken('opaque');
+    scheduleRenewal();
+    await vi.advanceTimersByTimeAsync(86_400_000 * 2);
+    expect(seen).toHaveLength(0);
   });
 });
 

@@ -2,7 +2,7 @@
 // bearer token, so the page reads the server-sent events over fetch and
 // parses them here. A lost stream connects again with Last-Event-ID.
 
-import { authHeaders, SigninNeeded, ApiError, type FetchLike, type Problem } from './client';
+import { authHeaders, renewToken, SigninNeeded, ApiError, type FetchLike, type Problem } from './client';
 import type { StreamEvent } from './types';
 
 /** One message of the event stream format, before its data is parsed. */
@@ -108,6 +108,8 @@ export interface StreamOptions {
   onEvent: (e: StreamEvent) => void;
   onStatus?: (s: StreamStatus) => void;
   onUnauthorized?: (e: SigninNeeded) => void;
+  /** Renews the token after a 401, and says whether it did. The default is renewToken. */
+  renew?: () => Promise<boolean>;
   /** Gets the build of the page that the front serves, or "", at each start of the stream. */
   onBuild?: (build: string) => void;
   fetch?: FetchLike;
@@ -137,11 +139,13 @@ export const QUIET_MS = 5000;
 
 /**
  * openStream reads the stream until close. After an error or an end, it
- * waits and connects again with Last-Event-ID. A 401 stops it.
+ * waits and connects again with Last-Event-ID. A 401 that a renewal of the
+ * token does not cure stops it.
  */
 export function openStream(opts: StreamOptions): StreamHandle {
   const url = opts.url || '/v1/bossmode/stream';
   const doFetch = opts.fetch || ((i, init) => fetch(i, init));
+  const renew = opts.renew || renewToken;
   const backoff = opts.backoff || BACKOFF;
   const sleep = opts.sleep || ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const now = opts.now || (() => Date.now());
@@ -150,11 +154,13 @@ export function openStream(opts: StreamOptions): StreamHandle {
   let closed = false;
   const status = (s: StreamStatus) => opts.onStatus && opts.onStatus(s);
 
-  async function once(): Promise<boolean> {
+  async function once(mayRenew = true): Promise<boolean> {
     const headers: Record<string, string> = { Accept: 'text/event-stream', ...authHeaders() };
     if (lastId) headers['Last-Event-ID'] = lastId;
     const res = await doFetch(url, { headers, signal: ctl.signal, cache: 'no-store', credentials: 'same-origin' });
     if (res.status === 401) {
+      // A token that expired renews, and the stream connects again with it.
+      if (mayRenew && (await renew())) return once(false);
       let p: Problem | null = null;
       try {
         p = (await res.json()) as Problem;
