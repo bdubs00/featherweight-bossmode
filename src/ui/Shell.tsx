@@ -89,14 +89,13 @@ const THEMES: [ThemeChoice, string][] = [
  * AccountMenu is the account key at the foot of the app bar: the name of
  * the person, the theme, Where to reach me, Connections, and Sign out.
  * ArrowUp and ArrowDown move in the menu, and Escape closes it and gives the
- * focus back. Where to reach me opens a dialog, which gives the focus back
- * to the account key when it closes.
+ * focus back. Where to reach me asks the shell to open its dialog, which
+ * gives the focus back to the account key when it closes.
  */
-function AccountMenu({ onSignOut }: { onSignOut: () => void }) {
+function AccountMenu({ onSignOut, onReach }: { onSignOut: () => void; onReach: () => void }) {
   const me = useSelect((s) => s.me);
   const choice = useChoice();
   const [open, setOpen] = useState(false);
-  const [notify, setNotify] = useState(false);
   const btn = useRef<HTMLButtonElement>(null);
   const list = useRef<HTMLDivElement>(null);
   const subject = (me && me.principal && me.principal.subject) || '';
@@ -166,7 +165,7 @@ function AccountMenu({ onSignOut }: { onSignOut: () => void }) {
             role="menuitem"
             onClick={() => {
               close();
-              setNotify(true);
+              onReach();
             }}
           >
             <span class="t">Where to reach me</span>
@@ -186,7 +185,6 @@ function AccountMenu({ onSignOut }: { onSignOut: () => void }) {
           </button>
         </div>
       )}
-      {notify && <Notifications onClose={() => setNotify(false)} />}
     </div>
   );
 }
@@ -200,8 +198,8 @@ export function placesOf(config: BossConfig | null): PlaceItem[] {
   return config && config.routines !== false ? PLACES : PLACES.filter((it) => it.id !== 'routines');
 }
 
-/** AppBar is the column of places: the logo well, the places, and the account. */
-export function AppBar({ route, onSignOut }: { route: Route; onSignOut: () => void }) {
+/** AppBar is the column of places: the logo well, the places, and the account. onReach opens Where to reach me. */
+export function AppBar({ route, onSignOut, onReach }: { route: Route; onSignOut: () => void; onReach: () => void }) {
   const place = placeOf(route);
   const config = useSelect((s) => s.config);
   // The count on Activity is the number of members that need you, over the open bridges.
@@ -228,7 +226,7 @@ export function AppBar({ route, onSignOut }: { route: Route; onSignOut: () => vo
           );
         })}
       </div>
-      <AccountMenu onSignOut={onSignOut} />
+      <AccountMenu onSignOut={onSignOut} onReach={onReach} />
     </nav>
   );
 }
@@ -392,13 +390,20 @@ export function shownOf(focus: Column, hasList: boolean, hasDetails: boolean): C
 export function Shell({ route, list, main, details, notice, onSignOut }: ShellProps) {
   const place = placeOf(route);
   const shown = shownOf(columnOf(route), !!list, !!details);
+  // The shell holds Where to reach me, and the app bar only opens it. A
+  // narrow window hides the app bar while it shows the main pane or the
+  // details. A modal dialog in a hidden element stays open but shows
+  // nothing, and the rest of the page takes no click. Outside the app bar,
+  // the dialog and its draft stay in sight when the width of the window
+  // crosses 800 pixels.
+  const [reach, setReach] = useState(false);
   // Each place remembers its last address for the app bar.
   useEffect(() => {
     lastOf[place] = location.hash || '#';
   });
   return (
     <div class="shell" data-show={shown} data-place={place} data-list={list ? '1' : '0'} data-details={details ? '1' : '0'}>
-      <AppBar route={route} onSignOut={onSignOut} />
+      <AppBar route={route} onSignOut={onSignOut} onReach={() => setReach(true)} />
       {list && (
         <section class="pane pane-list" aria-label="List">
           {list}
@@ -413,6 +418,7 @@ export function Shell({ route, list, main, details, notice, onSignOut }: ShellPr
           {details}
         </aside>
       )}
+      {reach && <Notifications onClose={() => setReach(false)} />}
     </div>
   );
 }

@@ -1,8 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import type { Fleet, NotifyChannel, NotifyRead, NotifySettings, Whoami } from '../api/types';
+import type { Route as Address } from '../lib/route';
 import { store } from '../state/store';
-import { AppBar } from './Shell';
+import shellCss from '../styles/shell.css?raw';
+import { Shell } from './Shell';
 import { Notifications } from './Notifications';
 import { click, fakeApi, fieldOf, keyNamed, mount, settle, typeIn, unmountAll, type Call } from './testkit-c';
 
@@ -73,15 +76,50 @@ async function open(read: object = READ, more: Record<string, unknown> = {}) {
   await settle();
 }
 
+/** shellAt draws the shell of an address, with a list and a main pane, as the page draws Activity. */
+const shellAt = (route: Address) => <Shell route={route} list={<p>list</p>} main={<p>main</p>} details={null} onSignOut={() => {}} />;
+
+/** reach opens Where to reach me from the account menu of a shell. */
+function reach(el: HTMLElement): HTMLButtonElement {
+  const key = el.querySelector('.account-key') as HTMLButtonElement;
+  click(key);
+  const item = [...el.querySelectorAll('[role="menuitem"]')].find((x) => x.textContent === 'Where to reach me') as HTMLElement;
+  expect(item).toBeTruthy();
+  click(item);
+  return key;
+}
+
+/**
+ * hiddenOnPhone names each rule of a narrow window that hides an element or
+ * an element that holds it: each selector of shell.css under the width of
+ * a phone whose rule says display: none.
+ */
+function hiddenOnPhone(el: Element): string[] {
+  const at = shellCss.indexOf('@media (max-width: 799px) {');
+  expect(at).toBeGreaterThan(-1);
+  let depth = 0;
+  let end = at;
+  for (let i = shellCss.indexOf('{', at); i < shellCss.length; i++) {
+    if (shellCss[i] === '{') depth++;
+    else if (shellCss[i] === '}' && --depth === 0) {
+      end = i;
+      break;
+    }
+  }
+  const block = shellCss.slice(shellCss.indexOf('{', at) + 1, end).replace(/\/\*[\s\S]*?\*\//g, '');
+  const out: string[] = [];
+  for (const m of block.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+    if (!/display:\s*none/.test(m[2])) continue;
+    for (const sel of m[1].split(',').map((x) => x.trim())) if (el.closest(sel)) out.push(sel);
+  }
+  return out;
+}
+
 describe('the account menu', () => {
   it('opens Where to reach me in a dialog, and gives the focus back to the account key when it closes', async () => {
     api = fakeApi({ 'GET /v1/notifications': READ });
-    const el = mount(<AppBar route={{ place: 'home' }} onSignOut={() => {}} />);
-    const key = el.querySelector('.account-key') as HTMLButtonElement;
-    click(key);
-    const item = [...el.querySelectorAll('[role="menuitem"]')].find((x) => x.textContent === 'Where to reach me') as HTMLElement;
-    expect(item).toBeTruthy();
-    click(item);
+    const el = mount(shellAt({ place: 'home' }));
+    const key = reach(el);
     await settle();
     expect(el.querySelector('.menu-account')).toBeNull();
     expect(outer()).toBeTruthy();
@@ -92,6 +130,28 @@ describe('the account menu', () => {
     await settle();
     expect(dialogs()).toEqual([]);
     expect(document.activeElement).toBe(key);
+  });
+
+  it('keeps Where to reach me open, with its draft, when the window crosses the width of a phone', async () => {
+    api = fakeApi({ 'GET /v1/notifications': READ });
+    // A wide window shows the app bar beside the main pane of an item.
+    const el = mount(shellAt({ place: 'activity', item: 'k' }));
+    expect(el.querySelector('.shell')!.getAttribute('data-show')).toBe('main');
+    reach(el);
+    await settle();
+    click(sw(outer(), 'Hold notifications at night'));
+    const dialog = outer();
+    // A phone hides the app bar beside the main pane. The dialog sits outside it, so it stays in sight.
+    expect(el.querySelector('.appbar')!.contains(dialog)).toBe(false);
+    expect(hiddenOnPhone(dialog)).toEqual([]);
+    // The phone goes back to the list and on to the item again. The same dialog keeps the draft.
+    for (const route of [{ place: 'activity' }, { place: 'activity', item: 'k' }] as Address[]) {
+      act(() => render(shellAt(route), el));
+      expect(outer()).toBe(dialog);
+      expect(sw(dialog, 'Hold notifications at night').checked).toBe(true);
+      expect(hiddenOnPhone(dialog)).toEqual([]);
+    }
+    expect(puts()).toEqual([]);
   });
 });
 
