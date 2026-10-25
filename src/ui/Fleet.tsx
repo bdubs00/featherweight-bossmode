@@ -178,27 +178,63 @@ export function OrphanNote() {
   );
 }
 
-/** FOLDED_KEY is the key under which this browser keeps the groups that the person folded. */
-export const FOLDED_KEY = 'fw.bossmode.fleet.folded';
+/** FOLD_KEY is the key under which this browser keeps the choices of the person about the groups of the people list. */
+export const FOLD_KEY = 'fw.bossmode.fleet.fold';
 
-/** groupKey names a group in the folded list: the id of its bridge, or none for Not on a bridge. */
+/** ATTENTION holds the statuses that open a group: the words of a member that the person must look at. */
+export const ATTENTION = ['needs you', 'error', 'failed', 'at its limit'];
+
+/** groupKey names a group: the id of its bridge, or none for Not on a bridge. */
 const groupKey = (g: PeopleGroup): string => g.key || 'none';
 
-/** readFolded returns the folded groups of this browser. A browser without storage folds nothing. */
-export function readFolded(): Set<string> {
+/** attentionRows are the rows of a group that the person must look at, the most urgent first. */
+const attentionRows = (rows: PersonRow[]): PersonRow[] =>
+  rows.filter((r) => r.light && !r.light.struck && ATTENTION.includes(r.light.word)).sort((a, b) => ATTENTION.indexOf(a.light!.word) - ATTENTION.indexOf(b.light!.word));
+
+/**
+ * A FoldChoice is a click of the person on the key of a group: open or
+ * not, and whether the group needed attention at that moment. A choice
+ * holds while the group keeps that state of attention.
+ */
+export interface FoldChoice {
+  open: boolean;
+  attention: boolean;
+}
+
+/**
+ * groupOpen decides whether a group shows its members. A group is folded
+ * unless a member needs attention. A choice of the person wins while the
+ * group keeps the state of attention of that moment, so a quiet group that
+ * the person opened stays open, and a group that starts to need attention
+ * opens again.
+ */
+export function groupOpen(choice: FoldChoice | undefined, attention: boolean): boolean {
+  if (choice && choice.attention === attention) return choice.open;
+  return attention;
+}
+
+/** readChoices returns the choices of this browser. A browser without storage has none. */
+export function readChoices(): Record<string, FoldChoice> {
   try {
-    const v = JSON.parse(localStorage.getItem(FOLDED_KEY) || '[]');
-    return new Set(Array.isArray(v) ? v.filter((k): k is string => typeof k === 'string') : []);
+    const v = JSON.parse(localStorage.getItem(FOLD_KEY) || '{}');
+    const out: Record<string, FoldChoice> = {};
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      for (const [k, c] of Object.entries(v as Record<string, unknown>)) {
+        const o = c as Partial<FoldChoice> | null;
+        if (o && typeof o.open === 'boolean' && typeof o.attention === 'boolean') out[k] = { open: o.open, attention: o.attention };
+      }
+    }
+    return out;
   } catch {
-    return new Set();
+    return {};
   }
 }
 
-/** keepFolded remembers the folded groups. The list of a browser without storage unfolds at the next load. */
-function keepFolded(keys: Set<string>): void {
+/** keepChoices remembers the choices. The list of a browser without storage falls back to the default at the next load. */
+function keepChoices(choices: Record<string, FoldChoice>): void {
   try {
-    if (keys.size) localStorage.setItem(FOLDED_KEY, JSON.stringify([...keys]));
-    else localStorage.removeItem(FOLDED_KEY);
+    if (Object.keys(choices).length) localStorage.setItem(FOLD_KEY, JSON.stringify(choices));
+    else localStorage.removeItem(FOLD_KEY);
   } catch {
     // No storage.
   }
@@ -208,8 +244,8 @@ function keepFolded(keys: Set<string>): void {
 function PeopleGroupView({ g, sel, shut, onFold }: { g: PeopleGroup; sel: string; shut: boolean; onFold: () => void }) {
   const key = groupKey(g);
   const rows = shut ? g.rows.filter((r) => r.key === sel) : g.rows;
-  // A folded group still says when a member that it hides needs the person.
-  const waiting = shut ? g.rows.filter((r) => r.key !== sel && r.light && r.light.word === 'needs you') : [];
+  // A folded group still shows the most urgent status of a member that it hides.
+  const waiting = shut ? attentionRows(g.rows.filter((r) => r.key !== sel)) : [];
   return (
     <div class="people-group" role="group" aria-labelledby={'pg-' + key}>
       <div class="people-head" id={'pg-' + key}>
@@ -231,7 +267,9 @@ function PeopleGroupView({ g, sel, shut, onFold }: { g: PeopleGroup; sel: string
         ) : (
           <span class="people-title muted clip">{g.title}</span>
         )}
-        {waiting.length > 0 && <Led tone={waiting[0].light!.tone} word="needs you" label={waiting.length === 1 ? '1 member needs you' : waiting.length + ' members need you'} />}
+        {waiting.length > 0 && (
+          <Led tone={waiting[0].light!.tone} word={waiting[0].light!.word} label={waiting.length === 1 ? '1 hidden member needs attention' : waiting.length + ' hidden members need attention'} />
+        )}
         <span class="people-count" aria-label={g.count === 1 ? '1 member' : g.count + ' members'}>
           {g.count}
         </span>
@@ -259,14 +297,19 @@ export function FleetList({ current, member }: { current?: string; member?: stri
   const list = useRoving<HTMLDivElement>();
   const count = peopleCount(groups);
   const sel = member ? 'seat:' + member : current ? 'agent:' + current : '';
-  // The folded groups of this browser. A search shows every match.
-  const [folded, setFolded] = useState(readFolded);
-  const fold = (key: string) => {
-    const next = new Set(folded);
-    if (next.has(key)) next.delete(key);
-    else next.add(key);
-    setFolded(next);
-    keepFolded(next);
+  // The choices of this browser about the groups. A search shows every match.
+  const [choices, setChoices] = useState(readChoices);
+  const isOpen = (g: PeopleGroup) => groupOpen(choices[groupKey(g)], attentionRows(g.rows).length > 0);
+  const fold = (g: PeopleGroup) => {
+    const key = groupKey(g);
+    const attention = attentionRows(g.rows).length > 0;
+    const open = !isOpen(g);
+    const next = { ...choices };
+    // A click back to the default forgets the choice, so the storage holds only what differs.
+    if (open === attention) delete next[key];
+    else next[key] = { open, attention };
+    setChoices(next);
+    keepChoices(next);
   };
   return (
     <section class="screen people" aria-labelledby="fleet-list-title">
@@ -295,7 +338,7 @@ export function FleetList({ current, member }: { current?: string; member?: stri
       <OrphanNote />
       <div class="scroll" ref={list}>
         {shown.map((g) => (
-          <PeopleGroupView g={g} sel={sel} shut={!q.trim() && folded.has(groupKey(g))} onFold={() => fold(groupKey(g))} />
+          <PeopleGroupView g={g} sel={sel} shut={!q.trim() && !isOpen(g)} onFold={() => fold(g)} />
         ))}
         {!loaded && <p class="people-note">Loading the members.</p>}
         {loaded && groups.length === 0 && (

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { act } from 'preact/test-utils';
-import { FleetList, FOLDED_KEY } from './Fleet';
+import { FleetList, FOLD_KEY, groupOpen } from './Fleet';
 import { Board } from './Board';
 import { FLEET, fakeFetch, mount, seedFleet, unmountAll } from './testkit-b';
 import { settle } from './testkit-a';
@@ -10,9 +10,13 @@ import { store } from '../state/store';
 let restore = () => {};
 
 beforeEach(() => {
+  localStorage.clear();
   restore = fakeFetch([]).restore;
   seedFleet();
 });
+
+/** openQuiet opens the group Not on a bridge, which folds by default, as a click of the person does. */
+const openQuiet = () => localStorage.setItem(FOLD_KEY, JSON.stringify({ none: { open: true, attention: false } }));
 
 afterEach(() => {
   unmountAll();
@@ -46,6 +50,7 @@ describe('the people list', () => {
   });
 
   it('groups the seats under the title of their bridge, then Not on a bridge', () => {
+    openQuiet();
     const el = mount(<FleetList member="b1/migrator-1" />);
     const titles = [...el.querySelectorAll('.people-title')].map((x) => x.textContent);
     expect(titles).toEqual(['Migrate Puppet', 'Not on a bridge']);
@@ -54,6 +59,7 @@ describe('the people list', () => {
   });
 
   it('gives each row its status as a word beside its light', () => {
+    openQuiet();
     const el = mount(<FleetList member="b1/migrator-1" />);
     const words = [...el.querySelectorAll('.person .status-word')].map((x) => x.textContent);
     expect(words).toEqual(['working', 'needs you', 'idle', 'awake']);
@@ -84,59 +90,72 @@ describe('folding a bridge in the people list', () => {
   const foldKey = (el: HTMLElement, i = 0) => el.querySelectorAll('.people-fold')[i] as HTMLButtonElement;
   const click = (b: HTMLElement) => act(() => b.click());
 
-  it('hides the members of a bridge, says that one needs you, and remembers it in this browser', () => {
+  it('folds every group unless a member in it needs attention', () => {
+    // Migrate Puppet holds migrator-2, which needs you. Not on a bridge holds the manager, which is awake.
+    const el = mount(<FleetList />);
+    expect(handles(el)).toEqual(['migrator-1', 'migrator-2', 'reviewer']);
+    expect(foldKey(el, 0).getAttribute('aria-expanded')).toBe('true');
+    expect(foldKey(el, 0).getAttribute('aria-label')).toBe('Hide the members of Migrate Puppet');
+    expect(foldKey(el, 1).getAttribute('aria-expanded')).toBe('false');
+    expect(foldKey(el, 1).getAttribute('aria-label')).toBe('Show the members of Not on a bridge');
+    expect(localStorage.getItem(FOLD_KEY)).toBeNull();
+  });
+
+  it('remembers a quiet group that the person opens, and forgets the choice when the person folds it again', () => {
     let el = mount(<FleetList />);
-    const key = foldKey(el);
-    expect(key.getAttribute('aria-expanded')).toBe('true');
-    expect(key.getAttribute('aria-label')).toBe('Hide the members of Migrate Puppet');
-    click(key);
-    expect(handles(el)).toEqual(['manager']);
-    expect(foldKey(el).getAttribute('aria-expanded')).toBe('false');
-    expect(foldKey(el).getAttribute('aria-label')).toBe('Show the members of Migrate Puppet');
-    // The count stays, and the hidden migrator-2 still asks for the person.
+    click(foldKey(el, 1));
+    expect(handles(el)).toEqual(['migrator-1', 'migrator-2', 'reviewer', 'manager']);
+    expect(JSON.parse(localStorage.getItem(FOLD_KEY)!)).toEqual({ none: { open: true, attention: false } });
+    unmountAll();
+    el = mount(<FleetList />);
+    expect(handles(el)).toContain('manager');
+    click(foldKey(el, 1));
+    expect(handles(el)).not.toContain('manager');
+    expect(localStorage.getItem(FOLD_KEY)).toBeNull();
+  });
+
+  it('folds a group that needs attention on a click, and its heading keeps the most urgent status', () => {
+    const el = mount(<FleetList />);
+    click(foldKey(el, 0));
+    expect(handles(el)).toEqual([]);
     const head = el.querySelector('.people-head')!;
     expect(head.querySelector('.people-count')!.textContent).toBe('3');
     expect(head.querySelector('.status-word')!.textContent).toBe('needs you');
-    expect(JSON.parse(localStorage.getItem(FOLDED_KEY)!)).toEqual(['b1']);
-
-    unmountAll();
-    el = mount(<FleetList />);
-    expect(handles(el)).toEqual(['manager']);
-    click(foldKey(el));
-    expect(handles(el)).toEqual(['migrator-1', 'migrator-2', 'reviewer', 'manager']);
-    expect(el.querySelector('.people-head .status-word')).toBeNull();
-    expect(localStorage.getItem(FOLDED_KEY)).toBeNull();
+    expect(JSON.parse(localStorage.getItem(FOLD_KEY)!)).toEqual({ b1: { open: false, attention: true } });
   });
 
   it('keeps the open member in sight', () => {
-    const el = mount(<FleetList member="b1/migrator-1" />);
-    click(foldKey(el));
-    expect(handles(el)).toEqual(['migrator-1', 'manager']);
-  });
-
-  it('folds the members that sit on no bridge too', () => {
-    const el = mount(<FleetList />);
-    click(foldKey(el, 1));
-    expect(handles(el)).toEqual(['migrator-1', 'migrator-2', 'reviewer']);
-    expect(JSON.parse(localStorage.getItem(FOLDED_KEY)!)).toEqual(['none']);
+    const el = mount(<FleetList current="manager" />);
+    expect(foldKey(el, 1).getAttribute('aria-expanded')).toBe('false');
+    expect(handles(el)).toEqual(['migrator-1', 'migrator-2', 'reviewer', 'manager']);
   });
 
   it('shows every match while the person searches', () => {
-    localStorage.setItem(FOLDED_KEY, JSON.stringify(['b1']));
     const el = mount(<FleetList />);
-    expect(handles(el)).toEqual(['manager']);
     const field = el.querySelector('input[type="search"]') as HTMLInputElement;
     act(() => {
-      field.value = 'migrator';
+      field.value = 'manager';
       field.dispatchEvent(new Event('input', { bubbles: true }));
     });
-    expect(handles(el)).toEqual(['migrator-1', 'migrator-2']);
+    expect(handles(el)).toEqual(['manager']);
   });
 
-  it('folds nothing when the storage of the browser holds something else', () => {
-    localStorage.setItem(FOLDED_KEY, '{"b1": true}');
+  it('falls back to the default when the storage of the browser holds something else', () => {
+    localStorage.setItem(FOLD_KEY, '["b1"]');
     const el = mount(<FleetList />);
-    expect(handles(el)).toEqual(['migrator-1', 'migrator-2', 'reviewer', 'manager']);
+    expect(handles(el)).toEqual(['migrator-1', 'migrator-2', 'reviewer']);
+  });
+
+  it('lets a choice hold while the group keeps its state of attention', () => {
+    // No choice: open only with attention.
+    expect(groupOpen(undefined, false)).toBe(false);
+    expect(groupOpen(undefined, true)).toBe(true);
+    // A quiet group that the person opened stays open while it is quiet, and stays open when it needs attention.
+    expect(groupOpen({ open: true, attention: false }, false)).toBe(true);
+    expect(groupOpen({ open: true, attention: false }, true)).toBe(true);
+    // A group that the person folded while it needed attention stays folded, and folds by default once it is quiet.
+    expect(groupOpen({ open: false, attention: true }, true)).toBe(false);
+    expect(groupOpen({ open: false, attention: true }, false)).toBe(false);
   });
 });
 
