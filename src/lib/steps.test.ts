@@ -57,3 +57,11 @@ describe('stepInputs', () => {
     expect(stepInputs(steps, items)).toEqual([{}, { path: 'new.md' }, { text: 'hi' }, undefined]);
   });
 });
+
+describe('the steps of env', () => {
+  it('name the package and never read the command add as a shell command', () => {
+    expect(stepWords('env', { command: 'add', manager: 'python', package: 'ansible-lint' })).toBe('Added the Python package ansible-lint');
+    expect(stepWords('env', { command: 'remove', manager: 'tools', package: 'jq' })).toBe('Removed the program jq');
+    expect(stepWords('env', { command: 'list' })).toBe('Listed the packages');
+  });
+});

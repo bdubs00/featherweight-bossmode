@@ -76,3 +76,11 @@ describe('ruleText', () => {
     ]);
   });
 });
+
+describe('the rules of env', () => {
+  it('say that the agent asks before a package, once for add and remove', () => {
+    expect(ruleText('env: command=add', [])).toBe('Asks before it adds or removes a package');
+    expect(rulesWords(['env: command=add', 'env: command=remove'], []).map((r) => [r.text, r.raw])).toEqual([['Asks before it adds or removes a package', ['env: command=add', 'env: command=remove']]]);
+    expect(abilitiesOf(['env'], []).map((a) => a.text)).toEqual(['Add and remove packages']);
+  });
+});

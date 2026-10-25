@@ -107,6 +107,8 @@ export function stepOf(it: Item, file?: Item, result?: Item): Step {
   const base = { key: 'step-' + it.seq, at: it.time, ...(result && result.isError ? { isError: true } : {}) };
   const f = file || (it.kind === 'file' ? it : undefined);
   if (f) return { ...base, text: (f.text === 'created' ? 'Created ' : f.text === 'deleted' ? 'Removed ' : 'Edited ') + (f.path || 'a file') };
+  // The command of env, such as add, is no shell command.
+  if (toolBase(it.tool) === 'env') return { ...base, text: stepWords('env', it.input) };
   const cmd = commandOf(it.input);
   if (cmd) return { ...base, text: 'Ran', cmd: cmd.length > 80 ? cmd.slice(0, 79) + '…' : cmd };
   const words = FRONT_WORDS[toolBase(it.tool)];

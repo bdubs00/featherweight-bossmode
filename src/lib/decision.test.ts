@@ -163,3 +163,13 @@ describe('Always allow', () => {
     expect(decisionOf(run('rule: ask ansible.playbook', ''))!.always).toBe(false);
   });
 });
+
+describe('a call of env', () => {
+  const add = { tool: 'env', input: { command: 'add', manager: 'python', package: 'ansible-lint' } };
+  it('has no plan of a command, keeps Allow, and never offers Always allow', () => {
+    expect(planOf(add)).toEqual({ kind: 'none' });
+    expect(briefOf(planOf(add))).toBeNull();
+    expect(verbOf({ ...add, label: 'Manage packages' })).toBe('Allow');
+    expect(alwaysByRule({ tool: 'env', reason: 'default' })).toBe(false);
+  });
+});

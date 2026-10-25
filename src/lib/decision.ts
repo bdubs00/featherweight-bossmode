@@ -5,7 +5,7 @@
 // what a click on its key does, so the person never reads JSON to decide.
 
 import type { Decision, Entry, Result, ResultDecision, Run } from '../api/types';
-import { commandOf, editOf, excerpt, inputFields, toolBase } from './words';
+import { commandOf, editOf, envCallOf, excerpt, inputFields, toolBase } from './words';
 
 /**
  * decisionOf builds the decision that a run waits for: the card of the
@@ -50,6 +50,8 @@ const FLAGS = /^(readonly|read-only|idempotent|destructive|parallel|parallelsafe
  */
 export function alwaysByRule(d: Pick<Decision, 'tool' | 'reason' | 'question' | 'schema'>, onWorker = true): boolean {
   if (!onWorker || !d.tool || d.question || d.schema) return false;
+  // A person approves each package, so env never offers Always allow.
+  if (toolBase(d.tool) === 'env') return false;
   const r = d.reason || '';
   if (r === 'default') return true;
   const m = /^rule: ask (.+)$/.exec(r);
@@ -158,10 +160,13 @@ function textLines(text: string): string[] {
  * fields of its input: the short ones first, each cut to one line, then a
  * text of several lines as a block, such as a playbook, then a map of
  * files by their names, such as the role files of a playbook. The files
- * tool says its change in the sentence of the card, so its plan is none.
+ * tool and the tool env say their change in the sentence of the card, so
+ * their plan is none.
  */
 export function planOf(d: Pick<Decision, 'tool' | 'input'>): Plan {
   const base = toolBase(d.tool);
+  // A call of env says its package in the sentence of the card. Its command, such as add, is no shell command.
+  if (envCallOf(d.tool, d.input)) return { kind: 'none' };
   const v = inputFields(d.input);
   const cmd = commandOf(d.input);
   if (cmd) return { kind: 'command', command: cmd };
@@ -206,14 +211,15 @@ export function planOf(d: Pick<Decision, 'tool' | 'input'>): Plan {
 /**
  * verbOf is the label of the primary key of a card: the action of the call
  * as a verb. The page names the tools that it knows: Open bridge, Write
- * page, and Hand off. A label of the backend, such as Run command, names
- * any other action, and Allow is the last fallback.
+ * page, and Hand off, and env keeps Allow. A label of the backend, such as
+ * Run command, names any other action, and Allow is the last fallback.
  */
 export function verbOf(d: Pick<Decision | ResultDecision, 'tool' | 'label'>): string {
   const base = toolBase(d.tool);
   if (base === 'bridge_open') return 'Open bridge';
   if (base === 'pages_write') return 'Write page';
   if (base === 'spawn_task') return 'Hand off';
+  if (base === 'env') return 'Allow';
   return d.label && d.label !== 'Answer' ? d.label : 'Allow';
 }
 

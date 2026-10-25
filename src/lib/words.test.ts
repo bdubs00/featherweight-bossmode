@@ -49,6 +49,14 @@ describe('decisionTitle', () => {
     expect(decisionTitle('m', d(undefined))).toBe('m asks for your decision');
   });
 
+  it('says the package of a call of env in plain words, with a label of the backend or not', () => {
+    expect(decisionTitle('proxmox-admin', d('env', { command: 'add', manager: 'python', package: 'ansible-lint' }))).toBe('proxmox-admin wants the Python package ansible-lint');
+    expect(decisionTitle('m', d('env', { command: 'add', manager: 'tools', package: 'nodejs>=22' }, 'Manage packages'))).toBe('m wants the program nodejs>=22');
+    expect(decisionTitle('m', d('env', { command: 'remove', manager: 'tools', package: 'jq' }))).toBe('m wants to remove the program jq');
+    expect(decisionTitle('m', d('env', JSON.stringify({ command: 'add', manager: 'python' })))).toBe('m wants a Python package');
+    expect(decisionTitle('m', d('env', { command: 'list' }))).toBe('m wants to list its packages');
+  });
+
   it('reads no shell command in the input of the files tool, which names its operation in command', () => {
     expect(commandOf({ command: 'str_replace', path: 'a.yml' })).toBe('');
     expect(commandOf({ command: 'ls -la' })).toBe('ls -la');
