@@ -462,6 +462,20 @@ export async function loadChats(): Promise<void> {
   store.dispatch({ type: 'chats', runs });
 }
 
+/**
+ * loadManagerChats reads the conversations of the person with the manager
+ * for the list of the Manager place. The list keeps the ones outside a
+ * bridge (conversationsOf).
+ */
+export async function loadManagerChats(): Promise<void> {
+  const s = store.get();
+  const m = s.config && s.config.manager;
+  const me = s.me && s.me.principal ? s.me.principal.subject : '';
+  if (!m || !m.agent) return;
+  const runs = await once('manager-chats', () => api.fleetRuns({ agent: m.agent, principal: me, limit: 200 }));
+  store.dispatch({ type: 'manager-chats', runs });
+}
+
 /** setManagerRun opens a conversation with the manager, or a new one with "". */
 export function setManagerRun(run: string): void {
   const s = store.get();

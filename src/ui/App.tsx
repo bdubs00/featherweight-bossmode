@@ -25,7 +25,7 @@ import { BridgeList } from './BridgeList';
 import { Channel } from './Channel';
 import { Roster } from './Roster';
 import { RunPane } from './RunPane';
-import { Manager } from './Manager';
+import { Manager, ManagerList } from './Manager';
 import { ChatDetails, ChatList, ChatMain, NoChat } from './Chat';
 import { Fleet, AgentPane, FleetList } from './Fleet';
 import { MemberMain, MemberProfile } from './Member';
@@ -152,7 +152,9 @@ function panesOf(r: Route): Panes {
       return { list: <PageTree current={r.path} />, main, details: null };
     }
     case 'manager':
-      return { list: null, main: <Manager />, details: null };
+      // Without a manager in the settings, the place holds one pane that says so.
+      if (!store.get().config || !store.get().config!.manager) return { list: null, main: <Manager />, details: null };
+      return { list: <ManagerList run={r.run} fresh={r.fresh} />, main: <Manager run={r.run} fresh={r.fresh} />, details: null };
     case 'chat': {
       const cfg = store.get().config;
       // Without a quick chat in the settings, the place holds one pane that says so.

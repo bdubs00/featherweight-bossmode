@@ -67,7 +67,7 @@ export interface SkillItem {
 export type Route =
   | { place: 'home' }
   | { place: 'activity'; item?: string }
-  | { place: 'manager' }
+  | { place: 'manager'; run?: string; fresh?: boolean }
   | { place: 'chat'; run?: string; fresh?: boolean; details?: boolean }
   | { place: 'new' }
   | { place: 'bridge'; id: string; pane: 'roster' | 'run' | 'none'; tab?: BridgeTab; run?: string; handle?: string }
@@ -110,7 +110,11 @@ export function parseRoute(hash: string): Route {
     case 'activity':
       // The item is the key of a row of the inbox, such as d:<run>/<approval>.
       return rest.length && rest.join('/') ? { place: 'activity', item: rest.map(dec).join('/') } : { place: 'activity' };
+    // #manager is the newest conversation with the manager, #manager/new a
+    // new one, and #manager/<run> a past one.
     case 'manager':
+      if (rest[0] === 'new') return { place: 'manager', fresh: true };
+      if (rest[0]) return { place: 'manager', run: dec(rest[0]) };
       return { place: 'manager' };
     // #chat is the history, #chat/new a new chat, #chat/<run> a chat, and
     // #chat/<run>/details the details of a chat, for a narrow window.
@@ -200,7 +204,8 @@ export function hrefOf(r: Route): string {
     case 'activity':
       return r.item ? '#activity/' + encPath(r.item) : '#activity';
     case 'manager':
-      return '#manager';
+      if (r.run) return '#manager/' + encodeURIComponent(r.run);
+      return r.fresh ? '#manager/new' : '#manager';
     case 'chat':
       if (r.run) return '#chat/' + encodeURIComponent(r.run) + (r.details ? '/details' : '');
       return r.fresh ? '#chat/new' : '#chat';
@@ -298,6 +303,8 @@ export function columnOf(r: Route): Column {
     case 'chat':
       if (r.run) return r.details ? 'details' : 'main';
       return r.fresh ? 'main' : 'list';
+    case 'manager':
+      return r.run || r.fresh ? 'main' : 'list';
   }
   return 'main';
 }
@@ -329,6 +336,8 @@ export function parentOf(r: Route): Route {
     case 'chat':
       if (r.run && r.details) return { place: 'chat', run: r.run };
       return r.run || r.fresh ? { place: 'chat' } : { place: 'home' };
+    case 'manager':
+      return r.run || r.fresh ? { place: 'manager' } : { place: 'home' };
     case 'pages':
       if (r.mode === 'tree') return { place: 'home' };
       if (r.mode === 'read' && !r.version) return { place: 'pages', mode: 'tree' };

@@ -106,12 +106,13 @@ export function NoChat() {
 
 /* ---------- the history ---------- */
 
-function ChatRow({ r, on }: { r: Run; on: boolean }) {
+/** HistoryRow is one conversation of a history list: its title, its status, and when it started. */
+function HistoryRow({ r, on, href }: { r: Run; on: boolean; href: string }) {
   const light = runStatus(r);
   const title = chatTitle(r);
   const d = new Date(r.createdAt);
   return (
-    <a class={'brow chat-row' + (on ? ' sel strong' : '')} href={hrefOf({ place: 'chat', run: r.id })} data-item aria-current={on ? 'page' : undefined} aria-label={title + ', ' + light.word + ', ' + since(r.createdAt)}>
+    <a class={'brow chat-row' + (on ? ' sel strong' : '')} href={href} data-item aria-current={on ? 'page' : undefined} aria-label={title + ', ' + light.word + ', ' + since(r.createdAt)}>
       <span class="brow-top">
         <span class="brow-title clip">{title}</span>
       </span>
@@ -128,52 +129,74 @@ function ChatRow({ r, on }: { r: Run; on: boolean }) {
   );
 }
 
-/** ChatList is the list pane of the Chat place: the history of the person, newest first, grouped by day. */
-export function ChatList({ current }: { current?: string }) {
-  const chat = useChat();
-  const { runs, loaded } = useHistory(chat);
+/** The words of a history list: its title, the nouns of one and of many rows, and the lines of its states. */
+export interface HistoryWords {
+  title: string;
+  one: string;
+  many: string;
+  find: string;
+  loading: string;
+  empty: string;
+  noMatch: string;
+}
+
+/**
+ * HistoryList is the list pane of a place of conversations, such as Chat
+ * and Manager: the conversations of the person, newest first, grouped by
+ * day, with a field to find one and the key New.
+ */
+export function HistoryList({ id, words, runs, loaded, current, hrefFor, newHref }: { id: string; words: HistoryWords; runs: Run[]; loaded: boolean; current?: string; hrefFor: (r: Run) => string; newHref: string }) {
   const [q, setQ] = useState('');
   const shown = useMemo(() => findChats(runs, q), [runs, q]);
   const groups = useMemo(() => historyGroups(shown), [shown]);
   const list = useRoving<HTMLDivElement>();
   return (
-    <section class="screen chat-list" aria-labelledby="chat-list-title">
+    <section class="screen chat-list" aria-labelledby={id}>
       <PaneHeader
-        id="chat-list-title"
-        title="Chat"
+        id={id}
+        title={words.title}
         count={loaded ? runs.length : undefined}
-        countLabel={runs.length === 1 ? '1 chat' : runs.length + ' chats'}
+        countLabel={runs.length === 1 ? '1 ' + words.one : runs.length + ' ' + words.many}
         actions={
-          <Button href={hrefOf({ place: 'chat', fresh: true })} size="s">
+          <Button href={newHref} size="s">
             New
           </Button>
         }
       />
       <div class="list-find">
-        <Find label="Find a chat" value={q} onInput={setQ} />
+        <Find label={words.find} value={q} onInput={setQ} />
       </div>
       <div class="scroll" ref={list}>
         {groups.map((g, i) => (
-          <div class="chat-day" role="group" aria-labelledby={'chat-day-' + i}>
-            <div class="people-head" id={'chat-day-' + i}>
+          <div class="chat-day" role="group" aria-labelledby={id + '-day-' + i}>
+            <div class="people-head" id={id + '-day-' + i}>
               <span class="people-title muted">{g.day}</span>
             </div>
             <div role="list" class="rows">
               {g.runs.map((r) => (
                 <div role="listitem">
-                  <ChatRow r={r} on={r.id === current} />
+                  <HistoryRow r={r} on={r.id === current} href={hrefFor(r)} />
                 </div>
               ))}
             </div>
           </div>
         ))}
-        {!loaded && runs.length === 0 && <p class="people-note">Loading the chats.</p>}
-        {/* The key New of the header starts a chat, so the empty list holds no second key. */}
-        {loaded && runs.length === 0 && <p class="people-note">No chat yet.</p>}
-        {runs.length > 0 && shown.length === 0 && <p class="people-note">No chat holds those words.</p>}
+        {!loaded && runs.length === 0 && <p class="people-note">{words.loading}</p>}
+        {/* The key New of the header starts a conversation, so the empty list holds no second key. */}
+        {loaded && runs.length === 0 && <p class="people-note">{words.empty}</p>}
+        {runs.length > 0 && shown.length === 0 && <p class="people-note">{words.noMatch}</p>}
       </div>
     </section>
   );
+}
+
+const CHAT_WORDS: HistoryWords = { title: 'Chat', one: 'chat', many: 'chats', find: 'Find a chat', loading: 'Loading the chats.', empty: 'No chat yet.', noMatch: 'No chat holds those words.' };
+
+/** ChatList is the list pane of the Chat place: the history of the person, newest first, grouped by day. */
+export function ChatList({ current }: { current?: string }) {
+  const chat = useChat();
+  const { runs, loaded } = useHistory(chat);
+  return <HistoryList id="chat-list-title" words={CHAT_WORDS} runs={runs} loaded={loaded} current={current} hrefFor={(r) => hrefOf({ place: 'chat', run: r.id })} newHref={hrefOf({ place: 'chat', fresh: true })} />;
 }
 
 /* ---------- the picks of a new chat ---------- */

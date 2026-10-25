@@ -5,7 +5,7 @@ import { forgetManagerRun } from '../state/actions';
 import { managerRunOf } from '../state/reducer';
 import type { BossConfig, Run } from '../api/types';
 import { conversationsOf, FIND_PAST_FROM, PastConversations } from './History';
-import { Manager } from './Manager';
+import { Manager, ManagerList } from './Manager';
 import { AgentChat } from './Fleet';
 import { click, fakeApi, keyNamed, mount, problem, settle, typeIn, unmountAll } from './testkit-c';
 
@@ -60,42 +60,38 @@ describe('the past conversations', () => {
     expect(conversationsOf(runs, 'manager', ME).map((r) => r.id)).toEqual(['b', 'duty', 'a']);
   });
 
-  it('open from the Manager screen, mark the open one, and open a pick there', async () => {
-    api = fakeApi(listing([conv('run-new', { title: 'Plan the k3s upgrade', createdAt: day(22) }), conv('run-old', { title: 'Which hosts run Proxmox?', createdAt: day(20) })]));
-    const el = mount(<Manager />);
+  it('fill the list of the Manager place, newest first, with a link each and the open one marked', async () => {
+    api = fakeApi(listing([conv('run-new', { title: 'Plan the k3s upgrade', createdAt: day(22) }), conv('run-old', { title: 'Which hosts run Proxmox?', createdAt: day(20) }), conv('run-bridge', { metadata: { 'fw.batch': 'bridge:01x' } })]));
+    let el = mount(<ManagerList />);
     await settle();
-    expect(managerRunOf(store.get())).toBe('run-new');
-    click(el.querySelector('button[aria-label="Past conversations"]'));
-    await settle();
-    expect(dialog()).not.toBeNull();
     expect(api.calls.some((c) => c.path === '/v1/fleet/runs?agent=manager&principal=alice%40example.com&limit=200')).toBe(true);
-    expect(dialog()!.querySelector('h2')!.textContent).toBe('Past conversations');
-    expect(dialog()!.textContent).toContain('Your conversations with the manager');
-    expect(rowTitles()).toEqual(['Plan the k3s upgrade', 'Which hosts run Proxmox?']);
-    const open = dialog()!.querySelector('.past-row[aria-current="true"] .brow-title')!;
-    expect(open.textContent).toBe('Plan the k3s upgrade');
-    click([...document.querySelectorAll('dialog.past-dialog .past-row')][1]);
+    expect(el.querySelector('#manager-list-title')!.textContent).toContain('Manager');
+    expect([...el.querySelectorAll('.chip .sr')].map((x) => x.textContent)).toEqual(['2 conversations']);
+    const rows = [...el.querySelectorAll('a.chat-row')];
+    expect(rows.map((a) => a.querySelector('.brow-title')!.textContent)).toEqual(['Plan the k3s upgrade', 'Which hosts run Proxmox?']);
+    expect(rows.map((a) => a.getAttribute('href'))).toEqual(['#manager/run-new', '#manager/run-old']);
+    // Without an address the newest conversation is the open one.
+    expect(el.querySelector('a.chat-row[aria-current="page"]')!.getAttribute('href')).toBe('#manager/run-new');
+    expect(keyNamed(el, 'New')!.getAttribute('href')).toBe('#manager/new');
+    unmountAll();
+    el = mount(<ManagerList run="run-old" />);
     await settle();
-    expect(dialog()).toBeNull();
-    expect(managerRunOf(store.get())).toBe('run-old');
+    expect(el.querySelector('a.chat-row[aria-current="page"]')!.getAttribute('href')).toBe('#manager/run-old');
+    unmountAll();
+    el = mount(<ManagerList fresh />);
+    await settle();
+    expect(el.querySelector('a.chat-row[aria-current="page"]')).toBeNull();
   });
 
-  it('close with Close and with Escape, and pick nothing', async () => {
-    api = fakeApi(listing([conv('run-new')]));
-    const el = mount(<Manager />);
+  it('open the conversation of the address, and follow it up', async () => {
+    api = fakeApi(listing([conv('run-new'), conv('run-old', { title: 'Which hosts run Proxmox?' })]));
+    const el = mount(<Manager run="run-old" />);
     await settle();
-    const key = el.querySelector('button[aria-label="Past conversations"]');
-    click(key);
-    await settle();
-    click(keyNamed(dialog()!, 'Close'));
-    expect(dialog()).toBeNull();
-    click(key);
-    await settle();
-    act(() => {
-      dialog()!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    });
-    expect(dialog()).toBeNull();
-    expect(managerRunOf(store.get())).toBe('run-new');
+    expect(managerRunOf(store.get())).toBe('run-old');
+    // The run of the transcript has no title, so the header names its first message.
+    expect(el.querySelector('#manager-title')!.textContent).toContain('Question run-old');
+    expect(api.calls.some((c) => c.path.startsWith('/v1/runs/run-old/transcript'))).toBe(true);
+    expect(api.calls.some((c) => c.path.startsWith('/v1/runs/run-new/transcript'))).toBe(false);
   });
 
   it('say so when there is none, and when the workbench refuses the list', async () => {

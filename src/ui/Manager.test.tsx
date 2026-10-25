@@ -136,9 +136,10 @@ describe('the manager', () => {
       'GET /v1/runs/run-n/transcript': { run: { ...run('queued', 1), id: 'run-n' }, items: [{ ...ASK, text: 'Hello' }], next: 0, prev: 0 },
       'GET /v1/tools': { tools: [] },
     });
-    const el = mount(<Manager />);
+    // The key New of the list opens #manager/new.
+    const el = mount(<Manager fresh />);
     await settle();
-    click(keyNamed(el, 'New conversation'));
+    expect(el.querySelector('#manager-title')!.textContent).toContain('New conversation');
     expect(el.querySelector('.thread-empty')!.textContent).toBe('Ask about the fleet, or ask for a bridge.');
     typeIn(el.querySelector('#composer'), 'Hello');
     click(keyNamed(el, 'Send'));
@@ -164,7 +165,7 @@ describe('the manager', () => {
       'GET /v1/runs/run-f/transcript': { run: { ...run('queued', 1), id: 'run-f' }, items: [], next: 0, prev: 0 },
       'GET /v1/tools': { tools: [] },
     });
-    const el = mount(<Manager />);
+    let el = mount(<Manager />);
     await settle();
     typeIn(el.querySelector('#composer'), 'Read this');
     pick(el, [new File(['hello'], 'note.txt')]);
@@ -172,7 +173,10 @@ describe('the manager', () => {
     await settle();
     const follow = api.calls.find((c) => c.method === 'POST' && c.path === '/v1/runs/run-m/messages')!;
     expect(follow.body).toEqual({ content: 'Read this', files: [{ name: 'note.txt', data: 'aGVsbG8=' }] });
-    click(keyNamed(el, 'New conversation'));
+    // The key New of the list opens #manager/new.
+    unmountAll();
+    el = mount(<Manager fresh />);
+    await settle();
     pick(el, [new File(['name,role'], 'team.csv')]);
     click(keyNamed(el, 'Send'));
     await settle();

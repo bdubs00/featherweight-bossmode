@@ -1,5 +1,8 @@
-// The conversation of the person with the manager. It opens the newest
-// manager run of the caller, from GET /v1/bossmode. The first message
+// The conversation of the person with the manager, in the layout of the
+// Chat place: the list pane holds the past conversations of the person
+// with the manager, newest first, and the key New. The main pane opens the
+// conversation of the address (#manager/<run>), a new one (#manager/new),
+// or else the newest manager run of the caller, from GET /v1/bossmode. The first message
 // starts a run on the manager Task, which sleeps between messages, so the
 // status says waking until the first answer arrives. A run of the front
 // sends no event on the stream, so the screen reads the run every 3 seconds
@@ -17,7 +20,7 @@ import { useEffect, useMemo, useState } from 'preact/hooks';
 import { api } from '../api/routes';
 import type { AttachedFile, Attachment, Result } from '../api/types';
 import { store, useSelect } from '../state/store';
-import { askManager, ended, loadAgentSkills, setManagerRun } from '../state/actions';
+import { askManager, ended, loadAgentSkills, loadManagerChats, setManagerRun } from '../state/actions';
 import { managerRunOf } from '../state/reducer';
 import { slashCommands } from '../state/people';
 import { parseSlash } from '../lib/mention';
@@ -27,8 +30,11 @@ import { AttachedFiles } from './AttachedFiles';
 import { Avatar, Menu } from './common';
 import { go } from '../lib/route';
 import { askOfRun } from '../lib/duties';
-import { Button, Help, IconButton, Led, Mark, PaneHeader } from './primitives';
-import { PastConversations } from './History';
+import { Help, Led, Mark, PaneHeader } from './primitives';
+import { conversationsOf } from './History';
+import { HistoryList, type HistoryWords } from './Chat';
+import { chatTitle } from '../lib/chat';
+import { hrefOf } from '../lib/route';
 import { Composer } from './Composer';
 import { Conversation, POLL_MS, usePoll, useTranscript } from './Conversation';
 import { FollowBox, Msg, Quiet } from './Thread';
@@ -53,19 +59,53 @@ function NoManager() {
   );
 }
 
-export function Manager() {
+const MANAGER_WORDS: HistoryWords = {
+  title: 'Manager',
+  one: 'conversation',
+  many: 'conversations',
+  find: 'Find a conversation',
+  loading: 'Loading the conversations.',
+  empty: 'No conversation yet.',
+  noMatch: 'No conversation holds those words.',
+};
+
+/** ManagerList is the list pane of the Manager place: the conversations of the person with the manager. */
+export function ManagerList({ run, fresh }: { run?: string; fresh?: boolean }) {
+  const agent = useSelect((s) => (s.config && s.config.manager ? s.config.manager.agent : ''));
+  const me = useSelect((s) => (s.me && s.me.principal ? s.me.principal.subject : ''));
+  const runs = useSelect((s) => s.runs);
+  const loaded = useSelect((s) => s.managerChats.loaded);
+  const picked = useSelect(managerRunOf);
+  useEffect(() => {
+    if (agent) attempt(loadManagerChats);
+  }, [agent, me]);
+  const list = useMemo(() => (agent ? conversationsOf(Object.values(runs), agent, me) : []), [runs, agent, me]);
+  if (!agent) return null;
+  const current = run || (fresh ? '' : picked);
+  return <HistoryList id="manager-list-title" words={MANAGER_WORDS} runs={list} loaded={loaded} current={current} hrefFor={(r) => hrefOf({ place: 'manager', run: r.id })} newHref={hrefOf({ place: 'manager', fresh: true })} />;
+}
+
+export function Manager({ run: routeRun, fresh }: { run?: string; fresh?: boolean } = {}) {
   const config = useSelect((s) => s.config);
   const me = useSelect((s) => (s.me && s.me.principal ? s.me.principal.subject : ''));
   const meName = useSelect((s) => (s.me && s.me.principal ? s.me.principal.name : undefined));
   const manager = config ? config.manager : null;
   const agent = manager ? manager.agent : '';
-  const runId = useSelect(managerRunOf);
+  const picked = useSelect(managerRunOf);
+  // A new conversation shows nothing until its first message starts a run here.
+  const [startedHere, setStartedHere] = useState('');
+  const runId = routeRun || (fresh ? startedHere : picked);
+  // The conversation of the address is the one that a message follows up, and a new one follows up nothing.
+  useEffect(() => {
+    setStartedHere('');
+    if (routeRun) setManagerRun(routeRun);
+    else if (fresh) setManagerRun('');
+  }, [routeRun, fresh]);
   const run = useSelect((s) => (runId ? s.runs[runId] : undefined));
   const skills = useSelect((s) => (s.skills ? s.skills.skills : null));
   const loadable = useSelect((s) => (agent ? s.agentSkills[agent] : undefined));
   const [sent, setSent] = useState<{ text: string; run: string; users: number; files: AttachedFile[] } | null>(null);
   const [res, setRes] = useState<Result | null>(null);
-  const [past, setPast] = useState(false);
 
   useEffect(() => {
     if (agent) loadAgentSkills(agent).catch(() => {});
@@ -117,9 +157,14 @@ export function Manager() {
         const r = await api.runSkill(runId, slash);
         if (r && r.id) store.dispatch({ type: 'run', run: r });
       } else {
-        await askManager(text, files).catch((e) => {
+        const id = await askManager(text, files).catch((e) => {
           throw refusalOf(e, files.length);
         });
+        // A new run gets its own address, so the list marks it and a reload opens it.
+        if (id && id !== runId) {
+          if (fresh) setStartedHere(id);
+          go({ place: 'manager', run: id }, !!fresh);
+        }
       }
     });
     if (!ok) setSent(null);
@@ -152,41 +197,22 @@ export function Manager() {
     <section class="screen manager" aria-labelledby="manager-title">
       <PaneHeader
         id="manager-title"
-        title="Manager"
+        title={run ? chatTitle(run) : sent ? chatTitle({ input: sent.text || sent.files.map((f) => f.name).join(', ') }) : runId || !fresh ? 'Manager' : 'New conversation'}
         size="title"
         level={1}
-        back={{ href: '#', label: 'Bridges', to: 'list' }}
-        lead={<Mark agent={agent} size={36} />}
+        back={{ href: '#manager', label: 'Manager', to: 'list' }}
+        lead={<Mark agent={agent} size={36} label={agent} />}
         actions={
-          <>
-            <IconButton icon="history" label="Past conversations" onClick={() => setPast(true)} />
-            <Button size="s" disabled={!runId && !sent} onClick={() => setManagerRun('')}>
-              New conversation
-            </Button>
-            {runId && (
-              // A conversation becomes a duty that asks the manager the same again.
-              <Menu label="More" items={[{ label: 'Make this a duty', onSelect: () => go({ place: 'duties', fresh: true, seed: { agent, act: 'manager', message: askOfRun(run, t.items) } }) }]} />
-            )}
-          </>
+          runId ? (
+            // A conversation becomes a duty that asks the manager the same again.
+            <Menu label="More" items={[{ label: 'Make this a duty', onSelect: () => go({ place: 'duties', fresh: true, seed: { agent, act: 'manager', message: askOfRun(run, t.items) } }) }]} />
+          ) : undefined
         }
       />
       <FollowBox end={end}>
         {!runId && !sent ? <p class="thread-empty">Ask about the fleet, or ask for a bridge.</p> : <Conversation run={run} result={res} t={t} agentLabel={agent} tail={tail} live={live} />}
       </FollowBox>
       <Composer draft="manager" label="Message to the manager" placeholder="Ask the manager" commands={commands} attach onSend={(text, _to, files) => send(text, files)} />
-      {past && (
-        <PastConversations
-          agent={agent}
-          label="the manager"
-          current={runId}
-          onClose={() => setPast(false)}
-          onPick={(r) => {
-            store.dispatch({ type: 'run', run: r });
-            setManagerRun(r.id);
-            setPast(false);
-          }}
-        />
-      )}
     </section>
   );
 }
