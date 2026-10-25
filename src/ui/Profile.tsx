@@ -5,7 +5,9 @@
 // each worker that the stream keeps, as on every screen. GET
 // /v1/pools/{name} gives only Keep and the gaps. The profile reads it when
 // it opens, and again when the phases of the workers change on the stream.
-// The page never says pool: it says Workers and Keep.
+// The page never says pool: it says Workers and Keep. Where the deployment
+// has a package mirror, an agent that a pool runs also has the section
+// Packages (Packages.tsx).
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
@@ -32,6 +34,8 @@ import { abilitiesOf, rulesWords } from '../lib/tools';
 import { costParts } from '../lib/cost';
 import { useToolCatalog } from '../state/tools';
 import { forgetReads, readCache, useEventRead } from '../state/eventread';
+import { PackagesSection } from './Packages';
+import { poolOfAgent } from '../lib/packages';
 
 const WORKER_HELP = 'A worker runs the work of one agent, one seat at a time. Keep is how many it keeps ready.';
 /** The answers of the pools and of today, kept for the next view of a profile. */
@@ -423,6 +427,10 @@ export function Profile({ agent, back }: { agent: string; back?: { href: string;
   const runs = useSelect((s) => s.runs);
   const channels = useSelect((s) => s.channels);
   const [pool, setPool, today] = usePool(agent);
+  // Packages exist only where the deployment has a package mirror, and only for an agent that a pool runs.
+  const packagesOn = useSelect((s) => !!(s.config && s.config.packages));
+  const listed = useSelect((s) => (s.agents || []).find((a) => a.name === agent && !!a.pool) || (s.agents || []).find((a) => a.name === agent));
+  const packagePool = useSelect((s) => (packagesOn ? poolOfAgent(listed, read, s.fleet, agent) : ''));
   const [edit, setEdit] = useState(false);
   const [said, setSaid] = useState('');
   const [busy, setBusy] = useState(false);
@@ -529,6 +537,7 @@ export function Profile({ agent, back }: { agent: string; back?: { href: string;
         <AgentDuties agent={agent} />
         <Liked agent={agent} />
         <Workers agent={agent} owner={owner} pool={pool} setPool={setPool} />
+        {packagePool && <PackagesSection key={packagePool} agent={agent} pool={packagePool} owner={owner} />}
         <TodaySec agent={agent} today={today} />
       </div>
     </section>

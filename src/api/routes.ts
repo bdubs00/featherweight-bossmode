@@ -33,6 +33,8 @@ import type {
   NotifyTestResult,
   OrphanList,
   OrphanRemoval,
+  Packages,
+  PackagesBody,
   Page,
   PageMeta,
   PageVersion,
@@ -190,6 +192,11 @@ export const api = {
   pool: (name: string) => orNull(call<Pool>(pool(name))),
   /** setKeep changes the number of workers that an agent keeps. Only an owner can. */
   setKeep: (name: string, replicas: number) => call<Pool>(pool(name), { method: 'PATCH', body: { replicas } }),
+  /** getPackages reads the packages of a pool: the setting, the two lists, and the state of each worker. A front without packages answers 404. */
+  getPackages: (name: string) => call<Packages>(pool(name) + '/packages'),
+  /** putPackages replaces the setting and the lists of a pool, or with dryRun checks them and changes nothing. Only an owner can. */
+  putPackages: (name: string, body: PackagesBody, dryRun = false) =>
+    call<Packages>(pool(name) + '/packages' + query({ dryRun: dryRun ? 'true' : undefined }), { method: 'PUT', body }),
   /** removeWorkers removes every worker of an agent. Only an owner can. */
   removeWorkers: (name: string) => call<null>(pool(name), { method: 'DELETE' }),
   /** orphans lists the child Tasks whose parent Task is gone, or null for a person who is no admin and for a front without the list. */

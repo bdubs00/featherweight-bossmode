@@ -763,6 +763,99 @@ a.file {
 .today b {
   font-weight: 700;
 }
+/* Packages: the line of an agent without them, the add row, two short
+   lists with a key per package, the state line with its light, the fold of
+   a failed install, and the note on when a worker gets a change. */
+.pkgs-off {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-2);
+  margin-top: var(--s-2);
+  font-size: var(--t-control);
+  line-height: var(--t-control-lh);
+  color: var(--muted);
+}
+.pkgs-add {
+  display: flex;
+  flex-direction: column;
+  margin-top: var(--s-2);
+}
+.pkgs-add-row {
+  display: flex;
+  gap: var(--s-2);
+}
+.pkgs-add-row .input {
+  flex: 1;
+  min-width: 0;
+}
+.pkgs-kind {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: var(--s-4);
+  font-size: var(--t-control);
+}
+.pkgs-list {
+  margin-top: var(--s-2);
+}
+.pkgs-list-head {
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+  font-weight: 600;
+  color: var(--muted);
+}
+.pkgs-list ul {
+  display: flex;
+  flex-direction: column;
+  margin: var(--s-1) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.pkgs-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: var(--h-small);
+  border-bottom: 1px solid var(--line-soft);
+}
+.pkgs-list li:last-child {
+  border-bottom: 0;
+}
+.pkgs-name {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: var(--t-code);
+  line-height: var(--t-code-lh);
+  overflow-wrap: anywhere;
+}
+.pkgs-state {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin-top: var(--s-3);
+  font-size: var(--t-control);
+  line-height: var(--t-control-lh);
+}
+.pkgs-fold {
+  margin-top: var(--s-1);
+  border-top: 0;
+}
+.pkgs-fold > summary {
+  font-size: var(--t-meta);
+}
+.pkgs-fold .pkgs-output {
+  margin-top: var(--s-1);
+}
+.pkgs-note {
+  margin-top: var(--s-2);
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+  color: var(--muted);
+}
+.pkgs-error {
+  margin-top: var(--s-2);
+}
 
 /* ---------- Activity ---------- */
 .inbox {
