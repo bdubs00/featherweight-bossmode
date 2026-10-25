@@ -6,6 +6,9 @@ import { ChatDetails, ChatList, ChatMain, forgetChat } from './Chat';
 import { at, fakeFetch, mount, unmountAll, type Call } from './testkit-b';
 import { clearNotice, currentNotice } from './notice';
 
+/** The time zone of the browser of the test, which each new run carries. */
+const ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
 let calls: Call[] = [];
 let restore = () => {};
 
@@ -136,7 +139,7 @@ describe('the Chat place', () => {
     expect(posts()[0]).toEqual({
       method: 'POST',
       path: '/v1/runs?member=default%2Fboss-0',
-      body: { agent: 'chat', input: 'How do I rotate the logs?', profile: { tools: ['files', 'web_fetch'], skills: [] }, metadata: { 'fw.view': 'quickchat' } },
+      body: { agent: 'chat', input: 'How do I rotate the logs?', profile: { tools: ['files', 'web_fetch'], skills: [], timeZone: ZONE }, metadata: { 'fw.view': 'quickchat' } },
     });
     await vi.waitFor(() => expect(location.hash).toBe('#chat/run-chat-9'));
   });
@@ -163,7 +166,7 @@ describe('the Chat place', () => {
     expect(rowsOf(el, 'chat-tools')).toEqual(['Read and change files in the workspace on']);
     send(el.querySelector('#composer') as HTMLTextAreaElement, 'Hello?');
     await vi.waitFor(() => expect(posts().length).toBe(1));
-    expect((posts()[0].body as { profile: unknown }).profile).toEqual({ tools: ['files'], skills: ['notes'] });
+    expect((posts()[0].body as { profile: unknown }).profile).toEqual({ tools: ['files'], skills: ['notes'], timeZone: ZONE });
   });
 
   it('leaves the tools out of the inline profile when neither the workbench nor the profile names a tool, so the list of the agent holds', async () => {
@@ -177,7 +180,7 @@ describe('the Chat place', () => {
       expect(el.querySelector('.chat-kit > summary')!.textContent).toBe('Tools and skills');
       send(el.querySelector('#composer') as HTMLTextAreaElement, 'Hello?');
       await vi.waitFor(() => expect(calls.filter((c) => c.method === 'POST').length + f.calls.filter((c) => c.method === 'POST').length).toBe(1));
-      expect((f.calls.find((c) => c.method === 'POST')!.body as { profile: unknown }).profile).toEqual({ skills: ['notes'] });
+      expect((f.calls.find((c) => c.method === 'POST')!.body as { profile: unknown }).profile).toEqual({ skills: ['notes'], timeZone: ZONE });
     } finally {
       f.restore();
     }
@@ -200,7 +203,7 @@ describe('the Chat place', () => {
       expect(el.querySelectorAll('section[aria-labelledby="chat-tools"] .kit-sep').length).toBe(1);
       send(el.querySelector('#composer') as HTMLTextAreaElement, 'Hello?');
       await vi.waitFor(() => expect(f.calls.some((c) => c.method === 'POST')).toBe(true));
-      expect((f.calls.find((c) => c.method === 'POST')!.body as { profile: unknown }).profile).toEqual({ tools: ['files', 'front.pages_*'], skills: ['notes'] });
+      expect((f.calls.find((c) => c.method === 'POST')!.body as { profile: unknown }).profile).toEqual({ tools: ['files', 'front.pages_*'], skills: ['notes'], timeZone: ZONE });
     } finally {
       f.restore();
     }
@@ -249,7 +252,7 @@ describe('the Chat place', () => {
     attach(fresh, [new File(['hello'], 'note.txt')]);
     send(fresh.querySelector('#composer') as HTMLTextAreaElement, 'Read this');
     await vi.waitFor(() => expect(posts().length).toBe(1));
-    expect(posts()[0].body).toEqual({ agent: 'chat', input: 'Read this', profile: { tools: ['files'], skills: ['notes'] }, metadata: { 'fw.view': 'quickchat' }, files: [{ name: 'note.txt', data: 'aGVsbG8=' }] });
+    expect(posts()[0].body).toEqual({ agent: 'chat', input: 'Read this', profile: { tools: ['files'], skills: ['notes'], timeZone: ZONE }, metadata: { 'fw.view': 'quickchat' }, files: [{ name: 'note.txt', data: 'aGVsbG8=' }] });
     unmountAll();
     act(() => store.dispatch({ type: 'run', run: OLD }));
     const el = mount(<ChatMain run="run-chat-1" />);

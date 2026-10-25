@@ -9,6 +9,9 @@ import { parseSlash } from '../lib/mention';
 import { click, fakeApi, keyNamed, mount, problem, settle, typeIn, unmountAll } from './testkit-c';
 import { clearNotice, currentNotice } from './notice';
 
+/** The time zone of the browser of the test, which each new run carries. */
+const ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
 const CONFIG: BossConfig = { manager: { agent: 'manager', member: 'default/manager-0', run: 'run-m' }, placement: 'queue', maxMembers: 16 };
 const run = (state: Run['state'], seq: number): Run => ({ id: 'run-m', agent: 'manager', state, seq, createdAt: '', updatedAt: '' });
 const T = '2026-10-22T00:00:00Z';
@@ -142,7 +145,7 @@ describe('the manager', () => {
     await settle();
     const start = api.calls.find((c) => c.method === 'POST')!;
     expect(start.path).toBe('/v1/runs?member=default%2Fmanager-0');
-    expect(start.body).toEqual({ agent: 'manager', input: 'Hello' });
+    expect(start.body).toEqual({ agent: 'manager', input: 'Hello', profile: { timeZone: ZONE } });
     expect(el.querySelector('[role="status"] .status')!.textContent).toBe('waking');
   });
 
@@ -174,7 +177,7 @@ describe('the manager', () => {
     click(keyNamed(el, 'Send'));
     await settle();
     const start = api.calls.find((c) => c.method === 'POST' && c.path.startsWith('/v1/runs?'))!;
-    expect(start.body).toEqual({ agent: 'manager', input: '', files: [{ name: 'team.csv', data: 'bmFtZSxyb2xl' }] });
+    expect(start.body).toEqual({ agent: 'manager', input: '', profile: { timeZone: ZONE }, files: [{ name: 'team.csv', data: 'bmFtZSxyb2xl' }] });
     // The files that went out show while the transcript does not hold the message yet.
     expect([...el.querySelectorAll('.tmsg .attached li')].map((li) => li.textContent)).toEqual(['team.csv9 B']);
   });

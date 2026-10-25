@@ -401,6 +401,8 @@ export interface RunEvent {
 export interface InlineProfile {
   tools?: string[];
   skills?: string[];
+  /** The IANA time zone of the run, such as America/New_York. */
+  timeZone?: string;
 }
 
 /** The body of POST /v1/runs. A field that is not set stays out, because the kernel refuses an unknown field. */

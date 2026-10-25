@@ -120,6 +120,13 @@ const pool = (name: string) => '/v1/pools/' + enc(name);
 
 const duty = (name: string) => '/v1/duties/' + enc(name);
 
+/**
+ * withZone starts a run in the time zone of the browser, so the agent reads
+ * its clock in the time of the person. A duty that the manager writes then
+ * runs in that time too. A zone that the body names wins.
+ */
+const withZone = (body: NewRun): NewRun => (body.profile && body.profile.timeZone ? body : { ...body, profile: { ...body.profile, timeZone: browserZone() } });
+
 /** dutyCall calls a route of the duties with X-Time-Zone, the zone of the browser, in which the front reads a time that a person says. */
 const dutyCall = <T>(path: string, opts: { method?: string; body?: unknown; signal?: AbortSignal } = {}) => call<T>(path, { ...opts, headers: { 'X-Time-Zone': browserZone() } });
 
@@ -207,7 +214,7 @@ export const api = {
   file: (id: string, path: string) => call<FileView>(run(id) + '/files/' + encPath(path)),
   /** events reads a page of the ledger of a run, from the seq from. The front sends the call to the member that holds the run. */
   events: (id: string, from: number, limit: number) => call<{ events: RunEvent[] }>(run(id) + '/events' + query({ from, limit })).then((r) => (r && r.events) || []),
-  start: (member: string, body: NewRun) => call<Run>('/v1/runs' + query({ member }), { method: 'POST', body }),
+  start: (member: string, body: NewRun) => call<Run>('/v1/runs' + query({ member }), { method: 'POST', body: withZone(body) }),
   /**
    * fleetRuns lists the runs of the whole fleet that the caller can see,
    * newest first, narrowed by agent, person, and state. The state active

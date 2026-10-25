@@ -5,6 +5,9 @@ import { AgentChat } from './Fleet';
 import { at, fakeFetch, mount, seedFleet, unmountAll, type Call } from './testkit-b';
 import { clearNotice, currentNotice } from './notice';
 
+/** The time zone of the browser of the test, which each new run carries. */
+const ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
 let calls: Call[] = [];
 let restore = () => {};
 
@@ -57,7 +60,7 @@ describe('the conversation with an agent on no bridge', () => {
     expect(box.placeholder).toBe('Message manager');
     send(box, 'What runs now?');
     await vi.waitFor(() => expect(posts().length).toBe(1));
-    expect(posts()[0]).toEqual({ method: 'POST', path: '/v1/runs?member=default%2Fboss-0', body: { agent: 'manager', input: 'What runs now?' } });
+    expect(posts()[0]).toEqual({ method: 'POST', path: '/v1/runs?member=default%2Fboss-0', body: { agent: 'manager', input: 'What runs now?', profile: { timeZone: ZONE } } });
     await vi.waitFor(() => expect(el.querySelector('.thread')!.textContent).toContain('What runs now?'));
     await vi.waitFor(() => expect(box.value).toBe(''));
     send(box, 'And the next one?');
@@ -82,7 +85,7 @@ describe('the conversation with an agent on no bridge', () => {
     attach(el, [new File(['hello'], 'note.txt')]);
     send(box, 'Read this');
     await vi.waitFor(() => expect(posts().length).toBe(1));
-    expect(posts()[0]).toEqual({ method: 'POST', path: '/v1/runs?member=default%2Fboss-0', body: { agent: 'manager', input: 'Read this', files: [{ name: 'note.txt', data: 'aGVsbG8=' }] } });
+    expect(posts()[0]).toEqual({ method: 'POST', path: '/v1/runs?member=default%2Fboss-0', body: { agent: 'manager', input: 'Read this', profile: { timeZone: ZONE }, files: [{ name: 'note.txt', data: 'aGVsbG8=' }] } });
     await vi.waitFor(() => expect(box.value).toBe(''));
     attach(el, [new File(['name,role'], 'team.csv')]);
     send(box, '');
