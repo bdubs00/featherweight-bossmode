@@ -153,11 +153,13 @@ export function focusHome(pane: Element | null): boolean {
  * returns the step that runs after it. When the action removed that
  * element, such as a card that a decision settles, the step gives the
  * focus to the first key of the nearest part of the page that still
- * stands, else to the home of its pane. An open dialog keeps its own focus.
+ * stands, else to the home of its pane. An open dialog keeps its own focus,
+ * and a part marked data-focus-own moves its focus itself.
  */
 export function holdFocus(): () => void {
   const before = document.activeElement as HTMLElement | null;
-  if (!before || before === document.body) return () => {};
+  // A screen that moves the focus itself after its actions, such as Activity, marks its part with data-focus-own.
+  if (!before || before === document.body || before.closest('[data-focus-own]')) return () => {};
   const chain: Element[] = [];
   for (let el: Element | null = before.parentElement; el && el !== document.body; el = el.parentElement) chain.push(el);
   return () => {

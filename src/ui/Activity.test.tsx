@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'preact/test-utils';
 import { store } from '../state/store';
-import { ActivityList, ActivityMain, holdFor, pick } from './Activity';
+import { ActivityList, ActivityMain, holdFor, negativeChoice, pick } from './Activity';
 import { AppBar } from './Shell';
-import { clearSaid, currentNotice, currentSaid, undoSaid } from './notice';
+import { clearNotice, clearSaid, currentNotice, currentSaid, undoSaid } from './notice';
 import { at, fakeFetch, mount, run, seat, bridge, unmountAll, type Call } from './testkit-b';
 
 let calls: Call[] = [];
@@ -109,6 +109,28 @@ describe('the inbox', () => {
     await new Promise((r) => setTimeout(r, 40));
     expect(calls.filter((c) => c.method === 'POST')).toEqual([]);
     await vi.waitFor(() => expect(calls.filter((c) => c.method === 'POST')).toEqual([{ method: 'POST', path: '/v1/runs/run-early/approvals/ap-early', body: { decision: 'allow' } }]));
+    act(() => clearSaid());
+  });
+
+  it('shows the held decision on the card too, with the seconds left and Undo, in place of Deny and Allow', () => {
+    holdFor(3000);
+    const el = mount(
+      <>
+        <ActivityList />
+        <ActivityMain />
+      </>,
+    );
+    const first = rows(el)[0];
+    act(() => first.focus());
+    key(first, 'd');
+    const pane = el.querySelector('.inbox-main-pane')!;
+    expect(pane.querySelector('.card.held .held-line')!.textContent).toBe('Denied. It goes out in 3 seconds.');
+    expect([...pane.querySelectorAll('.card button')].map((b) => b.textContent)).toEqual(['Undo']);
+    act(() => ([...pane.querySelectorAll('.card button')][0] as HTMLButtonElement).click());
+    expect(pane.querySelector('.card.held')).toBeNull();
+    expect([...pane.querySelectorAll('.card-actions button')].map((b) => b.textContent)).toContain('Deny');
+    expect(document.activeElement).toBe(first);
+    expect(calls.filter((c) => c.method === 'POST')).toEqual([]);
     act(() => clearSaid());
   });
 
@@ -293,6 +315,81 @@ describe('a question that the front names on a seat', () => {
   });
 });
 
+describe('the keys on a question of a seat', () => {
+  const Q = { seq: 8, at: at(42), from: { kind: 'agent' as const, handle: 'reviewer', run: 'run-reviewer' }, to: ['operator'], text: 'May I restart sshd on both hosts?', ask: { choices: ['Approve', 'Decline'] } };
+  beforeEach(() => {
+    act(() => {
+      store.dispatch({ type: 'bridges', bridges: [bridge('b1', 'Migrate Puppet', undefined, { needsYou: 2 }), bridge('b4', 'Harden the lab hosts', undefined, { needsYou: 1, lastSeq: 9, read: 9 })] });
+      store.dispatch({ type: 'bridge', bridge: bridge('b4', 'Harden the lab hosts', [{ ...seat('reviewer', 'reviewer', 'needs-you'), question: 8 }], { needsYou: 1, lastSeq: 9, read: 9 }) });
+      store.dispatch({ type: 'run', run: run('run-reviewer', 'reviewer', 'completed') });
+    });
+  });
+
+  it('finds the choice that says no', () => {
+    expect(negativeChoice(['Approve', 'Decline'])).toBe('Decline');
+    expect(negativeChoice(['Yes', 'No'])).toBe('No');
+    expect(negativeChoice(['Not now', 'Go'])).toBe('Not now');
+    expect(negativeChoice(['Red', 'Blue'])).toBe('');
+    expect(negativeChoice(undefined)).toBe('');
+  });
+
+  it('holds the choice that says no on d, with Undo, and sends it as the answer after the wait', async () => {
+    holdFor(60);
+    const f = fakeFetch([
+      ['GET', /\/v1\/bridges\/b4\/messages\/8$/, () => Q],
+      ['POST', /\/v1\/bridges\/b4\/messages$/, (b) => ({ seq: 10, at: at(43), from: { kind: 'person', name: 'alice@example.com' }, ...(b as object) })],
+    ]);
+    try {
+      const el = mount(
+        <>
+          <ActivityList />
+          <ActivityMain item="q:b4/8" />
+        </>,
+      );
+      const row = () => rows(el).find((r) => r.getAttribute('data-key') === 'q:b4/8')!;
+      await vi.waitFor(() => expect(el.querySelector('.inbox-main-pane .pick')).not.toBeNull());
+      act(() => row().focus());
+      key(row(), 'd');
+      expect(currentSaid()).toBe('Answered Decline.');
+      expect(row().querySelector('.status-word')!.textContent).toBe('answered');
+      expect(el.querySelector('.inbox-main-pane .held-line')!.textContent).toMatch(/^Answered Decline\. It goes out in /);
+      expect(f.calls.filter((c) => c.method === 'POST')).toEqual([]);
+      await vi.waitFor(() => expect(f.calls.filter((c) => c.method === 'POST').map((c) => c.body)).toEqual([{ text: 'Decline', to: ['reviewer'], replyTo: 8 }]));
+    } finally {
+      f.restore();
+      act(() => clearSaid());
+    }
+  });
+
+  it('says to answer with a when no choice says no, and opens the answer on a', async () => {
+    // A question of its own, since the page keeps the entry that it read for the test before.
+    act(() => store.dispatch({ type: 'bridge', bridge: bridge('b4', 'Harden the lab hosts', [{ ...seat('reviewer', 'reviewer', 'needs-you'), question: 11 }], { needsYou: 1, lastSeq: 11, read: 11 }) }));
+    const f = fakeFetch([['GET', /\/v1\/bridges\/b4\/messages\/11$/, () => ({ ...Q, seq: 11, ask: { choices: ['Red', 'Blue'] } })]]);
+    try {
+      const el = mount(
+        <>
+          <ActivityList />
+          <ActivityMain />
+        </>,
+      );
+      const row = () => rows(el).find((r) => r.getAttribute('data-key') === 'q:b4/11')!;
+      await vi.waitFor(() => expect(row()).toBeTruthy());
+      act(() => row().focus());
+      await vi.waitFor(() => expect(el.querySelector('.inbox-main-pane .pick')).not.toBeNull());
+      key(row(), 'd');
+      expect(currentSaid()).toBe('This question has no choice that says no. Press a to answer it.');
+      key(row(), 'a');
+      await vi.waitFor(() => expect((document.activeElement as HTMLElement).closest('.inbox-main-pane .card')).not.toBeNull());
+    } finally {
+      f.restore();
+      act(() => {
+        clearSaid();
+        clearNotice();
+      });
+    }
+  });
+});
+
 describe('the inbox after a decision', () => {
   it('hands the main pane and the focus to the row that takes the place of a decided one', () => {
     const el = mount(
@@ -347,5 +444,50 @@ describe('a run that the front knows only from its index', () => {
     expect(main.querySelector('.inbox-main-pane h1')!.textContent).toBe('bare');
     expect(main.querySelector('.card')).not.toBeNull();
     expect(currentNotice()).toBe('');
+  });
+});
+
+describe('the next row after a decision', () => {
+  // The tests before these leave newer runs in the store, so each test sets the runs of its rows again, with a newer seq.
+  let seq = 20;
+  const fresh = () =>
+    act(() => {
+      seq += 10;
+      store.dispatch({ type: 'run', run: run('run-late', 'migrator', 'input-required', { seq, pending: { id: 'ap-late-2', tool: 'bash', input: { command: 'git push' }, reason: 'rule: ask bash: git push*', requestedAt: at(30) } }) });
+      store.dispatch({ type: 'run', run: run('run-early', 'migrator', 'input-required', { seq, pending: { id: 'ap-early-2', tool: 'bash', input: { command: 'rm -rf build' }, reason: 'default', requestedAt: at(5) } }) });
+    });
+
+  it('moves the main pane and the focus together to the next row that needs you, not to the row at the same place', () => {
+    fresh();
+    const el = mount(
+      <>
+        <ActivityList />
+        <ActivityMain />
+      </>,
+    );
+    // The person decides the second row, late. The row at its place after it leaves is broke, which needs nobody.
+    act(() => rows(el)[1].focus());
+    expect(el.querySelector('.inbox-main-pane h1')!.textContent).toBe('late');
+    act(() => {
+      store.dispatch({ type: 'run', run: run('run-late', 'migrator', 'running', { seq: seq + 1 }) });
+      store.dispatch({ type: 'member', bridge: 'b1', member: seat('late', 'migrator', 'working') });
+    });
+    expect(rows(el).map((r) => r.querySelector('b')!.textContent)).toEqual(['early', 'broke']);
+    expect(el.querySelector('.inbox-main-pane h1')!.textContent).toBe('early');
+    expect(document.activeElement).toBe(rows(el)[0]);
+  });
+
+  it('keeps the focus with its row when a new row comes in above it', () => {
+    fresh();
+    const el = mount(<ActivityList />);
+    act(() => rows(el)[1].focus());
+    const late = rows(el)[1];
+    expect(late.getAttribute('data-key')).toBe('d:run-late/ap-late-2');
+    // A new decision waits longer than both, so it takes the top of the list.
+    act(() => {
+      store.dispatch({ type: 'bridge', bridge: bridge('b1', 'Migrate Puppet', [seat('late', 'migrator', 'needs-you'), seat('early', 'migrator', 'needs-you'), seat('broke', 'writer', 'error'), seat('first', 'migrator', 'needs-you')]) });
+      store.dispatch({ type: 'run', run: run('run-first', 'migrator', 'input-required', { pending: { id: 'ap-first', tool: 'bash', input: { command: 'ls' }, reason: 'default', requestedAt: at(1) } }) });
+    });
+    expect((document.activeElement as HTMLElement).getAttribute('data-key')).toBe('d:run-late/ap-late-2');
   });
 });

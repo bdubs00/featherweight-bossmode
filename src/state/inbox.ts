@@ -348,7 +348,7 @@ export function sortInbox(rows: InboxRow[]): InboxRow[] {
     .map((x) => x.r);
 }
 
-export type InboxAction = 'allow' | 'deny' | 'always' | 'answer' | 'reply' | 'open' | 'seat' | 'continue' | 'done';
+export type InboxAction = 'allow' | 'deny' | 'always' | 'answer' | 'decline' | 'reply' | 'open' | 'seat' | 'continue' | 'done';
 
 /**
  * keyAction maps a key on a row of the inbox to an action: a allows, d
@@ -359,6 +359,8 @@ export type InboxAction = 'allow' | 'deny' | 'always' | 'answer' | 'reply' | 'op
 export function keyAction(key: string, row: InboxRow): InboxAction | null {
   if (key === 'Enter') return 'open';
   if (key === 'r') return row.kind === 'asked' ? 'answer' : 'reply';
+  // A question of a seat: a opens the answer, and d picks the choice that says no.
+  if (row.kind === 'asked') return key === 'a' ? 'answer' : key === 'd' ? 'decline' : null;
   if (row.kind === 'decision') return key === 'a' ? 'allow' : key === 'd' ? 'deny' : null;
   if (row.kind === 'question') return key === 'a' ? 'answer' : key === 'd' ? 'deny' : null;
   if (row.kind === 'failed' || row.kind === 'stopped') return key === 's' ? 'seat' : null;

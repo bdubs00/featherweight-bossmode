@@ -142,7 +142,7 @@ describe('the inbox', () => {
     expect(rows.filter((r) => r.kind === 'asked').map((r) => [r.key, r.handle, r.status, r.entry!.seq])).toEqual([['q:b2/2', 'sleepy', 'needs-you', 2]]);
     // The newest message that does not ask you keeps its row of a message.
     expect(rows.find((r) => r.kind === 'message' && r.bridge === 'b2')!.entry!.seq).toBe(4);
-    expect(['r', 'a', 'Enter'].map((k) => keyAction(k, rows.find((r) => r.kind === 'asked')!))).toEqual(['answer', null, 'open']);
+    expect(['r', 'a', 'd', 'Enter', 'x'].map((k) => keyAction(k, rows.find((r) => r.kind === 'asked')!))).toEqual(['answer', 'answer', 'decline', 'open', null]);
     // A message of yours to that handle, or in reply to the message, answers it.
     const answered = channel([...s.channels.b2.seqs.map((q) => s.channels.b2.bySeq[q]), { seq: 5, at: at(53), from: { kind: 'person', name: 'me@example.com' }, text: 'main', to: ['asker'] }, { seq: 6, at: at(54), from: { kind: 'person', name: 'me@example.com' }, text: 'Lift it.', to: [], replyTo: 2 }]);
     expect(asksOf(s.bridges[1], answered, 'me@example.com')).toEqual([]);

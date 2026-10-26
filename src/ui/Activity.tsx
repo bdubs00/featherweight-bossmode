@@ -8,10 +8,14 @@
 // c continues a seat at its limit, and e is Done on a message, which clears
 // it for you through the read mark of its bridge. A decision of a or d
 // waits HOLD_MS before it goes out: the notice says Allowed. or Denied.
-// with Undo, the row says what it holds, the focus stays on the row, and u
-// on the row takes the decision back too. After a decision the main pane
-// opens the next item that needs you, else it shows the decided card
-// settled.
+// with Undo, the row and its card say what it holds, the focus stays on the
+// row, and u on the row takes the decision back too. On a question of a
+// seat, a opens the answer, and d holds the choice that says no, such as
+// Decline; a question without such a choice says to answer it with a.
+// After a decision or an answer, the main pane and the focus move together
+// to the next item that needs you, so a key never acts on a row that the
+// person does not see; when none needs you, the main pane shows the
+// decided card settled.
 // The main pane shows the row that has the focus: a decision as its card.
 // Where the main pane shows beside the list and no row is picked, it shows
 // the row that needs you and waits longest. The address names a picked
@@ -24,7 +28,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { go, hrefOf, parseRoute } from '../lib/route';
 import { decisionTitle, excerpt, personName, plainText, senderName, since } from '../lib/words';
 import { briefOf, planOf } from '../lib/decision';
-import { decide } from '../state/actions';
+import { answerQuestion, decide } from '../state/actions';
 import { useInboxRows, type InboxView } from '../state/activity';
 import { ensureChannels, ensureEntries, ensureResults } from '../state/fetchers';
 import { cardOf, keyAction, type InboxRow } from '../state/inbox';
@@ -40,7 +44,7 @@ import { markDone, madeOf, settledOf, useMade } from '../state/done';
 import { loadInbox } from '../state/duties';
 import { titleOfName } from '../lib/duties';
 import { EmptyPane } from './Shell';
-import { Avatar, Button, Led, Mark, PaneHeader } from './primitives';
+import { Avatar, Button, Card, Led, Mark, PaneHeader } from './primitives';
 
 const TWO_PANES = '(min-width: 800px)';
 
@@ -118,10 +122,11 @@ let settledRow: InboxRow | null = null;
  * whose card shows the decision settled.
  */
 function afterDecision(r: InboxRow, rows: InboxRow[]): void {
-  const next = rows.find((x) => x.key !== r.key && x.status === 'needs-you' && !(x.decision && madeOf(x.decision.run, x.decision.id)));
+  const next = nextNeed(rows, r.key);
   if (next) {
     settledRow = null;
     pick(next.key);
+    focusRow(next.key);
     return;
   }
   settledRow = r;
@@ -141,30 +146,40 @@ export function holdFor(ms: number = HOLD_MS): void {
   holdMs = ms;
 }
 
+/** What a row holds: a decision of a card, or a choice that answers a question of a seat. */
+export type HeldAct = 'allow' | 'deny' | 'answer';
+
 interface Held {
   key: string;
   bridge: string;
+  act: HeldAct;
+  /** The run and the approval of a decision. */
   run: string;
   id: string;
-  decision: 'allow' | 'deny';
+  /** The seat, the entry of its question, and the choice of an answer. */
+  handle: string;
+  seq: number;
+  text: string;
+  /** When it goes out, by the clock of the page, for the card that counts down. */
+  until: number;
   timer: ReturnType<typeof setTimeout>;
   undo: () => void;
   /** The decision that the page knew made on the card when the key held this one, so a decision on the card in the meantime shows. */
   made: unknown;
 }
 
-/** The decisions that wait to go out, by the key of their row. */
+/** The decisions and answers that wait to go out, by the key of their row. */
 const held = new Map<string, Held>();
 const heldListeners = new Set<() => void>();
 const tellHeld = () => {
   for (const f of [...heldListeners]) f();
 };
 
-/** useHeld names the decision that a row holds: allow, deny, or "". */
-function useHeld(key: string): '' | 'allow' | 'deny' {
-  const [v, setV] = useState<'' | 'allow' | 'deny'>(() => (held.get(key) ? held.get(key)!.decision : ''));
+/** useHeld gives what a row holds, or undefined. */
+function useHeld(key: string): Held | undefined {
+  const [v, setV] = useState<Held | undefined>(() => held.get(key));
   useEffect(() => {
-    const f = () => setV(held.get(key) ? held.get(key)!.decision : '');
+    const f = () => setV(held.get(key));
     heldListeners.add(f);
     f();
     return () => {
@@ -174,8 +189,36 @@ function useHeld(key: string): '' | 'allow' | 'deny' {
   return v;
 }
 
+/** heldWord is the word of what a row holds: Allowed, Denied, or Answered and the choice. */
+export const heldWord = (h: Pick<Held, 'act' | 'text'>): string => (h.act === 'allow' ? 'Allowed' : h.act === 'deny' ? 'Denied' : 'Answered ' + h.text);
+
 /** rowEl finds the row of a key in the list. */
 const rowEl = (key: string): HTMLElement | undefined => [...document.querySelectorAll<HTMLElement>('.inbox-row[data-key]')].find((x) => x.getAttribute('data-key') === key);
+
+/** hold keeps what a key did on a row for holdMs, with the notice and Undo, then sends it with go, unless it no longer waits. */
+function hold(r: InboxRow, h: Omit<Held, 'key' | 'bridge' | 'until' | 'timer' | 'undo'>, go: (h: Held) => Promise<unknown>): void {
+  const was = held.get(r.key);
+  if (was && was.act === h.act && was.text === h.text) return;
+  if (was) clearTimeout(was.timer);
+  const undo = () => undoHold(r.key);
+  const one: Held = {
+    ...h,
+    key: r.key,
+    bridge: r.bridge,
+    until: Date.now() + holdMs,
+    undo,
+    timer: setTimeout(() => {
+      held.delete(r.key);
+      tellHeld();
+      dropUndo(undo);
+      if (!stillWaits(one)) return;
+      attempt(() => go(one));
+    }, holdMs),
+  };
+  held.set(r.key, one);
+  tellHeld();
+  showUndo(heldWord(one) + '.', undo, holdMs);
+}
 
 /**
  * holdDecision holds the decision of a key on a row for holdMs, with the
@@ -186,33 +229,25 @@ const rowEl = (key: string): HTMLElement | undefined => [...document.querySelect
 export function holdDecision(r: InboxRow, decision: 'allow' | 'deny'): void {
   const d = r.decision;
   if (!d) return;
-  const was = held.get(r.key);
-  if (was && was.decision === decision) return;
-  if (was) clearTimeout(was.timer);
-  const undo = () => undoHold(r.key);
-  const h: Held = {
-    key: r.key,
-    bridge: r.bridge,
-    run: d.run,
-    id: d.id,
-    decision,
-    undo,
-    made: madeOf(d.run, d.id),
-    timer: setTimeout(() => {
-      held.delete(r.key);
-      tellHeld();
-      dropUndo(undo);
-      if (!stillWaits(h)) return;
-      // A question of a duty on no bridge leaves the inbox of the duties, so the inbox reads again.
-      attempt(() => decide(h.run, h.id, h.decision).then(() => (h.bridge ? undefined : loadInbox())));
-    }, holdMs),
-  };
-  held.set(r.key, h);
-  tellHeld();
-  showUndo(decision === 'allow' ? 'Allowed.' : 'Denied.', undo, holdMs);
+  // A question of a duty on no bridge leaves the inbox of the duties, so the inbox reads again.
+  hold(r, { act: decision, run: d.run, id: d.id, handle: '', seq: 0, text: '', made: madeOf(d.run, d.id) }, (h) => decide(h.run, h.id, h.act as 'allow' | 'deny').then(() => (h.bridge ? undefined : loadInbox())));
 }
 
-/** undoHold takes back the decision that a row holds, so nothing goes out, and gives the focus back to the row. */
+/** holdAnswer holds a choice that answers the question of a seat, as d does with the choice that says no, with Answered <choice>. and Undo. */
+export function holdAnswer(r: InboxRow, text: string): void {
+  if (!r.handle || !r.entry) return;
+  hold(r, { act: 'answer', run: '', id: '', handle: r.handle, seq: r.entry.seq, text, made: undefined }, (h) => answerQuestion(h.bridge, h.handle, h.seq, h.text));
+}
+
+/** NO_WORDS are the first words of a choice that says no, such as No, Decline, or Not now. */
+const NO_WORDS = /^(no|nope|decline|deny|reject|refuse|cancel|stop|skip|abort|don't|do not|not now|later)\b/i;
+
+/** negativeChoice finds the choice of a question that says no, or "" when none does. */
+export function negativeChoice(choices: string[] | undefined): string {
+  return (choices || []).find((c) => NO_WORDS.test(c.trim())) || '';
+}
+
+/** undoHold takes back what a row holds, so nothing goes out, and gives the focus back to the row. */
 export function undoHold(key: string): void {
   const h = held.get(key);
   if (!h) return;
@@ -225,15 +260,64 @@ export function undoHold(key: string): void {
   if (el) el.focus();
 }
 
-/** stillWaits reports whether the decision of a hold still waits: a card that the channel shows decided, or that the person decided on its card in the meantime, needs none. */
+/** stillWaits reports whether what a row holds still waits: a card that the channel shows decided, a question that ended, or a decision made on its card in the meantime needs nothing more. */
 function stillWaits(h: Held): boolean {
-  if (madeOf(h.run, h.id) !== h.made) return false;
   const s = store.get();
+  if (h.act === 'answer') {
+    const r = s.rosters[h.bridge];
+    const m = r ? r.byHandle[h.handle] : undefined;
+    return !m || m.question === h.seq;
+  }
+  if (madeOf(h.run, h.id) !== h.made) return false;
   const card = h.bridge ? cardOf(s.channels[h.bridge], h.run, h.id) : undefined;
   if (card && card.decision && card.decision.state !== 'pending') return false;
   // A run that waits for no decision, or for another one, took this decision already.
   const run = s.runs[h.run];
   return !(run && (run.pending === null || (run.pending && run.pending.id !== h.id)));
+}
+
+/** HeldCard takes the place of the card of a row whose decision or answer waits to go out: what it holds, the seconds left, and Undo. */
+function HeldCard({ h, title }: { h: Held; title: string }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(t);
+  }, []);
+  const left = Math.max(1, Math.ceil((h.until - now) / 1000));
+  return (
+    <Card class="decide held" title={title} tone="grey" quiet label={heldWord(h) + ', ' + title}>
+      <p class="held-line">
+        {heldWord(h)}. It goes out in {left === 1 ? '1 second' : left + ' seconds'}.
+      </p>
+      <div class="card-actions">
+        <Button kind="primary" onClick={() => undoHold(h.key)}>
+          Undo
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+/**
+ * nextNeed is the row that needs the person after the row gone leaves: the
+ * first one in the order of attention that waits, and that no key holds and
+ * no card decided.
+ */
+export function nextNeed(rows: InboxRow[], gone: string): InboxRow | undefined {
+  return rows.find((x) => x.key !== gone && x.status === 'needs-you' && !held.has(x.key) && !(x.decision && madeOf(x.decision.run, x.decision.id)));
+}
+
+/**
+ * focusRow gives the focus to the row of a key once it is drawn, where the
+ * list shows beside the main pane, so the row that the main pane shows and
+ * the row that the keys act on stay one.
+ */
+function focusRow(key: string): void {
+  if (!window.matchMedia(TWO_PANES).matches) return;
+  setTimeout(() => {
+    const el = rowEl(key);
+    if (el && document.activeElement !== el) el.focus();
+  }, 0);
 }
 
 /** doneOf is the entry that Done clears for a row: a message. A decision and a message that asks you leave when you answer them. */
@@ -343,8 +427,8 @@ function RowFace({ r }: { r: InboxRow }) {
 
 /** RowStatus is the light and the word of a row. A row whose decision waits to go out says it. */
 function RowStatus({ r }: { r: InboxRow }) {
-  const hold = useHeld(r.key);
-  if (hold) return <Led tone="grey" word={hold === 'allow' ? 'allowed' : 'denied'} label="It goes out in a few seconds. Undo takes it back." />;
+  const h = useHeld(r.key);
+  if (h) return <Led tone="grey" word={h.act === 'allow' ? 'allowed' : h.act === 'deny' ? 'denied' : 'answered'} label="It goes out in a few seconds. Undo takes it back." />;
   if (r.status === 'needs-you') return <Led tone="amber" word="needs you" />;
   if (r.kind === 'duty-paused') return <Led tone="grey" word="paused" />;
   if (r.kind === 'duty-failed') return <Led tone="red" word="failed" />;
@@ -465,11 +549,14 @@ export function ActivityList({ item }: { item?: string }) {
     }
     // Until the inbox has loaded, a row of the address can still come, so the list keeps it.
     if (!picked || rows.length === 0 || !ready.current || (settledRow && settledRow.key === picked)) return;
-    const next = rows[Math.min(lastIndex.current, rows.length - 1)];
+    // The next row that needs the person takes the place, else the row at the same place in the list.
+    const next = nextNeed(rows, picked) || rows[Math.min(lastIndex.current, rows.length - 1)];
     pick(next.key);
-    const lost = !document.activeElement || document.activeElement === document.body;
-    const el = list.current ? [...list.current.querySelectorAll<HTMLElement>('[data-key]')].find((x) => x.getAttribute('data-key') === next.key) : undefined;
-    if (lost && el) el.focus();
+    // The focus follows the main pane, unless the person moved it out of Activity.
+    const a = document.activeElement as HTMLElement | null;
+    const ours = !a || a === document.body || !a.isConnected || (list.current && list.current.contains(a)) || !!a.closest('.inbox-main-pane');
+    const el = rowEl(next.key);
+    if (ours && el) el.focus();
   }, [keyList, picked, settled]);
   const onKey = (e: KeyboardEvent) => {
     if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) return;
@@ -489,7 +576,12 @@ export function ActivityList({ item }: { item?: string }) {
     const d = r.decision;
     // A decision of a key waits a moment, with Undo, and the focus stays on its row.
     if ((act === 'allow' || act === 'deny') && d) holdDecision(r, act);
-    else if (act === 'answer') {
+    else if (act === 'decline') {
+      // d picks the choice that says no, held as a decision is. A question without one says to answer it.
+      const no = negativeChoice(r.entry && r.entry.ask ? r.entry.ask.choices : undefined);
+      if (no) holdAnswer(r, no);
+      else showSaid('This question has no choice that says no. Press a to answer it.');
+    } else if (act === 'answer') {
       pick(r.key);
       if (window.matchMedia(TWO_PANES).matches) {
         setTimeout(() => {
@@ -506,13 +598,14 @@ export function ActivityList({ item }: { item?: string }) {
     else if (act === 'done') done(r, rows, false);
   };
   return (
-    <section class="screen activity" aria-labelledby="activity-title">
+    <section class="screen activity" aria-labelledby="activity-title" data-focus-own>
       {/* The chip counts what the list shows. What needs you shows by its lights and by the count on the app bar, which counts the same rows less the new messages. */}
       <PaneHeader id="activity-title" title="Activity" count={loaded ? rows.length : undefined} countLabel={rows.length === 1 ? '1 item' : rows.length + ' items'} />
       <div class="scroll" ref={list} onKeyDown={onKey}>
         <div class="inbox" role="list" aria-label="Activity">
+          {/* Each row keeps its own element, so a row that leaves takes its focus with it, and a new row never inherits the focus of another. */}
           {rows.map((r) => (
-            <div role="listitem">
+            <div role="listitem" key={r.key}>
               <InboxItem r={r} on={r.key === shown} rows={rows} />
             </div>
           ))}
@@ -536,6 +629,7 @@ export function ActivityMain({ item }: { item?: string }) {
   const card = useSelect((s) => (r && r.decision ? cardOf(s.channels[r.bridge], r.decision.run, r.decision.id)?.decision || undefined : undefined));
   const made = useMade(r && r.decision ? r.decision.run : '', r && r.decision ? r.decision.id : '');
   const me = useSelect((s) => (s.me && s.me.principal ? s.me.principal.subject : ''));
+  const h = useHeld(r ? r.key : '');
   if (!r) {
     return (
       <EmptyPane back={{ href: '#activity', label: 'Activity' }}>
@@ -562,8 +656,10 @@ export function ActivityMain({ item }: { item?: string }) {
   const word = waits ? 'needs you' : r.kind === 'stopped' ? 'stopped' : r.kind === 'limit' ? 'at its limit' : r.kind === 'duty-paused' ? 'paused' : r.kind === 'duty-failed' ? 'failed' : r.status === 'error' ? 'error' : '';
   const convo = r.bridge && r.handle && (r.kind !== 'message' || (r.entry && r.entry.from.kind === 'agent')) ? hrefOf({ place: 'member', bridge: r.bridge, handle: r.handle, tab: 'chat' }) : '';
   const asked = r.kind === 'asked' && r.handle ? { entry: r.entry, handle: r.handle } : null;
+  // A row whose decision or answer waits to go out shows what it holds in place of its card.
+  const title = h ? (asked && asked.entry ? asked.handle + ' asks: ' + excerpt(plainText(asked.entry.text), 80) : rowText(r)) : '';
   return (
-    <section class="screen inbox-main-pane" aria-labelledby="inbox-title">
+    <section class="screen inbox-main-pane" aria-labelledby="inbox-title" data-focus-own>
       <PaneHeader
         id="inbox-title"
         title={name}
@@ -586,7 +682,11 @@ export function ActivityMain({ item }: { item?: string }) {
       >
         {where}
       </PaneHeader>
-      {asked ? (
+      {h ? (
+        <div class="scroll pad">
+          <HeldCard h={h} title={title} />
+        </div>
+      ) : asked ? (
         // A question of a seat shows as its card in the channel does: its words, a key per choice, and Your answer.
         <div class="scroll pad">
           {asked.entry ? <AskCard key={r.key} bridge={r.bridge} e={asked.entry} who={asked.handle} body={<Markdown text={asked.entry.text} refs />} /> : <Empty>Loading the channel.</Empty>}
