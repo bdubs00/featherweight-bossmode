@@ -85,3 +85,12 @@ describe('the steps of env', () => {
     expect(stepWords('env', { command: 'list' })).toBe('Listed the packages');
   });
 });
+
+describe('the words of a question to the person', () => {
+  it('says Asked you and the first line of the question, and names the person you', () => {
+    expect(stepWords('bridge_post', { ask: true, text: '@operator May I push?\nIt is the nginx role.', choices: ['Approve', 'Decline'] })).toBe('Asked you: May I push?');
+    expect(stepWords('front.bridge_post', { ask: true, text: '' })).toBe('Asked you');
+    expect(stepWords('bridge_post', { text: 'Done.', to: ['operator', 'tester'] })).toBe('Posted to you and tester');
+    expect(stepWords('ask_user', { question: 'Which host first?' })).toBe('Asked you: Which host first?');
+  });
+});

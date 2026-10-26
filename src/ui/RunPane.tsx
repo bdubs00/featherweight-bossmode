@@ -24,7 +24,9 @@ import { awakeFor, seatPresence, statusOf } from '../lib/status';
 import { selectFacts } from '../state/reducer';
 import { hrefOf } from '../lib/route';
 import { plainError, providerMessage } from '../lib/runerror';
-import { pagesWritten, stepInputs, stepWords } from '../lib/steps';
+import { pagesWritten, stepWords } from '../lib/steps';
+import { commandOf, decisionTitle } from '../lib/words';
+import { whoName, type Me } from '../lib/lines';
 import { pageName } from '../lib/pagepath';
 import { noteLost } from '../state/actions';
 import { newestRun } from '../state/people';
@@ -107,19 +109,102 @@ export function plainItems(items: Item[]): Item[] {
   return changed ? out : items;
 }
 
-/** RunTimes says when a run started, and when it ended, for a run that ended. */
-function RunTimes({ run }: { run: Run }) {
+/**
+ * endOf is when a run ended: the time that the server names, else the time
+ * of the last end of a turn in its transcript. updatedAt is no end, because
+ * a later reaction or note moves it. It is "" while the page knows neither.
+ */
+export function endOf(run: Pick<Run, 'endedAt'>, items?: Item[]): string {
+  if (run.endedAt) return run.endedAt;
+  const end = items ? [...items].reverse().find((x) => x.kind === 'end') : undefined;
+  return end ? end.time : '';
+}
+
+/** RunTimes says when a run started, and when it ended, for a run that ended and whose end the page knows. */
+function RunTimes({ run, items }: { run: Run; items?: Item[] }) {
   const ended = run.state === 'completed' || run.state === 'failed' || run.state === 'canceled';
+  const end = ended ? endOf(run, items) : '';
   return (
     <span class="run-times">
       started <When at={run.createdAt} />
-      {ended && run.updatedAt && (
+      {end && (
         <>
-          , ended <When at={run.updatedAt} />
+          , ended <When at={end} />
         </>
       )}
     </span>
   );
+}
+
+/** A line of What it did: its words, the mark at its end, and whether it failed. */
+export interface DidLine {
+  words: string;
+  mark: 'Done' | 'Error' | 'No result' | 'Denied';
+  err: boolean;
+}
+
+/** wanted words a call that a person denied: Wanted to run git push: you denied it. */
+function wanted(ask: Item, decided: Item, me: Me): string {
+  const by = whoName(decided.who, me);
+  const who = by === 'You' ? 'you' : by;
+  const cmd = commandOf(ask.input);
+  if (cmd) return 'Wanted to run ' + cmd + ': ' + who + ' denied it';
+  const t = decisionTitle('\u0000', { run: '', id: ask.id || '', tool: ask.tool || '', input: ask.input, label: '', state: 'deny', always: false })
+    .replace(/^\u0000 wants to /, 'Wanted to ')
+    .replace(/^\u0000 wants /, 'Wanted ')
+    .replace(/^\u0000 asks for your decision$/, 'Asked for a decision');
+  return t + ': ' + who + ' denied it';
+}
+
+/**
+ * didLines are the lines of What it did: each step of the result, in the
+ * words of the page, and each call that a person denied, which never ran.
+ * A question to the person reads Asked you: and its first line. A call of
+ * a step that a person denied reads as denied, not as an error. items is
+ * the transcript, which holds the inputs of the calls and the decisions.
+ */
+export function didLines(steps: { seq: number; tool: string; text: string; isError?: boolean; done: boolean }[], items: Item[], me: Me): DidLine[] {
+  const asks = new Map<string, Item>();
+  for (const x of items) if (x.kind === 'ask' && x.id) asks.set(x.id, x);
+  // The calls that a person denied, by their call id.
+  const denied = new Map<string, { ask: Item; decided: Item }>();
+  const loose: { seq: number; ask: Item; decided: Item }[] = [];
+  for (const x of items) {
+    if (x.kind !== 'decided' || x.text !== 'deny' || !x.id) continue;
+    const ask = asks.get(x.id);
+    if (!ask) continue;
+    if (ask.callId) denied.set(ask.callId, { ask, decided: x });
+    else loose.push({ seq: x.seq, ask, decided: x });
+  }
+  // Each step takes the call of its tool in order, as the transcript holds them.
+  const calls = new Map<string, Item[]>();
+  for (const x of items) {
+    if (x.kind !== 'tool' || !x.tool) continue;
+    const l = calls.get(x.tool) || [];
+    l.push(x);
+    calls.set(x.tool, l);
+  }
+  const callOf: (Item | undefined)[] = new Array(steps.length).fill(undefined);
+  for (let i = steps.length - 1; i >= 0; i--) {
+    const l = calls.get(steps[i].tool);
+    if (l && l.length) callOf[i] = l.pop();
+  }
+  const out: { seq: number; line: DidLine }[] = [];
+  const shown = new Set<string>();
+  steps.forEach((st, i) => {
+    const call = callOf[i];
+    const d = call && call.callId ? denied.get(call.callId) : undefined;
+    if (d && call && call.callId) {
+      shown.add(call.callId);
+      out.push({ seq: st.seq, line: { words: wanted(d.ask, d.decided, me), mark: 'Denied', err: false } });
+      return;
+    }
+    out.push({ seq: st.seq, line: { words: stepWords(st.tool, call ? call.input : undefined, st.text), mark: st.isError ? 'Error' : st.done ? 'Done' : 'No result', err: !!st.isError } });
+  });
+  // A denied call that no step names joins at the time of its decision.
+  for (const [callId, d] of denied) if (!shown.has(callId)) loose.push({ seq: d.decided.seq, ask: d.ask, decided: d.decided });
+  for (const l of loose) out.push({ seq: l.seq, line: { words: wanted(l.ask, l.decided, me), mark: 'Denied', err: false } });
+  return out.sort((a, b) => a.seq - b.seq).map((x) => x.line);
 }
 
 /** WakeNote says in place that a read of a run wakes its worker. */
@@ -376,7 +461,8 @@ export function RunView({ runId, result, bridge, member, who, items, endSeq, gon
   // Seat again starts the seat anew, so it shows only for the newest run of a seat that is not fired.
   const again = bridge && member && !member.fired && ended && newestRun(member) === runId ? { bridge, m: member } : undefined;
   const steps = res ? res.steps : undefined;
-  const inputs = useMemo(() => stepInputs(steps || [], items || []), [steps, items]);
+  const me = useSelect((s) => (s.me ? s.me.principal : null));
+  const did = useMemo(() => (res ? didLines(steps || [], items || [], me) : []), [res, steps, items, me]);
   return (
     <div class="run-view">
       <div class="run-head">
@@ -388,26 +474,26 @@ export function RunView({ runId, result, bridge, member, who, items, endSeq, gon
       {archived && !gone && <p class="run-note">{RUN_ARCHIVED}</p>}
       <p class="run-status">
         {run && <Light light={runStatus(run)} />}
-        {run && <RunTimes run={run} />}
+        {run && <RunTimes run={run} items={items} />}
         {phrase && <span class="clip">{phrase}</span>}
       </p>
       {fail && (fail.line || again) && <FailureView id={runId} f={fail} again={again} />}
       {res && res.summary && <Markdown text={res.summary} class="run-summary" refs />}
-      {res && res.steps && res.steps.length > 0 && (
+      {did.length > 0 && (
         <section class="run-sec" aria-labelledby={'did-' + runId}>
           <div class="run-sec-head">
             <h4 class="t-sub" id={'did-' + runId}>
               What it did
             </h4>
-            <Chip label={res.steps.length === 1 ? '1 step' : res.steps.length + ' steps'}>{res.steps.length}</Chip>
+            <Chip label={did.length === 1 ? '1 step' : did.length + ' steps'}>{did.length}</Chip>
           </div>
           <ol class="run-steps">
-            {res.steps.map((s, i) => (
-              <li class={s.isError ? 'err' : ''}>
+            {did.map((l) => (
+              <li class={l.err ? 'err' : l.mark === 'Denied' ? 'denied' : ''}>
                 <span>
-                  <Phrase text={stepWords(s.tool, inputs[i], s.text)} />
+                  <Phrase text={l.words} />
                 </span>
-                <small>{s.isError ? 'Error' : s.done ? 'Done' : 'No result'}</small>
+                <small>{l.mark}</small>
               </li>
             ))}
           </ol>

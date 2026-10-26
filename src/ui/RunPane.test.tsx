@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { act } from 'preact/test-utils';
 import type { Item, Run } from '../api/types';
 import { store } from '../state/store';
-import { RunPane, RunView, bridgeWords, plainItems } from './RunPane';
+import { RunPane, RunView, bridgeWords, didLines, plainItems } from './RunPane';
 import { at, bridge, fakeFetch, mount, seat, unmountAll } from './testkit-b';
 
 const ME = 'alice@example.com';
@@ -64,16 +64,55 @@ describe('the words of a message of a bridge in a run', () => {
 });
 
 describe('the times of a run', () => {
-  it('says when a run started, and when it ended, never the start as the end', () => {
-    const el = mount(<RunView runId="run-reviewer" result={null} who="reviewer" />);
+  it('says when a run started, and when it ended by the end of its last turn, never by updatedAt, which a reaction moves', () => {
+    // The run ended at 10, and a reaction moved updatedAt to 11 later.
+    const items: Item[] = [...ITEMS, { seq: 9, time: at(10), kind: 'end' }];
+    const el = mount(<RunView runId="run-reviewer" result={null} who="reviewer" items={items} />);
     const line = el.querySelector('.run-times')!;
     const times = [...line.querySelectorAll('time')].map((t) => t.getAttribute('datetime'));
     expect(line.textContent).toMatch(/^started .+, ended .+$/);
-    expect(times[0]).not.toBe(times[1]);
-    expect(times).toEqual([RUN.createdAt, RUN.updatedAt]);
+    expect(times).toEqual([RUN.createdAt, at(10)]);
+    // An end that the server names wins.
+    act(() => store.dispatch({ type: 'run', run: { ...RUN, endedAt: at(9) } }));
+    expect([...el.querySelectorAll('.run-times time')].map((t) => t.getAttribute('datetime'))).toEqual([RUN.createdAt, at(9)]);
     act(() => store.dispatch({ type: 'run', run: { ...RUN, state: 'running' } }));
     expect(el.querySelector('.run-times')!.textContent).toMatch(/^started /);
     expect(el.querySelector('.run-times')!.textContent).not.toContain('ended');
     expect(el.querySelectorAll('.run-times time').length).toBe(1);
+    act(() => store.dispatch({ type: 'run', run: RUN }));
+  });
+
+  it('says no end while the page knows none, rather than a wrong one', () => {
+    const el = mount(<RunView runId="run-reviewer" result={null} who="reviewer" />);
+    expect(el.querySelectorAll('.run-times time').length).toBe(1);
+  });
+});
+
+describe('What it did', () => {
+  const me = { subject: ME, name: 'Alice' };
+  const items: Item[] = [
+    { seq: 2, time: at(1), kind: 'tool', tool: 'bridge_read', callId: 'c1', input: {} },
+    { seq: 4, time: at(2), kind: 'tool', tool: 'bridge_post', callId: 'c2', input: { ask: true, text: '@operator May I push the role?', choices: ['Approve', 'Decline'] } },
+    { seq: 6, time: at(3), kind: 'tool', tool: 'bash', callId: 'c3', input: { command: 'git push --help' } },
+    { seq: 7, time: at(3), kind: 'ask', id: 'ap-1', tool: 'bash', callId: 'c3', input: { command: 'git push --help' } },
+    { seq: 8, time: at(4), kind: 'decided', id: 'ap-1', text: 'deny', who: ME },
+  ];
+
+  it('says what a question asked and what call the person denied, in place of a post and a missing line', () => {
+    const steps = [
+      { seq: 2, tool: 'bridge_read', text: 'Read', done: true },
+      { seq: 4, tool: 'bridge_post', text: 'Posted', done: true },
+    ];
+    expect(didLines(steps, items, me)).toEqual([
+      { words: 'Read the channel', mark: 'Done', err: false },
+      { words: 'Asked you: May I push the role?', mark: 'Done', err: false },
+      { words: 'Wanted to run git push --help: you denied it', mark: 'Denied', err: false },
+    ]);
+  });
+
+  it('words a step of a denied call as denied, not as an error, and names who denied it', () => {
+    const steps = [{ seq: 6, tool: 'bash', text: 'denied by policy', isError: true, done: true }];
+    const byBob = items.map((x) => (x.kind === 'decided' ? { ...x, who: 'bob@example.com' } : x));
+    expect(didLines(steps, byBob, me)).toEqual([{ words: 'Wanted to run git push --help: bob denied it', mark: 'Denied', err: false }]);
   });
 });

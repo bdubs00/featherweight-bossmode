@@ -3,7 +3,16 @@
 // input names one. The kernel words a shell call and a file call itself,
 // such as Ran "ls" or Wrote a.yml, so those keep its words.
 
-import { envCallOf, envWhat, list } from './words';
+import { envCallOf, envWhat, excerpt, list, plainText } from './words';
+
+/** firstLine is the first line of a text with words, as plain words, at most 80 characters, without the @operator that opens a question to the person. */
+const firstLine = (text: string): string =>
+  excerpt(
+    plainText((String(text || '').split('\n').find((l) => l.trim()) || '').trim())
+      .replace(/^@operator\b[,:]?\s*/i, '')
+      .trim(),
+    80,
+  );
 
 function fields(input: unknown): Record<string, unknown> {
   let v = input;
@@ -138,7 +147,9 @@ export function stepWords(tool: string | undefined, input?: unknown, said?: stri
     case 'pages_list':
       return str('prefix') ? 'Listed the pages under ' + str('prefix') : 'Listed the pages';
     case 'bridge_post': {
-      const to = Array.isArray(v.to) ? v.to.filter((x): x is string => typeof x === 'string' && !!x) : [];
+      // A post with ask is a question to the person: the step says what it asked.
+      if (v.ask === true) return firstLine(str('text')) ? 'Asked you: ' + firstLine(str('text')) : 'Asked you';
+      const to = Array.isArray(v.to) ? v.to.filter((x): x is string => typeof x === 'string' && !!x).map((x) => (x === 'operator' ? 'you' : x)) : [];
       return to.length ? 'Posted to ' + list(to) : 'Posted to the bridge';
     }
     case 'bridge_read':
@@ -158,7 +169,7 @@ export function stepWords(tool: string | undefined, input?: unknown, said?: stri
     case 'bridge_close':
       return 'Closed the bridge';
     case 'ask_user':
-      return 'Asked you';
+      return firstLine(str('question')) ? 'Asked you: ' + firstLine(str('question')) : 'Asked you';
     case 'env': {
       // The command of env, such as add, is no shell command: the step names the package.
       const c = envCallOf(name, input)!;

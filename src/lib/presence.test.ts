@@ -55,7 +55,7 @@ describe('presence', () => {
     expect(phaseOf('Suspended')).toMatchObject({ word: 'asleep', tone: 'grey' });
     expect(phaseOf('Failed').tone).toBe('red');
     expect(phaseOf('Odd').word).toBe('odd');
-    expect(runStatus({ state: 'completed', output: 'done' }).word).toBe('ready');
+    expect(runStatus({ state: 'completed', output: 'done' }).word).toBe('answered');
     expect(runStatus({ state: 'completed', output: '' }).word).toBe('ended');
     // A run that the front knows without its texts, such as from its index after a restart, cannot say whether it answered.
     expect(runStatus({ state: 'completed', input: '', output: '' }).word).toBe('finished');

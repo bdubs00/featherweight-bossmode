@@ -342,6 +342,8 @@ export interface Run {
   metadata?: Record<string, string>;
   createdAt: string;
   updatedAt: string;
+  /** When the run ended, when the server names it. updatedAt is no end: a later reaction moves it. */
+  endedAt?: string;
   member?: string;
   activity?: Activity | null;
   reactions?: Partial<Record<ReactionKind, number>>;

@@ -92,7 +92,7 @@ describe('a run of the archive', () => {
     expect(closed({ ...OLD, archived: false })).toBe(false);
     expect(runStatus(OLD)).toEqual({ word: 'ended', tone: 'grey', label: 'Its worker was replaced. You can read it.' });
     // A run that finished keeps the word of its state.
-    expect(runStatus({ ...OLD, state: 'completed', output: 'Two.' }).word).toBe('ready');
+    expect(runStatus({ ...OLD, state: 'completed', output: 'Two.' }).word).toBe('answered');
     expect(runStatus({ ...OLD, state: 'failed' }).word).toBe('failed');
     // A run on crew-0 keeps it busy, and the same run from the archive does not.
     const held = { ...OLD, agent: 'migrator', member: 'default/crew-0', archived: false };

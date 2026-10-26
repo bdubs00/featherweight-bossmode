@@ -118,7 +118,8 @@ export function runStatus(r: Pick<Run, 'state' | 'output'> & Partial<Pick<Run, '
     case 'suspended':
       return { word: 'working', tone: 'green', label: 'Runs, or pauses between two steps.' };
     case 'completed':
-      if (r.output) return { word: 'ready', tone: 'grey', label: 'Finished with an answer to review.' };
+      // One word with the lists of conversations: a run that answered waits for nothing, so it never says ready.
+      if (r.output) return { word: 'answered', tone: 'grey', label: 'Finished with an answer.' };
       if (r.input === '' && !r.title) return { word: 'finished', tone: 'grey', label: 'Finished. Its messages show once its worker answers.' };
       return { word: 'ended', tone: 'grey', label: 'Finished with no answer.' };
     case 'failed':
