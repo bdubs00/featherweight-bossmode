@@ -9,6 +9,11 @@
 // of the seats will appear, and the key says Ask the manager. A person with
 // playbooks can start from one: it fills the goal, the seats, the
 // placement, the caps, and what the manager can do.
+//
+// The form keeps a draft in sessionStorage, as a composer does, so a move to
+// another screen, Escape, or a reload keeps the half-filled job and its
+// seats. Open bridge and Ask the manager end the draft, and Cancel asks
+// before it throws a filled form away.
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { Caps, Delegation, Placement, Playbook } from '../api/types';
@@ -24,7 +29,8 @@ import { go } from '../lib/route';
 import { attempt } from './notice';
 import { loadPlaybooks, readPlaybook, seatsOf, usePlaybooks } from '../state/playbooks';
 import { PlaybookPick } from './Playbooks';
-import { Advanced, Button, Choices, Field, IconButton, Input, Mark, PaneHeader, TextArea } from './primitives';
+import { Confirm } from './common';
+import { Advanced, Button, Choices, Field, Help, IconButton, Input, Mark, PaneHeader, TextArea } from './primitives';
 
 /** One seat of the form. task follows the goal until the person changes it. */
 export interface SeatRow {
@@ -37,9 +43,9 @@ export interface SeatRow {
 
 export type SeatMode = 'pick' | 'manager';
 
-export const PLACEMENTS: { id: Placement; label: string }[] = [
-  { id: 'queue', label: 'Keep warm workers' },
-  { id: 'spawn', label: 'Fresh sandbox per seat' },
+export const PLACEMENTS: { id: Placement; label: string; meta: string }[] = [
+  { id: 'queue', label: 'Keep warm workers', meta: 'Each seat starts at once on a worker that its agent keeps.' },
+  { id: 'spawn', label: 'Fresh sandbox per seat', meta: 'The manager starts a new worker for each seat, so a seat starts later.' },
 ];
 
 /** The words of what the manager can do, as the channel of screen A names them. */
@@ -77,9 +83,32 @@ export interface BridgeForm {
   delegation: Delegation;
 }
 
-/** bridgeErrors says what is wrong with the form, by field. hasManager says whether the settings name a manager. */
-export function bridgeErrors(f: BridgeForm, hasManager: boolean): { goal?: string; seats?: string; placement?: string; seat: Record<number, string>; caps: Partial<Record<keyof Caps, string>> } {
-  const out: ReturnType<typeof bridgeErrors> = { seat: {}, caps: {} };
+/** The field of a seat that an error names: the handle, the agent, or the task. */
+export type SeatField = 'handle' | 'agent' | 'task';
+
+export interface BridgeErrors {
+  goal?: string;
+  seats?: string;
+  placement?: string;
+  /** The reason of each seat that cannot go out, by its key. */
+  seat: Record<number, string>;
+  /** The field of each such seat that the reason names, so only that field shows red. */
+  seatField: Record<number, SeatField>;
+  caps: Partial<Record<keyof Caps, string>>;
+}
+
+/** hasErrors reports whether the errors of the form hold any reason. */
+export function hasErrors(e: BridgeErrors): boolean {
+  return !!(e.goal || e.seats || e.placement || Object.keys(e.seat).length || Object.keys(e.caps).length);
+}
+
+/**
+ * bridgeErrors says what is wrong with the form, by field. hasManager says
+ * whether the settings name a manager. A job for the manager has no seats
+ * and no caps of the form, because the manager picks them.
+ */
+export function bridgeErrors(f: BridgeForm, hasManager: boolean): BridgeErrors {
+  const out: BridgeErrors = { seat: {}, seatField: {}, caps: {} };
   if (!f.goal.trim()) out.goal = 'Write the goal of the bridge.';
   if (f.placement === 'spawn' && !hasManager) out.placement = 'A fresh sandbox per seat needs a manager. Pick keep warm workers, or set up a manager.';
   if (f.mode === 'pick') {
@@ -87,11 +116,16 @@ export function bridgeErrors(f: BridgeForm, hasManager: boolean): { goal?: strin
     f.seats.forEach((s, i) => {
       const others = f.seats.filter((x) => x.key !== s.key).map((x) => x.handle);
       const why = handleReason(s.handle, others);
-      if (why) out.seat[s.key] = why;
-      else if (!s.agent) out.seat[s.key] = `Member ${i + 1} needs an agent.`;
-      else if (!s.task.trim()) out.seat[s.key] = `Member ${i + 1} needs a task.`;
+      const bad = (field: SeatField, reason: string) => {
+        out.seat[s.key] = reason;
+        out.seatField[s.key] = field;
+      };
+      if (why) bad('handle', why);
+      else if (!s.agent) bad('agent', `Member ${i + 1} needs an agent.`);
+      else if (!s.task.trim()) bad('task', `Member ${i + 1} needs a task.`);
     });
   }
+  if (f.mode === 'manager') return out;
   for (const [k] of CAPS) {
     const v = (f.caps[k] || '').trim();
     if (v && !(Number.isInteger(Number(v)) && Number(v) > 0)) out.caps[k] = 'Write a whole number.';
@@ -131,6 +165,59 @@ export function askOf(f: BridgeForm, defaultPlacement: Placement = 'queue'): str
 
 let seatKey = 0;
 
+/** The key of the draft of the form in sessionStorage. */
+export const DRAFT_KEY = 'fw.bossmode.newbridge';
+
+/** A draft of the form: its fields, the playbook it started from, and whether Advanced is open. */
+interface Draft {
+  f: BridgeForm;
+  from: string;
+  adv: boolean;
+}
+
+/** readDraft reads the draft of the form, or null for none or for one that this page cannot read. */
+function readDraft(): Draft | null {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const d = JSON.parse(raw) as Draft;
+    if (!d || !d.f || typeof d.f.goal !== 'string' || !Array.isArray(d.f.seats) || !d.f.delegation || !d.f.caps) return null;
+    // The keys of the seats of a new row never meet the keys of the draft.
+    for (const x of d.f.seats) if (typeof x.key === 'number' && x.key > seatKey) seatKey = x.key;
+    return { f: d.f, from: typeof d.from === 'string' ? d.from : '', adv: !!d.adv };
+  } catch {
+    return null;
+  }
+}
+
+/** writeDraft keeps the draft of the form, or forgets it for null. */
+function writeDraft(d: Draft | null): void {
+  try {
+    if (d) sessionStorage.setItem(DRAFT_KEY, JSON.stringify(d));
+    else sessionStorage.removeItem(DRAFT_KEY);
+  } catch {
+    // No storage: the draft lives as long as the screen.
+  }
+}
+
+/** blankForm is the form before the person types: keep warm workers, unless the deployment picked a fresh sandbox per seat and has the manager that it needs. */
+function blankForm(config: { placement?: Placement; manager?: unknown } | null): BridgeForm {
+  return {
+    goal: '',
+    mode: 'pick',
+    seats: [],
+    placement: config && config.placement === 'spawn' && config.manager ? 'spawn' : 'queue',
+    title: '',
+    caps: {},
+    delegation: { approve: false, budget: false, members: false, report: true },
+  };
+}
+
+/** filled reports whether the person put something in the form that a draft keeps. */
+export function filled(f: BridgeForm, blank: BridgeForm): boolean {
+  return JSON.stringify(f) !== JSON.stringify(blank);
+}
+
 /** bridgeFormOf fills the form from a playbook: its goal, its seats, its placement, its caps, and what the manager can do. The title stays. */
 export function bridgeFormOf(p: Playbook, f: BridgeForm): BridgeForm {
   const caps: BridgeForm['caps'] = {};
@@ -150,31 +237,53 @@ export function NewBridge() {
   const agents = useSelect((s) => s.agents);
   const config = useSelect((s) => s.config);
   const hasManager = !!(config && config.manager);
-  const [f, setF] = useState<BridgeForm>(() => ({
-    goal: '',
-    mode: 'pick',
-    seats: [],
-    // Keep warm workers, unless the deployment picked a fresh sandbox per seat and has the manager that it needs.
-    placement: config && config.placement === 'spawn' && config.manager ? 'spawn' : 'queue',
-    title: '',
-    caps: {},
-    delegation: { approve: false, budget: false, members: false, report: true },
-  }));
-  const [adv, setAdv] = useState(false);
+  const [draft] = useState(readDraft);
+  const [f, setF] = useState<BridgeForm>(() => (draft ? draft.f : blankForm(config)));
+  const [adv, setAdv] = useState(() => !!(draft && draft.adv));
   const [picking, setPicking] = useState(false);
   const addKey = useRef<HTMLButtonElement>(null);
   const [busy, setBusy] = useState(false);
-  const [errors, setErrors] = useState<ReturnType<typeof bridgeErrors> | null>(null);
+  // After a failed submit, the errors follow the form, so a fixed field loses its error as the person types.
+  const [tried, setTried] = useState(false);
+  const [shown, setShown] = useState(0);
+  const [discard, setDiscard] = useState(false);
   const first = useRef<HTMLTextAreaElement>(null);
+  const box = useRef<HTMLFormElement>(null);
+  const done = useRef(false);
   const max = (config && config.maxMembers) || 16;
   const books = usePlaybooks((s) => s.list);
-  const [from, setFrom] = useState('');
+  const [from, setFrom] = useState(() => (draft ? draft.from : ''));
+  // The blank form of the moment the screen opened, so settings that load later do not make an untouched form look filled.
+  const [blank] = useState(() => blankForm(config));
+  const errors = tried ? bridgeErrors(f, hasManager) : null;
 
   useEffect(() => {
     if (!agents) attempt(loadAgents);
     loadPlaybooks().catch(() => {});
     if (first.current) first.current.focus();
   }, []);
+
+  // The draft follows the form. A form with nothing in it keeps no draft.
+  useEffect(() => {
+    if (done.current) return;
+    writeDraft(filled(f, blank) || from ? { f, from, adv } : null);
+  }, [f, from, adv]);
+
+  // After a failed submit, the first field with an error takes the focus, so a phone shows it.
+  useEffect(() => {
+    if (!shown || !box.current) return;
+    const bad = box.current.querySelector('[aria-invalid="true"], .field-error');
+    if (!bad) return;
+    let to = bad.matches('[aria-invalid="true"]') ? (bad as HTMLElement) : null;
+    if (!to) {
+      // An error of a group, such as the seats or the placement, gives the focus to its first control.
+      const group = bad.closest('fieldset, .seats');
+      to = group ? (group.querySelector('input:checked, input, button') as HTMLElement | null) : null;
+    }
+    if (!to) return;
+    to.focus();
+    if (typeof to.scrollIntoView === 'function') to.scrollIntoView({ block: 'nearest' });
+  }, [shown]);
 
   /** startFrom fills the form from a playbook that the person picked. */
   const startFrom = async (name: string) => {
@@ -183,27 +292,32 @@ export function NewBridge() {
     await attempt(async () => {
       const p = await readPlaybook(name);
       setF((x) => bridgeFormOf(p, x));
-      setErrors(null);
+      setTried(false);
     });
   };
 
-  const patch = (p: Partial<BridgeForm>) => {
-    setF((x) => ({ ...x, ...p }));
-    if (errors) setErrors(null);
-  };
+  const patch = (p: Partial<BridgeForm>) => setF((x) => ({ ...x, ...p }));
   // A seat takes its task from the first sentence of the goal, as a seat of the members pane does, until the person changes it.
   const setGoal = (goal: string) => setF((x) => ({ ...x, goal, seats: x.seats.map((s) => (s.own ? s : { ...s, task: taskOfGoal(goal) })) }));
   const addSeat = (agent: string) =>
     setF((x) => (x.seats.length >= max ? x : { ...x, seats: [...x.seats, { key: ++seatKey, agent, handle: nextHandle(agent, x.seats.map((s) => s.handle)), task: taskOfGoal(x.goal), own: false }] }));
   const setSeat = (key: number, p: Partial<SeatRow>) => setF((x) => ({ ...x, seats: x.seats.map((s) => (s.key === key ? { ...s, ...p } : s)) }));
 
+  /** forget ends the draft: the bridge opened, the manager has the job, or the person threw the form away. */
+  const forget = () => {
+    done.current = true;
+    writeDraft(null);
+  };
+
   const submit = async (e: Event) => {
     e.preventDefault();
     const errs = bridgeErrors(f, hasManager);
-    const bad = !!(errs.goal || errs.seats || errs.placement || Object.keys(errs.seat).length || Object.keys(errs.caps).length);
-    setErrors(bad ? errs : null);
+    const bad = hasErrors(errs);
+    setTried(bad);
     if (bad) {
-      if (errs.placement || Object.keys(errs.caps).length || (Object.keys(errs.seat).length && !adv)) setAdv(true);
+      // A handle shows as a field only under Advanced, so a wrong handle opens it. A missing task does not.
+      if (errs.placement || Object.keys(errs.caps).length || Object.values(errs.seatField).includes('handle')) setAdv(true);
+      setShown((n) => n + 1);
       return;
     }
     setBusy(true);
@@ -223,15 +337,27 @@ export function NewBridge() {
         to = '#bridge/' + encodeURIComponent(id);
       }
     });
+    if (to) forget();
     setBusy(false);
     if (to) go(to);
   };
 
-  const err = errors || { seat: {} as Record<number, string>, caps: {} as Partial<Record<keyof Caps, string>> };
+  /** cancel leaves the form. A filled form asks first, because Cancel throws its draft away. */
+  const cancel = () => {
+    if (filled(f, blank) || from) {
+      setDiscard(true);
+      return;
+    }
+    forget();
+    go('#');
+  };
+
+  const err: BridgeErrors = errors || { seat: {}, seatField: {}, caps: {} };
+  const manager = f.mode === 'manager';
   return (
     <section class="screen newbridge" aria-labelledby="new-title">
       <PaneHeader id="new-title" title="Open a bridge" size="title" level={1} back={{ href: '#', label: 'Bridges', to: 'list' }} />
-      <form class="scroll pad" onSubmit={submit} noValidate>
+      <form class="scroll pad" ref={box} onSubmit={submit} noValidate>
         <div class="make">
           {books && books.length > 0 && <PlaybookPick value={from} onChange={startFrom} label="Start from a playbook" empty="No playbook" />}
           <Field label="What is the job?" error={err.goal}>
@@ -265,13 +391,13 @@ export function NewBridge() {
                   <div class="seat-main">
                     <div class="seat-handle">
                       {adv ? (
-                        <Input aria-label={'Handle of ' + s.handle} value={s.handle} maxLength={32} invalid={!!err.seat[s.key]} spellcheck={false} onInput={(e) => setSeat(s.key, { handle: (e.target as HTMLInputElement).value.toLowerCase() })} />
+                        <Input aria-label={'Handle of ' + s.handle} value={s.handle} maxLength={32} invalid={err.seatField[s.key] === 'handle'} spellcheck={false} onInput={(e) => setSeat(s.key, { handle: (e.target as HTMLInputElement).value.toLowerCase() })} />
                       ) : (
                         <span class="t-sub">{s.handle}</span>
                       )}
                       {s.agent !== s.handle && <span class="t-meta">{s.agent}</span>}
                     </div>
-                    <Input aria-label={'Task of ' + s.handle} placeholder={'What ' + s.handle + ' does on this bridge'} value={s.task} invalid={!!err.seat[s.key]} onInput={(e) => setSeat(s.key, { task: (e.target as HTMLInputElement).value, own: true })} />
+                    <Input aria-label={'Task of ' + s.handle} placeholder={'What ' + s.handle + ' does on this bridge'} value={s.task} invalid={err.seatField[s.key] === 'task'} onInput={(e) => setSeat(s.key, { task: (e.target as HTMLInputElement).value, own: true })} />
                     {err.seat[s.key] && (
                       <span class="field-error" role="alert">
                         {err.seat[s.key]}
@@ -300,35 +426,57 @@ export function NewBridge() {
               <Input value={f.title} maxLength={120} placeholder={titleOf(f.goal)} onInput={(e) => patch({ title: (e.target as HTMLInputElement).value })} />
             </Field>
             <Choices name="placement" legend="Placement" value={f.placement} options={PLACEMENTS} onChange={(placement) => patch({ placement })} error={err.placement} />
-            <fieldset>
-              <legend>Caps</legend>
-              <div class="field-row">
-                {CAPS.map(([k, label]) => (
-                  <Field label={label} error={err.caps[k]}>
-                    <Input type="number" min={1} inputMode="numeric" value={f.caps[k] || ''} invalid={!!err.caps[k]} onInput={(e) => patch({ caps: { ...f.caps, [k]: (e.target as HTMLInputElement).value } })} />
-                  </Field>
-                ))}
-              </div>
-            </fieldset>
-            <fieldset>
-              <legend>What the manager can do here</legend>
-              {DELEGATION.map(([k, label]) => (
-                <label class="check">
-                  <input type="checkbox" checked={f.delegation[k]} onChange={(e) => patch({ delegation: { ...f.delegation, [k]: (e.target as HTMLInputElement).checked } })} />
-                  <span>{label}</span>
-                </label>
-              ))}
-            </fieldset>
+            {/* The manager picks the caps and what it can do when it opens the bridge, so a job for the manager asks neither. */}
+            {!manager && (
+              <>
+                <fieldset>
+                  <legend>
+                    Caps <Help label="What the caps are">Each cap counts the whole bridge. The bridge stops at a cap until you raise it. An empty field keeps the usual cap of the server.</Help>
+                  </legend>
+                  <div class="field-row">
+                    {CAPS.map(([k, label]) => (
+                      <Field label={label} error={err.caps[k]}>
+                        <Input type="number" min={1} inputMode="numeric" placeholder="Usual" value={f.caps[k] || ''} invalid={!!err.caps[k]} onInput={(e) => patch({ caps: { ...f.caps, [k]: (e.target as HTMLInputElement).value } })} />
+                      </Field>
+                    ))}
+                  </div>
+                </fieldset>
+                <fieldset>
+                  <legend>What the manager can do here</legend>
+                  {DELEGATION.map(([k, label]) => (
+                    <label class="check">
+                      <input type="checkbox" checked={f.delegation[k]} onChange={(e) => patch({ delegation: { ...f.delegation, [k]: (e.target as HTMLInputElement).checked } })} />
+                      <span>{label}</span>
+                    </label>
+                  ))}
+                </fieldset>
+              </>
+            )}
           </Advanced>
 
           <div class="form-end">
-            <Button href="#">Cancel</Button>
+            <Button onClick={cancel}>Cancel</Button>
             <Button type="submit" kind="primary" disabled={busy}>
-              {f.mode === 'manager' ? 'Ask the manager' : 'Open bridge'}
+              {manager ? 'Ask the manager' : 'Open bridge'}
             </Button>
           </div>
         </div>
       </form>
+      {discard && (
+        <Confirm
+          title="Throw away this bridge?"
+          confirm="Throw away"
+          danger
+          onCancel={() => setDiscard(false)}
+          onConfirm={() => {
+            forget();
+            setDiscard(false);
+            go('#');
+          }}
+        >
+          <p>The job and the seats that you wrote go. No bridge opens.</p>
+        </Confirm>
+      )}
     </section>
   );
 }

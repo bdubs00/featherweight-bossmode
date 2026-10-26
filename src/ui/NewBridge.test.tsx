@@ -3,7 +3,7 @@ import { act } from 'preact/test-utils';
 import { store } from '../state/store';
 import { forgetManagerRun } from '../state/actions';
 import type { BossConfig, Fleet } from '../api/types';
-import { NewBridge, askOf, bodyOf, bridgeErrors, titleOf, type BridgeForm } from './NewBridge';
+import { DRAFT_KEY, NewBridge, askOf, bodyOf, bridgeErrors, titleOf, type BridgeForm } from './NewBridge';
 import { click, fakeApi, keyNamed, mount, settle, typeIn, unmountAll } from './testkit-c';
 
 const MANAGER: BossConfig = { manager: { agent: 'manager', member: 'default/manager-0', run: '' }, placement: 'queue', maxMembers: 16 };
@@ -28,6 +28,7 @@ beforeEach(() => {
     store.dispatch({ type: 'fleet', fleet: FLEET });
   });
   forgetManagerRun();
+  sessionStorage.removeItem(DRAFT_KEY);
   location.hash = '#new';
 });
 afterEach(() => {
@@ -48,7 +49,7 @@ describe('NewBridge', () => {
     const adv = el.querySelector('details.advanced') as HTMLDetailsElement;
     expect(adv.open).toBe(false);
     expect(adv.querySelectorAll('input[name="placement"]').length).toBe(2);
-    const choices = [...el.querySelectorAll<HTMLInputElement>('input[name="placement"]')].map((i) => ({ word: i.closest('label')!.textContent, on: i.checked, value: i.value }));
+    const choices = [...el.querySelectorAll<HTMLInputElement>('input[name="placement"]')].map((i) => ({ word: i.closest('label')!.querySelector('.t-sub')!.textContent, on: i.checked, value: i.value }));
     expect(choices).toEqual([
       { word: 'Keep warm workers', on: true, value: 'queue' },
       { word: 'Fresh sandbox per seat', on: false, value: 'spawn' },
@@ -131,6 +132,99 @@ describe('NewBridge', () => {
     expect((start.body as { input: string }).input).toBe('Write the release notes of 2.4.\n\nPlease open a bridge for this and pick the seats.');
     expect(keyNamed(el, 'Ask the manager')).toBeTruthy();
     expect(location.hash).toBe('#manager');
+  });
+});
+
+describe('the draft and the errors of the form', () => {
+  const migrator = (el: HTMLElement) => [...el.querySelectorAll<HTMLElement>('.picker .pick-row')].find((r) => r.querySelector('.pick-name')!.textContent === 'Migrator')!;
+  const alerts = (el: HTMLElement) => [...el.querySelectorAll('[role="alert"]')].map((x) => x.textContent);
+
+  it('keeps a draft in the tab, so the form comes back with the job and the seats after a move away', () => {
+    api = fakeApi({});
+    let el = mount(<NewBridge />);
+    typeIn(el.querySelector('textarea'), 'Migrate logrotate. Then review it.');
+    click(keyNamed(el, 'Add a seat'));
+    click(migrator(el));
+    unmountAll();
+    el = mount(<NewBridge />);
+    expect((el.querySelector('textarea') as HTMLTextAreaElement).value).toBe('Migrate logrotate. Then review it.');
+    expect([...el.querySelectorAll('.seat .seat-handle .t-sub')].map((x) => x.textContent)).toEqual(['migrator']);
+    expect((el.querySelector('input[aria-label="Task of migrator"]') as HTMLInputElement).value).toBe('Migrate logrotate');
+  });
+
+  it('keeps the focus in the picker after a pick, so Escape closes the picker and leaves the form alone', () => {
+    api = fakeApi({});
+    const el = mount(<NewBridge />);
+    click(keyNamed(el, 'Add a seat'));
+    const row = migrator(el);
+    act(() => row.focus());
+    click(row);
+    // The pick moves the agent to On this bridge. The focus follows its row and never falls to the page.
+    const on = document.activeElement as HTMLElement;
+    expect(on.closest('.picker')).not.toBeNull();
+    expect(on.dataset.agent).toBe('migrator');
+    act(() => {
+      on.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    });
+    expect(el.querySelector('.picker')).toBeNull();
+    expect(document.activeElement).toBe(keyNamed(el, 'Add a seat'));
+    expect(el.querySelectorAll('.seat').length).toBe(1);
+  });
+
+  it('marks only the field that is wrong, focuses the first one, and clears each error as the person fixes it', async () => {
+    api = fakeApi({});
+    const el = mount(<NewBridge />);
+    click(keyNamed(el, 'Add a seat'));
+    click(migrator(el));
+    click(keyNamed(el, 'Open bridge'));
+    await settle();
+    expect(alerts(el)).toEqual(['Write the goal of the bridge.', 'Member 1 needs a task.']);
+    // A missing task is no fault of the handle: Advanced stays shut, and the task alone shows red.
+    expect((el.querySelector('details.advanced') as HTMLDetailsElement).open).toBe(false);
+    expect(el.querySelector('input[aria-label="Task of migrator"]')!.getAttribute('aria-invalid')).toBe('true');
+    expect(document.activeElement).toBe(el.querySelector('textarea'));
+    // The task of the seat follows the goal, so the goal fixes both.
+    typeIn(el.querySelector('textarea'), 'Migrate logrotate.');
+    expect(alerts(el)).toEqual([]);
+    expect(el.querySelector('[aria-invalid="true"]')).toBeNull();
+  });
+
+  it('asks before Cancel throws a filled form away, and then forgets the draft', () => {
+    api = fakeApi({});
+    location.hash = '#new';
+    const el = mount(<NewBridge />);
+    typeIn(el.querySelector('textarea'), 'Migrate logrotate.');
+    expect(sessionStorage.getItem(DRAFT_KEY)).not.toBeNull();
+    click(keyNamed(el, 'Cancel'));
+    const dialog = el.querySelector('dialog.confirm')!;
+    expect(dialog.querySelector('h2')!.textContent).toBe('Throw away this bridge?');
+    click(keyNamed(dialog, 'Throw away'));
+    expect(sessionStorage.getItem(DRAFT_KEY)).toBeNull();
+    expect(location.hash).toBe('');
+  });
+
+  it('leaves an empty form at once on Cancel, with no draft and no question', () => {
+    api = fakeApi({});
+    location.hash = '#new';
+    const el = mount(<NewBridge />);
+    click(keyNamed(el, 'Cancel'));
+    expect(el.querySelector('dialog.confirm')).toBeNull();
+    expect(location.hash).toBe('');
+    expect(sessionStorage.getItem(DRAFT_KEY)).toBeNull();
+  });
+
+  it('asks the manager for the job without the caps and what the manager can do, which the manager picks', () => {
+    api = fakeApi({});
+    const el = mount(<NewBridge />);
+    const legends = () => [...el.querySelectorAll('details.advanced legend')].map((x) => x.firstChild!.textContent!.trim());
+    expect(legends()).toEqual(['Placement', 'Caps', 'What the manager can do here']);
+    click([...el.querySelectorAll('input[name="mode"]')][1]);
+    expect(legends()).toEqual(['Placement']);
+    // Each placement says in one line what it means.
+    expect([...el.querySelectorAll('input[name="placement"]')].map((i) => i.closest('label')!.querySelector('.t-meta')!.textContent)).toEqual([
+      'Each seat starts at once on a worker that its agent keeps.',
+      'The manager starts a new worker for each seat, so a seat starts later.',
+    ]);
   });
 });
 

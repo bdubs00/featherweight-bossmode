@@ -10,7 +10,9 @@
 // new-bridge screen, for a bridge that does not exist yet. There the seats
 // of the form are the agents on this bridge, and the form holds its own
 // Advanced. Escape and a click outside close it, and the focus goes back to
-// the key Add.
+// the key Add. A pick moves the row of its agent, so the focus follows the
+// row, or goes to the field: it never falls to the page, where Escape would
+// leave the screen.
 
 import type { JSX, RefObject } from 'preact';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
@@ -49,7 +51,7 @@ export interface PickerProps {
 function Row({ r, onPick }: { r: PickRow; onPick: (agent: string) => void }) {
   const word = r.free >= 0 ? freeWords(r.free) : '';
   return (
-    <button type="button" class="pick-row" data-pick onClick={() => onPick(r.agent)}>
+    <button type="button" class="pick-row" data-pick data-agent={r.agent} onClick={() => onPick(r.agent)}>
       <Mark agent={r.agent} size={32} />
       <span class="pick-text">
         <span class="pick-name">{r.name}</span>
@@ -182,6 +184,25 @@ export function Picker({ bridge, drafts, draftHandles, onPick, onClose, anchor, 
     if (anchor.current) anchor.current.focus();
   };
 
+  // A pick redraws the groups, and the row of the agent can move to On this
+  // bridge. After the redraw, the focus goes to that row, else to the field.
+  const picked = useRef<string | null>(null);
+  const pick = (agent: string) => {
+    picked.current = agent;
+    onPick(agent);
+  };
+  useLayoutEffect(() => {
+    const agent = picked.current;
+    if (agent === null || !panel.current) return;
+    picked.current = null;
+    // A focus that stays in the picker stays where it is, such as in the field after Enter.
+    const on = document.activeElement;
+    if (on && on !== document.body && panel.current.contains(on)) return;
+    const row = [...panel.current.querySelectorAll<HTMLElement>('[data-pick]')].find((x) => x.dataset.agent === agent);
+    const to = row || field.current;
+    if (to) to.focus();
+  });
+
   // Escape closes. The arrows move between the field and the rows.
   const onKey = (e: JSX.TargetedKeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'Escape') {
@@ -226,7 +247,7 @@ export function Picker({ bridge, drafts, draftHandles, onPick, onClose, anchor, 
                 if (e.key === 'Enter') {
                   e.preventDefault();
                   const r = groups.here[0] || groups.others[0];
-                  if (r) onPick(r.agent);
+                  if (r) pick(r.agent);
                 }
               }}
             />
@@ -240,7 +261,7 @@ export function Picker({ bridge, drafts, draftHandles, onPick, onClose, anchor, 
                     On this bridge
                   </div>
                   {groups.here.map((r) => (
-                    <Row r={r} onPick={onPick} />
+                    <Row key={r.agent} r={r} onPick={pick} />
                   ))}
                 </div>
                 <div role="group" aria-labelledby="pick-others">
@@ -248,12 +269,12 @@ export function Picker({ bridge, drafts, draftHandles, onPick, onClose, anchor, 
                     Everyone else
                   </div>
                   {groups.others.map((r) => (
-                    <Row r={r} onPick={onPick} />
+                    <Row key={r.agent} r={r} onPick={pick} />
                   ))}
                 </div>
               </>
             ) : (
-              [...groups.here, ...groups.others].map((r) => <Row r={r} onPick={onPick} />)
+              [...groups.here, ...groups.others].map((r) => <Row key={r.agent} r={r} onPick={pick} />)
             )}
             {none && agents && <div class="pick-none" />}
           </div>
