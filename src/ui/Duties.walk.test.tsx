@@ -115,6 +115,19 @@ async function wait(ms: number): Promise<void> {
   for (let t = 0; t < ms; t += 10) await act(async () => void (await new Promise((r) => setTimeout(r, 10))));
 }
 
+/**
+ * until lets the timers of the page run until a test holds, and fails
+ * after several seconds. A test then waits on the state of the page, not
+ * on a time that a busy machine can stretch.
+ */
+async function until(test: () => boolean, ms = 5000): Promise<void> {
+  const end = Date.now() + ms;
+  while (!test()) {
+    if (Date.now() > end) throw new Error('until: the page did not reach the state in ' + ms + ' ms');
+    await wait(10);
+  }
+}
+
 function pick(el: HTMLElement, name: string): void {
   click(keyNamed(el, 'Pick an agent') || keyNamed(el, 'Change the agent'));
   click([...el.querySelectorAll('.picker .pick-row')].find((r) => r.querySelector('.pick-name')!.textContent === name));
@@ -125,11 +138,14 @@ describe('the page of a duty', () => {
     following.fast = 10;
     const queued: DutyRun = { at: ago(1), run: '01KRUN', state: 'queued' };
     const done: DutyRun = { ...queued, state: 'completed', costUSD: 0.004 };
+    // The run waits for a worker until the test lets it finish, so no step of the test depends on the time that a read takes.
     let n = 0;
+    let finished = false;
     api = fakeApi({
       'GET /v1/duties': { duties: [duty({ state: { lastRun: queued, todayUSD: 0, failuresInRow: 0 } })], paused: false },
       'GET /v1/duties/walk-duty': () => {
-        const r = ++n >= 3 ? done : queued;
+        n++;
+        const r = finished ? done : queued;
         return { body: duty({ state: { lastRun: r, todayUSD: 0, failuresInRow: 0 }, history: [r] }) };
       },
     });
@@ -137,13 +153,19 @@ describe('the page of a duty', () => {
     const el = mount(<DutyMain name="walk-duty" />);
     await settle();
     expect(text(el.querySelector('.pane-head'))).toContain('waiting for a worker');
-    await wait(80);
-    expect(text(el.querySelector('.pane-head'))).toContain('finished');
+    // While the run waits, the page reads the duty again by itself.
+    await until(() => n >= 3);
+    expect(text(el.querySelector('.pane-head'))).toContain('waiting for a worker');
+    // Once the run ends, the next read shows it.
+    finished = true;
+    await until(() => text(el.querySelector('.pane-head')).includes('finished'));
     expect(text(el.querySelector('.duty-run'))).toContain('finished');
     // The row of the list follows too.
     expect(text(list.querySelector('.duty-row'))).toContain('finished');
+    // A run that ended asks for no more reads, however long the page waits.
+    await settle();
     const reads = api.calls.filter((c) => c.path === '/v1/duties/walk-duty').length;
-    await wait(60);
+    await wait(10 * following.fast);
     expect(api.calls.filter((c) => c.path === '/v1/duties/walk-duty').length).toBe(reads);
   });
 
@@ -157,14 +179,18 @@ describe('the page of a duty', () => {
     });
     const el = mount(<DutyMain name="walk-duty" />);
     await settle();
-    const before = api.calls.filter((c) => c.path === '/v1/duties/walk-duty').length;
+    const reads = () => api.calls.filter((c) => c.path === '/v1/duties/walk-duty').length;
+    const before = reads();
+    const pressed = Date.now();
     click(keyNamed(el, 'Run now'));
-    await wait(40);
-    expect(api.calls.filter((c) => c.path === '/v1/duties/walk-duty').length).toBeGreaterThan(before + 1);
-    await wait(40);
-    const after = api.calls.filter((c) => c.path === '/v1/duties/walk-duty').length;
-    await wait(40);
-    expect(api.calls.filter((c) => c.path === '/v1/duties/walk-duty').length).toBe(after);
+    // Run now reads the duty once, and the page then goes on reading it while the new run may still be missing.
+    await until(() => reads() > before + 2);
+    // Once the while after Run now has passed, the reads stop.
+    await until(() => Date.now() - pressed > 3 * following.after);
+    await settle();
+    const after = reads();
+    await wait(10 * following.fast);
+    expect(reads()).toBe(after);
   });
 
   it('keeps the focus on Pause, Resume, and Run now, and gives a page that opens its heading', async () => {
