@@ -66,7 +66,7 @@ The statuses of a seat: `working`, `needs you`, `waiting for a worker`,
 worker: `awake`, `asleep`, `starting`, `failed`, and `stopping`. The readout
 of the fleet also counts `working`, a worker that is awake and holds an open
 run. The statuses of a run: `waiting for a worker`, `working`, `needs you`,
-`ready`, `ended`, `failed`, and `stopped`.
+`answered`, `ended`, `failed`, and `stopped`.
 
 Capacity shows where seating happens:
 
@@ -176,6 +176,7 @@ Capacity shows where seating happens:
 | the notice stays until Dismiss or the next action that works | change | when the person moves to another screen, the notice also clears | done |
 | new | add | a notice of an action that worked, such as `Saved the playbook <name>.`, a status with the key `Dismiss`. It goes after six seconds, stays through a move to another screen, and gives way to a notice of a failed action | done |
 | `The workbench did not answer. Check the connection and try again.` | change | `The server did not answer. Check the connection and try again.` | done |
+| new | add | a notice of an action that worked stays while the pointer rests on it or the focus sits in it, and goes six seconds after both leave, so a key such as `See the playbook` stays in reach | done |
 
 ### src/lib/presence.ts
 
@@ -196,6 +197,7 @@ Capacity shows where seating happens:
 | new | add | `at its limit` for a seat whose newest run stopped at a limit of its budget (presence `limit`, or a failed run whose error starts with `budget exceeded`), with a grey light and `Stopped at a limit of its budget. Continue gives it more room.` It is no error: the key is Continue, and a bridge does not count it as failed | Lead |
 | new | add | `not started` for a seat with no run that nothing will seat, because the manager of its spawn bridge stopped first (presence `not-started`), with `The manager stopped before it seated this member. A message starts it.` | done |
 | the word of a status from three sources: the presence of the bridge, the phases of the stream, and the read of the pool | change | one word for one status on every screen, from `statusOf` of `src/lib/status.ts`. The counts `N awake` and `N workers awake` take it, and so do the people list and the board. The halo of a conversation, a row of the members, the run pane, and the Workers of a profile take it too. The words stay the words of this section. | done |
+| `ready` (a finished run with an answer) | change | `answered`, with the tooltip `Finished with an answer.`, as the lists of conversations say | done |
 
 ### src/lib/words.ts
 
@@ -231,6 +233,7 @@ Capacity shows where seating happens:
 | `front.pages_write` (a step of the run that the kernel names by its tool), `Used pages_write` (a step line of a thread) | change | the step as a person says it, with its target: `Wrote <path>`, `Read <path>`, `Read the history of <path>`, `Searched the wiki for "<words>"`, `Listed the pages`, `Listed the pages under <prefix>`, `Posted to the bridge`, `Posted to <a> and <b>`, `Read the channel`, `Listed the bridges`, `Opened a bridge`, `Seated <handle>`, `Fired <handle>`, `Closed the bridge`, and `Asked you`. Without a target: `Wrote a page`, `Read a page`, `Seated a member`, and the like | done |
 | `Ran "<command>"`, `Wrote <path>`, and the other words of the kernel for a step | keep | the command shows as code | done |
 | `Used <tool>` | keep | only for a tool that the page does not know and that the kernel names only by its name | done |
+| `Posted to the bridge` and `Asked you` for a question to the person | change | `Asked you: <first line of the question>`, and `Posted to you` for a post to the person | done |
 
 ### src/lib/handles.ts, src/lib/pagepath.ts
 
@@ -303,6 +306,8 @@ Capacity shows where seating happens:
 | the tab Wiki with only `New page` | change | `No page yet. The members keep their notes and reports here, and you can write one too.` with the key `New page` | done |
 | new | add | `Nothing waits for you. The cards below were decided or answered.` above the cards of the tab Decisions when none waits | done |
 | `Members finish what they do. The channel takes no new message.` (Close bridge) | change | the same, then `You can reopen it from More.` | done |
+| `Nothing waits for you. The cards below were decided or answered.` | change | `Nothing waits for you. The cards below were decided, answered, or ended without an answer.` | done |
+| new | add | `Saved what the manager can do here.` in the notice after Save of the dialog `What the manager can do here` | done |
 
 ### src/ui/Message.tsx
 
@@ -349,6 +354,7 @@ Capacity shows where seating happens:
 | `You` (the author line of a message of the person who reads the page, a person of a line, and a decided card) | add | the subject or the name of `/v1/whoami` matches the sender or the decider. A person who signs in with the token of the fleet thus never reads `token` for themself. | done |
 | `Someone`, `token` (a line whose sentence names nobody, or the token of the fleet for another person) | add | | done |
 | `to operator` (the address line of a message to the person) | change | `to you` | done |
+| new | add | under a question of a seat that no longer waits: `Answered: <the words of the answer>`, or `Ended without an answer` | done |
 
 ### src/ui/Decision.tsx
 
@@ -374,6 +380,7 @@ Capacity shows where seating happens:
 | `Deny`, `Allow` on the card of the channel, `Deny`, `Always allow`, `Allow` on the card of Activity for the same decision | change | the same keys on every surface: Always allow only by the rule of the front, never for a rule with a pattern such as `check=false` | done |
 | new | add | the card of a question of a seat: `Needs your answer` with the amber light, the words of the seat, one key per choice, `Your answer`, and `Answer`. `Question from <who>` names the card for a screen reader, and `Answers for <who>` the group of the keys. Once a person answers, or the seat posts again, the entry reads as a message | done |
 | new | add | `No answer needed`, a quiet key beside `Answer` on the card of a question of a seat, in the channel and in Activity. It ends the question, and the seat does not wake. A server without the route: `This server cannot end a question without an answer yet. Answer it instead.` | done |
+| new | add | the notice `The question of <handle> ended without an answer.` after `No answer needed` | done |
 
 ### src/ui/Composer.tsx
 
@@ -394,6 +401,7 @@ Capacity shows where seating happens:
 | `The files are too large to send. Remove some, and send again.` | add | the notice of a 413 for a message with files. The draft and its files stay | done |
 | the sentence of a 409 for files, such as `Files go only to a member with a run, and reviewer has none yet: send them once it works, or address another member.` | add | the notice, in the words of the front. The draft and its files stay | done |
 | `A command takes no files. Send the files in a message of their own.` | add | the notice of a slash command with files in the manager. Nothing goes out | done |
+| new | add | `Offline. Your message waits here until the page reaches the server.` in the address line while the page reaches no server, with Send and Attach files off | done |
 
 ### src/ui/Roster.tsx
 
@@ -467,6 +475,8 @@ Capacity shows where seating happens:
 | `Done` | add | a small secondary key on the row of a message, under its text, and in the head of the main pane, and the key e. It clears the message for you: the read mark of its bridge moves to the message. `Done with <name>` for a screen reader on a row. A decision and a message that asks you have no Done | B |
 | `at its limit` (a seat whose newest run stopped at a limit) | add | its row, after the errors: the plain line of the limit, such as `Stopped at its turn limit`, and the key `Continue`, also in the main pane, and the key c. `Continue <handle>` for a screen reader on a row | B |
 | a and d decide at once | change | a and d hold the decision five seconds with the notice `Allowed.` or `Denied.` and `Undo`. The row says `allowed` or `denied` with the tooltip `It goes out in a few seconds. Undo takes it back.`, and u on the row takes it back. Undo says `Undone. Nothing went out.` | done |
+| the card of a row whose decision waits to go out | change | the card says `<Denied or Allowed or Answered <choice>>. It goes out in <n> seconds.` with the one key `Undo` | done |
+| a and d on a question of a seat | add | a opens the answer. d holds the choice that says no, such as `Decline`, with the notice `Answered Decline.` and `Undo`. A question with no such choice says `This question has no choice that says no. Press a to answer it.` | done |
 
 ### src/ui/Fleet.tsx
 
@@ -560,6 +570,8 @@ Capacity shows where seating happens:
 | new | add | `This read wakes the worker.`, one short line in place while the worker that holds the run sleeps. It shows on the tabs Run and Files of a seat and in the run pane of a bridge. The tab reads the run because the person opened it, and the line goes once the worker is awake. The Chat tab reads nothing of a worker that sleeps, so it needs no such line. The line is the one sentence of explanation of these views: without it, a worker that wakes for a read looks like a fault. | done |
 | the start time of a run beside its status, which read as its end | change | `started <time>`, and `started <time>, ended <time>` for a run that ended | done |
 | `[bridge "<title>" <id>] @<handle> from operator: ` and `Answer to your question in entry <n>: ` in the conversation of a run | remove | the words of the sender alone, under `You` or the handle of the seat that sent them | done |
+| new | add | in What it did, a call that a person denied: `Wanted to run <command>: you denied it` (or the name of who denied it) with the mark `Denied` | done |
+| `ended <time>` from the last change of the run | change | the end of its last turn in the transcript, or the end that the server names; no end while the page knows none | done |
 
 ### src/ui/Member.tsx and src/ui/Board.tsx
 
