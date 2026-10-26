@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'preact/test-utils';
-import { Composer, addressWords, keyWords } from './Composer';
+import { Composer, OFFLINE_WHY, addressWords, keyWords } from './Composer';
+import { forgetReach, noteAnswer } from '../state/reach';
 import { MAX_FILES, MAX_FILE_BYTES } from '../lib/attachments';
 import { mount, unmountAll } from './testkit-a';
 
@@ -87,6 +88,31 @@ describe('the reply chip', () => {
     const box = el.querySelector('textarea')!;
     expect(box.disabled).toBe(true);
     expect(box.getAttribute('placeholder')).toBe('Closed. Reopen it to send.');
+  });
+});
+
+describe('a composer while the page reaches no server', () => {
+  it('turns off Send and Attach files with the reason, and keeps taking words for the draft', async () => {
+    const send = vi.fn(async () => true);
+    const el = mount(<Composer draft="c-off" label="Message the bridge" placeholder="Message the bridge" members={members} attach onSend={send} />);
+    type(el, 'Keep 14.');
+    act(() => noteAnswer(0));
+    const key = [...el.querySelectorAll('button')].find((b) => b.textContent === 'Send') as HTMLButtonElement;
+    expect(key.disabled).toBe(true);
+    expect((el.querySelector('button[aria-label="Attach files"]') as HTMLButtonElement).disabled).toBe(true);
+    expect(el.querySelector('.address')!.textContent).toBe(OFFLINE_WHY);
+    const box = el.querySelector('textarea') as HTMLTextAreaElement;
+    expect(box.disabled).toBe(false);
+    // Ctrl+Enter sends nothing either.
+    act(() => {
+      box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true }));
+    });
+    await act(async () => new Promise((r) => setTimeout(r, 0)));
+    expect(send).not.toHaveBeenCalled();
+    act(() => noteAnswer(200));
+    expect(key.disabled).toBe(false);
+    expect(el.querySelector('.address')!.textContent).toBe('To everyone');
+    act(() => forgetReach());
   });
 });
 

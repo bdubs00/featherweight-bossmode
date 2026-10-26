@@ -25,6 +25,9 @@ import { attempt } from './notice';
 import { freeWords, pickGroups, seatReason, taskOfGoal, type PickRow } from './seats';
 import { Button, Field, Find, GrooveBand, Input, Led, Mark, TextArea } from './primitives';
 
+/** No seat that waits, for the picker of a bridge that does not exist yet. */
+const NO_DRAFTS: string[] = [];
+
 export interface PickerProps {
   /** The bridge of the seats, or "" for a bridge that the new-bridge screen opens. */
   bridge: string;
@@ -144,9 +147,11 @@ export function Picker({ bridge, drafts, draftHandles, onPick, onClose, anchor, 
   // The manager and the agent of the quick chat are no workers for a bridge.
   const skipKey = useSelect((s) => [s.config && s.config.manager ? s.config.manager.agent : '', s.config && s.config.chat ? s.config.chat.agent : ''].filter(Boolean).join('\n'));
   const skip = useMemo(() => (skipKey ? skipKey.split('\n') : []), [skipKey]);
-  const groups = useMemo(() => pickGroups(agents || [], faces, seats, facts, query, drafts, skip), [agents, faces, seats, facts, query, drafts, skip]);
+  // A seat of a bridge that does not exist yet takes no worker, so its agent keeps the free workers that the fleet shows.
+  const waiting = bridge ? drafts : NO_DRAFTS;
+  const groups = useMemo(() => pickGroups(agents || [], faces, seats, facts, query, waiting, skip), [agents, faces, seats, facts, query, waiting, skip]);
   const taken = useMemo(() => [...membersOf(roster).map((m) => m.handle), ...draftHandles], [roster, draftHandles]);
-  const all = useMemo(() => pickGroups(agents || [], faces, seats, facts, '', drafts, skip), [agents, faces, seats, facts, drafts, skip]);
+  const all = useMemo(() => pickGroups(agents || [], faces, seats, facts, '', waiting, skip), [agents, faces, seats, facts, waiting, skip]);
 
   useEffect(() => {
     // The agents come from the fleet and from the profiles of the front.

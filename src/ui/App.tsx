@@ -14,7 +14,7 @@
 // changes its file and never this one.
 
 import type { ComponentChildren } from 'preact';
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { clearToken, getToken, scheduleRenewal, setReachHandler, setToken, setUnauthorizedHandler, stopRenewal, type SigninNeeded } from '../api/client';
 import { noteAnswer, watchReach } from '../state/reach';
 import { afterUnauthorized, clearSigninMarks, markSignedOut, sessionStore } from '../api/auth';
@@ -26,7 +26,7 @@ import { dismissBuild, useNewBuild } from '../lib/build';
 import { applyTheme, themeOf } from '../lib/theme';
 import { canonicalPath, columnOf, go, parentOf, parseRoute, placeOf, type Place, type Route } from '../lib/route';
 import { isTyping } from './keys';
-import { clearNotice, clearSaid, currentSaidLink, showError, undoSaid, useNotice, useSaid, useUndo } from './notice';
+import { clearNotice, clearSaid, currentSaidLink, holdSaid, showError, undoSaid, useNotice, useSaid, useUndo } from './notice';
 import { EmptyPane, Shell, shownOf } from './Shell';
 import { BridgeList } from './BridgeList';
 import { Channel } from './Channel';
@@ -233,8 +233,35 @@ function Notice({ text }: { text: string }) {
 /** Said is the notice of an action that worked: its sentence, with Undo for an action that waits to go out or a link to what the action made, and Dismiss. It goes by itself after a few seconds. */
 function Said({ text, undo }: { text: string; undo: boolean }) {
   const link = currentSaidLink();
+  // The notice stays while the pointer rests on it or the focus sits in it, so a person can read it and reach its link.
+  const box = useRef<HTMLDivElement>(null);
+  const hover = useRef(false);
+  const inside = useRef(false);
+  const follow = () => holdSaid(hover.current || inside.current);
+  // A notice that leaves while the person rests on it lets the next one go after its time.
+  useEffect(() => () => holdSaid(false), []);
   return (
-    <div class="notice" role="status">
+    <div
+      class="notice"
+      role="status"
+      ref={box}
+      onMouseEnter={() => {
+        hover.current = true;
+        follow();
+      }}
+      onMouseLeave={() => {
+        hover.current = false;
+        follow();
+      }}
+      onFocusIn={() => {
+        inside.current = true;
+        follow();
+      }}
+      onFocusOut={(e) => {
+        inside.current = !!(box.current && e.relatedTarget && box.current.contains(e.relatedTarget as Node));
+        follow();
+      }}
+    >
       <p>{text}</p>
       {undo && (
         <Button kind="secondary" size="s" onClick={undoSaid}>

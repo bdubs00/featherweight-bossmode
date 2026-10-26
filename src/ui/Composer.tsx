@@ -8,15 +8,21 @@
 // it. A composer with attach takes files too, from the key Attach files, a
 // drop, or a paste, and shows each one with its size and the key Remove.
 // The files of a draft stay in the memory of the tab, so a move to another
-// screen keeps them and a reload drops them.
+// screen keeps them and a reload drops them. While the page reaches no
+// server, Send and Attach files are off and the address line says why; the
+// box still takes words, and the draft waits for the server.
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { Attachment } from '../api/types';
 import { encodeFiles, filesProblem } from '../lib/attachments';
 import { applyCompletion, completionAt, mentionsIn, slashAt, type Completion } from '../lib/mention';
 import { list, sizeText } from '../lib/words';
+import { useOffline } from '../state/reach';
 import { Glyph } from './icons';
 import { Button, IconButton, Mark } from './primitives';
+
+/** OFFLINE_WHY is the reason of a composer that cannot send while the page reaches no server. */
+export const OFFLINE_WHY = 'Offline. Your message waits here until the page reaches the server.';
 
 const draftKey = (k: string) => 'fw.bossmode.draft.' + k;
 
@@ -127,6 +133,7 @@ export function useCoarse(): boolean {
 }
 
 export function Composer(p: ComposerProps) {
+  const offline = useOffline();
   const [text, setText] = useState(() => readDraft(p.draft));
   const [files, setFiles] = useState<File[]>(() => fileDrafts.get(p.draft) || []);
   const [problem, setProblem] = useState('');
@@ -198,7 +205,7 @@ export function Composer(p: ComposerProps) {
 
   /** addFiles takes picked, dropped, or pasted files, unless the message would pass a limit. */
   const addFiles = (picked: File[]) => {
-    if (!p.attach || busy || p.disabled || !picked.length) return;
+    if (!p.attach || busy || p.disabled || offline || !picked.length) return;
     const next = [...files, ...picked];
     const why = filesProblem(next);
     setProblem(why);
@@ -207,7 +214,7 @@ export function Composer(p: ComposerProps) {
 
   const send = async () => {
     const t = text.trim();
-    if ((!t && !files.length) || busy || p.disabled) return;
+    if ((!t && !files.length) || busy || p.disabled || offline) return;
     const key = p.draft;
     setBusy(true);
     setProblem('');
@@ -395,7 +402,7 @@ export function Composer(p: ComposerProps) {
         <div class="tools">
           {p.attach && (
             <>
-              <IconButton icon="clip" label="Attach files" class="attach" disabled={busy || !!p.disabled} onClick={() => picker.current && picker.current.click()} />
+              <IconButton icon="clip" label="Attach files" class="attach" disabled={busy || !!p.disabled || offline} onClick={() => picker.current && picker.current.click()} />
               <input
                 ref={picker}
                 type="file"
@@ -409,13 +416,15 @@ export function Composer(p: ComposerProps) {
               />
             </>
           )}
-          <span class="address">{typing ? <code class="arg-hint">{'/' + typing.name + ' ' + typing.hint}</code> : hint}</span>
+          <span class={'address' + (offline && !p.disabled ? ' offline-why' : '')}>
+            {offline && !p.disabled ? OFFLINE_WHY : typing ? <code class="arg-hint">{'/' + typing.name + ' ' + typing.hint}</code> : hint}
+          </span>
           {!coarse && (
             <span class="keys" aria-hidden="true">
               {keyWords()}
             </span>
           )}
-          <Button type="submit" kind="primary" class="send" disabled={busy || (!text.trim() && !files.length) || !!p.disabled}>
+          <Button type="submit" kind="primary" class="send" disabled={busy || (!text.trim() && !files.length) || !!p.disabled || offline} title={offline && !p.disabled ? OFFLINE_WHY : undefined}>
             Send
           </Button>
         </div>

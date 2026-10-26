@@ -171,6 +171,16 @@ describe('the draft and the errors of the form', () => {
     expect(el.querySelectorAll('.seat').length).toBe(1);
   });
 
+  it('keeps the free workers of a picked agent, since a seat of a bridge that does not exist yet takes none', () => {
+    api = fakeApi({});
+    const el = mount(<NewBridge />);
+    click(keyNamed(el, 'Add a seat'));
+    const word = () => migrator(el).querySelector('.status-word')!.textContent;
+    expect(word()).toBe('1 free');
+    click(migrator(el));
+    expect(word()).toBe('1 free');
+  });
+
   it('marks only the field that is wrong, focuses the first one, and clears each error as the person fixes it', async () => {
     api = fakeApi({});
     const el = mount(<NewBridge />);

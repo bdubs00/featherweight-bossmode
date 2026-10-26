@@ -2,7 +2,9 @@
 // an alert until the person dismisses it or the next action works. A
 // short sentence about an action that worked, such as Saved the playbook
 // weekly-patching., takes the same place for a few seconds, as a status.
-// A failed action takes its place. A sentence can carry Undo, as Denied.
+// A failed action takes its place. While the pointer rests on the notice,
+// or the focus sits in it, it stays; it goes SAID_MS after both leave. A
+// sentence can carry Undo, as Denied.
 // does while a decision of a key waits to go out; a failed action hides it
 // and leaves its Undo, which shows again when the failure is dismissed.
 
@@ -16,6 +18,10 @@ let said = '';
 let saidLink: SaidLink | null = null;
 let undo: (() => void) | null = null;
 let saidTimer: ReturnType<typeof setTimeout> | null = null;
+/** True while the pointer rests on the notice or the focus sits in it, so it stays. */
+let held = false;
+/** How long the sentence that shows stays after the person leaves it. */
+let saidFor = 0;
 const listeners = new Set<() => void>();
 
 /** How long the sentence of an action that worked stays, in milliseconds. */
@@ -48,7 +54,8 @@ export function showSaid(words: string, link?: SaidLink): void {
   said = words;
   saidLink = link || null;
   undo = null;
-  saidTimer = setTimeout(clearSaid, SAID_MS);
+  saidFor = SAID_MS;
+  saidTimer = held ? null : setTimeout(clearSaid, SAID_MS);
   tell();
 }
 
@@ -58,8 +65,21 @@ export function showUndo(words: string, onUndo: () => void, ms: number): void {
   said = words;
   saidLink = null;
   undo = onUndo;
-  saidTimer = setTimeout(clearSaid, ms);
+  saidFor = ms;
+  saidTimer = held ? null : setTimeout(clearSaid, ms);
   tell();
+}
+
+/**
+ * holdSaid keeps the sentence that shows while the person reads it: the
+ * pointer rests on the notice or the focus sits in it. With false, the
+ * sentence goes after its time again, from that moment.
+ */
+export function holdSaid(on: boolean): void {
+  held = on;
+  if (saidTimer) clearTimeout(saidTimer);
+  saidTimer = null;
+  if (!on && said) saidTimer = setTimeout(clearSaid, saidFor || SAID_MS);
 }
 
 /** undoSaid takes back the action of the sentence that shows, and hides it. */
@@ -88,6 +108,7 @@ export function currentSaidLink(): SaidLink | null {
 export function clearSaid(): void {
   if (saidTimer) clearTimeout(saidTimer);
   saidTimer = null;
+  held = false;
   undo = null;
   saidLink = null;
   if (!said) return;
