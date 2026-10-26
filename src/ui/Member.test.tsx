@@ -43,6 +43,9 @@ const NOTES_ITEMS = [
   { seq: 9, time: at(5), kind: 'end', text: 'failed', isError: true },
 ];
 
+/** OLD_RUN is the run of a seat whose worker was replaced: the front reads it from its archive. */
+const OLD_RUN = { id: 'run-old', agent: 'reviewer', state: 'completed' as const, archived: true, seq: 3, createdAt: at(0), updatedAt: at(3), member: 'default/reviewer-0' };
+
 /** seatFailed seats notes, whose newest run failed when the provider refused the request. */
 function seatFailed(): void {
   act(() => {
@@ -69,6 +72,9 @@ beforeEach(() => {
     ['GET', /^\/v1\/runs\/run-notes\/result$/, () => ({ runId: 'run-notes', title: 'Write the runbook of the alerts', agent: 'writer', status: 'failed', error: PREFILL, steps: [{ seq: 12, tool: 'front.bridge_read', text: 'front.bridge_read', done: true }, { seq: 14, tool: 'front.pages_write', text: 'front.pages_write', done: true }, { seq: 16, tool: 'front.bridge_post', text: 'front.bridge_post', done: true }], started: at(0), changed: at(5) })],
     ['GET', /^\/v1\/runs\/run-notes\/transcript/, () => ({ run: NOTES_RUN, items: NOTES_ITEMS, next: 0, prev: 0 })],
     ['GET', /^\/v1\/runs\/run-notes$/, () => NOTES_RUN],
+    ['GET', /^\/v1\/runs\/run-old\/result$/, () => ({ runId: 'run-old', archived: true, title: 'Write the role node_exporter', agent: 'reviewer', status: 'ready', summary: 'The role is on the wiki.', files: [{ path: 'roles/node_exporter/tasks/main.yml', op: 'created', seq: 4 }], started: at(0), changed: at(3) })],
+    ['GET', /^\/v1\/runs\/run-old\/transcript/, () => ({ run: OLD_RUN, items: [{ seq: 1, time: at(0), kind: 'user', text: 'Write the role.', who: 'alice@example.com' }], next: 0, prev: 0 })],
+    ['GET', /^\/v1\/runs\/run-old$/, () => OLD_RUN],
     ['PATCH', /^\/v1\/bridges\/b1\/members\/notes$/, (b) => ({ handle: 'notes', agent: 'writer', task: 'Write the runbook of the alerts', runs: ['run-notes', 'run-notes-2'], fired: false, muted: false, presence: 'working', ...(b as object) })],
     ['GET', /^\/v1\/runs\/run-tester\/result$/, () => ({ runId: 'run-tester', title: 'Run molecule', agent: 'tester', status: 'ready', summary: 'Molecule passed.', files: [], started: at(0), changed: at(0) })],
     ['GET', /^\/v1\/runs\/run-tester\/transcript/, () => ({ run: { id: 'run-tester', agent: 'tester', state: 'completed', seq: 2, createdAt: at(0), updatedAt: at(0), member: 'default/crew-1' }, items: [], next: 0, prev: 0 })],
@@ -136,16 +142,29 @@ describe('the member conversation', () => {
     expect(currentNotice()).toBe('');
   });
 
-  it('reads nothing of a run that the front calls gone, and says so at once', async () => {
+  it('reads a run that the front calls gone from the archive, and says that its worker was replaced', async () => {
+    act(() => {
+      store.dispatch({ type: 'member', bridge: 'b1', member: { handle: 'old', agent: 'reviewer', task: 'Review', runs: ['run-old'], fired: false, muted: false, presence: 'idle', gone: true } });
+    });
+    const run = mount(<MemberMain bridge="b1" handle="old" tab="run" />);
+    await vi.waitFor(() => expect(run.textContent).toContain('This run is from a worker that was replaced.'));
+    expect(run.textContent).toContain('Write the role node_exporter');
+    expect(run.textContent).not.toContain('This run is gone.');
+    // A run that changes nothing now has no Stop.
+    expect([...run.querySelectorAll('button')].some((b) => b.textContent === 'Stop')).toBe(false);
+    const files = mount(<MemberMain bridge="b1" handle="old" tab="files" />);
+    await vi.waitFor(() => expect(files.textContent).toContain('The files of this run were on a worker that was replaced'));
+    expect((files.querySelector('button.file') as HTMLButtonElement).disabled).toBe(true);
+    expect(currentNotice()).toBe('');
+  });
+
+  it('says that a run is gone when even the archive does not hold it', async () => {
     act(() => {
       store.dispatch({ type: 'member', bridge: 'b1', member: { handle: 'ghost', agent: 'reviewer', task: 'Review', runs: ['run-ghost'], fired: false, muted: false, presence: 'idle', gone: true } });
     });
     const run = mount(<MemberMain bridge="b1" handle="ghost" tab="run" />);
-    expect(run.textContent).toContain('This run is gone.');
-    const files = mount(<MemberMain bridge="b1" handle="ghost" tab="files" />);
-    expect(files.textContent).toContain('This run is gone.');
-    await new Promise((r) => setTimeout(r, 50));
-    expect(calls.filter((c) => c.path.includes('run-ghost'))).toEqual([]);
+    await vi.waitFor(() => expect(run.textContent).toContain('This run is gone.'));
+    expect(calls.some((c) => c.path.includes('run-ghost'))).toBe(true);
     expect(currentNotice()).toBe('');
   });
 

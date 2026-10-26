@@ -161,7 +161,7 @@ function FileBox({ run, path, onClose }: { run: string; path: string; onClose: (
  * that the read wakes the worker of the run. gone says that no worker
  * holds the run now, so no result comes.
  */
-export function FilesView({ runId, result, items, wakes, gone }: { runId: string; result: Result | null; items?: Item[]; wakes?: boolean; gone?: boolean }) {
+export function FilesView({ runId, result, items, wakes, gone, archived }: { runId: string; result: Result | null; items?: Item[]; wakes?: boolean; gone?: boolean; archived?: boolean }) {
   const [file, setFile] = useState('');
   useEffect(() => setFile(''), [runId]);
   const files = (result && result.files) || [];
@@ -178,13 +178,14 @@ export function FilesView({ runId, result, items, wakes, gone }: { runId: string
     );
   return (
     <div class="files-view">
-      {wakes && <WakeNote />}
+      {wakes && !archived && <WakeNote />}
+      {archived && files.length > 0 && <p class="run-note">{FILES_ARCHIVED}</p>}
       {files.length === 0 && pages.length === 0 && <p class="run-note">No files changed in this run.</p>}
       {files.length > 0 && (
         <div class="files" role="list">
           {files.map((f) => (
             <div role="listitem">
-              <button type="button" class={'file' + (f.op === 'deleted' ? ' gone' : '') + (file === f.path ? ' on' : '')} aria-expanded={file === f.path} onClick={() => setFile(file === f.path ? '' : f.path)}>
+              <button type="button" class={'file' + (f.op === 'deleted' ? ' gone' : '') + (file === f.path ? ' on' : '')} aria-expanded={file === f.path} disabled={archived} onClick={() => setFile(file === f.path ? '' : f.path)}>
                 <Icon name="file" />
                 <span class="fn">
                   <b>{f.path.split('/').pop()}</b>
@@ -302,7 +303,13 @@ export function StopKey({ runId, who }: { runId: string; who: string }) {
  * again. items is the transcript of the run, which gives the targets of
  * the steps. wakes says that the read wakes the worker of the run.
  */
-export function RunView({ runId, result, bridge, member, who, items, endSeq, gone, wakes }: { runId: string; result: Result | null; bridge?: string; member?: Member; who: string; items?: Item[]; endSeq?: number; gone?: boolean; wakes?: boolean }) {
+/** RUN_ARCHIVED is the line of a run that the front reads from its archive. */
+export const RUN_ARCHIVED = 'This run is from a worker that was replaced. You can read it, and it changes nothing now.';
+
+/** FILES_ARCHIVED is the line of the files of such a run, which were on the disk of that worker. */
+export const FILES_ARCHIVED = 'The files of this run were on a worker that was replaced, so they do not open. The pages of the wiki stay.';
+
+export function RunView({ runId, result, bridge, member, who, items, endSeq, gone, archived, wakes }: { runId: string; result: Result | null; bridge?: string; member?: Member; who: string; items?: Item[]; endSeq?: number; gone?: boolean; archived?: boolean; wakes?: boolean }) {
   const run = useSelect((s) => s.runs[runId]);
   const presence = useSelect((s) => (member ? seatPresence(selectFacts(s), member) : ''));
   const res = result;
@@ -319,10 +326,11 @@ export function RunView({ runId, result, bridge, member, who, items, endSeq, gon
     <div class="run-view">
       <div class="run-head">
         <h3 class="t-heading">{(res && res.title) || (run && run.title) || 'The run'}</h3>
-        {!gone && <StopKey runId={runId} who={who} />}
+        {!gone && !archived && <StopKey runId={runId} who={who} />}
       </div>
-      {wakes && !gone && <WakeNote />}
+      {wakes && !gone && !archived && <WakeNote />}
       {gone && <p class="run-note">This run is gone.</p>}
+      {archived && !gone && <p class="run-note">{RUN_ARCHIVED}</p>}
       <p class="run-status">
         {run && <Light light={runStatus(run)} />}
         {run && <When at={run.createdAt} />}
@@ -376,7 +384,8 @@ export function RunPane({ bridge, runId, handle }: { bridge: string; runId: stri
   // The person opened the run, so the pane reads it, and says so when the read wakes its worker.
   const res = useResult(runId);
   const t = useTranscript(runId);
-  const wakes = useSelect((s) => awakeFor(selectFacts(s), s.runs[runId]) === false);
+  const archived = !!((res && res.archived) || (run && run.archived));
+  const wakes = useSelect((s) => awakeFor(selectFacts(s), s.runs[runId]) === false) && !archived;
   const seatLight = useSelect((s) => (member ? statusOf(selectFacts(s), { seat: member }) : null));
   const light = seatLight || (run ? runStatus(run) : null);
   const who = handle || (member ? member.handle : run ? run.agent : 'the agent');
@@ -391,8 +400,8 @@ export function RunPane({ bridge, runId, handle }: { bridge: string; runId: stri
         lead={run ? <Mark agent={run.agent} size={32} halo={light ? { tone: light.tone, word: light.word } : undefined} label={who} /> : undefined}
       />
       <div class="scroll">
-        <RunView runId={runId} result={res} bridge={bridge} member={member} who={who} items={t.items} endSeq={end ? end.seq : undefined} wakes={wakes} />
-        {filesCount(res, t.items) > 0 && <FilesView runId={runId} result={res} items={t.items} />}
+        <RunView runId={runId} result={res} bridge={bridge} member={member} who={who} items={t.items} endSeq={end ? end.seq : undefined} gone={t.gone} archived={archived} wakes={wakes} />
+        {filesCount(res, t.items) > 0 && <FilesView runId={runId} result={res} items={t.items} gone={t.gone} archived={archived} />}
         <Conversation run={run} result={res} t={t} agentLabel={who} />
       </div>
     </section>

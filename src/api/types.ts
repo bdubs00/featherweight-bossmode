@@ -455,6 +455,8 @@ export interface ResultStep {
 /** The answer of GET /v1/runs/{id}/result. */
 export interface Result {
   runId: string;
+  /** True when no worker holds the run any more, and the front reads it from its archive. */
+  archived?: boolean;
   title: string;
   agent: string;
   status: string;
