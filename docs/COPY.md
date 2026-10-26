@@ -569,12 +569,12 @@ Capacity shows where seating happens:
 | `<by> saved this page while you edited it, <time>. Your text is still here, and nothing is lost.` | change | `<by> saved this page while you edited it. Your text is still here.` | C |
 | `See their version` | keep | | C |
 | `Drop my text and take theirs`, `Save mine over theirs` | change | `Take theirs`, `Keep mine` | C |
-| `Path, such as runbooks/deploy.md. The page adds .md when you leave it out.` | change | `Path` with the placeholder `runbooks/deploy.md` | C |
+| `Path, such as runbooks/deploy.md. The page adds .md when you leave it out.` | change | `Name` with the placeholder `runbooks/deploy`. A space between words becomes a hyphen, and the hint `The page will be <path>.` names the path | done |
 | `The page will be <path>.` | keep | | C |
 | `Markdown`, `What changed, in a few words` | change | `Text`, `What changed` | C |
 | `Cancel`, `Create the page`, `Save` | change | `Cancel`, `Create page`, `Save` | C |
 | `Cmd or Ctrl+Enter saves. A save that meets a newer version stops and asks you.` | change | `Ctrl+Enter` beside the key, `⌘+Enter` on a Mac, and no key on a touch screen, from `keyWords` and `useCoarse` of the composer | done |
-| `A page with this path exists already. Pick another path, or edit that page.` | keep | | C |
+| `A page with this path exists already. Pick another path, or edit that page.` | change | `A page with this name exists already. Pick another name, or edit that page.`, under the field Name, with the link `Edit <path>` | done |
 | `the fleet token`, `run <id>` (writers) | keep | | C |
 
 ### src/ui/Manager.tsx
