@@ -1533,6 +1533,15 @@ field `pool` of `GET /v1/agents`. Next it reads `pool` of
 the agent. A profile with `front` true has no section. An agent that no
 pool runs has no section either.
 
+Turn on packages sends `ask: true`. Each package shows the version that
+the first ready worker names in `installed`. The state line counts each
+worker that is `pending` or `materializing`, as `Updating on <n> of <m>
+workers`. A running worker takes a change in place (section 11 of the
+plan), so no line waits for an idle worker. The index of the mirror can
+lack a new Python package. The front then answers 400 with the detail
+`There is no Python package named X`, and the section shows that
+sentence.
+
 When the section opens, it reads the route once. While `applying` is true,
 or while packages are on and a worker is not `ready`, it reads the route
 again every 5 seconds. The page accepts an answer with missing fields: a
@@ -1546,3 +1555,25 @@ package.
 
 **Open:** section 6.3 of the plan names `GET /v1/bossmode/config`. The page
 reads `GET /v1/bossmode`, so the front must add `packages` to that answer.
+
+## 18. Runs of the archive
+
+Section 11.3 of the Packages plan of 2026-10-25 names the archive of the
+runs. When no worker holds a run, `GET /v1/fleet/runs` and
+`GET /v1/runs/{id}` answer it from the archive with `"archived": true`. A
+message to such a run answers 409 with `The worker of this conversation
+was replaced, so the conversation is read-only. Start a new one.`
+
+The page treats an archived run as a run that ended:
+
+- The Manager list, Past conversations, and the history of the Chat place
+  list it. A run of the archive that had not finished shows `ended`.
+- The Manager place, the conversation with an agent, and the quick chat
+  show it with the line `This conversation is from a worker that was
+  replaced. You can read it, and your next message starts a new
+  conversation.` The next message starts a new run.
+- If a message answers 409, the page reads the run again. When the run is
+  archived, failed, or canceled, the message starts a new run.
+- An archived run keeps no worker busy, takes no decision, and the page
+  reads it once, with no poll and no live answer.
+
