@@ -278,7 +278,7 @@ describe('a change of the packages', () => {
     typeIn(field, '--pre');
     expect(el.querySelector('.pkgs-error')).toBeNull();
     submit(el);
-    expect(said()).toBe('A package name cannot start with a dash.');
+    expect(said()).toBe('"--pre" starts with a dash.');
     expect(field.getAttribute('aria-invalid')).toBe('true');
     expect(field.getAttribute('aria-describedby')).toBe(el.querySelector('.pkgs-error')!.id);
     typeIn(field, 'Ansible-Lint');
@@ -313,6 +313,25 @@ describe('a change of the packages', () => {
     expect(puts()[1].body).toEqual({ on: false, ask: false, python: ['ansible-lint'], tools: ['iproute2'] });
     await vi.waitFor(() => expect(el.querySelector('.pkgs-off')).not.toBeNull());
     expect(document.activeElement).toBe(button(el, 'Turn on packages'));
+  });
+
+  it('shows the sentence of the server for a refused name as it is', async () => {
+    // A name that the page takes, and that the server refuses: the mirror has no such package.
+    const sentence = '"ruamel.yaml.extra" is not on the package index. Check the name, such as ruamel.yaml.';
+    putAnswer = () => new Response(JSON.stringify({ status: 400, detail: sentence }), { status: 400, headers: { 'Content-Type': 'application/problem+json' } });
+    const el = await section();
+    typeIn(el.querySelector('form.pkgs-add input') as HTMLInputElement, 'ruamel.yaml.extra');
+    submit(el);
+    await vi.waitFor(() => expect(el.querySelector('.pkgs-error')).not.toBeNull());
+    expect(el.querySelector('.pkgs-error')!.textContent).toBe(sentence);
+  });
+
+  it('refuses a bad name before the call, in the sentence of the server', async () => {
+    const el = await section();
+    typeIn(el.querySelector('form.pkgs-add input') as HTMLInputElement, 'bad name;rm');
+    submit(el);
+    expect(el.querySelector('.pkgs-error')!.textContent).toBe('"bad name;rm" holds a semicolon; a condition after a semicolon is not available, so write the name and the version alone, such as pyyaml>=6.');
+    expect(puts().length).toBe(0);
   });
 
   it('shows a refusal of the front as one sentence in the section, and keeps the packages', async () => {

@@ -11,7 +11,7 @@
 
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { api } from '../api/routes';
-import type { Tool } from '../api/types';
+import type { Agent, Tool } from '../api/types';
 import { store, useSelect } from '../state/store';
 import { forgetAgentSkills, loadAgentSkills, loadAgents, loadFleet, loadSkills, skillsAnswerFor } from '../state/actions';
 import { readProfile } from '../state/profiles';
@@ -96,31 +96,44 @@ function useLoaders(): void {
   useEffect(() => () => forgetAgentSkills(), []);
 }
 
+/** toolListOf is the tool list of a profile: its own tools, else the tools that its workers give it, or null when it names neither. */
+const toolListOf = (p: Agent | null | undefined): string[] | null => (p && p.tools && p.tools.length ? p.tools : p && p.workerTools && p.workerTools.length ? p.workerTools : null);
+
 /**
- * useToolLists reads the tool list of each agent of the fleet that the
- * front answers, while the Skills place shows a tool: the tools of its
- * profile, else the tools that its workers give it. An agent whose list
- * the page cannot read stays out.
+ * useToolLists names the tool list of each agent of the fleet while the
+ * Skills place shows a tool. The list of GET /v1/agents carries the tools
+ * of each profile and of its workers, so the page reads a profile alone
+ * only for an agent that the list leaves out and that the front answers.
+ * An agent whose list the page cannot read stays out.
  */
 function useToolLists(on: boolean): Record<string, string[]> {
   const agents = useSelect(selectAgents);
-  const [lists, setLists] = useState<Record<string, string[]>>({});
+  const own = useSelect((s) => s.agents);
+  const [read, setRead] = useState<Record<string, string[]>>({});
+  const listed = useMemo(() => {
+    const out: Record<string, string[]> = {};
+    for (const a of own || []) {
+      const list = toolListOf(a);
+      if (list) out[a.name] = list;
+    }
+    return out;
+  }, [own]);
   useEffect(() => {
     if (!on) return;
     let live = true;
     const s = store.get();
     for (const a of agents || []) {
-      if (!skillsAnswerFor(s, a.name)) continue;
+      if (listed[a.name] || !skillsAnswerFor(s, a.name)) continue;
       readProfile(a.name).then((p) => {
-        const list = p && p.tools && p.tools.length ? p.tools : p && p.workerTools && p.workerTools.length ? p.workerTools : null;
-        if (live && list) setLists((x) => ({ ...x, [a.name]: list }));
+        const list = toolListOf(p);
+        if (live && list) setRead((x) => ({ ...x, [a.name]: list }));
       });
     }
     return () => {
       live = false;
     };
-  }, [agents, on]);
-  return lists;
+  }, [agents, listed, on]);
+  return useMemo(() => ({ ...read, ...listed }), [read, listed]);
 }
 
 /** toolUsers names the agents whose tool list gives a tool: by its name, its server, or a glob, such as front.*. */

@@ -505,8 +505,10 @@ Capacity shows where seating happens:
 | new | add | `No member matches “<words>”.` with the key `Clear the search`, and `N members match` for a screen reader | done |
 | new | add | the gaps of the workers: `Some changes have not reached the workers of this agent yet. An admin can read why.`, with the words of the server in the fold `Details` | done |
 | `<n> min` beside a sleeping worker | remove | it was the age of the read of the fleet, not the time asleep | done |
-| new | add | a heart: `Liked because: <note>`, `Asked: <task>`, `Answer: <answer>`, and `Show more` and `Show less` for an answer over 240 characters | done |
+| new | add | a heart: `Liked because: <note>`, `Asked: <task>`, `Answer: <answer>`, and `Show more` and `Show less` for an answer over 240 characters or 4 lines. An answer of several lines, which the server keeps indented on the page, shows as Markdown with its lists and tables. | done |
 | new | add | `Skills: <name>, <name>`, each a link to its page, under What it can do | done |
+| `Add and remove packages`, `Asks before it adds or removes a package` | change | only while packages are on and the agent may ask, from workerPackages of the profile or the read of the section Packages | done |
+| new | add | the switch of the packages in the preview of New agent: `Packages are off, so it has only the programs that it came with. Its profile can turn them on.`, `Packages are on. It can ask for a package, and you approve each one.`, or `Packages are on. You add each package on its profile.` | done |
 | `Keep 0` (the row of an agent with no worker in Not on a bridge) | remove | the row shows no words for an agent with no worker. The list holds the agents of the fleet, so a profile of the front with no pool and no run shows nowhere. | done |
 | `asks before <pattern>`, `asks first` (an amber word for a rule of the profile) | change | the rule as a person reads it, in an amber line under What it can do: `Asks before git push` for `bash: git push*`, `Asks before a real Ansible run` for `ansible.playbook: check=false`, `Asks before a tool that changes things`, `Asks first when <field> is <value>`, `Asks first: <ability>`, and `Asks first`. Two patterns with one meaning make one line. The patterns sit in the tooltip. | done |
 | `Tools and rules` (the list of chips) | add | an accessible name, now of the list of What it can do | done |
@@ -1020,7 +1022,7 @@ install as it is, which can hold any word.
 | new | add | the version that a ready worker installed, in muted words after the name of each package | done |
 | new | add | the refusal of the front `There is no Python package named <name>.` | done |
 | new | add | the switch `The agent can ask for a package. You approve each one.` | done |
-| new | add | the errors `Write the name of a package.`, `A package name cannot start with a dash.`, `A package name cannot hold a control character.`, `A package name holds 200 characters at most.`, `<name> is in the list already.`, `A list holds 100 packages at most.`, `That is not the name of a Python package. Write a name such as pyyaml, with a version such as >=6 when you need one.`, and `That is not the name of a program. Write a name such as jq, with a version such as =1.7 when you need one.` | done |
+| new | add | the errors `Write the name of a package.` and `"<name>" <reason>.`, the sentence of the server for a refused name, such as `"bad name;rm" holds a semicolon; a condition after a semicolon is not available, so write the name and the version alone, such as pyyaml>=6.`, which the page says before the call with the rule of the kernel (src/lib/packages.ts) and shows as it is from the server; then `<name> is in the list already.` and `A list holds 100 packages at most.` | done |
 
 ### src/ui/Decision.tsx and src/lib/words.ts: the card of a package
 

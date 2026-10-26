@@ -27,6 +27,7 @@ import { Abilities } from './Abilities';
 import { abilitiesOf, rulesWords } from '../lib/tools';
 import { policyRules } from '../state/people';
 import { useToolCatalog } from '../state/tools';
+import { rulesWithPackages, switchWords, withPackages } from '../lib/packages';
 
 /** The default number of workers of a new agent, as fleet.DefaultWorkers of the backend. */
 export const DEFAULT_WORKERS = 2;
@@ -158,15 +159,18 @@ export function requestOf(f: AgentForm, templates: Template[]): { profile: NewPr
 function Can({ saved, ask }: { saved: AgentSaved; ask: string[] }) {
   const catalog = useToolCatalog();
   const tools = saved.workerTools || [];
-  const abilities = useMemo(() => abilitiesOf(tools, catalog), [tools.join('\n'), catalog]);
-  const rules = useMemo(() => rulesWords([...new Set([...policyRules(saved.workerPolicy), ...ask])].sort(), catalog), [saved.workerPolicy, ask.join('\n'), catalog]);
-  if (abilities.length === 0 && rules.length === 0) return null;
+  const sw = saved.workerPackages;
+  // The tool env adds a package only while packages are on and the agent may ask, so the preview says what the switch allows.
+  const abilities = useMemo(() => withPackages(abilitiesOf(tools, catalog), sw), [tools.join('\n'), catalog, sw && sw.on, sw && sw.ask]);
+  const rules = useMemo(() => rulesWords(rulesWithPackages([...new Set([...policyRules(saved.workerPolicy), ...ask])].sort(), sw), catalog), [saved.workerPolicy, ask.join('\n'), catalog, sw && sw.on, sw && sw.ask]);
+  if (abilities.length === 0 && rules.length === 0 && !sw) return null;
   return (
     <section class="workers-out" aria-labelledby="can-out">
       <h2 class="sec-head t-sub" id="can-out">
         What it can do
       </h2>
       <Abilities abilities={abilities} rules={rules} label="Tools and rules" />
+      {sw && <p class="t-meta can-packages">{switchWords(sw)}</p>}
     </section>
   );
 }

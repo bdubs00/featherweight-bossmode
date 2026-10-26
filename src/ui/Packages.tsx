@@ -18,7 +18,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
 import { ApiError, SigninNeeded } from '../api/client';
-import type { Packages, PackagesBody } from '../api/types';
+import type { PackageSwitch, Packages, PackagesBody } from '../api/types';
 import { KIND_WORDS, POLL_MS, bodyOf, keyOf, lineOf, nameProblem, normalize, shouldPoll, versionsOf, type PackageKind } from '../lib/packages';
 import { Button, Command, IconButton, Input, LineLed } from './primitives';
 import { Switch } from './ChannelDialog';
@@ -34,6 +34,20 @@ export const NOTE_TEXT = 'Workers take a change in about a minute. Work in progr
 
 const KINDS: PackageKind[] = ['python', 'tools'];
 
+/**
+ * refusalText is the sentence of a refused change. The server words a
+ * refused name as one sentence that starts with the name in quotes, such
+ * as "bad name;rm" holds a semicolon; ..., and the section shows it as it
+ * is: the cut at the first full stop of a plain error would cut a name
+ * such as ruamel.yaml. Another error keeps the words of the client.
+ */
+export function refusalText(e: unknown): string {
+  if (!(e instanceof ApiError)) return 'The change failed. Try it again.';
+  const detail = e.problem && typeof e.problem.detail === 'string' ? e.problem.detail.trim() : '';
+  if (detail.startsWith('"') || detail === 'Write the name of a package.') return detail;
+  return e.message;
+}
+
 /** offWords names what the workers lose when packages turn off: a few names, else a count. */
 export function offWords(p: Packages): string {
   const names = [...p.python, ...p.tools].map((x) => x.name);
@@ -48,7 +62,7 @@ type FocusTo = '' | 'field' | 'turn-on';
  * PackagesSection is the section Packages of the profile of agent, whose
  * workers the pool runs. An owner changes it. Any other person reads it.
  */
-export function PackagesSection({ agent, pool, owner }: { agent: string; pool: string; owner: boolean }) {
+export function PackagesSection({ agent, pool, owner, onSwitch }: { agent: string; pool: string; owner: boolean; onSwitch?: (sw: PackageSwitch) => void }) {
   // undefined while the first read runs, null when the section does not exist.
   const [p, setP] = useState<Packages | null | undefined>(undefined);
   // The reason of a refused change, and the reason why the name in the field does not work. The section shows one sentence.
@@ -96,6 +110,13 @@ export function PackagesSection({ agent, pool, owner }: { agent: string; pool: s
     );
   }, [pool, tick]);
 
+  // The profile words what the agent can do from the switch, so it hears each switch that the section reads or sets.
+  const on = !!p && p.available !== false && p.on;
+  const ask = !!p && p.ask;
+  useEffect(() => {
+    if (p && p.available !== false && onSwitch) onSwitch({ on, ask });
+  }, [!!p, on, ask]);
+
   // The refresh: a read every POLL_MS while the change reaches the workers. A change in progress holds it.
   const poll = !busy && shouldPoll(p);
   useEffect(() => {
@@ -130,7 +151,7 @@ export function PackagesSection({ agent, pool, owner }: { agent: string; pool: s
       setP(normalize(v, pool));
       return true;
     } catch (e) {
-      if (live.current && !(e instanceof SigninNeeded)) setError(e instanceof ApiError ? e.message : 'The change failed. Try it again.');
+      if (live.current && !(e instanceof SigninNeeded)) setError(refusalText(e));
       return false;
     } finally {
       saving.current = false;

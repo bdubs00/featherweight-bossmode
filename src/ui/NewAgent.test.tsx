@@ -174,6 +174,25 @@ describe('NewAgent', () => {
     expect(el.querySelector('#workers-out .t-meta')).toBeNull();
   });
 
+  it('previews the switch of the packages, and leaves out adding packages while they are off', async () => {
+    config();
+    const dry = (sw: { on: boolean; ask: boolean }) => ({ name: 'linter', exists: false, pool: { name: 'linter', wanted: 2, tasks: [] }, workerTools: ['bash', 'env'], workerPolicy: { ask: ['env: command=add', 'env: command=remove'] }, workerPackages: sw });
+    api = fakeApi({ 'PUT /v1/agents/linter?dryRun=true': dry({ on: false, ask: false }) });
+    const el = mount(<NewAgent />);
+    typeIn(fieldOf(el, 'Name'), 'linter');
+    click(keyNamed(el, 'Preview'));
+    await settle();
+    const can = () => el.querySelector('[aria-labelledby="can-out"]')!;
+    expect([...can().querySelectorAll('.abilities li')].map((x) => x.textContent)).toEqual(['Run shell commands']);
+    expect(can().querySelector('.can-packages')!.textContent).toBe('Packages are off, so it has only the programs that it came with. Its profile can turn them on.');
+    api.restore();
+    api = fakeApi({ 'PUT /v1/agents/linter?dryRun=true': dry({ on: true, ask: true }) });
+    click(keyNamed(el, 'Preview'));
+    await settle();
+    expect([...can().querySelectorAll('.abilities li')].map((x) => x.textContent)).toEqual(['Run shell commands', 'Add and remove packages', 'Asks before it adds or removes a package']);
+    expect(can().querySelector('.can-packages')!.textContent).toBe('Packages are on. It can ask for a package, and you approve each one.');
+  });
+
   it('refuses a name that an agent holds, and a bad number of workers', () => {
     const f = { ...emptyForm([]), name: 'migrator', workers: '0' };
     const e = formErrors(f, ['migrator']);

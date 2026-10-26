@@ -157,6 +157,20 @@ describe('the Skills place', () => {
     expect([...el.querySelectorAll('.loaders li')].map((x) => x.textContent)).toEqual(['migrator', 'scribe']);
   });
 
+  it('takes the tool lists from the list of the agents, and reads no profile that the list names', async () => {
+    forgetProfiles();
+    act(() => {
+      store.dispatch({ type: 'skills', skills: { ...CONTRACT, tools: [] } });
+      store.dispatch({ type: 'agents', agents: [{ name: 'migrator', role: 'owner', tools: ['bash'] }, { name: 'scribe', role: 'owner', workerTools: ['bash', 'front.*'] }, { name: 'reviewer', role: 'owner', workerTools: ['files'] }] });
+      store.dispatch({ type: 'fleet', fleet: { name: 'f', members: [], pools: ['migrator', 'reviewer', 'scribe'].map((a) => ({ name: a, atespace: 'default', agent: a, intake: '', wanted: 1, actual: 1, ready: 1, hash: '', checkedAt: '', tasks: [] })) } });
+    });
+    api = fakeApi({ 'GET /v1/tools': TOOLS });
+    const el = mount(<SkillMain item={{ kind: 'tool', id: 'bash' }} />);
+    await settle(8);
+    expect([...el.querySelectorAll('.loaders li')].map((x) => x.textContent)).toEqual(['migrator', 'scribe']);
+    expect(api.calls.some((c) => /^\/v1\/agents\/[^/]+$/.test(c.path))).toBe(false);
+  });
+
   it('opens the first skill where two panes show, and says nothing twice', async () => {
     const wide = window.matchMedia;
     window.matchMedia = ((q: string) => ({ matches: true, media: q, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;

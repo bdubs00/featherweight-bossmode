@@ -318,14 +318,26 @@ export function likedOf(text: string): LikedEntry[] {
       e.handle = seat[1];
       e.run = seat[2];
     }
-    // The list of the entry: one item per line that starts with "- ", and its continuation lines.
+    // The list of the entry: one item per line that starts with "- ". An
+    // item that ends with a colon, such as "What reviewer did:", holds an
+    // answer of several lines: its lines follow it indented, with blank
+    // lines between its blocks, and keep their breaks, so its lists and
+    // its tables stay. Another line after an item continues it on one
+    // line, as a wrapped item of Markdown does.
     const items: string[] = [];
+    let block = false;
     for (const line of rest.split('\n')) {
-      if (/^\s*[-*] /.test(line)) items.push(line.replace(/^\s*[-*] /, '').trim());
-      else if (items.length && line.trim()) items[items.length - 1] += ' ' + line.trim();
+      if (/^[-*] /.test(line)) {
+        const text = line.replace(/^[-*] /, '').trim();
+        items.push(text);
+        block = text.endsWith(':');
+      } else if (!items.length) continue;
+      else if (block && (/^\s*$/.test(line) || /^ {2}/.test(line))) items[items.length - 1] += '\n' + line.replace(/^ {2}/, '').replace(/\s+$/, '');
+      else if (line.trim()) items[items.length - 1] += ' ' + line.trim();
     }
     let m: RegExpExecArray | null;
-    for (const it of items) {
+    for (const raw of items) {
+      const it = raw.trim();
       if ((m = /^What .+? asked:\s*([\s\S]*)$/.exec(it))) e.asked = m[1].trim();
       else if ((m = /^What .+? did:\s*([\s\S]*)$/.exec(it))) e.did = m[1].trim();
       else if ((m = /^The note of .+?:\s*([\s\S]*)$/.exec(it))) e.note = m[1].trim();
