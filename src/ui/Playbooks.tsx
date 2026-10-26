@@ -13,7 +13,7 @@ import { api, type PlaybookBody } from '../api/routes';
 import { ApiError } from '../api/client';
 import type { Caps, Delegation, Duty, Playbook } from '../api/types';
 import { keepsWords, playbookBodyOf, playbookLabel, playbookName, playbookReason } from '../lib/playbooks';
-import { dutyTitle, firstLine, listWords, slugOf, splitProblem, titleOfName } from '../lib/duties';
+import { dutyTitle, firstLine, listWords, slugOf, splitProblem } from '../lib/duties';
 import { go, hrefOf } from '../lib/route';
 import { membersOf } from '../state/reducer';
 import { useSelect } from '../state/store';
@@ -45,7 +45,8 @@ export function SavePlaybook({ bridge, confirm = 'Save playbook', onClose, onSav
   const b = useSelect((s) => s.bridges.byId[bridge]);
   const roster = useSelect((s) => s.rosters[bridge]);
   const list = usePlaybooks((s) => s.list);
-  const [words, setWords] = useState(() => titleOfName(playbookName(b ? b.title : '')));
+  // The name starts as the short name of the title of the bridge, and the page shows a playbook by its name as it is.
+  const [words, setWords] = useState(() => playbookName(b ? b.title : ''));
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -70,7 +71,7 @@ export function SavePlaybook({ bridge, confirm = 'Save playbook', onClose, onSav
       const body = playbookBodyOf(b, members);
       await savePlaybook(name, old && typeof old.revision === 'number' ? { ...body, revision: old.revision } : body);
       setBusy(false);
-      showSaid('Saved the playbook ' + titleOfName(name) + '.', { label: 'See the playbook', href: bookHref(name) });
+      showSaid('Saved the playbook ' + name + '.', { label: 'See the playbook', href: bookHref(name) });
       onClose();
       if (onSaved) onSaved(name);
       return;
@@ -87,14 +88,14 @@ export function SavePlaybook({ bridge, confirm = 'Save playbook', onClose, onSav
           value={words}
           maxLength={80}
           invalid={!!error}
-          placeholder="Weekly patching"
-          aria-describedby={name && !error ? 'playbook-slug' : undefined}
+          placeholder="weekly-patching"
+          aria-describedby={name && name !== words.trim() && !error ? 'playbook-slug' : undefined}
           onInput={(e) => {
             setWords((e.target as HTMLInputElement).value);
             setError('');
           }}
         />
-        {name && !error && (
+        {name && name !== words.trim() && !error && (
           <span class="t-meta duty-slug" id="playbook-slug">
             It saves as {name}.
           </span>
@@ -128,7 +129,7 @@ export function PlaybookPick({ value, onChange, label = 'Playbook', error, empty
           {(list || []).map((p) => (
             <option value={p.name}>{playbookLabel(p)}</option>
           ))}
-          {value && list && !names.includes(value) && <option value={value}>{titleOfName(value) + ', not here'}</option>}
+          {value && list && !names.includes(value) && <option value={value}>{value + ', not here'}</option>}
         </select>
       </Field>
       {list && list.length === 0 && <p class="t-meta">Save one from a bridge: open More, then Save as playbook.</p>}
@@ -171,7 +172,7 @@ const bookHref = (name: string) => hrefOf({ place: 'duties', tab: 'playbooks', p
 const usersOf = (duties: Duty[] | null, name: string): Duty[] => (duties || []).filter((d) => !!(d.do && d.do.open && d.do.open.playbook === name));
 
 /** matchesBook reports whether a playbook holds the words of a search, in its name or its goal. */
-const matchesBook = (p: Playbook, q: string) => [titleOfName(p.name), p.name, p.goal || ''].some((x) => x.toLowerCase().includes(q.toLowerCase()));
+const matchesBook = (p: Playbook, q: string) => [p.name, p.goal || ''].some((x) => x.toLowerCase().includes(q.toLowerCase()));
 
 /** PlaybookList is the list pane of the tab Playbooks: each playbook with the first line of its goal and its seats. */
 export function PlaybookList({ current }: { current?: string }) {
@@ -208,7 +209,7 @@ export function PlaybookList({ current }: { current?: string }) {
                   {seats[0] ? <Mark agent={seats[0].agent} size={32} selected={on} /> : <span class="mark s32 mark-empty" aria-hidden="true" />}
                   <span class="duty-row-main">
                     <span class="duty-row-top">
-                      <span class="duty-row-title">{titleOfName(p.name)}</span>
+                      <span class="duty-row-title">{p.name}</span>
                     </span>
                     {goal && <span class="duty-row-when">{goal}</span>}
                     <span class="duty-row-meta">
@@ -312,7 +313,7 @@ function PlaybookView({ name }: { name: string }) {
     return () => clearTimeout(t);
   }, [name, !!(whole || listed)]);
   const p = whole || listed;
-  const title = titleOfName(name);
+  const title = name;
   const back = { href: hrefOf({ place: 'duties', tab: 'playbooks' }), label: 'Playbooks', to: 'list' as const };
   if (!p) {
     return (
@@ -362,7 +363,7 @@ function PlaybookView({ name }: { name: string }) {
                 <Mark agent={m.agent} size={24} />
                 <span class="book-seat-main">
                   <span class="t-sub">{m.handle}</span>
-                  {m.task && <span class="t-meta">{firstLine(m.task)}</span>}
+                  {m.task && <SeatTask task={m.task} />}
                 </span>
               </li>
             ))}
@@ -419,13 +420,30 @@ function PlaybookView({ name }: { name: string }) {
   );
 }
 
+/** A task of a seat longer than this, or of several lines, shows its first line and folds the rest. */
+const SHORT_TASK = 160;
+
+/** SeatTask shows the task of a seat of a playbook whole: in full when it is short, else its first line with the whole task in a fold. */
+function SeatTask({ task }: { task: string }) {
+  const t = task.trim();
+  if (t.length <= SHORT_TASK && !t.includes('\n')) return <span class="t-meta book-task">{t}</span>;
+  return (
+    <details class="book-task-fold">
+      <summary>
+        <span class="t-meta">{firstLine(t)}</span> <span class="book-task-more">The whole task</span>
+      </summary>
+      <p class="t-meta book-task">{t}</p>
+    </details>
+  );
+}
+
 /** usersWords says how many duties open a bridge from a playbook. */
 const usersWords = (n: number) => (n === 1 ? '1 duty opens a bridge from it.' : n + ' duties open a bridge from it.');
 
 /** DeletePlaybook asks before it deletes a playbook, and says what a duty that opens a bridge from it does then. */
 function DeletePlaybook({ name, users, onClose, onDone }: { name: string; users: Duty[]; onClose: () => void; onDone: () => void }) {
   const [busy, setBusy] = useState(false);
-  const title = titleOfName(name);
+  const title = name;
   return (
     <Confirm
       title={'Delete ' + title + '?'}
@@ -443,8 +461,11 @@ function DeletePlaybook({ name, users, onClose, onDone }: { name: string; users:
         onDone();
       }}
     >
-      {users.length > 0 && <p>{usersWords(users.length)}</p>}
-      <p>A duty that opens a bridge from it stops until you pick another playbook.</p>
+      {users.length > 0 ? (
+        <p>{usersWords(users.length) + (users.length === 1 ? ' It stops until you pick another playbook for it.' : ' They stop until you pick another playbook for them.')}</p>
+      ) : (
+        <p>The bridges that it opened stay.</p>
+      )}
     </Confirm>
   );
 }
@@ -458,9 +479,19 @@ function DeletePlaybook({ name, users, onClose, onDone }: { name: string; users:
  */
 function RenamePlaybook({ name, users, onClose }: { name: string; users: Duty[]; onClose: () => void }) {
   const list = usePlaybooks((s) => s.list);
-  const [words, setWords] = useState(() => titleOfName(name));
+  const [words, setWords] = useState(name);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const field = useRef<HTMLInputElement>(null);
+  // The dialog opens with the focus in the name, which the person came to change. The dialog gives Cancel the focus first, so this runs after it.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (!field.current) return;
+      field.current.focus();
+      field.current.select();
+    }, 0);
+    return () => clearTimeout(t);
+  }, []);
   const next = slugOf(words);
   const save = async () => {
     const why = words.trim() && !next ? 'A name needs at least one letter from a to z, or a digit.' : playbookReason(next);
@@ -498,9 +529,9 @@ function RenamePlaybook({ name, users, onClose }: { name: string; users: Duty[];
     }
     setBusy(false);
     onClose();
-    const newTitle = titleOfName(next);
+    const newTitle = next;
     if (stuck.length) {
-      showError(new Error('Saved the playbook as ' + newTitle + '. ' + listWords(stuck) + (stuck.length === 1 ? ' still opens' : ' still open') + ' a bridge from ' + titleOfName(name) + ', so that playbook stays too.'));
+      showError(new Error('Saved the playbook as ' + newTitle + '. ' + listWords(stuck) + (stuck.length === 1 ? ' still opens' : ' still open') + ' a bridge from ' + name + ', so that playbook stays too.'));
     } else {
       const ok = await attempt(() => removePlaybook(name));
       if (ok) showSaid('Renamed the playbook to ' + newTitle + '.', { label: 'See the playbook', href: bookHref(next) });
@@ -508,19 +539,20 @@ function RenamePlaybook({ name, users, onClose }: { name: string; users: Duty[];
     go(bookHref(next));
   };
   return (
-    <Confirm title={'Rename ' + titleOfName(name)} confirm="Rename" busy={busy} onCancel={onClose} onConfirm={save}>
+    <Confirm title={'Rename ' + name} confirm="Rename" busy={busy} onCancel={onClose} onConfirm={save}>
       <Field label="Name" error={error}>
         <Input
+          ref={field}
           value={words}
           maxLength={80}
           invalid={!!error}
-          aria-describedby={next && !error ? 'rename-slug' : undefined}
+          aria-describedby={next && next !== words.trim() && !error ? 'rename-slug' : undefined}
           onInput={(e) => {
             setWords((e.target as HTMLInputElement).value);
             setError('');
           }}
         />
-        {next && !error && (
+        {next && next !== words.trim() && !error && (
           <span class="t-meta duty-slug" id="rename-slug">
             It saves as {next}.
           </span>

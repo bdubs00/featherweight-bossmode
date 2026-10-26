@@ -15,6 +15,7 @@ import { forgetTranscripts } from './Conversation';
 import { hrefOf } from '../lib/route';
 import { answerLine } from '../lib/duties';
 import { DutyList, DutyMain } from './Duties';
+import { DutyEditor } from './DutyEditor';
 import { PlaybookList, PlaybookMain } from './Playbooks';
 import { clearNotice, clearSaid, currentNotice, currentSaid, currentSaidLink } from './notice';
 import { click, fakeApi, keyNamed, mount, settle, typeIn, unmountAll, type Call } from './testkit-c';
@@ -175,7 +176,8 @@ describe('the tab Playbooks', () => {
     expect(text(books.querySelector('.pane-head'))).toContain('Playbooks');
     const rows = [...books.querySelectorAll('.duty-row')];
     expect(rows.map((r) => r.getAttribute('href'))).toEqual(['#playbooks/weekly-patching', '#playbooks/restore-drill']);
-    expect(text(rows[0])).toBe('Weekly patching Patch the lab hosts. 2 seats');
+    // A playbook goes by its name as it is.
+    expect(text(rows[0])).toBe('weekly-patching Patch the lab hosts. 2 seats');
     expect(rows[0].getAttribute('aria-current')).toBe('page');
     typeIn(books.querySelector('input[type="search"]'), 'restore');
     expect([...books.querySelectorAll('.duty-row')].map((r) => r.getAttribute('href'))).toEqual(['#playbooks/restore-drill']);
@@ -185,12 +187,13 @@ describe('the tab Playbooks', () => {
     api = fakeApi(routes());
     const el = mount(<PlaybookMain name="weekly-patching" />);
     await settle();
-    expect(text(el.querySelector('h1'))).toBe('Weekly patching');
+    expect(text(el.querySelector('h1'))).toBe('weekly-patching');
     expect(el.querySelector('.book-goal')!.textContent).toBe('Patch the lab hosts.\nThen report what changed.');
-    expect([...el.querySelectorAll('.book-seat')].map(text)).toEqual(['patcher Patch each host.', 'reviewer Review the patches.']);
+    // A task shows whole.
+    expect([...el.querySelectorAll('.book-seat')].map(text)).toEqual(['patcher Patch each host. Reboot the ones that need it.', 'reviewer Review the patches.']);
     expect(text(el.querySelector('section[aria-labelledby="book-runs"]'))).toBe('How its bridge runs Keep warm workers Most messages: 200 Most turns: 40 The manager can: decide for members, write a report on close.');
     const users = el.querySelector('section[aria-labelledby="book-users"]')!;
-    expect([...users.querySelectorAll('a')].map((a) => [a.textContent, a.getAttribute('href')])).toEqual([['Patch tuesday', '#duties/patch-tuesday']]);
+    expect([...users.querySelectorAll('a')].map((a) => [a.textContent, a.getAttribute('href')])).toEqual([['patch-tuesday', '#duties/patch-tuesday']]);
     expect(keyNamed(el, 'Make a duty')!.getAttribute('href')).toBe(hrefOf({ place: 'duties', fresh: true, seed: { act: 'open', playbook: 'weekly-patching', agent: 'migrator' } }));
   });
 
@@ -201,12 +204,12 @@ describe('the tab Playbooks', () => {
     await settle();
     more(el, 'Delete');
     const ask = document.querySelector('dialog.confirm')!;
-    expect(text(ask.querySelector('h2'))).toBe('Delete Weekly patching?');
-    expect(text(ask)).toContain('1 duty opens a bridge from it. A duty that opens a bridge from it stops until you pick another playbook.');
+    expect(text(ask.querySelector('h2'))).toBe('Delete weekly-patching?');
+    expect(text(ask)).toContain('1 duty opens a bridge from it. It stops until you pick another playbook for it.');
     click(keyNamed(ask, 'Delete'));
     await settle();
     expect(api.calls.some((c) => c.method === 'DELETE' && c.path === '/v1/playbooks/weekly-patching')).toBe(true);
-    expect(currentSaid()).toBe('Deleted the playbook Weekly patching.');
+    expect(currentSaid()).toBe('Deleted the playbook weekly-patching.');
     expect(location.hash).toBe('#playbooks');
   });
 
@@ -224,8 +227,12 @@ describe('the tab Playbooks', () => {
     await settle();
     more(el, 'Rename');
     const ask = document.querySelector('dialog.confirm')!;
-    expect(text(ask.querySelector('h2'))).toBe('Rename Weekly patching');
+    expect(text(ask.querySelector('h2'))).toBe('Rename weekly-patching');
     expect(text(ask)).toContain('The duty that opens a bridge from it moves to the new name.');
+    // The dialog opens with the focus in the name, which starts as the name as it is.
+    await settle();
+    expect(document.activeElement).toBe(fieldOf(ask, 'Name'));
+    expect(fieldOf(ask, 'Name')!.value).toBe('weekly-patching');
     // A name that a playbook holds already is refused.
     typeIn(fieldOf(ask, 'Name'), 'Restore drill');
     click(keyNamed(ask, 'Rename'));
@@ -240,7 +247,7 @@ describe('the tab Playbooks', () => {
     expect((moved.body as DutyRecord).do).toEqual({ open: { playbook: 'patch-day' } });
     expect((moved.body as DutyRecord).revision).toBe(3);
     expect(api.calls.some((c) => c.method === 'DELETE' && c.path === '/v1/playbooks/weekly-patching')).toBe(true);
-    expect(currentSaid()).toBe('Renamed the playbook to Patch day.');
+    expect(currentSaid()).toBe('Renamed the playbook to patch-day.');
     expect(currentSaidLink()).toEqual({ label: 'See the playbook', href: '#playbooks/patch-day' });
     expect(location.hash).toBe('#playbooks/patch-day');
   });
@@ -261,6 +268,59 @@ describe('the tab Playbooks', () => {
     click(keyNamed(ask, 'Rename'));
     await settle();
     expect(api.calls.some((c) => c.method === 'DELETE')).toBe(false);
-    expect(currentNotice()).toBe('Saved the playbook as Patch day. Patch tuesday still opens a bridge from Weekly patching, so that playbook stays too.');
+    expect(currentNotice()).toBe('Saved the playbook as patch-day. patch-tuesday still opens a bridge from weekly-patching, so that playbook stays too.');
+  });
+});
+
+describe('the walk of the held changes', () => {
+  it('names a duty by its title in the conversation of its run, with the clock of the duties as its face', async () => {
+    const titled = duty({ title: 'Walk Duty 7' });
+    api = fakeApi({
+      'GET /v1/duties': { duties: [titled], paused: false },
+      'GET /v1/duties/nightly-report': { ...titled, history: [{ at: ago(10), run: '01KNEW', state: 'completed' }] },
+      'GET /v1/runs/01KNEW': runOf('01KNEW', 'Done.'),
+      'GET /v1/runs/01KNEW/result': { runId: '01KNEW', title: 'Nightly report', agent: 'scribe', status: 'ready', started: T, changed: T },
+      'GET /v1/runs/01KNEW/transcript': { run: runOf('01KNEW', 'Done.'), items: [{ seq: 1, time: T, kind: 'user', text: 'Write the report.', who: 'duty:nightly-report' }], next: 0, prev: 0 },
+    });
+    const el = mount(<DutyMain name="nightly-report" run="01KNEW" />);
+    await settle();
+    expect(text(el.querySelector('h1'))).toBe('Walk Duty 7');
+    const msg = el.querySelector('.duty-runpane .thread')!;
+    expect(text(msg)).toContain('The duty Walk Duty 7');
+    const face = msg.querySelector('.avatar')!;
+    expect(face.classList.contains('avatar-duty')).toBe(true);
+    expect(face.querySelector('svg')).toBeTruthy();
+    expect(face.textContent).toBe('');
+  });
+
+  it('shows a long task of a seat in a fold, and speaks of duties in Delete only when a duty opens the playbook', async () => {
+    const long = 'Patch each host of the lab with the newest packages of its distribution.\nReboot each host that needs it, one at a time, and wait until it answers again before the next one.';
+    api = fakeApi({
+      'GET /v1/playbooks': { playbooks: [{ ...BOOK, seats: [{ handle: 'patcher', agent: 'migrator', task: long }] }] },
+      'GET /v1/playbooks/weekly-patching': { ...WHOLE, seats: [{ handle: 'patcher', agent: 'migrator', task: long }] },
+      'GET /v1/duties': { duties: [], paused: false },
+    });
+    const el = mount(<PlaybookMain name="weekly-patching" />);
+    await settle();
+    const fold = el.querySelector('.book-seat details.book-task-fold') as HTMLDetailsElement;
+    expect(fold.open).toBe(false);
+    expect(text(fold.querySelector('summary'))).toBe('Patch each host of the lab with the newest packages of its distribution. The whole task');
+    expect(fold.querySelector('.book-task')!.textContent).toBe(long);
+    more(el, 'Delete');
+    const ask = document.querySelector('dialog.confirm')!;
+    expect(text(ask)).not.toContain('duty');
+    expect(text(ask)).toContain('The bridges that it opened stay.');
+  });
+
+  it('goes back to the playbook from Cancel of a duty that Make a duty started there', async () => {
+    location.hash = '#playbooks/weekly-patching';
+    await settle();
+    location.hash = '#duties/new?do=open&playbook=weekly-patching';
+    await settle();
+    api = fakeApi({ 'GET /v1/duties': { duties: [], paused: false }, 'GET /v1/playbooks': { playbooks: [BOOK] }, 'PUT /v1/duties/weekly-patching': (c: Call) => ({ body: { duty: c.body, readback: '', next: [], problems: [] } }) });
+    const el = mount(<DutyEditor seed={{ act: 'open', playbook: 'weekly-patching' }} />);
+    await settle();
+    expect(keyNamed(el, 'Cancel')!.getAttribute('href')).toBe('#playbooks/weekly-patching');
+    expect(el.querySelector('a.back')!.getAttribute('aria-label')).toBe('Back to the playbook');
   });
 });

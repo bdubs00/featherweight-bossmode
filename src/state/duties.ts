@@ -16,6 +16,7 @@ import { api } from '../api/routes';
 import { ApiError } from '../api/client';
 import type { Duty, DutyOptions, DutyRecord, DutyStarted, InboxItem, SharedChannel } from '../api/types';
 import { store } from './store';
+import { dutyTitle, rememberDuties } from '../lib/duties';
 
 export interface DutiesState {
   /** The duties of the list, or null before the first read. */
@@ -113,6 +114,7 @@ async function readList(): Promise<void> {
   watchStream();
   try {
     const r = await api.duties();
+    rememberDuties(r.duties || []);
     set({ ...state, list: r.duties, paused: r.paused, error: '', off: false });
   } catch (e) {
     if (e instanceof ApiError && e.status === 404) {
@@ -129,6 +131,7 @@ const reading = new Map<string, Promise<void>>();
 
 /** putDuty keeps a duty that the page read whole, and its row in the list. */
 function putDuty(d: Duty): void {
+  rememberDuties([d]);
   const list = state.list ? (state.list.some((x) => x.name === d.name) ? state.list.map((x) => (x.name === d.name ? { ...x, ...strip(d) } : x)) : [...state.list, strip(d)]) : state.list;
   const gone = { ...state.gone };
   delete gone[d.name];
@@ -161,6 +164,23 @@ export function loadDuty(name: string): Promise<void> {
     });
   reading.set(name, p);
   return p;
+}
+
+/**
+ * useDutyLabel is the name of a duty as a person reads it, for a screen
+ * that knows the duty by its name only, such as a row of Activity: its
+ * title, else its name as it is. The list of the duties gives the title,
+ * so the hook reads the list once when the page has none.
+ */
+export function useDutyLabel(name: string): string {
+  const label = useDuties((s) => {
+    const d = s.byName[name] || (s.list ? s.list.find((x) => x.name === name) : undefined);
+    return d ? dutyTitle(d) : name;
+  });
+  useEffect(() => {
+    if (name && !state.list && !state.off) loadDuties().catch(() => {});
+  }, [name]);
+  return label;
 }
 
 /* ---------- the actions ---------- */

@@ -639,3 +639,32 @@
 .duty-form > .duty-sec > .duty-books {
   margin: 0;
 }
+/* A duty in a conversation: the clock of the place Duties on a raised
+   square, so it reads neither as a person nor as an agent. */
+.avatar.avatar-duty {
+  background: var(--raised);
+  border: 1px solid var(--raised-line);
+  color: var(--ink);
+}
+/* The task of a seat of a playbook: whole, or its first line with a fold that holds the rest. */
+.book-task {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.book-task-fold > summary {
+  cursor: pointer;
+  list-style: none;
+}
+.book-task-fold > summary::-webkit-details-marker {
+  display: none;
+}
+.book-task-more {
+  font-size: var(--t-meta);
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: underline;
+}
+.book-task-fold[open] .book-task-more {
+  display: none;
+}

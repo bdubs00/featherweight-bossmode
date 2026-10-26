@@ -204,15 +204,18 @@ if (typeof window !== 'undefined')
     }
   });
 
-/** cameFrom is the address that Make this a duty came from, or "" for a move inside Duties or none. */
+/** cameFrom is the address that Make this a duty or Make a duty came from, or "" for a move among the duties or none. A playbook counts as a place to go back to. */
 function cameFrom(): string {
   if (!before || before === '#') return '';
-  return parseRoute(before).place === 'duties' ? '' : before;
+  const r = parseRoute(before);
+  return r.place === 'duties' && !(r.tab === 'playbooks' && r.playbook) ? '' : before;
 }
 
 /** backTo names the screen of an address, for the link back to it. */
 function backTo(hash: string): string {
-  switch (parseRoute(hash).place) {
+  const r = parseRoute(hash);
+  if (r.place === 'duties' && r.tab === 'playbooks') return 'the playbook';
+  switch (r.place) {
     case 'chat':
       return 'the chat';
     case 'manager':
@@ -1261,7 +1264,7 @@ function EditorForm({ name, seed, base: read, heading, back: home }: FormProps) 
               value={shownName}
               maxLength={MAX_TITLE}
               invalid={!!(err.name || nameWhy || pr.name)}
-              placeholder={fresh ? 'Daily report' : titleOfName(name || '')}
+              placeholder={fresh ? 'Daily report' : name}
               aria-describedby={slug && !(err.name || nameWhy || pr.name) ? 'duty-slug' : undefined}
               onInput={(e) => patch({ name: (e.target as HTMLInputElement).value, nameOwn: true })}
             />

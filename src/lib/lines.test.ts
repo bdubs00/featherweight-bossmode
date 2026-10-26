@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Entry } from '../api/types';
 import { decidedRuns, hiddenLine, isMe, lineWords, lostRunOf, napOf, napRuns, napWords, whoName, type Nap } from './lines';
+import { rememberDuties } from './duties';
 
 const TOKEN = { subject: 'token', kind: 'token' };
 const ALICE = { subject: 'alice@example.com', name: 'Alice Example' };
@@ -116,8 +117,10 @@ describe('isMe and whoName', () => {
     expect(whoName('bob@example.com', TOKEN)).toBe('bob');
     expect(whoName('somebody', TOKEN)).toBe('Someone');
     expect(whoName('the front', TOKEN)).toBe('The front');
-    // A run of a duty comes from the duty, by its name in words.
-    expect(whoName('duty:nightly-restore-test', TOKEN)).toBe('The duty Nightly restore test');
+    // A run of a duty comes from the duty, by its title once the page read it, else by its name as it is.
+    expect(whoName('duty:nightly-restore-test', TOKEN)).toBe('The duty nightly-restore-test');
+    rememberDuties([{ name: 'walk-duty-7', title: 'Walk Duty 7' }]);
+    expect(whoName('duty:walk-duty-7', TOKEN)).toBe('The duty Walk Duty 7');
   });
 });
 

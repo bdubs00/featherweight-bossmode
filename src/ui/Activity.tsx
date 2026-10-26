@@ -41,8 +41,8 @@ import { attempt, dropUndo, showSaid, showUndo } from './notice';
 import { Empty, Markdown, When } from './common';
 import { SeatAgainKey, continueSeat, seatAgain } from './SeatAgain';
 import { markDone, madeOf, settledOf, useMade } from '../state/done';
-import { loadInbox } from '../state/duties';
-import { titleOfName } from '../lib/duties';
+import { loadInbox, useDutyLabel } from '../state/duties';
+import { dutyLabel } from '../lib/duties';
 import { EmptyPane } from './Shell';
 import { Avatar, Button, Card, Led, Mark, PaneHeader } from './primitives';
 
@@ -395,11 +395,12 @@ export function useInbox(): InboxView {
 /** dutyHref is the address of the page of a duty. */
 const dutyHref = (name: string) => hrefOf({ place: 'duties', name });
 
-/** DutyChip names the duty of a run, and opens it. */
+/** DutyChip names the duty of a run, by its title or its name as it is, and opens it. */
 function DutyChip({ name }: { name: string }) {
+  const label = useDutyLabel(name);
   return (
-    <a class="chip chip-plain duty-chip" href={dutyHref(name)} title={'Open the duty ' + titleOfName(name)}>
-      {titleOfName(name)}
+    <a class="chip chip-plain duty-chip" href={dutyHref(name)} title={'Open the duty ' + label}>
+      {label}
     </a>
   );
 }
@@ -458,7 +459,7 @@ function rowText(r: InboxRow): string {
 function rowName(r: InboxRow): string {
   if (r.kind === 'message' && r.entry) return senderName(r.entry.from);
   // A row of a duty names its agent, as a row of a seat does, and its chip names the duty.
-  if (r.kind === 'duty-failed' || r.kind === 'duty-paused' || r.kind === 'duty-waits') return r.agent || (r.duty ? titleOfName(r.duty) : 'A duty');
+  if (r.kind === 'duty-failed' || r.kind === 'duty-paused' || r.kind === 'duty-waits') return r.agent || (r.duty ? dutyLabel(r.duty) : 'A duty');
   return r.handle || '';
 }
 

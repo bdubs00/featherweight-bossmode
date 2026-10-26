@@ -34,6 +34,7 @@ import {
   decidedWords,
   dutyLight,
   dutyShape,
+  dutyLabel,
   dutyTitle,
   dutyWhat,
   importedOf,
@@ -430,7 +431,7 @@ function DutyView({ name, open }: { name: string; open?: string }) {
   if (!d) {
     return (
       <section class="screen duty" aria-labelledby="duty-title">
-        <PaneHeader id="duty-title" title={titleOfName(name)} size="title" level={1} back={back} headingRef={heading} focusable />
+        <PaneHeader id="duty-title" title={dutyLabel(name)} size="title" level={1} back={back} headingRef={heading} focusable />
         <div class="empty center">
           <p>{gone && off ? <OffWords /> : gone ? 'This duty is not here. It was removed, or you cannot see it.' : failed || 'Loading the duty.'}</p>
         </div>
@@ -634,7 +635,7 @@ function DoWords({ d, agentName, title, locked }: { d: Duty; agentName: string; 
         <p class="duty-who">
           <Mark agent={d.agent} size={24} />
           <span>
-            {agent} opens a bridge from the playbook {titleOfName(x.open.playbook)}
+            {agent} opens a bridge from the playbook {x.open.playbook}
           </span>
         </p>
         {x.open.goal && <MessageWords text={x.open.goal} />}
@@ -719,20 +720,26 @@ function HistoryLine({ name, r, me, open, who }: { name: string; r: DutyRun; me:
         </a>
       )}
       {answer && <span class="duty-run-answer">{answer}</span>}
-      {decided.length > 0 && (
-        <ul class="duty-decided" aria-label="Decided while you were away">
-          {decided.map((x) => (
-            <li>
-              <span class="duty-decided-at">
-                <When at={x.at} />
-              </span>
-              <span>{decidedWords(x, me)}</span>
-            </li>
-          ))}
-        </ul>
-      )}
+      {decided.length > 0 && <Decided list={decided} me={me} />}
       {open && r.run && <DutyRunPane runId={r.run} who={who} />}
     </li>
+  );
+}
+
+/** Decided lists the questions of a run that somebody decided while the person was away, each call in words, such as a shell command. */
+function Decided({ list, me }: { list: NonNullable<DutyRun['decided']>; me: string }) {
+  const catalog = useToolCatalog();
+  return (
+    <ul class="duty-decided" aria-label="Decided while you were away">
+      {list.map((x) => (
+        <li>
+          <span class="duty-decided-at">
+            <When at={x.at} />
+          </span>
+          <span title={x.tool || undefined}>{decidedWords(x, me, (t) => phraseOf(catalog, t))}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 

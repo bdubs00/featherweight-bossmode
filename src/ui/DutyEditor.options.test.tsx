@@ -267,7 +267,7 @@ describe('What', () => {
     click(radio(el, 'duty-do', 'open'));
     await settle();
     expect(fieldOf(el, 'Ask Migrator')).toBeNull();
-    expect(optionsOf(fieldOf(el, 'Playbook'))).toEqual(['Pick a playbook', 'Weekly patching: Patch the lab hosts and report.']);
+    expect(optionsOf(fieldOf(el, 'Playbook'))).toEqual(['Pick a playbook', 'weekly-patching: Patch the lab hosts and report.']);
     // The budget of an open is the turns of the bridge, and nothing else.
     expect(fieldOf(el, 'The most a run can cost')).toBeNull();
     const turns = () => fieldOf(el, 'The most turns of the bridge')!;

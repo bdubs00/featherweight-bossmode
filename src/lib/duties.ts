@@ -499,13 +499,52 @@ export function checkLine(r: DutyRun): string {
   return n + (r.woke ? ', woke the agent' : '');
 }
 
+/** The calls of the tools that a person knows by what they do, by the name of the tool without its server. */
+const CALL_WORDS: Record<string, string> = {
+  bash: 'a shell command',
+  shell: 'a shell command',
+  exec: 'a shell command',
+  files: 'a change of files',
+  http: 'a web request',
+  web_fetch: 'a web request',
+  env: 'a change of its packages',
+  memory: 'a note in its memory',
+  recall: 'a search of its memory',
+  pages_write: 'a write to the wiki',
+  bridge_open: 'a new bridge',
+  bridge_post: 'a post in a bridge',
+  bridge_close: 'the close of a bridge',
+  spawn_task: 'a hand-off to another agent',
+  send: 'a message on the bus',
+  ask_user: 'a question to you',
+};
+
+/**
+ * callWords says a call of a tool in words, such as a shell command for
+ * bash, for a line that tells who decided it. phrase names a tool that the
+ * page does not know by what it does, from the catalog of the server, as a
+ * call to find incidents. Else the line names the tool.
+ */
+export function callWords(tool: string | undefined, phrase?: (tool: string) => string): string {
+  const t = String(tool || '').trim();
+  if (!t) return 'a tool';
+  const base = t.slice(Math.max(t.lastIndexOf('.'), t.lastIndexOf('/')) + 1);
+  if (CALL_WORDS[base]) return CALL_WORDS[base];
+  if (base.startsWith('pages_')) return 'a read of the wiki';
+  if (base.startsWith('bridge_')) return 'a use of a bridge';
+  const p = phrase ? phrase(t) : '';
+  if (p && p !== t && p !== toolName(t) && p !== base) return 'a call to ' + lowerFirst(p);
+  return 'the tool ' + toolName(t);
+}
+
 /**
  * decidedWords says who decided a question of a run of a duty while the
- * person was away, such as The manager allowed shell.exec: it only reads.
- * me is the subject of the person who reads it.
+ * person was away, such as The manager allowed a shell command: it only
+ * reads. me is the subject of the person who reads it, and phrase names a
+ * tool by what it does, from the catalog.
  */
-export function decidedWords(d: DutyDecided, me = ''): string {
-  const tool = d.tool || 'a tool';
+export function decidedWords(d: DutyDecided, me = '', phrase?: (tool: string) => string): string {
+  const tool = callWords(d.tool, phrase);
   const why = d.reason && d.reason.trim() ? ': ' + d.reason.trim() : '.';
   if (d.question) {
     // A person answers or declines a question, as the digest says it.
@@ -591,11 +630,23 @@ export function templatedOf(d: Pick<Duty, 'origin' | 'template' | 'do' | 'source
 
 /**
  * dutyTitle is the name of a duty as a person reads it: its title, the
- * words that the person wrote, such as Walk Duty 1, else its short name in
- * words, so daily-report is Daily report. The list, the page of the duty,
- * its dialogs, and a profile all call the duty by it.
+ * words that the person wrote, such as Walk Duty 1, else its name as it
+ * is, such as daily-report. The page never dresses a name up, so a duty
+ * reads the same in the list, on its page, in its dialogs, on a profile,
+ * in Activity, and in the conversation of its run.
  */
-export const dutyTitle = (d: Pick<DutyRecord, 'name' | 'title'>): string => (d.title && d.title.trim()) || titleOfName(d.name);
+export const dutyTitle = (d: Pick<DutyRecord, 'name' | 'title'>): string => (d.title && d.title.trim()) || d.name;
+
+/** The titles of the duties that the page read, by name, for the screens that know a duty by its name only, such as the sender of its run. */
+const titles = new Map<string, string>();
+
+/** rememberDuties keeps the title of each duty that the page read. */
+export function rememberDuties(list: Pick<DutyRecord, 'name' | 'title'>[]): void {
+  for (const d of list) if (d && d.name) titles.set(d.name, dutyTitle(d));
+}
+
+/** dutyLabel is the name of a duty as a person reads it, from its name alone: its title once the page read it, else its name as it is. */
+export const dutyLabel = (name: string): string => titles.get(name) || name;
 
 /** MAX_TITLE is the longest title of a duty that the server keeps, in characters. */
 export const MAX_TITLE = 100;
@@ -608,7 +659,7 @@ export function dutyWhat(d: Pick<DutyRecord, 'do'>): string {
   const x = d.do || {};
   const message = (x.ask && x.ask.message) || (x.post && x.post.message) || (x.manager && x.manager.message) || '';
   if (message.trim()) return firstLine(toWords(message));
-  if (x.open && x.open.playbook) return 'Open a bridge from the playbook ' + titleOfName(x.open.playbook);
+  if (x.open && x.open.playbook) return 'Open a bridge from the playbook ' + x.open.playbook;
   return '';
 }
 
