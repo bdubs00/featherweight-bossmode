@@ -24,6 +24,8 @@ beforeAll(() => {
   window.matchMedia = ((q: string) => ({ matches: /min-width/.test(q), media: q, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
 });
 beforeEach(() => {
+  // A draft of the editor lives in the storage of the tab. Each test starts without one.
+  sessionStorage.clear();
   forgetPlaybooks();
   location.hash = '#bridge/b1';
   act(() => {
@@ -73,12 +75,15 @@ describe('a playbook from a bridge', () => {
     more(el, 'Save as playbook');
     await settle();
     expect(dialog().querySelector('h2')!.textContent).toBe('Save as playbook');
-    expect(fieldOf(dialog(), 'Name')!.value).toBe('migrate-puppet');
+    // The name reads as words, and the page shows the short name that it saves as.
+    expect(fieldOf(dialog(), 'Name')!.value).toBe('Migrate puppet');
+    expect(dialog().querySelector('#playbook-slug')!.textContent).toBe('It saves as migrate-puppet.');
     expect(dialog().textContent).toContain('It keeps the goal, 2 seats, the placement, the caps, and what the manager can do.');
-    typeIn(fieldOf(dialog(), 'Name'), 'Puppet To Ansible');
+    typeIn(fieldOf(dialog(), 'Name'), '???');
     click(keyNamed(dialog(), 'Save playbook'));
-    expect(fieldOf(dialog(), 'Name')!.closest('label')!.querySelector('.field-error')!.textContent).toBe('A name holds 1 to 63 of a to z, 0 to 9, hyphens, and underscores.');
-    typeIn(fieldOf(dialog(), 'Name'), 'puppet-to-ansible');
+    expect(fieldOf(dialog(), 'Name')!.closest('label')!.querySelector('.field-error')!.textContent).toBe('A name needs at least one letter from a to z, or a digit.');
+    typeIn(fieldOf(dialog(), 'Name'), 'Puppet To Ansible');
+    expect(dialog().querySelector('#playbook-slug')!.textContent).toBe('It saves as puppet-to-ansible.');
     click(keyNamed(dialog(), 'Save playbook'));
     await settle();
     const put = api.calls.find((c) => c.method === 'PUT' && c.path.startsWith('/v1/playbooks/'))!;
@@ -89,7 +94,7 @@ describe('a playbook from a bridge', () => {
     expect(dialog()).toBeNull();
     expect(document.activeElement!.getAttribute('aria-label')).toBe('More');
     // A short notice says that it worked.
-    expect(currentSaid()).toBe('Saved the playbook puppet-to-ansible.');
+    expect(currentSaid()).toBe('Saved the playbook Puppet to ansible.');
   });
 
   it('replaces a playbook of the same name with the revision that it read, and says when it changed in the meantime', async () => {

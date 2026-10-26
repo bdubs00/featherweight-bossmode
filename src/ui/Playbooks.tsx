@@ -2,13 +2,14 @@
 // saves its goal, placement, seats, caps, and what the manager can do under
 // a name. The choice of a playbook serves New bridge and the action open of
 // a duty. Under that choice, a list shows the playbooks with Delete.
-// docs/CONTRACT.md, section 16, names the routes.
+// docs/CONTRACT.md, section 16, names the routes. The person names a
+// playbook in words, and the page makes its short name and shows it.
 
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { ApiError } from '../api/client';
 import type { Playbook } from '../api/types';
 import { keepsWords, playbookBodyOf, playbookLabel, playbookName, playbookReason } from '../lib/playbooks';
-import { splitProblem, titleOfName } from '../lib/duties';
+import { slugOf, splitProblem, titleOfName } from '../lib/duties';
 import { membersOf } from '../state/reducer';
 import { useSelect } from '../state/store';
 import { loadPlaybooks, removePlaybook, savePlaybook, seatsOf, usePlaybooks } from '../state/playbooks';
@@ -27,25 +28,27 @@ export function problemsOfError(e: unknown): string[] {
 
 /**
  * SavePlaybook is the dialog of Save as playbook, from a bridge. The name
- * starts from the title of the bridge. A name that a playbook holds
- * already replaces it, with the revision that the list read, so a change
- * in the meantime answers 409. confirm names the key, such as Save and
- * make a duty, and onSaved gets the name.
+ * starts from the title of the bridge, in words, and the page makes the
+ * short name that the server keeps. A name that a playbook holds already
+ * replaces it, with the revision that the list read, so a change in the
+ * meantime answers 409. confirm names the key, such as Save and make a
+ * duty, and onSaved gets the short name.
  */
 export function SavePlaybook({ bridge, confirm = 'Save playbook', onClose, onSaved }: { bridge: string; confirm?: string; onClose: () => void; onSaved?: (name: string) => void }) {
   const b = useSelect((s) => s.bridges.byId[bridge]);
   const roster = useSelect((s) => s.rosters[bridge]);
   const list = usePlaybooks((s) => s.list);
-  const [name, setName] = useState(() => playbookName(b ? b.title : ''));
+  const [words, setWords] = useState(() => titleOfName(playbookName(b ? b.title : '')));
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     loadPlaybooks().catch(() => {});
   }, []);
+  const name = slugOf(words);
   const members = membersOf(roster).filter((m) => m && !m.fired);
   const old = (list || []).find((p) => p.name === name);
   const save = async () => {
-    const why = playbookReason(name);
+    const why = words.trim() && !name ? 'A name needs at least one letter from a to z, or a digit.' : playbookReason(name);
     if (why) {
       setError(why);
       return;
@@ -60,7 +63,7 @@ export function SavePlaybook({ bridge, confirm = 'Save playbook', onClose, onSav
       const body = playbookBodyOf(b, members);
       await savePlaybook(name, old && typeof old.revision === 'number' ? { ...body, revision: old.revision } : body);
       setBusy(false);
-      showSaid('Saved the playbook ' + name + '.');
+      showSaid('Saved the playbook ' + titleOfName(name) + '.');
       onClose();
       if (onSaved) onSaved(name);
       return;
@@ -74,16 +77,21 @@ export function SavePlaybook({ bridge, confirm = 'Save playbook', onClose, onSav
     <Confirm title="Save as playbook" confirm={confirm} busy={busy} onCancel={onClose} onConfirm={save}>
       <Field label="Name" error={error}>
         <Input
-          value={name}
-          maxLength={63}
-          spellcheck={false}
+          value={words}
+          maxLength={80}
           invalid={!!error}
-          placeholder="weekly-patching"
+          placeholder="Weekly patching"
+          aria-describedby={name && !error ? 'playbook-slug' : undefined}
           onInput={(e) => {
-            setName((e.target as HTMLInputElement).value.toLowerCase());
+            setWords((e.target as HTMLInputElement).value);
             setError('');
           }}
         />
+        {name && !error && (
+          <span class="t-meta duty-slug" id="playbook-slug">
+            It saves as {name}.
+          </span>
+        )}
       </Field>
       <p>{keepsWords(members.length)}</p>
       {old && <p>A playbook of this name exists. Saving replaces it.</p>}
@@ -126,10 +134,11 @@ export function PlaybookShelf() {
   const list = usePlaybooks((s) => s.list);
   const [asking, setAsking] = useState<Playbook | null>(null);
   const [busy, setBusy] = useState(false);
+  const head = useRef<HTMLElement>(null);
   if (!list || list.length === 0) return null;
   return (
     <details class="advanced duty-books">
-      <summary>
+      <summary ref={head}>
         <Glyph name="back" size={16} />
         See the playbooks
       </summary>
@@ -161,7 +170,15 @@ export function PlaybookShelf() {
             setBusy(true);
             const ok = await attempt(() => removePlaybook(asking.name));
             setBusy(false);
-            if (ok) setAsking(null);
+            if (ok) {
+              setAsking(null);
+              showSaid('Deleted the playbook ' + titleOfName(asking.name) + '.');
+              // Its row and its key are gone, so the focus goes to the head of the list.
+              setTimeout(() => {
+                const a = document.activeElement;
+                if (head.current && (!a || a === document.body)) head.current.focus();
+              }, 0);
+            }
           }}
         >
           <p>A duty that opens a bridge from it stops until you pick another playbook.</p>
