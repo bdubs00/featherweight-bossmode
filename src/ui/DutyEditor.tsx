@@ -160,6 +160,8 @@ export function useFocusLost(ref: RefObject<HTMLElement>, deps: unknown[]): void
 interface DutyDraft {
   form: DutyForm;
   words: string;
+  /** The words of Write the check for me. */
+  checkWords?: string;
   from?: string;
   revision?: number;
   datesOwn?: boolean;
@@ -630,6 +632,7 @@ function EditorForm({ name, seed, base: read, heading, back: home }: FormProps) 
   const [picking, setPicking] = useState(false);
   const [checkOpen, setCheckOpen] = useState(() => !!(base && base.checkFirst));
   const [words, setWords] = useState(() => (kept ? kept.words || '' : ''));
+  const [checkSaid, setCheckSaid] = useState(() => (kept ? kept.checkWords || '' : ''));
   const [wordsBusy, setWordsBusy] = useState(false);
   const [wordsProblems, setWordsProblems] = useState<string[]>([]);
   const [preview, setPreview] = useState<Preview>({ answer: null, busy: false, error: '' });
@@ -686,9 +689,9 @@ function EditorForm({ name, seed, base: read, heading, back: home }: FormProps) 
 
   // Each change goes to the draft of the tab. A form as it opened keeps no draft.
   useEffect(() => {
-    const dirty = JSON.stringify(f) !== JSON.stringify(initial) || !!words.trim();
-    writeDraft(key, dirty ? { form: f, words, from, revision: base && typeof base.revision === 'number' ? base.revision : undefined, datesOwn: datesOwn.current } : null);
-  }, [f, words]);
+    const dirty = JSON.stringify(f) !== JSON.stringify(initial) || !!words.trim() || !!checkSaid.trim();
+    writeDraft(key, dirty ? { form: f, words, checkWords: checkSaid, from, revision: base && typeof base.revision === 'number' ? base.revision : undefined, datesOwn: datesOwn.current } : null);
+  }, [f, words, checkSaid]);
 
   /** discard drops the draft and gives the form back as it opened. */
   const discard = () => {
@@ -696,6 +699,7 @@ function EditorForm({ name, seed, base: read, heading, back: home }: FormProps) 
     setKeptLine(false);
     setF(initial);
     setWords('');
+    setCheckSaid('');
     setWordsProblems([]);
     setErrors(null);
     setProblems({});
@@ -1044,6 +1048,8 @@ function EditorForm({ name, seed, base: read, heading, back: home }: FormProps) 
               onAgentProblems={(agent) => setProblems((x) => (agent.length ? { ...x, agent } : x.agent ? { ...x, agent: undefined } : x))}
               open={checkOpen}
               onToggle={setCheckOpen}
+              words={checkSaid}
+              onWords={setCheckSaid}
             />
           )}
 

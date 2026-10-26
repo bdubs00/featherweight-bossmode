@@ -251,6 +251,7 @@ describe('the editor of a duty', () => {
     pick(el, 'Migrator');
     typeIn(fieldOf(el, 'Ask Migrator'), 'Sum up the day.');
     typeIn(fieldOf(el, 'The most a run can cost'), '0.05');
+    typeIn(fieldOf(el, 'Wake the agent only when'), 'there is a new page');
     await settle();
     unmountAll();
     // Another screen, then New duty again: the changes are back.
@@ -259,6 +260,7 @@ describe('the editor of a duty', () => {
     expect(text(el.querySelector('.duty-kept'))).toBe('Your unsaved changes are back. Discard them');
     expect(fieldOf(el, 'Ask Migrator')!.value).toBe('Sum up the day.');
     expect(fieldOf(el, 'The most a run can cost')!.value).toBe('0.05');
+    expect(fieldOf(el, 'Wake the agent only when')!.value).toBe('there is a new page');
     click(keyNamed(el, 'Discard them'));
     await settle();
     expect(el.querySelector('.duty-kept')).toBeNull();

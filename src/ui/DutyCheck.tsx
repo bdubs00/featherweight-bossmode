@@ -86,6 +86,9 @@ export interface CheckProps {
   onAgentProblems?: (list: string[]) => void;
   open: boolean;
   onToggle: (open: boolean) => void;
+  /** The words of Write the check for me, which the editor keeps in its draft. Without them, the section keeps its own. */
+  words?: string;
+  onWords?: (words: string) => void;
 }
 
 /**
@@ -268,7 +271,9 @@ type Tried = { found: CheckFound } | { error: string } | null;
  */
 export function CheckFirst(p: CheckProps) {
   const { check, onChange, agent, agentName, pathName, writeName, record, options, open, onToggle } = p;
-  const [words, setWords] = useState('');
+  const [ownWords, setOwnWords] = useState('');
+  const words = p.words !== undefined ? p.words : ownWords;
+  const setWords = p.onWords || setOwnWords;
   const [writer, setWriter] = useState(true);
   const [writing, setWriting] = useState(false);
   const [waited, setWaited] = useState(0);
