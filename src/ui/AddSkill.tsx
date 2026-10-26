@@ -87,7 +87,7 @@ function PreviewView({ p, busy, conflict, onInstall, onCancel }: { p: Preview; b
         <h2 id="preview-name" class="t-heading">
           {p.name || 'SKILL.md'}
         </h2>
-        <Help label="What an install does">An installed skill is instructions for every agent of a profile that allows it.</Help>
+        <Help label="What an install does">An installed skill is a set of instructions that an agent loads when its work needs them. Every agent can load it, unless the list of skills of the agent leaves it out.</Help>
         {replaces && <Led tone="grey" word={'replaces ' + p.name} />}
       </div>
       {p.description && <p class="preview-lede">{p.description}</p>}
@@ -247,7 +247,7 @@ function PasteAvenue({ onPick, busy }: { onPick: (src: SkillSource) => void; bus
       }}
     >
       <Field label="SKILL.md">
-        <TextArea class="code-area" rows={12} value={text} placeholder={'---\nname: release-notes\ndescription: Draft release notes from merged changes.\n---\n'} onInput={(e) => setText((e.target as HTMLTextAreaElement).value)} />
+        <TextArea class="code-area" rows={12} value={text} placeholder="Paste the whole text of a SKILL.md file." onInput={(e) => setText((e.target as HTMLTextAreaElement).value)} />
       </Field>
       <div class="form-end">
         <Button type="submit" disabled={busy || !text.trim()}>
@@ -363,6 +363,14 @@ export function AddSkill({ initial = 'marketplace' }: { initial?: Avenue }) {
     setStep({ kind: 'idle' });
     setConflict('');
   };
+  // Cancel of a preview gives the focus to the first control of the avenue, so it never falls to the page.
+  const cancelPreview = () => {
+    cancel();
+    requestAnimationFrame(() => {
+      const first = top.current && (top.current.querySelector('input, textarea, button:not([disabled])') as HTMLElement | null);
+      if (first) first.focus();
+    });
+  };
 
   const pending = step.kind === 'busy';
   return (
@@ -404,7 +412,7 @@ export function AddSkill({ initial = 'marketplace' }: { initial?: Avenue }) {
             {step.text}
           </p>
         )}
-        {step.kind === 'ready' && <PreviewView p={step.p} busy={busy} conflict={conflict} onInstall={install} onCancel={cancel} />}
+        {step.kind === 'ready' && <PreviewView p={step.p} busy={busy} conflict={conflict} onInstall={install} onCancel={cancelPreview} />}
       </div>
     </section>
   );

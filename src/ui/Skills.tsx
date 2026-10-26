@@ -13,7 +13,9 @@ import { useEffect, useMemo, useState } from 'preact/hooks';
 import { api } from '../api/routes';
 import type { Tool } from '../api/types';
 import { store, useSelect } from '../state/store';
-import { forgetAgentSkills, loadAgentSkills, loadAgents, loadFleet, loadSkills } from '../state/actions';
+import { forgetAgentSkills, loadAgentSkills, loadAgents, loadFleet, loadSkills, skillsAnswerFor } from '../state/actions';
+import { readProfile } from '../state/profiles';
+import { toolOn } from '../lib/chat';
 import { selectAgents } from '../state/agents';
 import { catalogOf, docOf, skillGroups, toolGroups, type CatalogSkill, type CatalogTool, type Group, type SkillDoc } from '../lib/catalog';
 import { go, hrefOf, type SkillItem } from '../lib/route';
@@ -94,6 +96,41 @@ function useLoaders(): void {
   useEffect(() => () => forgetAgentSkills(), []);
 }
 
+/**
+ * useToolLists reads the tool list of each agent of the fleet that the
+ * front answers, while the Skills place shows a tool: the tools of its
+ * profile, else the tools that its workers give it. An agent whose list
+ * the page cannot read stays out.
+ */
+function useToolLists(on: boolean): Record<string, string[]> {
+  const agents = useSelect(selectAgents);
+  const [lists, setLists] = useState<Record<string, string[]>>({});
+  useEffect(() => {
+    if (!on) return;
+    let live = true;
+    const s = store.get();
+    for (const a of agents || []) {
+      if (!skillsAnswerFor(s, a.name)) continue;
+      readProfile(a.name).then((p) => {
+        const list = p && p.tools && p.tools.length ? p.tools : p && p.workerTools && p.workerTools.length ? p.workerTools : null;
+        if (live && list) setLists((x) => ({ ...x, [a.name]: list }));
+      });
+    }
+    return () => {
+      live = false;
+    };
+  }, [agents, on]);
+  return lists;
+}
+
+/** toolUsers names the agents whose tool list gives a tool: by its name, its server, or a glob, such as front.*. */
+export function toolUsers(t: Pick<CatalogTool, 'id' | 'name' | 'builtin' | 'server'>, lists: Record<string, string[]>): string[] {
+  const tool = { id: t.id, name: t.name, server: t.builtin ? '' : t.server };
+  return Object.keys(lists)
+    .filter((a) => lists[a].length > 0 && toolOn(lists[a], tool))
+    .sort();
+}
+
 /** useAdmin reports whether whoami says the person is an admin. */
 export function useAdmin(): boolean {
   return useSelect((s) => !!(s.me && s.me.admin));
@@ -106,6 +143,14 @@ function itemOf(cat: Catalog | null, item?: SkillItem): CatalogSkill | CatalogTo
 
 /* ---------- the list ---------- */
 
+/** plainPhrase is the plain phrase of a tool for a title: its description up to the first full stop, when it is short. */
+export function plainPhrase(description: string): string {
+  const t = (description || '').trim();
+  const i = t.search(/[.\n]/);
+  const first = (i >= 0 ? t.slice(0, i) : t).trim();
+  return first.length > 0 && first.length <= 60 ? first : '';
+}
+
 function GroupRows<T extends { name: string; description: string }>({ g, kind, idOf, current }: { g: Group<T>; kind: 'skill' | 'tool'; idOf: (x: T) => string; current?: SkillItem }) {
   const id = kind + '-' + g.key;
   return (
@@ -117,11 +162,13 @@ function GroupRows<T extends { name: string; description: string }>({ g, kind, i
       <div role="list" class="c-rows">
         {g.items.map((x) => {
           const on = !!current && current.kind === kind && current.id === idOf(x);
+          // A tool leads with its plain phrase, and its name, which is code, follows small.
+          const phrase = kind === 'tool' ? plainPhrase(x.description) : '';
           return (
             <div role="listitem">
               <a class={'srow' + (on ? ' sel' : '')} href={hrefOf({ place: 'skills', item: { kind, id: idOf(x) } })} data-item aria-current={on ? 'page' : undefined}>
-                <span class="t-sub clip">{x.name}</span>
-                <span class="t-meta clip">{x.description}</span>
+                <span class="t-sub clip">{phrase || x.name}</span>
+                <span class="t-meta clip">{phrase ? x.name : x.description}</span>
               </a>
             </div>
           );
@@ -189,11 +236,11 @@ export function SkillList({ current }: { current?: SkillItem }) {
 
 /* ---------- the item ---------- */
 
-function AgentsThatLoad({ agents }: { agents: string[] }) {
+function AgentsThatLoad({ agents, title = 'Agents that can load it' }: { agents: string[]; title?: string }) {
   return (
     <section class="msec" aria-labelledby="loaders">
       <h2 class="sec-head t-sub" id="loaders">
-        Agents that can load it <Chip>{agents.length}</Chip>
+        {title} <Chip>{agents.length}</Chip>
       </h2>
       {agents.length > 0 && (
         <ul class="loaders">
@@ -299,6 +346,7 @@ export function SkillMain({ item, add }: { item?: SkillItem; add?: boolean }) {
     if (add) openAddSkill();
   }, [add]);
   const [ask, setAsk] = useState(false);
+  const lists = useToolLists(!!item && item.kind === 'tool');
   // Where two panes show, the place opens the first skill of the list, else the first tool, so the main pane is never empty beside the list.
   const first = !item && !add && !adding && cat ? firstItem(cat) : null;
   useEffect(() => {
@@ -316,7 +364,7 @@ export function SkillMain({ item, add }: { item?: SkillItem; add?: boolean }) {
     <section class="screen skill" aria-labelledby="skill-title">
       <PaneHeader
         id="skill-title"
-        title={it.name}
+        title={tool ? plainPhrase(tool.description) || tool.name : it.name}
         size="title"
         level={1}
         back={{ href: '#skills', label: 'Skills', to: 'list' }}
@@ -329,8 +377,13 @@ export function SkillMain({ item, add }: { item?: SkillItem; add?: boolean }) {
           <SkillView s={skill} />
         ) : (
           <>
+            {plainPhrase(tool!.description) && (
+              <p class="skill-call">
+                <code>{tool!.name}</code>
+              </p>
+            )}
             <p class="c-lede">{tool!.description}</p>
-            <AgentsThatLoad agents={tool!.agents} />
+            <AgentsThatLoad agents={[...new Set([...tool!.agents, ...toolUsers(tool!, lists)])].sort()} title="Agents that can use it" />
           </>
         )}
       </div>

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { act } from 'preact/test-utils';
 import { store } from '../state/store';
+import { forgetProfiles } from '../state/profiles';
 import type { SkillsList, Whoami } from '../api/types';
 import { catalogOf, skillGroups, toolGroups } from '../lib/catalog';
 import { callOf, SkillActions, SkillList, SkillMain, forgetTools } from './Skills';
@@ -69,7 +70,9 @@ describe('the catalog', () => {
     await settle();
     const heads = [...el.querySelectorAll('.group-head span:first-child')].map((x) => x.textContent);
     expect(heads).toEqual(['Imported', 'Local', 'docs', 'Built in', 'docs']);
-    expect(el.textContent).toContain('Runs a shell command.');
+    // A tool leads with its plain phrase, and its name follows small.
+    const bash = [...el.querySelectorAll('.srow')].find((r) => r.textContent!.includes('bash'))!;
+    expect([...bash.children].map((x) => x.textContent)).toEqual(['Runs a shell command', 'bash']);
   });
 });
 
@@ -130,6 +133,28 @@ describe('the Skills place', () => {
     expect(el.querySelector('.skill-text h1')!.textContent).toBe('Ansible style');
     expect(el.querySelector('.skill-text script')).toBeNull();
     expect([...el.querySelectorAll('.loaders li')].map((x) => x.textContent)).toEqual(['migrator', 'reviewer']);
+  });
+
+  it('names the agents that can use a tool, from the tool list of each profile, a server or a glob too', async () => {
+    forgetProfiles();
+    act(() => {
+      store.dispatch({ type: 'skills', skills: { ...CONTRACT, tools: [] } });
+      store.dispatch({ type: 'agents', agents: [{ name: 'migrator', role: 'owner' }, { name: 'reviewer', role: 'owner' }, { name: 'scribe', role: 'owner' }] });
+      store.dispatch({ type: 'fleet', fleet: { name: 'f', members: [], pools: ['migrator', 'reviewer', 'scribe'].map((a) => ({ name: a, atespace: 'default', agent: a, intake: '', wanted: 1, actual: 1, ready: 1, hash: '', checkedAt: '', tasks: [] })) } });
+    });
+    api = fakeApi({
+      'GET /v1/tools': TOOLS,
+      'GET /v1/agents/migrator': { name: 'migrator', role: 'owner', tools: ['bash', 'files'] },
+      'GET /v1/agents/reviewer': { name: 'reviewer', role: 'owner', tools: ['github.*'] },
+      // A profile that names no tools takes the tools of its workers.
+      'GET /v1/agents/scribe': { name: 'scribe', role: 'owner', workerTools: ['bash', 'front.*'] },
+    });
+    const el = mount(<SkillMain item={{ kind: 'tool', id: 'bash' }} />);
+    await settle(8);
+    expect(el.querySelector('h1')!.textContent).toBe('Run a command');
+    expect(el.querySelector('.skill-call')!.textContent).toBe('bash');
+    expect(el.querySelector('#loaders')!.textContent).toBe('Agents that can use it 2');
+    expect([...el.querySelectorAll('.loaders li')].map((x) => x.textContent)).toEqual(['migrator', 'scribe']);
   });
 
   it('opens the first skill where two panes show, and says nothing twice', async () => {
@@ -239,7 +264,7 @@ describe('Add skill', () => {
     const pv = el.querySelector('.preview')!;
     // The one sentence about what an install does sits behind its question mark.
     click(pv.querySelector('.help-key'));
-    expect(pv.querySelector('[role="note"]')!.textContent).toBe('An installed skill is instructions for every agent of a profile that allows it.');
+    expect(pv.querySelector('[role="note"]')!.textContent).toBe('An installed skill is a set of instructions that an agent loads when its work needs them. Every agent can load it, unless the list of skills of the agent leaves it out.');
     expect([...pv.querySelectorAll('.fm li')].map((x) => x.textContent)).toEqual(['licenseMIT', 'allowed-toolsbash, files']);
     expect(pv.querySelector('.preview-body h1')!.textContent).toBe('Ansible style');
     expect([...pv.querySelectorAll('.file-list li')].map((x) => x.textContent)).toEqual(['SKILL.md230 B', 'scripts/lint.sh2.0 KB']);

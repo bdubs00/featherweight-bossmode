@@ -646,7 +646,7 @@ Capacity shows where seating happens:
 | `Find a skill` (with the name `Find a skill or a tool`), `No skill holds those words.`, `Loading the skill.`, `Loading the skills.` | add | | done |
 | `Address`, `Preview`, `Pick files`, `Pick a folder`, `SKILL.md`, `Files`, `Close` | add | the keys and fields of the chooser | done |
 | `Loading the marketplaces.`, `No marketplace is set up.`, `Loading the preview.` | add | | done |
-| `An installed skill is instructions for every agent of a profile that allows it.` | add | behind the question mark `What an install does` beside the name of the preview, because the chrome never explains | done |
+| `An installed skill is a set of instructions that an agent loads when its work needs them. Every agent can load it, unless the list of skills of the agent leaves it out.` | add | behind the question mark `What an install does` beside the name of the preview, because the chrome never explains. It said profile before. | done |
 | `replaces <name>` (a grey light), `blocks` (red), `note` (grey) | add | the status words of a preview and its problems | done |
 | `Replace <name>` | add | the key after a 409 for the name of an imported skill. A 409 for a source that changed shows its reason, and a new preview. | done |
 | `imported`, `local`, `built in`, and the name of a server | add | the origin of a skill or a tool | done |
