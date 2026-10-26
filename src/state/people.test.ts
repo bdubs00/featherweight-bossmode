@@ -279,6 +279,33 @@ describe('the profile', () => {
     ]);
   });
 
+  it('keeps the lines of an answer of several lines, so its lists and its tables stay, as the server writes it indented', () => {
+    const text = [
+      '# What people liked from reviewer',
+      '',
+      '## 2026-10-27, bridge "b" (b2), reviewer, run 01RUN3',
+      '',
+      '- What alice asked: Check the report.',
+      '- What reviewer did:',
+      '',
+      '  Review done.',
+      '',
+      '  | Check | Result |',
+      '  |---|---|',
+      '  | Sections | Pass |',
+      '',
+      '  ## Next',
+      '  - ship it',
+      '',
+      '- The note of alice: Clear.',
+      '- [Open the run](#run/01RUN3)',
+      '',
+    ].join('\n');
+    expect(likedOf(text)).toEqual([
+      { did: 'Review done.\n\n| Check | Result |\n|---|---|\n| Sections | Pass |\n\n## Next\n- ship it', asked: 'Check the report.', note: 'Clear.', run: '01RUN3', bridge: 'b2', handle: 'reviewer' },
+    ]);
+  });
+
   it('reads an entry in paragraphs, as an older front wrote them, and a page with no entry', () => {
     const text = '# What people liked from migrator\n\n## 2026-10-21, bridge b, migrator-2\n\nBob hearted: Pushed the branch.\n\nTheir note: Ran the lint first.\n\n## 2026-10-20, bridge b, migrator-1\n\nAlice hearted: Kept the hiera names. [run](#)\n';
     expect(likedOf(text)).toEqual([{ did: 'Pushed the branch.', note: 'Ran the lint first.' }, { did: 'Kept the hiera names.' }]);

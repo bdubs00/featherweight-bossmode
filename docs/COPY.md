@@ -486,7 +486,7 @@ Capacity shows where seating happens:
 | new | add | `No member matches “<words>”.` with the key `Clear the search`, and `N members match` for a screen reader | done |
 | new | add | the gaps of the workers: `Some changes have not reached the workers of this agent yet. An admin can read why.`, with the words of the server in the fold `Details` | done |
 | `<n> min` beside a sleeping worker | remove | it was the age of the read of the fleet, not the time asleep | done |
-| new | add | a heart: `Liked because: <note>`, `Asked: <task>`, `Answer: <answer>`, and `Show more` and `Show less` for an answer over 240 characters | done |
+| new | add | a heart: `Liked because: <note>`, `Asked: <task>`, `Answer: <answer>`, and `Show more` and `Show less` for an answer over 240 characters or 4 lines. An answer of several lines, which the server keeps indented on the page, shows as Markdown with its lists and tables. | done |
 | new | add | `Skills: <name>, <name>`, each a link to its page, under What it can do | done |
 | `Add and remove packages`, `Asks before it adds or removes a package` | change | only while packages are on and the agent may ask, from workerPackages of the profile or the read of the section Packages | done |
 | new | add | the switch of the packages in the preview of New agent: `Packages are off, so it has only the programs that it came with. Its profile can turn them on.`, `Packages are on. It can ask for a package, and you approve each one.`, or `Packages are on. You add each package on its profile.` | done |

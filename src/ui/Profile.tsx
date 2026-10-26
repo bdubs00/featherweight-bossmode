@@ -25,7 +25,7 @@ import { statusOf } from '../lib/status';
 import { selectFacts } from '../state/reducer';
 import { hrefOf } from '../lib/route';
 import { attempt, showError } from './notice';
-import { Confirm, InlineMarkdown, Menu } from './common';
+import { Confirm, InlineMarkdown, Markdown, Menu } from './common';
 import { Glyph, Icon } from './icons';
 import { Button, Chip, Field, Help, Input, Led, Mark, PaneHeader } from './primitives';
 import { Abilities } from './Abilities';
@@ -320,11 +320,20 @@ export function plainAnswer(text: string): string {
     .trim();
 }
 
-/** LikedItem is one heart: the note of the person first, what was asked, and the answer, folded when it is long. */
+/** The lines of an answer of several lines above which a heart folds it. */
+export const LIKED_FOLD_LINES = 4;
+
+/**
+ * LikedItem is one heart: the note of the person first, what was asked,
+ * and the answer, folded when it is long. The server keeps the lines of an
+ * answer of several lines, which shows as Markdown with its lists and its
+ * tables. An answer that an older server kept on one line shows cleaned.
+ */
 function LikedItem({ t }: { t: LikedEntry }) {
   const [more, setMore] = useState(false);
-  const did = plainAnswer(t.did);
-  const long = did.length > LIKED_FOLD;
+  const multi = t.did.includes('\n');
+  const did = multi ? t.did : plainAnswer(t.did);
+  const long = did.length > LIKED_FOLD || (multi && did.split('\n').length > LIKED_FOLD_LINES);
   return (
     <li>
       <Glyph name="heart" size={14} class="heart" />
@@ -341,12 +350,18 @@ function LikedItem({ t }: { t: LikedEntry }) {
             {t.asked}
           </p>
         )}
-        {did && (
-          <p class={'liked-did' + (long && !more ? ' folded' : '')}>
-            <span class="liked-label">Answer: </span>
-            <InlineMarkdown text={did} />
-          </p>
-        )}
+        {did &&
+          (multi ? (
+            <div class={'liked-did liked-block' + (long && !more ? ' folded' : '')}>
+              <span class="liked-label">Answer:</span>
+              <Markdown text={did} />
+            </div>
+          ) : (
+            <p class={'liked-did' + (long && !more ? ' folded' : '')}>
+              <span class="liked-label">Answer: </span>
+              <InlineMarkdown text={did} />
+            </p>
+          ))}
         {long && (
           <button type="button" class="prof-link liked-more" aria-expanded={more} onClick={() => setMore(!more)}>
             {more ? 'Show less' : 'Show more'}

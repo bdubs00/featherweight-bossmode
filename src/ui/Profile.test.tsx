@@ -383,4 +383,34 @@ describe('the profile', () => {
       g.restore();
     }
   });
+
+  it('shows an answer of several lines with its table, folded, and reads the hearts again when a heart changes the page', async () => {
+    let text = LEARNED;
+    const g = fakeFetch([
+      ['GET', /^\/v1\/pages\/agents\/migrator\/learned\.md$/, () => ({ path: 'agents/migrator/learned.md', text })],
+      ['GET', /^\/v1\/pools\/crew$/, () => POOL],
+      ['GET', /^\/v1\/bossmode\/agents\/migrator\/today$/, () => ({ runs: 0, decisions: 0 })],
+    ]);
+    // The list of the wiki holds the page of the hearts.
+    act(() => store.dispatch({ type: 'pages', pages: [{ path: 'agents/migrator/learned.md', title: '', hash: 'h-old', size: 1, by: 'bossmode', at: '' }] }));
+    try {
+      const el = mount(<Profile agent="migrator" />);
+      await vi.waitFor(() => expect(el.querySelectorAll('.liked li').length).toBe(2));
+      // A new heart writes the page, and the stream says so: the section reads it again.
+      text = LEARNED.replace(
+        '## 2026-10-22',
+        ['## 2026-10-23, bridge "Migrate Puppet" (b1), migrator-1, run 01RUN3', '', '- What migrator did:', '', '  Checked the roles.', '', '  | Role | Result |', '  |---|---|', '  | cron | Pass |', '  | nginx | Pass |', '  | ssh | Pass |', '', '- The note of alice: Tidy.', '', '## 2026-10-22'].join('\n'),
+      );
+      act(() => store.dispatch({ type: 'stream', event: { id: '11', kind: 'page', data: { path: 'agents/migrator/learned.md', title: '', hash: 'h-new', size: text.length, by: 'bossmode', at: '' } } as never }));
+      await vi.waitFor(() => expect(el.querySelectorAll('.liked li').length).toBe(3));
+      const first = el.querySelectorAll('.liked li')[0];
+      expect(first.querySelector('.liked-note')!.textContent).toBe('Liked because: Tidy.');
+      expect(first.querySelectorAll('.liked-block table tr').length).toBe(4);
+      expect(first.querySelector('.liked-block')!.classList.contains('folded')).toBe(true);
+      act(() => (first.querySelector('button.liked-more') as HTMLButtonElement).click());
+      expect(first.querySelector('.liked-block')!.classList.contains('folded')).toBe(false);
+    } finally {
+      g.restore();
+    }
+  });
 });
