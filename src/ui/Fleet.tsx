@@ -18,18 +18,20 @@ import { selectFacts } from '../state/reducer';
 import { closed, loadAgentSkills, loadAgents, loadFleet, rereadRun } from '../state/actions';
 import { selectAgents } from '../state/agents';
 import { ensureRosters, ensureRuns, refreshAfterReset } from '../state/fetchers';
-import { filterPeople, firstPerson, newestRun, peopleCount, peopleOf, slashCommands, type PeopleGroup, type PersonRow } from '../state/people';
+import { agentGone, filterPeople, firstPerson, newestRun, peopleCount, peopleOf, reachOf, slashCommands, type PeopleGroup, type PersonRow } from '../state/people';
+import { workersOf } from '../lib/workers';
 import { parseSlash } from '../lib/mention';
 import { useRoving } from './keys';
 import { attempt, showError } from './notice';
 import { Composer } from './Composer';
-import { Conversation, useTranscript, usePoll } from './Conversation';
+import { Conversation, focusComposer, useTranscript, usePoll } from './Conversation';
 import { useResult } from './RunPane';
 import { FollowBox, Quiet } from './Thread';
 import { useLiveAnswer } from './Live';
 import { ARCHIVED_LINE, answerSeqs, lastSeq, works } from '../lib/chat';
 import { Profile } from './Profile';
 import { EmptyPane } from './Shell';
+import { useFleetAgent } from '../state/profiles';
 import { Confirm, Menu } from './common';
 import { askOfRun } from '../lib/duties';
 import { Button, Chip, Find, Help, IconButton, Led, Mark, PaneHeader } from './primitives';
@@ -298,6 +300,7 @@ export function FleetList({ current, member }: { current?: string; member?: stri
   const shown = useMemo(() => filterPeople(groups, q), [groups, q]);
   const list = useRoving<HTMLDivElement>();
   const count = peopleCount(groups);
+  const matches = shown.reduce((n, g) => n + g.rows.length, 0);
   const sel = member ? 'seat:' + member : current ? 'agent:' + current : '';
   // The choices of this browser about the groups. A search shows every match.
   const [choices, setChoices] = useState(readChoices);
@@ -337,12 +340,24 @@ export function FleetList({ current, member }: { current?: string; member?: stri
       <div class="list-find">
         <Find label="Find a member" value={q} onInput={setQ} />
       </div>
+      {/* A screen reader hears how many members a search finds. */}
+      <p class="sr" role="status">
+        {loaded && q.trim() ? (matches === 1 ? '1 member matches' : matches + ' members match') : ''}
+      </p>
       <OrphanNote />
       <div class="scroll" ref={list}>
         {shown.map((g) => (
           <PeopleGroupView g={g} sel={sel} shut={!q.trim() && !isOpen(g)} onFold={() => fold(g)} />
         ))}
         {!loaded && <p class="people-note">Loading the members.</p>}
+        {loaded && q.trim() && matches === 0 && (
+          <div class="people-none">
+            <p class="people-note">No member matches {'\u201c' + q.trim() + '\u201d'}.</p>
+            <Button size="s" onClick={() => setQ('')}>
+              Clear the search
+            </Button>
+          </div>
+        )}
         {loaded && groups.length === 0 && (
           <div class="empty">
             <p>No agent yet.</p>
@@ -376,6 +391,47 @@ function keepRun(agent: string, id: string): void {
   }
 }
 
+/** How often a conversation reads the fleet again while the worker of its agent starts, and for how long at most. */
+export const START_READ_MS = 3000;
+export const START_READ_FOR_MS = 120_000;
+
+/**
+ * useWorkerStart reads the fleet again while an agent has no member that
+ * takes a message but a worker that starts, such as right after New agent
+ * makes it. The fleet view lists the member of a new worker only once the
+ * worker is up, and the stream names no agent for a new member.
+ */
+function useWorkerStart(starting: boolean): void {
+  useEffect(() => {
+    if (!starting) return;
+    const from = Date.now();
+    const t = setInterval(() => {
+      if (Date.now() - from > START_READ_FOR_MS) {
+        clearInterval(t);
+        return;
+      }
+      if (typeof document !== 'undefined' && document.hidden) return;
+      loadFleet().catch(() => {});
+    }, START_READ_MS);
+    return () => clearInterval(t);
+  }, [starting]);
+}
+
+/** AgentGone is the page of an agent that no longer exists, with the way back to the fleet. */
+export function AgentGone({ agent }: { agent: string }) {
+  return (
+    <section class="screen member-main agent-gone" aria-labelledby="agent-gone-title">
+      <PaneHeader id="agent-gone-title" title={agent} size="title" level={1} back={{ href: '#fleet', label: 'Fleet', to: 'list' }} />
+      <div class="empty center">
+        <p>This agent no longer exists.</p>
+        <Button href="#fleet" kind="primary">
+          Back to Fleet
+        </Button>
+      </div>
+    </section>
+  );
+}
+
 /**
  * AgentChat is the conversation with an agent that sits on no bridge, as a
  * run: the first message starts it on a worker of the agent, a later one
@@ -387,9 +443,12 @@ export function AgentChat({ agent }: { agent: string }) {
   useEffect(() => rememberOpen(hrefOf({ place: 'fleet', agent })), [agent]);
   const config = useSelect((s) => s.config);
   const fleet = useSelect((s) => s.fleet);
+  const facts = useSelect(selectFacts);
   const skills = useSelect((s) => (s.skills ? s.skills.skills : null));
   const loadable = useSelect((s) => s.agentSkills[agent]);
   const face = useSelect((s) => s.faces[agent]);
+  const gone = useSelect((s) => agentGone(s, agent));
+  const listed = useFleetAgent(agent);
   useEffect(() => {
     loadAgentSkills(agent).catch(() => {});
   }, [agent]);
@@ -404,10 +463,11 @@ export function AgentChat({ agent }: { agent: string }) {
     setRunId(readRun(agent) || (manager ? manager.run : ''));
   }, [agent, manager && manager.run]);
   const light = useSelect((s) => statusOf(selectFacts(s), { agent }));
-  // The member of the fleet that serves the agent: a live one first.
-  const member = manager
-    ? manager.member
-    : ((fleet ? fleet.members : []).filter((m) => m.agents.some((a) => a.name === agent)).sort((a, b) => (a.state === 'live' ? 0 : 1) - (b.state === 'live' ? 0 : 1))[0] || { name: '' }).name;
+  // The member of the fleet that serves the agent, or why none can take a message yet.
+  const workers = useMemo(() => workersOf(facts, agent).workers, [facts, agent]);
+  const reach = manager ? { member: manager.member, why: '' } : reachOf(fleet, workers, agent);
+  const member = reach.member;
+  useWorkerStart(!member && !!fleet && reach.why.endsWith(' is starting.'));
   const commands = useMemo(() => slashCommands(skills, loadable), [skills, loadable]);
   const names = useMemo(() => commands.map((c) => c.name), [commands]);
   const answers = useMemo(() => answerSeqs(t.items), [t.items]);
@@ -457,11 +517,14 @@ export function AgentChat({ agent }: { agent: string }) {
     });
   };
   const name = (face && face.displayName) || agent;
+  if (gone) return <AgentGone agent={agent} />;
+  // An empty conversation says what the agent does, so the person knows what to ask.
+  const about = (face && face.tagline) || (listed && listed.description) || '';
   return (
     <section class="screen member-main agent-chat" aria-labelledby="agent-chat-title">
       <PaneHeader
         id="agent-chat-title"
-        title={agent}
+        title={name}
         size="title"
         level={1}
         back={{ href: '#fleet', label: 'Fleet', to: 'list' }}
@@ -471,7 +534,17 @@ export function AgentChat({ agent }: { agent: string }) {
           <Menu
             label="More"
             items={[
-              ...(runId ? [{ label: 'New conversation', onSelect: () => open('') }] : []),
+              ...(runId
+                ? [
+                    {
+                      label: 'New conversation',
+                      onSelect: () => {
+                        open('');
+                        focusComposer();
+                      },
+                    },
+                  ]
+                : []),
               { label: 'Past conversations', onSelect: () => setPast(true) },
               // A conversation that did a job once becomes a duty of this agent that does it again.
               ...(runId ? [{ label: 'Make this a duty', onSelect: () => go({ place: 'duties', fresh: true, seed: { agent, act: 'ask', message: askOfRun(run, t.items) } }) }] : []),
@@ -480,9 +553,17 @@ export function AgentChat({ agent }: { agent: string }) {
         }
       />
       <FollowBox end={end}>
-        {runId ? <Conversation run={run} result={res} t={t} agentLabel={agent} live={live} tail={archived ? <Quiet tone="grey">{ARCHIVED_LINE}</Quiet> : undefined} /> : <div class="thread" />}
+        {runId ? (
+          <Conversation run={run} result={res} t={t} agentLabel={agent} live={live} tail={archived ? <Quiet tone="grey">{ARCHIVED_LINE}</Quiet> : undefined} />
+        ) : (
+          <div class="thread">
+            <p class="thread-empty">
+              {about ? 'Start a conversation with ' + name + '. ' + about : 'Start a conversation with ' + name + '.'}
+            </p>
+          </div>
+        )}
       </FollowBox>
-      <Composer draft={'agent:' + agent} label={'Message to ' + agent} placeholder={'Message ' + agent} disabled={member ? '' : 'Keep 0'} commands={commands} attach onSend={(text, _to, files) => send(text, files)} />
+      <Composer draft={'agent:' + agent} label={'Message to ' + agent} placeholder={'Message ' + agent} disabled={member ? '' : reach.why} commands={commands} attach onSend={(text, _to, files) => send(text, files)} />
       {past && (
         <PastConversations
           agent={agent}

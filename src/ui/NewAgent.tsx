@@ -13,15 +13,15 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
 import type { AgentSaved, NewProfile, Template, WorkersAsk } from '../api/types';
 import { templatesOf } from '../lib/workers';
-import { useSelect } from '../state/store';
+import { store, useSelect } from '../state/store';
 import { loadAgents, loadFaces, loadFleet } from '../state/actions';
 import { selectAgents } from '../state/agents';
 import { forgetProfiles } from '../state/profiles';
 import { phaseOf } from '../lib/presence';
-import { hrefOf } from '../lib/route';
+import { go, hrefOf } from '../lib/route';
 import { useCatalog } from './Skills';
 import { SkillPicker } from './SkillPicker';
-import { attempt } from './notice';
+import { attempt, showSaid } from './notice';
 import { Advanced, Button, Chip, Field, Input, Led, Mark, PaneHeader, TextArea } from './primitives';
 import { Abilities } from './Abilities';
 import { abilitiesOf, rulesWords } from '../lib/tools';
@@ -36,6 +36,14 @@ export const MAX_WORKERS = 32;
 export const DEFAULT_COMPACTION = 262144;
 /** The efforts that the kernel takes. */
 export const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
+/** The time zone of the browser, which the placeholder of the field names. */
+const BROWSER_ZONE = (() => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Berlin';
+  } catch {
+    return 'Europe/Berlin';
+  }
+})();
 /** The rule of the name of a profile, as the kernel checks it. */
 const NAME = /^[A-Za-z0-9_-][A-Za-z0-9._-]{0,63}$/;
 
@@ -234,9 +242,17 @@ export function NewAgent() {
         const adv = document.getElementById('agent-advanced') as HTMLDetailsElement | null;
         if (adv) adv.open = true;
       }
+      // The first field with an error comes into view and takes the focus, so the key never seems to do nothing.
+      requestAnimationFrame(() => {
+        const bad = document.querySelector('.new-agent [aria-invalid="true"]') as HTMLElement | null;
+        if (!bad) return;
+        if ('scrollIntoView' in bad) bad.scrollIntoView({ block: 'center' });
+        bad.focus();
+      });
       return;
     }
     const { profile, workers } = requestOf(f, templates);
+    let made = '';
     setBusy(true);
     await attempt(async () => {
       const saved = await api.putAgent(f.name.trim(), profile, workers, dry);
@@ -249,9 +265,18 @@ export function NewAgent() {
       if (!dry) {
         forgetProfiles();
         await Promise.allSettled([loadAgents(), loadFaces(), loadFleet()]);
+        made = saved.name || f.name.trim();
+        // A read of the fleet that began before the save lacks the workers of the new agent, so the answer of the save stands in until the next read.
+        const fleet = store.get().fleet;
+        if (saved.pool && fleet && !(fleet.pools || []).some((p) => p.agent === made)) store.dispatch({ type: 'fleet', fleet: { ...fleet, pools: [...(fleet.pools || []), { ...saved.pool, agent: saved.pool.agent || made }] } });
       }
     });
     setBusy(false);
+    // The new agent opens, and its conversation says when its worker can take a message.
+    if (made) {
+      showSaid('Made the agent ' + made + '. Its workers start now.');
+      go({ place: 'fleet', agent: made });
+    }
   };
 
   const name = f.name.trim();
@@ -303,7 +328,7 @@ export function NewAgent() {
           <Advanced id="agent-advanced">
             <div class="field-row">
               <Field label="Model">
-                <Input value={f.model} spellcheck={false} onInput={text('model')} />
+                <Input value={f.model} spellcheck={false} placeholder="The default model" onInput={text('model')} />
               </Field>
               <Field label="Effort">
                 <select class="recess" value={f.effort} onChange={(e) => set('effort', (e.target as HTMLSelectElement).value)}>
@@ -351,7 +376,7 @@ export function NewAgent() {
               </div>
             </fieldset>
             <Field label="Time zone" class="half">
-              <Input value={f.timeZone} spellcheck={false} placeholder="Europe/Berlin" onInput={text('timeZone')} />
+              <Input value={f.timeZone} spellcheck={false} placeholder={BROWSER_ZONE} onInput={text('timeZone')} />
             </Field>
           </Advanced>
           {shown && shown.saved.exists && (

@@ -3,11 +3,11 @@
 // the agents that sit on no bridge. Each row has a status: a light and its
 // word. The functions here are pure, so the tests read them without a page.
 
-import type { Agent, Bridge, Fleet, Member, Rules, Run, Skill } from '../api/types';
+import type { Agent, BossConfig, Bridge, Fleet, Member, Rules, Run, Skill } from '../api/types';
 import { presenceOf, type Light } from '../lib/presence';
 import { hrefOf } from '../lib/route';
 import { factsOf, statusOf } from '../lib/status';
-import { workersOf, type Workers } from '../lib/workers';
+import { workersOf, type Worker, type Workers } from '../lib/workers';
 import type { Channel, Roster } from './reducer';
 
 export interface PersonRow {
@@ -343,4 +343,48 @@ export function likedOf(text: string): LikedEntry[] {
     if (e.did || e.asked || e.note) out.push(e);
   }
   return out;
+}
+
+/**
+ * agentGone reports whether an agent no longer exists: the page knows the
+ * fleet and the profiles of the front, and neither names the agent. The
+ * agents of the manager and of the quick chat always exist. While the page
+ * lacks one of the two lists, it cannot tell, so the agent counts as there.
+ */
+export function agentGone(s: { fleet: Fleet | null; agents: Agent[] | null; config: BossConfig | null }, agent: string): boolean {
+  if (!agent || !s.fleet || !s.agents) return false;
+  const c = s.config;
+  if (c && ((c.manager && c.manager.agent === agent) || (c.chat && c.chat.agent === agent))) return false;
+  if (s.agents.some((a) => a.name === agent)) return false;
+  if ((s.fleet.pools || []).some((p) => p.agent === agent)) return false;
+  return !(s.fleet.members || []).some((m) => (m.agents || []).some((a) => !!a && a.name === agent));
+}
+
+/** The member that takes a message to an agent, or "" with the reason why none can. */
+export interface Reach {
+  member: string;
+  why: string;
+}
+
+/**
+ * reachOf names the member that takes a message to an agent that sits on
+ * no bridge. A member of the fleet that names the agent comes first, a
+ * live one before the others. Else a worker of the agent: an awake one,
+ * else one that sleeps, because a message wakes it. A member that the
+ * stream adds names no agent yet, so the workers stand in for it. With no
+ * such member, the reason says why, in the words of the composer.
+ */
+export function reachOf(fleet: Fleet | null | undefined, workers: Worker[], agent: string): Reach {
+  const served = (fleet ? fleet.members || [] : [])
+    .filter((m) => (m.agents || []).some((a) => !!a && a.name === agent))
+    .sort((a, b) => (a.state === 'live' ? 0 : 1) - (b.state === 'live' ? 0 : 1))[0];
+  if (served) return { member: served.name, why: '' };
+  const up = workers.find((w) => w.phase === 'Running') || workers.find((w) => w.phase === 'Suspended');
+  if (up) return { member: up.member, why: '' };
+  if (!fleet) return { member: '', why: 'Loading the workers.' };
+  const pool = (fleet.pools || []).find((p) => p.agent === agent);
+  const starting = workers.some((w) => w.phase === 'Pending' || w.phase === '') || (!!pool && pool.wanted > 0 && workers.length === 0);
+  if (starting) return { member: '', why: 'The worker of ' + agent + ' is starting.' };
+  if (workers.length > 0 && workers.every((w) => w.phase === 'Failed')) return { member: '', why: 'Every worker of ' + agent + ' failed. Its profile says more.' };
+  return { member: '', why: agent + ' has no worker. Set Keep on its profile.' };
 }

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'preact/test-utils';
 import { store } from '../state/store';
 import { AgentChat } from './Fleet';
-import { at, fakeFetch, mount, seedFleet, unmountAll, type Call } from './testkit-b';
+import { FLEET, at, fakeFetch, mount, seedFleet, unmountAll, type Call } from './testkit-b';
 import { clearNotice, currentNotice } from './notice';
 
 /** The time zone of the browser of the test, which each new run carries. */
@@ -19,6 +19,8 @@ beforeEach(() => {
     ['POST', /^\/v1\/runs\/run-boss-1\/messages$/, () => ({ run: 'run-boss-1', seq: 2 })],
     ['POST', /^\/v1\/bossmode\/runs\/run-boss-1\/skill$/, () => ({ run: 'run-boss-1', seq: 3 })],
     ['GET', /^\/v1\/runs\/run-boss-1$/, () => RUN],
+    // The fleet view answers what the store holds, as a read of an unchanged fleet does.
+    ['GET', /^\/v1\/fleet$/, () => store.get().fleet],
     ['GET', /^\/v1\/runs\/run-boss-1\/transcript/, () => ({ run: RUN, items: [{ seq: 1, time: at(1), kind: 'user', text: 'What runs now?', who: 'alice@example.com' }], next: 0, prev: 0 })],
   ]);
   calls = f.calls;
@@ -124,5 +126,48 @@ describe('the conversation with an agent on no bridge', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('says what the agent does in an empty conversation', () => {
+    act(() => store.dispatch({ type: 'agents', agents: [{ name: 'migrator', role: 'owner', description: 'Moves Puppet modules to Ansible.' }, { name: 'manager', role: 'operator' }] }));
+    const el = mount(<AgentChat agent="migrator" />);
+    expect(el.querySelector('.thread-empty')!.textContent).toBe('Start a conversation with migrator. Moves Puppet modules to Ansible.');
+    expect((el.querySelector('#composer') as HTMLTextAreaElement).disabled).toBe(false);
+  });
+
+  it('waits for the worker of a new agent with a sentence, reads the fleet until the worker is up, and then takes a message', async () => {
+    vi.useFakeTimers();
+    try {
+      // New agent made walker: its pool wants one worker, and the fleet lists no member for it yet.
+      const pool = { name: 'walker', atespace: 'default', agent: 'walker', intake: '', wanted: 1, actual: 0, ready: 0, hash: '', tasks: [{ name: 'walker-0', phase: 'Pending', current: true }], checkedAt: '' };
+      act(() => store.dispatch({ type: 'fleet', fleet: { ...FLEET, pools: [...(FLEET.pools || []), pool] } }));
+      const el = mount(<AgentChat agent="walker" />);
+      const box = el.querySelector('#composer') as HTMLTextAreaElement;
+      expect(box.disabled).toBe(true);
+      expect(box.placeholder).toBe('The worker of walker is starting.');
+      const reads = () => calls.filter((c) => c.method === 'GET' && c.path === '/v1/fleet').length;
+      await act(async () => {
+        vi.advanceTimersByTime(3000);
+      });
+      expect(reads()).toBe(1);
+      // The worker wakes: the stream says so, and the member names no agent yet.
+      act(() => store.dispatch({ type: 'stream', event: { id: '9', kind: 'task', data: { member: 'default/walker-0', phase: 'Running' } } as never }));
+      expect(box.disabled).toBe(false);
+      expect(box.placeholder).toBe('Message walker');
+      await act(async () => {
+        vi.advanceTimersByTime(9000);
+      });
+      expect(reads()).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('says that an agent of an old address no longer exists, with the way back to the fleet', () => {
+    const el = mount(<AgentChat agent="nobody-here" />);
+    expect(el.querySelector('h1')!.textContent).toBe('nobody-here');
+    expect(el.textContent).toContain('This agent no longer exists.');
+    expect(el.querySelector('#composer')).toBeNull();
+    expect(el.querySelector('a[href="#fleet"].button, .empty a[href="#fleet"]')!.textContent).toBe('Back to Fleet');
   });
 });

@@ -1107,6 +1107,25 @@ a.file {
 .strip-seg .status {
   font-size: inherit;
 }
+/* The filter of the board in its head: what it shows, and the key that shows every member again. */
+.board-only {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  min-height: 28px;
+  padding: 0 var(--s-2);
+  border: 1px solid var(--ink);
+  border-radius: var(--r);
+  background: none;
+  color: var(--ink);
+  font-size: var(--t-meta);
+  font-weight: 600;
+  cursor: pointer;
+}
+.board-only .status {
+  font-size: inherit;
+}
 .board-lights {
   display: flex;
   flex-wrap: wrap;
@@ -1205,4 +1224,16 @@ a.file {
   .files-view {
     padding: var(--s-4);
   }
+}
+
+/* A search of the people list that finds nothing says so, with the key that clears it. */
+.people-none {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-2);
+  padding: 0 var(--s-4) var(--s-4);
+}
+.people-none .people-note {
+  padding: 0;
 }

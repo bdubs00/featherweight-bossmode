@@ -81,6 +81,22 @@ describe('the people list', () => {
       field.dispatchEvent(new Event('input', { bubbles: true }));
     });
     expect(handles(el)).toEqual(['reviewer']);
+    expect(el.querySelector('p.sr[role="status"]')!.textContent).toBe('1 member matches');
+  });
+
+  it('says when a search finds no member, and clears it with one key', () => {
+    const el = mount(<FleetList />);
+    const field = el.querySelector('input[type="search"]') as HTMLInputElement;
+    act(() => {
+      field.value = 'zzzq';
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(handles(el)).toEqual([]);
+    expect(el.querySelector('.people-none')!.textContent).toContain('No member matches \u201czzzq\u201d.');
+    expect(el.querySelector('p.sr[role="status"]')!.textContent).toBe('0 members match');
+    act(() => (el.querySelector('.people-none button') as HTMLButtonElement).click());
+    expect(el.querySelector('.people-none')).toBeNull();
+    expect(handles(el).length).toBeGreaterThan(0);
   });
 });
 
@@ -165,7 +181,7 @@ describe('the board', () => {
     const lights = [...el.querySelectorAll('a.board-light')];
     expect(lights.map((a) => a.textContent)).toEqual(['migrator-1, working', 'migrator-2, needs you', 'reviewer, idle', 'manager, awake']);
     expect(lights[1].getAttribute('href')).toBe('#member/b1/migrator-2');
-    expect(lights[1].getAttribute('title')).toBe('migrator-2');
+    expect(lights[1].getAttribute('title')).toBe('migrator-2: needs you');
   });
 
   it('filters to the status of a segment of a strip, and back', () => {
@@ -175,6 +191,14 @@ describe('the board', () => {
     act(() => seg.click());
     expect([...el.querySelectorAll('a.board-light')].map((a) => a.textContent)).toEqual(['migrator-2, needs you']);
     expect(el.querySelector('.strip-seg[aria-pressed="true"]')!.textContent).toBe('1 needs you');
+    // The head says what the board shows, and its key shows every member again.
+    const only = el.querySelector('.board-only') as HTMLButtonElement;
+    expect(only.textContent).toBe('Showing needs you only (1)');
+    expect(only.getAttribute('aria-label')).toBe('Showing needs you only, 1 member. Show every member.');
+    act(() => only.click());
+    expect(el.querySelectorAll('a.board-light').length).toBe(4);
+    expect(el.querySelector('.board-only')).toBeNull();
+    act(() => seg.click());
     act(() => (el.querySelector('.strip-seg[aria-pressed="true"]') as HTMLButtonElement).click());
     expect(el.querySelectorAll('a.board-light').length).toBe(4);
   });

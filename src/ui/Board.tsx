@@ -10,6 +10,7 @@ import { filterStatus, stripOf, type PeopleGroup, type PersonRow } from '../stat
 import { useRoving } from './keys';
 import { usePeople } from './Fleet';
 import { Led, PaneHeader } from './primitives';
+import { Icon } from './icons';
 
 /** Strip is the status strip of a group: one key per status, with its light and its count in words. */
 export function Strip({ rows, title, active, onPick }: { rows: PersonRow[]; title: string; active: string; onPick: (word: string) => void }) {
@@ -31,7 +32,7 @@ function BoardLight({ r }: { r: PersonRow }) {
   const tone = r.light ? r.light.tone : 'grey';
   const word = r.light ? r.light.word : r.task;
   return (
-    <a class="board-light" href={r.href} title={r.handle} data-item>
+    <a class="board-light" href={r.href} title={word ? r.handle + ': ' + word : r.handle} data-item>
       <span class="sr">{r.handle + ', '}</span>
       <Led tone={tone} word={word} struck={r.light ? r.light.struck : false} quiet label={r.handle} />
     </a>
@@ -74,6 +75,7 @@ export function Board() {
   const byKey = useMemo(() => new Map(groups.map((g) => [g.key, g])), [groups]);
   const lights = useRoving<HTMLDivElement>();
   const total = groups.reduce((n, g) => n + g.rows.length, 0);
+  const shownCount = shown.reduce((n, g) => n + g.rows.length, 0);
   return (
     <section class="screen board" aria-labelledby="board-title">
       <PaneHeader
@@ -82,10 +84,16 @@ export function Board() {
         size="title"
         level={1}
         back={{ href: '#fleet', label: 'Fleet', to: 'list' }}
-        count={loaded ? total : undefined}
-        countLabel={total === 1 ? '1 member' : total + ' members'}
+        count={loaded ? (status ? shownCount : total) : undefined}
+        countLabel={(status ? shownCount : total) === 1 ? '1 member' : (status ? shownCount : total) + ' members'}
       >
-        {status && <Led tone={(groups.flatMap((g) => g.rows).find((r) => r.light && r.light.word === status)?.light?.tone) || 'grey'} word={status} />}
+        {status && (
+          // The filter says what the board shows, and the key shows every member again.
+          <button type="button" class="board-only" aria-label={'Showing ' + status + ' only, ' + (shownCount === 1 ? '1 member' : shownCount + ' members') + '. Show every member.'} onClick={() => setStatus('')}>
+            <Led tone={(groups.flatMap((g) => g.rows).find((r) => r.light && r.light.word === status)?.light?.tone) || 'grey'} word={'Showing ' + status + ' only (' + shownCount + ')'} still />
+            <Icon name="close" />
+          </button>
+        )}
       </PaneHeader>
       <div class="scroll pad" ref={lights}>
         {shown.map((g) => (

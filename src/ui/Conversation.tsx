@@ -180,6 +180,14 @@ export function useTranscript(runId: string, load = true): TranscriptState {
   return { items, prev, loading, gone, problem, earlier };
 }
 
+/** focusComposer puts the focus in the message box once the screen draws it, as after New conversation. */
+export function focusComposer(): void {
+  requestAnimationFrame(() => {
+    const box = document.getElementById('composer') as HTMLTextAreaElement | null;
+    if (box && !box.disabled) box.focus();
+  });
+}
+
 /** The time between two reads of a run that works. */
 export const POLL_MS = 3000;
 
