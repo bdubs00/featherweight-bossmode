@@ -145,12 +145,14 @@ describe('the states of the section', () => {
     expect(el.querySelector('form.pkgs-add')).toBeNull();
     expect(button(el, 'Turn off')).toBeUndefined();
     act(() => button(el, 'Turn on packages')!.click());
-    await vi.waitFor(() => expect(el.querySelector('form.pkgs-add')).not.toBeNull());
+    // Each step waits on the state that it checks: the page draws the answer, and then an effect moves the focus, which a loaded machine runs later.
+    await vi.waitFor(() => expect(puts().length).toBe(1));
     // Turn on lets the agent ask for a package, whatever the setting held while off.
     expect(puts()[0]).toEqual({ method: 'PUT', path: '/v1/pools/crew/packages', body: { on: true, ask: true, python: [], tools: [] } });
-    expect((el.querySelector('input[role="switch"]') as HTMLInputElement).checked).toBe(true);
+    await vi.waitFor(() => expect(el.querySelector('form.pkgs-add')).not.toBeNull());
+    await vi.waitFor(() => expect((el.querySelector('input[role="switch"]') as HTMLInputElement).checked).toBe(true));
     // The focus goes to the field of the add row, which took the place of the key.
-    expect(document.activeElement).toBe(el.querySelector('form.pkgs-add input[aria-label="Package name"]'));
+    await vi.waitFor(() => expect(document.activeElement).toBe(el.querySelector('form.pkgs-add input[aria-label="Package name"]')));
   });
 
   it('shows the add row and the switch when on and empty, with no list, no state line, and no note', async () => {
@@ -257,8 +259,8 @@ describe('a change of the packages', () => {
     await vi.waitFor(() => expect(puts().length).toBe(1));
     expect(puts()[0].body).toEqual({ on: true, ask: true, python: ['ansible-lint'], tools: ['iproute2', 'nodejs>=22'] });
     await vi.waitFor(() => expect(field.value).toBe(''));
-    expect([...el.querySelectorAll('.pkgs-list')][1].textContent).toContain('nodejs>=22');
-    expect(document.activeElement).toBe(field);
+    await vi.waitFor(() => expect([...el.querySelectorAll('.pkgs-list')][1].textContent).toContain('nodejs>=22'));
+    await vi.waitFor(() => expect(document.activeElement).toBe(field));
   });
 
   it('adds with the key Add, as a Python package by default', async () => {
@@ -312,7 +314,7 @@ describe('a change of the packages', () => {
     await vi.waitFor(() => expect(puts().length).toBe(2));
     expect(puts()[1].body).toEqual({ on: false, ask: false, python: ['ansible-lint'], tools: ['iproute2'] });
     await vi.waitFor(() => expect(el.querySelector('.pkgs-off')).not.toBeNull());
-    expect(document.activeElement).toBe(button(el, 'Turn on packages'));
+    await vi.waitFor(() => expect(document.activeElement).toBe(button(el, 'Turn on packages')));
   });
 
   it('shows the sentence of the server for a refused name as it is', async () => {
