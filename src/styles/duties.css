@@ -102,6 +102,18 @@
 .duty-body > * {
   max-width: 760px;
 }
+/* The lines of a duty from the setup of the server sit over the keys, and the first one opens the page. */
+.duty-body > .duty-origin:first-child,
+.duty-form > .duty-origin {
+  margin-top: 0;
+}
+.duty-body > .duty-origin + .duty-keys,
+.duty-body > .duty-locked + .duty-keys {
+  margin-top: var(--s-3);
+}
+.duty-template {
+  color: var(--muted);
+}
 .duty-keys {
   display: flex;
   flex-wrap: wrap;

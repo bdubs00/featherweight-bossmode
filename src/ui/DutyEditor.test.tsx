@@ -626,3 +626,93 @@ describe('the dialog of a save', () => {
     }
   });
 });
+
+describe('a duty from the setup of the server', () => {
+  const HOOK: Duty = {
+    name: 'renew-certificates',
+    agent: 'migrator',
+    owner: 'alice@example.com',
+    origin: { kind: 'config', name: 'renew-certificates' },
+    template: true,
+    when: { webhook: { auth: { mode: 'bearer', secret: 'CERT_HOOK' } } },
+    do: { ask: {} },
+    limits: { budget: {} },
+    runAs: 'duty',
+    source: 'store',
+    revision: 1,
+    readback: '',
+  };
+  const saved = (c: Call) => ({ body: { ...(c.body as object), revision: 2 } });
+
+  it('opens in the editor with the line of its origin, an empty message, and the line of the template, and keeps that message on a save', async () => {
+    api = fakeApi({
+      'GET /v1/duties': { duties: [HOOK], paused: false },
+      'GET /v1/duties/renew-certificates': { ...HOOK, history: [] },
+      'PUT /v1/duties/renew-certificates?dryRun=true': dry({ readback: '' }),
+      'PUT /v1/duties/renew-certificates': saved,
+    });
+    const el = mount(<DutyEditor name="renew-certificates" />);
+    await settle();
+    expect(text(el.querySelector('.duty-form > .duty-origin'))).toBe('First set up in the configuration of the server.');
+    const box = fieldOf(el, 'Ask migrator') as unknown as HTMLTextAreaElement;
+    expect(box.value).toBe('');
+    expect(text(el.querySelector('#duty-template-line'))).toBe('The message comes from the setup of the server. Write a message to replace it.');
+    expect(box.getAttribute('aria-describedby')).toBe('duty-template-line');
+    // The budget stays required: no silent cost.
+    typeIn(fieldOf(el, 'The most a run can cost'), '0.30');
+    click(keyNamed(el, 'Save duty'));
+    await settle();
+    expect(text(el.querySelector('section[aria-labelledby="duty-what-head"] .field-error'))).toBe('');
+    click(keyNamed(document.querySelector('dialog.confirm')!, 'Save duty'));
+    await settle();
+    const put = puts().find((c) => c.path === '/v1/duties/renew-certificates')!;
+    // An empty message keeps the message of the setup: the record names none.
+    expect((put.body as DutyRecord).do).toEqual({ ask: {} });
+    expect(location.hash).toBe('#duties/renew-certificates');
+  });
+
+  it('replaces the message of the template with the message of the person', async () => {
+    api = fakeApi({
+      'GET /v1/duties': { duties: [HOOK], paused: false },
+      'GET /v1/duties/renew-certificates': { ...HOOK, history: [] },
+      'PUT /v1/duties/renew-certificates?dryRun=true': dry({ readback: '' }),
+      'PUT /v1/duties/renew-certificates': saved,
+    });
+    const el = mount(<DutyEditor name="renew-certificates" />);
+    await settle();
+    typeIn(fieldOf(el, 'Ask migrator'), 'Renew the certificate that the event names.');
+    expect(el.querySelector('#duty-template-line')).toBeNull();
+    typeIn(fieldOf(el, 'The most a run can cost'), '0.30');
+    click(keyNamed(el, 'Save duty'));
+    await settle();
+    click(keyNamed(document.querySelector('dialog.confirm')!, 'Save duty'));
+    await settle();
+    expect((puts().find((c) => c.path === '/v1/duties/renew-certificates')!.body as DutyRecord).do).toEqual({ ask: { message: 'Renew the certificate that the event names.' } });
+  });
+
+  it('says that a locked duty changes in the setup of the server, with no form', async () => {
+    const locked = { ...HOOK, name: 'audit-access', locked: true, template: false, do: { ask: { message: 'Audit the access log.' } } };
+    api = fakeApi({ 'GET /v1/duties': { duties: [locked], paused: false }, 'GET /v1/duties/audit-access': { ...locked, history: [] } });
+    const el = mount(<DutyEditor name="audit-access" />);
+    await settle();
+    expect(text(el.querySelector('.empty'))).toBe('This duty is locked by the setup of this server. The person who runs the server can change it.');
+    expect(el.querySelector('form')).toBeNull();
+  });
+
+  it('shows the sentence of the server when a save of a duty that became locked answers 409', async () => {
+    const imported = { ...HOOK, template: false, do: { ask: { message: 'Renew it.' } }, limits: { budget: { maxCostUSD: 0.3 } } };
+    api = fakeApi({
+      'GET /v1/duties': { duties: [imported], paused: false },
+      'GET /v1/duties/renew-certificates': { ...imported, history: [] },
+      'PUT /v1/duties/renew-certificates?dryRun=true': dry({ readback: '' }),
+      'PUT /v1/duties/renew-certificates': () => problem(409, 'This duty is locked by the setup of this server. The person who runs the server can change it.'),
+    });
+    const el = mount(<DutyEditor name="renew-certificates" />);
+    await settle();
+    click(keyNamed(el, 'Save duty'));
+    await settle();
+    click(keyNamed(document.querySelector('dialog.confirm')!, 'Save duty'));
+    await settle();
+    expect(text(el.querySelector('.duty-problems-box'))).toContain('This duty is locked by the setup of this server. The person who runs the server can change it.');
+  });
+});

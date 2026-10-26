@@ -1012,7 +1012,8 @@ export interface CheckFirst {
 
 /** What a duty does: exactly one of ask, post (in a bridge that stays open), open (a bridge from a playbook), and manager. */
 export interface DutyDo {
-  ask?: { message: string; [k: string]: unknown };
+  /** The message of the person. A duty whose message comes from the setup of the server names none. */
+  ask?: { message?: string; [k: string]: unknown };
   post?: { bridge: string; to?: string[]; message: string };
   open?: { playbook: string; goal?: string };
   manager?: { message: string };
@@ -1116,8 +1117,14 @@ export interface DutyRecord {
 
 /** A duty as a read answers it: the record, and what the front adds. */
 export interface Duty extends DutyRecord {
-  /** store for a duty of the bucket, file for an entry of the settings that the routes never change. */
+  /** store for a duty of the bucket. An older server answers file for an entry of its settings that the routes never change, and the page shows it locked. */
   source?: 'store' | 'file' | string;
+  /** Where the duty came from: kind config for an entry of the configuration of the server that the server imported once. */
+  origin?: { kind: string; name?: string } | null;
+  /** True for a duty that the setup of the server locks: a change, a pause, or a delete answers 409. */
+  locked?: boolean;
+  /** True when the message of the duty comes from the setup of the server. No route shows that message. */
+  template?: boolean;
   revision?: number;
   /** The schedule in words, such as Every weekday at 9:00 AM, New York time. */
   readback?: string;

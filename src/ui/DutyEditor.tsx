@@ -82,6 +82,13 @@ import {
   type FormErrors,
   type Placeholder,
   type WhenForm,
+  LOCKED_LINE,
+  ORIGIN_LINE,
+  TEMPLATE_LINE,
+  TEMPLATE_REPLACE,
+  importedOf,
+  lockedOf,
+  templatedOf,
 } from '../lib/duties';
 import { useSelect } from '../state/store';
 import { membersOf } from '../state/reducer';
@@ -440,12 +447,13 @@ export function DutyEditor({ name, seed }: { name?: string; seed?: DutySeed }) {
   }, [name]);
   const back = name ? { href: hrefOf({ place: 'duties', name }), label: 'the duty', to: 'here' as const } : { href: '#duties', label: 'Duties', to: 'list' as const };
   const heading = fresh ? 'New duty' : 'Edit duty';
-  if (!fresh && (!base || base.source === 'file')) {
+  // Every duty opens in the editor, except a duty that the setup of the server locks.
+  if (!fresh && (!base || lockedOf(base))) {
     return (
       <section class="screen duty-edit" aria-labelledby="duty-edit-title">
         <PaneHeader id="duty-edit-title" title={heading} size="title" level={1} back={back} />
         <div class="empty center">
-          <p>{base ? 'This duty comes from the settings of the front. Change it there.' : gone ? 'This duty is not here. It was removed, or you cannot see it.' : failed || 'Loading the duty.'}</p>
+          <p>{base ? LOCKED_LINE : gone ? 'This duty is not here. It was removed, or you cannot see it.' : failed || 'Loading the duty.'}</p>
         </div>
       </section>
     );
@@ -493,6 +501,8 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
   const faces = useSelect((s) => s.faces);
   const tagline = useSelect((s) => (f.agent && s.faces[f.agent] ? s.faces[f.agent].tagline : ''));
   const keepsWhen = !!(base && base.when && base.when.webhook);
+  // The message of a duty from the setup of the server never shows. An empty field keeps it, and a message replaces it.
+  const templated = templatedOf(base);
   const shownName = f.nameOwn ? f.name : nameOf(f.act === 'open' ? f.goal || f.playbook : f.message);
   // The reason of a name that cannot name a duty, shown as the person types, before a save.
   const nameWhy = fresh && shownName.trim() ? nameReason(shownName.trim(), []) : '';
@@ -627,7 +637,7 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
 
   const submit = async (e: Event) => {
     e.preventDefault();
-    const errs = formErrors(f, { fresh, name: shownName.trim(), taken: fresh && list ? list.map((d) => d.name) : [], keepsWhen });
+    const errs = formErrors(f, { fresh, name: shownName.trim(), taken: fresh && list ? list.map((d) => d.name) : [], keepsWhen, templated });
     if (Object.keys(errs).length) {
       setErrors(errs);
       if (errs.count || errs.where) setCheckOpen(true);
@@ -655,7 +665,9 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
     } catch (err) {
       setReview(null);
       if (err instanceof ApiError && err.status === 409) {
-        setProblems({ top: ['This duty changed since you opened it. Open it again, then make your change.'] });
+        // A duty that the setup of the server locked since the person opened it answers 409 with its own two sentences.
+        const detail = err.problem && typeof err.problem.detail === 'string' ? err.problem.detail.trim() : '';
+        setProblems({ top: [/\blocked\b/i.test(err.message) ? detail || err.message : 'This duty changed since you opened it. Open it again, then make your change.'] });
         showFirst();
       } else if (err instanceof ApiError && err.status === 400 && err.problem && Array.isArray(err.problem.problems) && err.problem.problems.length) takeProblems(err.problem.problems as unknown[]);
       else showError(err);
@@ -674,6 +686,7 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
       <PaneHeader id="duty-edit-title" title={heading} size="title" level={1} back={back} />
       <form class="scroll pad" ref={formRef} onSubmit={submit} noValidate>
         <div class="make duty-form">
+          {importedOf(base) && <p class="duty-said duty-origin">{ORIGIN_LINE}</p>}
           {pr.top && pr.top.length > 0 && (
             <div class="duty-problems-box" role="alert">
               <p>The duty cannot save yet.</p>
@@ -846,8 +859,14 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
                   invalid={!!(err.message || pr.message)}
                   placeholder={f.act === 'post' ? 'Review what changed since [The last run].' : f.act === 'manager' ? "Check the backups of [Today's date] and tell me what failed." : "Write the report of [Today's date] to the wiki."}
                   onInput={(e) => patch({ message: (e.target as HTMLTextAreaElement).value })}
+                  aria-describedby={templated && f.act === 'ask' && !f.message.trim() ? 'duty-template-line' : undefined}
                 />
               </Field>
+            )}
+            {templated && f.act === 'ask' && !f.message.trim() && (
+              <p class="duty-template" id="duty-template-line">
+                {TEMPLATE_LINE} {TEMPLATE_REPLACE}
+              </p>
             )}
             <div class="duty-chips" role="group" aria-label="Words that change each run">
               {chips.map((p) => (

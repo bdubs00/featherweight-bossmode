@@ -441,7 +441,7 @@ export function runLight(r: DutyRun | null | undefined): Light {
   }
   if (r.state === 'completed') return { word: 'finished', tone: 'grey', label: 'The run finished.' };
   const word = r.state ? r.state.replace(/[-_]/g, ' ') : 'unknown';
-  return { word, tone: 'grey', label: why || 'The front reports ' + word + '.' };
+  return { word, tone: 'grey', label: why || 'The server reports ' + word + '.' };
 }
 
 /** dutyLight is the light of a duty in the list: paused, else the light of its last run. */
@@ -503,6 +503,39 @@ export function firstLine(text: string): string {
 
 /** titleOfName makes a name into words: daily-homelab-report is Daily homelab report. */
 export const titleOfName = (name: string) => cap(String(name || '').replace(/[-_]+/g, ' ').trim());
+
+/* ---------- a duty from the setup of the server ---------- */
+
+/** The line of a duty that the configuration of the server set up first. */
+export const ORIGIN_LINE = 'First set up in the configuration of the server.';
+/** The line in place of a message that comes from the setup of the server, and its end, which a locked duty leaves out. */
+export const TEMPLATE_LINE = 'The message comes from the setup of the server.';
+export const TEMPLATE_REPLACE = 'Write a message to replace it.';
+/** The sentence of a locked duty, as the server refuses a change of it. */
+export const LOCKED_LINE = 'This duty is locked by the setup of this server. The person who runs the server can change it.';
+
+/** importedOf reports whether the server imported a duty from its configuration. */
+export function importedOf(d: Pick<Duty, 'origin'> | null | undefined): boolean {
+  return !!d && !!d.origin && d.origin.kind === 'config';
+}
+
+/** lockedOf reports whether the setup of the server locks a duty. An older server marks such a duty with the source file. */
+export function lockedOf(d: Pick<Duty, 'locked' | 'source'> | null | undefined): boolean {
+  return !!d && (!!d.locked || d.source === 'file');
+}
+
+/**
+ * templatedOf reports whether the message of a duty comes from the setup of
+ * the server: the read says template, or a duty that the server imported
+ * asks its agent with no message.
+ */
+export function templatedOf(d: Pick<Duty, 'origin' | 'template' | 'do' | 'source'> | null | undefined): boolean {
+  if (!d) return false;
+  if (d.template) return true;
+  if (!importedOf(d) && d.source !== 'file') return false;
+  const x = d.do || {};
+  return !x.post && !x.open && !x.manager && !(x.ask && x.ask.message && x.ask.message.trim());
+}
 
 /** dutyTitle says what a duty does, from its message, else from its name. */
 export function dutyTitle(d: Pick<DutyRecord, 'name' | 'do'>): string {
@@ -917,7 +950,8 @@ export function formOf(d: Duty, zone: string): DutyForm {
     event: e ? { kind: e.kind || '', agent: e.agent || '', after: e.after || '1h', path: e.path || '' } : emptyEvent(),
     check: checkFormOf(d.checkFirst),
     act: actOf(x),
-    message: toWords((x.ask && x.ask.message) || (x.post && x.post.message) || (x.manager && x.manager.message) || ''),
+    // A message from the setup of the server never shows, so the field starts empty, and an empty field keeps that message.
+    message: templatedOf(d) ? '' : toWords((x.ask && x.ask.message) || (x.post && x.post.message) || (x.manager && x.manager.message) || ''),
     bridge: (x.post && x.post.bridge) || '',
     to: (x.post && x.post.to) || [],
     playbook: (x.open && x.open.playbook) || '',
@@ -1080,7 +1114,10 @@ export function doOf(f: DutyForm, base: Duty | null): DutyDo {
     case 'manager':
       return { manager: { message } };
   }
-  return { ask: { ...((base && base.do && base.do.ask) || {}), message } };
+  const ask: NonNullable<DutyDo['ask']> = { ...((base && base.do && base.do.ask) || {}), message };
+  // An empty message of a duty whose message comes from the setup of the server keeps that message: the record names none.
+  if (!message && templatedOf(base)) delete ask.message;
+  return { ask };
 }
 
 /**
@@ -1167,7 +1204,7 @@ export interface FormErrors {
 export const OPEN_NEEDS_TURNS = 'A duty that opens a bridge needs the most turns of the whole bridge, such as 40.';
 
 /** formErrors says what is wrong with the form before a dry run. taken names the duties that exist, for a new one. */
-export function formErrors(f: DutyForm, opts: { fresh: boolean; name: string; taken: string[]; keepsWhen: boolean }): FormErrors {
+export function formErrors(f: DutyForm, opts: { fresh: boolean; name: string; taken: string[]; keepsWhen: boolean; templated?: boolean }): FormErrors {
   const e: FormErrors = {};
   if (!f.agent) e.agent = 'Pick the agent that does the duty.';
   if (!opts.keepsWhen && f.start === 'event') {
@@ -1179,7 +1216,8 @@ export function formErrors(f: DutyForm, opts: { fresh: boolean; name: string; ta
   }
   if (f.act === 'post' && !f.bridge) e.bridge = 'Pick the bridge.';
   if (f.act === 'open' && !f.playbook) e.playbook = 'Pick a playbook.';
-  if (f.act !== 'open' && !f.message.trim()) e.message = f.act === 'post' ? 'Write the message for the bridge.' : f.act === 'manager' ? 'Write what the manager does.' : 'Write what the agent does.';
+  // A duty whose message comes from the setup of the server can ask its agent with no message of the person.
+  if (f.act !== 'open' && !f.message.trim() && !(opts.templated && f.act === 'ask')) e.message = f.act === 'post' ? 'Write the message for the bridge.' : f.act === 'manager' ? 'Write what the manager does.' : 'Write what the agent does.';
   // The budget follows the action. A post spends nothing of its own, so it needs no limit.
   const whole = (text: string) => Number.isInteger(Number(text)) && Number(text) > 0;
   if (f.act === 'open') {

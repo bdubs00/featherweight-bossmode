@@ -4,14 +4,20 @@
 // the light of its last run, its next time, and its spend of today. For an
 // admin, its foot holds the switch that pauses every duty. The main pane
 // holds one duty with its history, or the editor of New duty and Edit
-// (DutyEditor.tsx). docs/CONTRACT.md, section 16, names the routes.
+// (DutyEditor.tsx). docs/CONTRACT.md, section 16, names the routes. A duty
+// that the configuration of the server set up first says so, and a duty
+// that the setup of the server locks shows no key that changes it.
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { Duty, DutyRun } from '../api/types';
 import { go, hrefOf, type DutySeed } from '../lib/route';
 import { costText } from '../lib/cost';
 import {
+  LOCKED_LINE,
+  ORIGIN_LINE,
   PLACEHOLDERS,
+  TEMPLATE_LINE,
+  TEMPLATE_REPLACE,
   actOf,
   awayWords,
   channelsIn,
@@ -20,7 +26,9 @@ import {
   decidedWords,
   dutyLight,
   dutyTitle,
+  importedOf,
   limitWords,
+  lockedOf,
   listWords,
   retryWords,
   nextShort,
@@ -28,6 +36,7 @@ import {
   runLight,
   startWords,
   tellWords,
+  templatedOf,
   titleOfName,
   toWords,
 } from '../lib/duties';
@@ -310,7 +319,9 @@ function DutyView({ name }: { name: string }) {
   const gone = useDuties((s) => !!s.gone[name]);
   const off = useDuties((s) => s.off);
   const allPaused = useDuties((s) => s.paused);
-  const canChange = useCanChange(d);
+  // A locked duty takes no change, no pause, and no delete, whoever the person is.
+  const locked = lockedOf(d);
+  const canChange = useCanChange(d) && !locked;
   const agentName = useAgentName(d ? d.agent : '');
   const faces = useSelect((s) => s.faces);
   const nameOfAgent = (a: string) => (faces[a] && faces[a].displayName) || a;
@@ -359,7 +370,6 @@ function DutyView({ name }: { name: string }) {
   }
   const title = dutyTitle(d);
   const light = dutyLight(d, allPaused);
-  if (d.source === 'file') return <SourceView d={d} title={title} agentName={agentName} back={back} />;
   const run = async (f: () => Promise<void>) => {
     setBusy(true);
     try {
@@ -385,6 +395,12 @@ function DutyView({ name }: { name: string }) {
         <Led tone={light.tone} word={light.word} label={light.label} still={light.still} class="duty-status" />
       </PaneHeader>
       <div class="scroll pad duty-body">
+        {importedOf(d) && <p class="duty-said duty-origin">{ORIGIN_LINE}</p>}
+        {locked && (
+          <p class="duty-said duty-locked">
+            <LineLed tone="grey" /> {LOCKED_LINE}
+          </p>
+        )}
         <div class="duty-keys">
           <Button size="s" disabled={busy} onClick={runNow}>
             Run now
@@ -441,7 +457,7 @@ function DutyView({ name }: { name: string }) {
           <h2 class="t-sub duty-sec-head" id="duty-what">
             What it does
           </h2>
-          <DoWords d={d} agentName={agentName} title={title} />
+          <DoWords d={d} agentName={agentName} title={title} locked={locked} />
         </section>
         {/* The readback of the front says what the check looks for, so the section shows only without it. */}
         {d.checkFirst && !d.readback && (
@@ -504,44 +520,13 @@ function DutyView({ name }: { name: string }) {
 }
 
 /**
- * SourceView is the page of a duty that comes from the settings of the
- * front, an entry of workbench.sources: the note that it changes there,
- * when it starts, and its agent. It has no limits, no decisions while the
- * person is away, and no notifications, and the front refuses every
- * change, so the page offers no key.
- */
-function SourceView({ d, title, agentName, back }: { d: Duty; title: string; agentName: string; back: { href: string; label: string; to: 'list' } }) {
-  return (
-    <section class="screen duty" aria-labelledby="duty-title">
-      <PaneHeader id="duty-title" title={<span title={title}>{title}</span>} size="title" level={1} back={back} />
-      <div class="scroll pad duty-body">
-        <p class="duty-said">This duty comes from the settings of the front. Change it there.</p>
-        <section class="duty-sec" aria-labelledby="duty-when">
-          <h2 class="t-sub duty-sec-head" id="duty-when">
-            When
-          </h2>
-          <p class="duty-readback">{d.readback || startWords(d) || 'Another app starts it.'}</p>
-        </section>
-        <section class="duty-sec" aria-labelledby="duty-agent">
-          <h2 class="t-sub duty-sec-head" id="duty-agent">
-            Agent
-          </h2>
-          <p class="duty-who">
-            <Mark agent={d.agent} size={24} />
-            <a href={hrefOf({ place: 'fleet', agent: d.agent, profile: true })}>{agentName}</a>
-          </p>
-        </section>
-      </div>
-    </section>
-  );
-}
-
-/**
  * DoWords says what a duty does: it asks its agent, posts in a bridge to
  * some members, opens a bridge from a playbook, or asks the manager, with
- * its message or its goal.
+ * its message or its goal. A message that comes from the setup of the
+ * server never shows: a line says so, and asks for a message unless the
+ * duty is locked.
  */
-function DoWords({ d, agentName, title }: { d: Duty; agentName: string; title: string }) {
+function DoWords({ d, agentName, title, locked }: { d: Duty; agentName: string; title: string; locked: boolean }) {
   const x = d.do || {};
   const bridge = useSelect((s) => (x.post && x.post.bridge ? s.bridges.byId[x.post.bridge] : undefined));
   const agent = <a href={hrefOf({ place: 'fleet', agent: d.agent, profile: true })}>{agentName}</a>;
@@ -593,7 +578,13 @@ function DoWords({ d, agentName, title }: { d: Duty; agentName: string; title: s
           {agent}
         </span>
       </p>
-      {x.ask ? <MessageWords text={x.ask.message} /> : <p>{title}</p>}
+      {templatedOf(d) ? (
+        <p class="duty-template">{locked ? TEMPLATE_LINE : TEMPLATE_LINE + ' ' + TEMPLATE_REPLACE}</p>
+      ) : x.ask ? (
+        <MessageWords text={x.ask.message || ''} />
+      ) : (
+        <p>{title}</p>
+      )}
     </>
   );
 }

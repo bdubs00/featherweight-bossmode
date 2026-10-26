@@ -443,36 +443,63 @@ describe('the page of a duty', () => {
     expect(el.querySelector('button[aria-label="More"]')).toBeNull();
   });
 
-  it('shows a source of the settings of the front with the note, its start, and its agent, and no key', async () => {
+  it('shows a duty that the server imported as any duty, with the line of its origin and every key', async () => {
     act(() => store.dispatch({ type: 'me', me: ADMIN }));
-    // A source as the front reads it: no action, empty limits, no decisions while away, and no notifications.
-    const hook: Duty = {
-      name: 'lab-hook',
-      agent: 'triage',
-      when: { webhook: { auth: { mode: 'bearer', secret: 'LAB_HOOK' } } },
-      do: {},
-      limits: { budget: {} },
-      source: 'file',
-      revision: 0,
-      readback: 'When another app calls the address of this source, each new event starts a run of triage. An operator sets it in the settings of the front, so it changes there.',
-      next: [],
-    };
-    const poll: Duty = { ...hook, name: 'tickets', when: {}, checkFirst: { look: { http: { url: 'https://helpdesk.example.com/api/tickets' } }, items: 'tickets', key: '', wake: { when: 'new' } }, readback: 'Every 5m, it looks at helpdesk.example.com/api/tickets, and each new item starts a run of triage. An operator sets it in the settings of the front, so it changes there.' };
-    for (const d of [hook, poll]) {
+    const imported = base({ name: 'helpdesk-tickets', agent: 'triage', origin: { kind: 'config', name: 'helpdesk-tickets' }, do: { ask: { message: 'Sort the new tickets.' } }, readback: 'Every 5 minutes.' });
+    api = fakeApi(one(imported));
+    const el = mount(<DutyMain name="helpdesk-tickets" />);
+    await settle();
+    expect(text(el.querySelector('.duty-body > .duty-origin'))).toBe('First set up in the configuration of the server.');
+    expect(el.querySelector('.duty-body')!.firstElementChild!.classList.contains('duty-origin')).toBe(true);
+    expect(keyNamed(el, 'Run now')).toBeTruthy();
+    expect(keyNamed(el, 'Pause')).toBeTruthy();
+    expect(keyNamed(el, 'Edit')!.getAttribute('href')).toBe(hrefOf({ place: 'duties', name: 'helpdesk-tickets', edit: true }));
+    expect(el.querySelector('button[aria-label="More"]')).not.toBeNull();
+    expect(text(el.querySelector('section[aria-labelledby="duty-what"]'))).toContain('Sort the new tickets.');
+    expect(el.querySelector('.duty-locked')).toBeNull();
+    expect(el.textContent!.toLowerCase()).not.toMatch(/\bfront\b/);
+  });
+
+  it('says that the message comes from the setup of the server, and shows no message', async () => {
+    act(() => store.dispatch({ type: 'me', me: ADMIN }));
+    const hook = base({ name: 'renew-certificates', agent: 'triage', origin: { kind: 'config', name: 'renew-certificates' }, when: { webhook: { auth: { mode: 'bearer', secret: 'CERT_HOOK' } } }, do: { ask: {} }, limits: { budget: {} }, readback: 'When another app calls.' });
+    // A read that names template, and a read of an imported duty that names no message, say the same.
+    for (const d of [hook, { ...hook, template: true, do: { ask: { message: '' } } }]) {
       api = fakeApi(one(d));
-      const el = mount(<DutyMain name={d.name} />);
+      const el = mount(<DutyMain name="renew-certificates" />);
       await settle();
-      expect(text(el.querySelector('h1'))).toBe(d.name === 'tickets' ? 'Tickets' : 'Lab hook');
-      expect([...el.querySelectorAll('.duty-body > *')].map((x) => text(x.querySelector('h2') || x))).toEqual(['This duty comes from the settings of the front. Change it there.', 'When', 'Agent']);
-      expect(text(el.querySelector('.duty-readback'))).toBe(d.readback);
-      expect(text(el.querySelector('.duty-who'))).toBe('triage');
-      expect(el.querySelector('.duty-who a')!.getAttribute('href')).toBe(hrefOf({ place: 'fleet', agent: 'triage', profile: true }));
-      // The front refuses every change of a source, so no key shows, Run now neither.
-      expect(el.querySelectorAll('.duty-keys, button').length).toBe(0);
-      expect(el.querySelector('.pane-head .status')).toBeNull();
+      expect(text(el.querySelector('.duty-template'))).toBe('The message comes from the setup of the server. Write a message to replace it.');
+      expect(text(el.querySelector('h1'))).toBe('Renew certificates');
+      expect(keyNamed(el, 'Edit')).toBeTruthy();
       unmountAll();
       api.restore();
     }
+  });
+
+  it('shows a locked duty with the sentence of the server and no key that changes it, also from an older server', async () => {
+    act(() => store.dispatch({ type: 'me', me: ADMIN }));
+    const locked = base({ name: 'audit-access', agent: 'triage', origin: { kind: 'config', name: 'audit-access' }, locked: true, readback: 'Every day at 6:00 AM, UTC.' });
+    // An older server marks an entry of its settings with the source file, and refuses every change of it.
+    const old = base({ name: 'lab-hook', agent: 'triage', source: 'file', revision: 0, when: { webhook: { auth: { mode: 'bearer', secret: 'LAB_HOOK' } } }, do: {}, limits: { budget: {} }, readback: 'When another app calls.' });
+    for (const d of [locked, old]) {
+      api = fakeApi(one(d));
+      const el = mount(<DutyMain name={d.name} />);
+      await settle();
+      expect(text(el.querySelector('.duty-locked'))).toBe('This duty is locked by the setup of this server. The person who runs the server can change it.');
+      expect(keyNamed(el, 'Run now')).toBeTruthy();
+      expect(keyNamed(el, 'Pause')).toBeUndefined();
+      expect(keyNamed(el, 'Edit')).toBeUndefined();
+      expect(el.querySelector('button[aria-label="More"]')).toBeNull();
+      // The When of the duty shows as for any duty.
+      expect(text(el.querySelector('.duty-readback'))).toBe(d.readback);
+      unmountAll();
+      api.restore();
+    }
+    // A locked duty whose message comes from the setup asks for no message.
+    api = fakeApi(one({ ...locked, do: { ask: {} } }));
+    const el = mount(<DutyMain name="audit-access" />);
+    await settle();
+    expect(text(el.querySelector('.duty-template'))).toBe('The message comes from the setup of the server.');
   });
 
   it('reads the duty again when a run of its history changes its state, as no event of a duty reaches the page', async () => {
