@@ -10,6 +10,10 @@
 // run of the duty works, the page reads the duty again every few seconds,
 // so its state and its history follow the run. A key that changes the duty
 // keeps the focus, and the focus that a move drops goes to the heading.
+// Each run of the history shows the first line of its answer, and Open the
+// run opens the run in a pane under its line, at #duties/<name>/run/<run>:
+// the result, the files, and the conversation, as the run pane of a seat
+// shows them. The tabs over the list lead to the playbooks.
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { Duty, DutyRun } from '../api/types';
@@ -22,6 +26,7 @@ import {
   TEMPLATE_LINE,
   TEMPLATE_REPLACE,
   actOf,
+  answerLine,
   awayWords,
   channelsIn,
   checkLine,
@@ -50,6 +55,12 @@ import { phraseOf } from '../lib/tools';
 import { useSelect } from '../state/store';
 import { loadDuties, loadDuty, loadSharedChannels, pauseAll, pauseDuty, removeDuty, runDutyNow, useDuties } from '../state/duties';
 import { useToolCatalog } from '../state/tools';
+import { ensureRuns } from '../state/fetchers';
+import { selectFacts } from '../state/reducer';
+import { awakeFor } from '../lib/status';
+import { Conversation, useTranscript } from './Conversation';
+import { FilesView, RunView, filesCount, useResult } from './RunPane';
+import { DutyTabs } from './Playbooks';
 import { useRoving } from './keys';
 import { attempt, showError, showSaid } from './notice';
 import { Confirm, Menu, When } from './common';
@@ -66,8 +77,11 @@ export const DUTY_IS = 'A duty is work that an agent does on its own, on a sched
 
 const dutyHref = (name: string) => hrefOf({ place: 'duties', name });
 
-/** runHref links a run of a duty on the page at /ui, as a heart and a ticket of a routine do. */
-const runHref = (run: string) => '/ui#run/' + encodeURIComponent(run);
+/** runHref is the address of a run of the history of a duty, which opens under its line. */
+const runHref = (name: string, run: string) => hrefOf({ place: 'duties', name, run });
+
+/** The runs of the history whose answers the page reads, newest first. A read of a run is served by the view of the fleet and wakes no worker. */
+const ANSWERS = 10;
 
 /**
  * How often the page of a duty reads the duty again: every fast
@@ -225,6 +239,7 @@ export function DutyList({ current }: { current?: string }) {
           ) : undefined
         }
       />
+      {!off && <DutyTabs current="duties" />}
       {paused && !off && (
         <div class="duty-note" role="status">
           <p>
@@ -279,10 +294,10 @@ export function DutyList({ current }: { current?: string }) {
 /* ---------- the main pane ---------- */
 
 /** DutyMain is the main pane: a new duty, the editor of a duty, a duty, or, without one, the first duty where two panes show. A seed fills a new duty from Make this a duty. */
-export function DutyMain({ name, edit, fresh, seed }: { name?: string; edit?: boolean; fresh?: boolean; seed?: DutySeed }) {
+export function DutyMain({ name, edit, fresh, seed, run }: { name?: string; edit?: boolean; fresh?: boolean; seed?: DutySeed; run?: string }) {
   if (fresh) return <DutyEditor seed={seed} />;
   if (name && edit) return <DutyEditor name={name} />;
-  if (name) return <DutyView name={name} />;
+  if (name) return <DutyView name={name} open={run} />;
   return <DutyHome />;
 }
 
@@ -347,7 +362,7 @@ function useCanChange(d: Duty | undefined): boolean {
 type Said = { run: string } | { started: true } | { skipped: string } | null;
 
 /** DutyView is the page of one duty: what it does, when, its limits, and its history, with Run now, Pause, Edit, and Delete. */
-function DutyView({ name }: { name: string }) {
+function DutyView({ name, open }: { name: string; open?: string }) {
   const d = useDuties((s) => s.byName[name] || (s.list ? s.list.find((x) => x.name === name) : undefined));
   const gone = useDuties((s) => !!s.gone[name]);
   const off = useDuties((s) => s.off);
@@ -479,7 +494,7 @@ function DutyView({ name }: { name: string }) {
           <p class="duty-said" role="status">
             {'run' in said ? (
               <>
-                A run started. <a href={runHref(said.run)}>Open the run</a>
+                A run started. <a href={runHref(name, said.run)}>Open the run</a>
               </>
             ) : 'started' in said ? (
               'Started. See the history for what it did.'
@@ -546,7 +561,7 @@ function DutyView({ name }: { name: string }) {
           <h2 class="t-sub duty-sec-head" id="duty-history">
             History <Chip label={history.length === 1 ? '1 run' : history.length + ' runs'}>{history.length}</Chip>
           </h2>
-          {history.length === 0 ? <p class="t-meta">No run yet.</p> : <History runs={history} />}
+          {history.length === 0 ? <p class="t-meta">No run yet.</p> : <History name={name} runs={history} open={open} who={agentName} />}
         </section>
       </div>
       {asking && (
@@ -659,47 +674,94 @@ function DoWords({ d, agentName, title, locked }: { d: Duty; agentName: string; 
 
 /**
  * History lists the runs of a duty, newest first: the time, the light,
- * what the check found, the cost, and the run. Under a run come the
- * questions that somebody decided while the person was away.
+ * what the check found, the cost, the first line of the answer, and the
+ * key that opens the run. Under a run come the questions that somebody
+ * decided while the person was away, and the run that the address opens.
+ * The page reads the runs of the newest lines for their answers.
  */
-function History({ runs }: { runs: DutyRun[] }) {
+function History({ name, runs, open, who }: { name: string; runs: DutyRun[]; open?: string; who: string }) {
   const me = useSelect((s) => (s.me && s.me.principal ? s.me.principal.subject : ''));
+  const ids = runs
+    .map((r) => r.run || '')
+    .filter(Boolean)
+    .slice(0, ANSWERS)
+    .join(',');
+  useEffect(() => {
+    if (ids) ensureRuns(ids.split(','));
+  }, [ids]);
   return (
     <ol class="duty-runs">
-      {runs.map((r) => {
-        const light = runLight(r);
-        const found = checkLine(r);
-        const decided = r.decided || [];
-        return (
-          <li class="duty-run">
-            <span class="duty-run-at">
-              <When at={r.at} />
-            </span>
-            <Led tone={light.tone} word={light.word} label={light.label} still />
-            {found && <span class="duty-run-found">{found}</span>}
-            {typeof r.costUSD === 'number' && r.costUSD > 0 && <span class="duty-run-cost">{costText(r.costUSD)}</span>}
-            {r.state === 'retrying' ? <span class="duty-run-why">{retryWords(r)}</span> : r.reason && <span class="duty-run-why">{r.reason}</span>}
-            {r.run && (
-              <a class="duty-run-link" href={runHref(r.run)}>
-                Open the run
-              </a>
-            )}
-            {decided.length > 0 && (
-              <ul class="duty-decided" aria-label="Decided while you were away">
-                {decided.map((x) => (
-                  <li>
-                    <span class="duty-decided-at">
-                      <When at={x.at} />
-                    </span>
-                    <span>{decidedWords(x, me)}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </li>
-        );
-      })}
+      {runs.map((r) => (
+        <HistoryLine name={name} r={r} me={me} open={!!r.run && r.run === open} who={who} />
+      ))}
     </ol>
+  );
+}
+
+/** HistoryLine is one run of the history, with the first line of its answer, and its run pane when the address opens it. */
+function HistoryLine({ name, r, me, open, who }: { name: string; r: DutyRun; me: string; open: boolean; who: string }) {
+  const light = runLight(r);
+  const found = checkLine(r);
+  const decided = r.decided || [];
+  const answer = useSelect((s) => (r.run && s.runs[r.run] ? answerLine(s.runs[r.run].output || '') : ''));
+  return (
+    <li class={'duty-run' + (open ? ' open' : '')}>
+      <span class="duty-run-at">
+        <When at={r.at} />
+      </span>
+      <Led tone={light.tone} word={light.word} label={light.label} still />
+      {found && <span class="duty-run-found">{found}</span>}
+      {typeof r.costUSD === 'number' && r.costUSD > 0 && <span class="duty-run-cost">{costText(r.costUSD)}</span>}
+      {r.state === 'retrying' ? <span class="duty-run-why">{retryWords(r)}</span> : r.reason && <span class="duty-run-why">{r.reason}</span>}
+      {r.run && (
+        <a class="duty-run-link" href={open ? hrefOf({ place: 'duties', name }) : runHref(name, r.run)} aria-expanded={open} aria-controls={open ? 'duty-run-' + r.run : undefined}>
+          {open ? 'Hide the run' : 'Open the run'}
+        </a>
+      )}
+      {answer && <span class="duty-run-answer">{answer}</span>}
+      {decided.length > 0 && (
+        <ul class="duty-decided" aria-label="Decided while you were away">
+          {decided.map((x) => (
+            <li>
+              <span class="duty-decided-at">
+                <When at={x.at} />
+              </span>
+              <span>{decidedWords(x, me)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {open && r.run && <DutyRunPane runId={r.run} who={who} />}
+    </li>
+  );
+}
+
+/**
+ * DutyRunPane is a run of a duty under its line of the history: the result
+ * (its title, its status, a failure, the answer, what it did, the limits,
+ * and the reactions), the files that it changed, and its conversation, as
+ * the run pane of a seat shows them. The person opened it, so the pane
+ * reads the run, and says so when the read wakes its worker.
+ */
+function DutyRunPane({ runId, who }: { runId: string; who: string }) {
+  const run = useSelect((s) => s.runs[runId]);
+  const res = useResult(runId);
+  const t = useTranscript(runId);
+  const archived = !!((res && res.archived) || (run && run.archived));
+  const wakes = useSelect((s) => awakeFor(selectFacts(s), s.runs[runId]) === false) && !archived;
+  const end = [...t.items].reverse().find((x) => x.kind === 'end');
+  const box = useRef<HTMLElement>(null);
+  // The pane opens in sight, below its line.
+  useEffect(() => {
+    const el = box.current;
+    if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'nearest' });
+  }, [runId]);
+  return (
+    <section class="duty-runpane" id={'duty-run-' + runId} aria-label={'The run of ' + who} ref={box}>
+      <RunView runId={runId} result={res} who={who} items={t.items} endSeq={end ? end.seq : undefined} gone={t.gone} archived={archived} wakes={wakes} />
+      {filesCount(res, t.items) > 0 && <FilesView runId={runId} result={res} items={t.items} gone={t.gone} archived={archived} />}
+      <Conversation run={run} result={res} t={t} agentLabel={who} />
+    </section>
   );
 }
 

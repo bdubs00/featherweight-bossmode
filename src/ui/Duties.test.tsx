@@ -263,7 +263,8 @@ describe('the page of a duty', () => {
     const runs = [...el.querySelectorAll('.duty-run')];
     expect(runs.length).toBe(3);
     expect(text(runs[0])).toContain('failed Found 2, woke the agent $0.04 The run reached its limit. Open the run');
-    expect(runs[0].querySelector('a.duty-run-link')!.getAttribute('href')).toBe('/ui#run/01KWOKE');
+    // The run opens under its line, in Bossmode.
+    expect(runs[0].querySelector('a.duty-run-link')!.getAttribute('href')).toBe('#duties/watch-p1/run/01KWOKE');
     expect(runs[0].querySelector('time')).toBeTruthy();
     expect(text(runs[1])).toContain('slept Found nothing');
     expect(runs[1].querySelector('a')).toBeNull();
@@ -295,7 +296,7 @@ describe('the page of a duty', () => {
     const runs = [...el.querySelectorAll('.duty-run')];
     expect(text(runs[0])).toContain('failed The queue of triage did not answer.');
     expect(runs[0].querySelector('a')).toBeNull();
-    expect(runs[1].querySelector('a.duty-run-link')!.getAttribute('href')).toBe('/ui#run/01KWOKE');
+    expect(runs[1].querySelector('a.duty-run-link')!.getAttribute('href')).toBe('#duties/watch-p1/run/01KWOKE');
   });
 
   it('says the check in its own words when the front gives no readback', async () => {
@@ -384,7 +385,7 @@ describe('the page of a duty', () => {
     expect(post.path).toBe('/v1/duties/daily-report/run');
     expect(post.headers['X-Time-Zone']).toBe(ZONE);
     expect(text(el.querySelector('.duty-said'))).toBe('A run started. Open the run');
-    expect(el.querySelector('.duty-said a')!.getAttribute('href')).toBe('/ui#run/01KNEW');
+    expect(el.querySelector('.duty-said a')!.getAttribute('href')).toBe('#duties/daily-report/run/01KNEW');
     click(keyNamed(el, 'Run now'));
     await settle();
     expect(text(el.querySelector('.duty-said'))).toBe('Skipped: The last run still works.');

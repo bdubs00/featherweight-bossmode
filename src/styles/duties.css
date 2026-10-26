@@ -573,3 +573,69 @@
   color: var(--muted);
   overflow-wrap: anywhere;
 }
+
+/* ---------- the held changes of 2026-10-26 ---------- */
+/* The tabs Duties and Playbooks under the header of the list. */
+.duty-tabs {
+  display: flex;
+  min-height: var(--h-row);
+  padding: 0 var(--s-4);
+  border-bottom: 1px solid var(--line-soft);
+}
+.duty-tabs .tabs {
+  align-self: stretch;
+}
+/* The first line of the answer of a run, on a line of its own under its run. */
+.duty-run-answer {
+  flex: 1 0 100%;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+/* A run of the history opens in a pane under its line. */
+.duty-run.open {
+  border-bottom-color: var(--line);
+}
+.duty-runpane {
+  flex: 1 0 100%;
+  min-width: 0;
+  margin-top: var(--s-2);
+  padding: 0 var(--s-3) var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--card);
+  font-size: var(--t-body);
+  line-height: var(--t-body-lh);
+}
+.duty-runpane .run-view {
+  padding: var(--s-3) 0 var(--s-4);
+}
+.duty-runpane .thread {
+  max-width: none;
+}
+/* The page of a playbook: its goal and its seats. */
+.book-goal {
+  margin: 0;
+}
+.book-seats {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.book-seat {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-2);
+  min-width: 0;
+}
+.book-seat-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.duty-form > .duty-sec > .duty-books {
+  margin: 0;
+}

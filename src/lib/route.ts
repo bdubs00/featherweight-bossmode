@@ -77,7 +77,7 @@ export type Route =
   | { place: 'appearance' }
   | { place: 'skills'; item?: SkillItem; add?: boolean }
   | { place: 'routines'; agent?: string; name?: string; tab?: RoutineTab; details?: boolean }
-  | { place: 'duties'; name?: string; edit?: boolean; fresh?: boolean; seed?: DutySeed }
+  | { place: 'duties'; name?: string; edit?: boolean; fresh?: boolean; seed?: DutySeed; run?: string; tab?: 'playbooks'; playbook?: string }
   | { place: 'pages'; path?: string; mode: 'tree' | 'read' | 'history' | 'edit' | 'create'; version?: number };
 
 /** The places of the app bar. */
@@ -142,9 +142,10 @@ export function parseRoute(hash: string): Route {
       return base;
     }
     // #duties is the list, #duties/new a new duty, #duties/<name> a duty,
-    // and #duties/<name>/edit its editor. A duty named new opens at
-    // #duties/new/, with the slash, so it never meets the new duty. A query
-    // after #duties/new holds what Make this a duty brought.
+    // #duties/<name>/edit its editor, and #duties/<name>/run/<run> a run of
+    // its history. A duty named new opens at #duties/new/, with the slash,
+    // so it never meets the new duty. A query after #duties/new holds what
+    // Make this a duty brought.
     case 'duties': {
       if (!rest[0]) return { place: 'duties' };
       if (/^new(\?|$)/.test(rest[0]) && rest.length === 1) {
@@ -152,8 +153,12 @@ export function parseRoute(hash: string): Route {
         return seed ? { place: 'duties', fresh: true, seed } : { place: 'duties', fresh: true };
       }
       const name = dec(rest[0]);
+      if (rest[1] === 'run' && rest[2]) return { place: 'duties', name, run: dec(rest[2]) };
       return rest[1] === 'edit' ? { place: 'duties', name, edit: true } : { place: 'duties', name };
     }
+    // #playbooks is the tab Playbooks of Duties, and #playbooks/<name> one playbook. A head of its own keeps any name free for a duty.
+    case 'playbooks':
+      return rest[0] ? { place: 'duties', tab: 'playbooks', playbook: dec(rest[0]) } : { place: 'duties', tab: 'playbooks' };
     case 'bridge': {
       if (!rest[0]) return { place: 'home' };
       const id = dec(rest[0]);
@@ -225,8 +230,10 @@ export function hrefOf(r: Route): string {
       return r.tab === 'evidence' || r.tab === 'runbook' ? base + '/' + r.tab : base;
     }
     case 'duties':
+      if (r.tab === 'playbooks') return '#playbooks' + (r.playbook ? '/' + encodeURIComponent(r.playbook) : '');
       if (r.fresh) return '#duties/new' + seedQuery(r.seed);
       if (!r.name) return '#duties';
+      if (r.run) return '#duties/' + encodeURIComponent(r.name) + '/run/' + encodeURIComponent(r.run);
       return '#duties/' + encodeURIComponent(r.name) + (r.edit ? '/edit' : r.name === 'new' ? '/' : '');
     case 'bridge': {
       const base = '#bridge/' + encodeURIComponent(r.id);
@@ -299,6 +306,7 @@ export function columnOf(r: Route): Column {
       if (r.name) return r.details ? 'details' : 'main';
       return 'list';
     case 'duties':
+      if (r.tab === 'playbooks') return r.playbook ? 'main' : 'list';
       return r.name || r.fresh ? 'main' : 'list';
     case 'chat':
       if (r.run) return r.details ? 'details' : 'main';
@@ -331,7 +339,8 @@ export function parentOf(r: Route): Route {
       if (r.agent && r.name && r.details) return { place: 'routines', agent: r.agent, name: r.name };
       return r.name ? { place: 'routines' } : { place: 'home' };
     case 'duties':
-      if (r.name && r.edit) return { place: 'duties', name: r.name };
+      if (r.tab === 'playbooks') return r.playbook ? { place: 'duties', tab: 'playbooks' } : { place: 'home' };
+      if (r.name && (r.edit || r.run)) return { place: 'duties', name: r.name };
       return r.name || r.fresh ? { place: 'duties' } : { place: 'home' };
     case 'chat':
       if (r.run && r.details) return { place: 'chat', run: r.run };

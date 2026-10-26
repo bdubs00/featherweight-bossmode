@@ -138,6 +138,11 @@ describe('routes', () => {
       // A duty named new keeps its own address, with the slash.
       ['#duties/new/', { place: 'duties', name: 'new' }],
       ['#duties/new/edit', { place: 'duties', name: 'new', edit: true }],
+      // A run of the history of a duty opens on the page of the duty.
+      ['#duties/daily-homelab-report/run/01KRUN', { place: 'duties', name: 'daily-homelab-report', run: '01KRUN' }],
+      // The tab Playbooks, and one playbook, under a head of their own.
+      ['#playbooks', { place: 'duties', tab: 'playbooks' }],
+      ['#playbooks/weekly-patching', { place: 'duties', tab: 'playbooks', playbook: 'weekly-patching' }],
     ];
     for (const [hash, route] of cases) {
       expect(parseRoute(hash)).toEqual(route);
@@ -153,6 +158,13 @@ describe('routes', () => {
     expect(parentOf({ place: 'duties', name: 'x' })).toEqual({ place: 'duties' });
     expect(parentOf({ place: 'duties', fresh: true })).toEqual({ place: 'duties' });
     expect(parentOf({ place: 'duties' })).toEqual({ place: 'home' });
+    expect(parentOf({ place: 'duties', name: 'x', run: 'r' })).toEqual({ place: 'duties', name: 'x' });
+    expect(columnOf({ place: 'duties', name: 'x', run: 'r' })).toBe('main');
+    expect(placeOf({ place: 'duties', tab: 'playbooks' })).toBe('duties');
+    expect(columnOf({ place: 'duties', tab: 'playbooks' })).toBe('list');
+    expect(columnOf({ place: 'duties', tab: 'playbooks', playbook: 'p' })).toBe('main');
+    expect(parentOf({ place: 'duties', tab: 'playbooks', playbook: 'p' })).toEqual({ place: 'duties', tab: 'playbooks' });
+    expect(parentOf({ place: 'duties', tab: 'playbooks' })).toEqual({ place: 'home' });
   });
 
   it('keeps what Make this a duty brought in a short query after #duties/new, so a reload keeps it', () => {

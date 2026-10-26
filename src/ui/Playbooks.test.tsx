@@ -6,7 +6,7 @@ import { forgetPlaybooks } from '../state/playbooks';
 import { playbookBodyOf } from '../lib/playbooks';
 import { Channel } from './Channel';
 import { NewBridge } from './NewBridge';
-import { clearSaid, currentSaid } from './notice';
+import { clearSaid, currentSaid, currentSaidLink } from './notice';
 import { bridge, seat } from './testkit-b';
 import { click, fakeApi, fieldOf, keyNamed, mount, settle, typeIn, unmountAll, type Call, type Route } from './testkit-c';
 
@@ -95,6 +95,8 @@ describe('a playbook from a bridge', () => {
     expect(document.activeElement!.getAttribute('aria-label')).toBe('More');
     // A short notice says that it worked.
     expect(currentSaid()).toBe('Saved the playbook Puppet to ansible.');
+    // The notice links to the page of the playbook, on the tab Playbooks of Duties.
+    expect(currentSaidLink()).toEqual({ label: 'See the playbook', href: '#playbooks/puppet-to-ansible' });
   });
 
   it('replaces a playbook of the same name with the revision that it read, and says when it changed in the meantime', async () => {

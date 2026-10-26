@@ -93,7 +93,8 @@ describe('Activity and the duties', () => {
     expect(main.querySelector('h1')!.textContent).toBe('scribe');
     expect(main.querySelector('.pane-head a.duty-chip')!.getAttribute('href')).toBe('#duties/daily-report');
     expect(main.querySelector('.inbox-reason')!.textContent).toBe('The run reached its limit of turns.');
-    expect(main.querySelector('a[href="/ui#run/run-x"]')!.textContent).toBe('Open the run');
+    // The run opens on the page of its duty, in Bossmode.
+    expect(main.querySelector('a[href="#duties/daily-report/run/run-x"]')!.textContent).toBe('Open the run');
   });
 
   it('links no run for a failed start that the queue never took, whose run is empty', async () => {
@@ -107,7 +108,7 @@ describe('Activity and the duties', () => {
     await settle();
     const main = el.querySelector('.inbox-main-pane')!;
     expect(main.querySelector('.inbox-reason')!.textContent).toBe('The queue of scribe did not answer.');
-    expect([...el.querySelectorAll('a')].some((a) => a.textContent === 'Open the run' || (a.getAttribute('href') || '').startsWith('/ui#run/'))).toBe(false);
+    expect([...el.querySelectorAll('a')].some((a) => a.textContent === 'Open the run' || (a.getAttribute('href') || '').includes('/run/'))).toBe(false);
     expect(api.calls.some((c) => c.path.startsWith('/v1/runs/'))).toBe(false);
   });
 

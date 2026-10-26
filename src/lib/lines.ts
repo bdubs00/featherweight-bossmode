@@ -41,6 +41,8 @@ export function whoName(who: string | undefined, me: Me, display?: string): stri
   if (w.toLowerCase() === 'somebody' || !w) return 'Someone';
   // A name that the backend writes as words, such as the front, starts the line with a capital.
   if (/^the /i.test(w)) return cap(w);
+  // The principal of the runs of a duty, such as duty:nightly-report, reads as the duty by its name in words.
+  if (/^duty:./i.test(w)) return 'The duty ' + cap(w.slice(5).replace(/[-_]+/g, ' ').trim());
   return personName(w, display);
 }
 

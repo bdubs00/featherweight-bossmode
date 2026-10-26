@@ -116,6 +116,8 @@ describe('isMe and whoName', () => {
     expect(whoName('bob@example.com', TOKEN)).toBe('bob');
     expect(whoName('somebody', TOKEN)).toBe('Someone');
     expect(whoName('the front', TOKEN)).toBe('The front');
+    // A run of a duty comes from the duty, by its name in words.
+    expect(whoName('duty:nightly-restore-test', TOKEN)).toBe('The duty Nightly restore test');
   });
 });
 

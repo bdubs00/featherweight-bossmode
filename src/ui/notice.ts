@@ -10,6 +10,8 @@ import { holdFocus } from './keys';
 
 let text = '';
 let said = '';
+/** The link of the sentence about an action that worked, such as See the playbook, or null. */
+let saidLink: SaidLink | null = null;
 let saidTimer: ReturnType<typeof setTimeout> | null = null;
 const listeners = new Set<() => void>();
 
@@ -30,10 +32,17 @@ export function showError(e: unknown): void {
   tell();
 }
 
-/** showSaid shows a short sentence about an action that worked, for SAID_MS, or until the person dismisses it. */
-export function showSaid(words: string): void {
+/** A link beside the sentence about an action that worked: its words and its address. */
+export interface SaidLink {
+  label: string;
+  href: string;
+}
+
+/** showSaid shows a short sentence about an action that worked, for SAID_MS, or until the person dismisses it. link leads to what the action made. */
+export function showSaid(words: string, link?: SaidLink): void {
   if (saidTimer) clearTimeout(saidTimer);
   said = words;
+  saidLink = link || null;
   saidTimer = setTimeout(clearSaid, SAID_MS);
   tell();
 }
@@ -41,6 +50,11 @@ export function showSaid(words: string): void {
 /** currentSaid is the sentence about an action that worked, or "" when none shows. */
 export function currentSaid(): string {
   return said;
+}
+
+/** currentSaidLink is the link of that sentence, or null. */
+export function currentSaidLink(): SaidLink | null {
+  return said ? saidLink : null;
 }
 
 /** clearSaid hides the sentence about an action that worked. */

@@ -1,22 +1,29 @@
 // The playbooks on the page. Save as playbook is a dialog of a bridge that
 // saves its goal, placement, seats, caps, and what the manager can do under
 // a name. The choice of a playbook serves New bridge and the action open of
-// a duty. Under that choice, a list shows the playbooks with Delete.
-// docs/CONTRACT.md, section 16, names the routes. The person names a
-// playbook in words, and the page makes its short name and shows it.
+// a duty. The tab Playbooks of Duties, at #playbooks, lists them, and the
+// page of a playbook, at #playbooks/<name>, shows its goal, its seats, how
+// its bridge runs, and the duties that open it, with Make a duty, Rename,
+// and Delete. docs/CONTRACT.md, section 16, names the routes. The person
+// names a playbook in words, and the page makes its short name and shows
+// it. The notice of a saved playbook links to its page.
 
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { api, type PlaybookBody } from '../api/routes';
 import { ApiError } from '../api/client';
-import type { Playbook } from '../api/types';
+import type { Caps, Delegation, Duty, Playbook } from '../api/types';
 import { keepsWords, playbookBodyOf, playbookLabel, playbookName, playbookReason } from '../lib/playbooks';
-import { slugOf, splitProblem, titleOfName } from '../lib/duties';
+import { dutyTitle, firstLine, listWords, slugOf, splitProblem, titleOfName } from '../lib/duties';
+import { go, hrefOf } from '../lib/route';
 import { membersOf } from '../state/reducer';
 import { useSelect } from '../state/store';
-import { loadPlaybooks, removePlaybook, savePlaybook, seatsOf, usePlaybooks } from '../state/playbooks';
-import { attempt, showSaid } from './notice';
-import { Confirm } from './common';
-import { Glyph } from './icons';
-import { Button, Field, Input } from './primitives';
+import { loadDuties, saveDuty, useDuties } from '../state/duties';
+import { loadPlaybooks, readPlaybook, removePlaybook, savePlaybook, seatsOf, usePlaybooks } from '../state/playbooks';
+import { useRoving } from './keys';
+import { attempt, showError, showSaid } from './notice';
+import { Confirm, Menu } from './common';
+import { EmptyPane } from './Shell';
+import { Button, Chip, Field, Find, Input, Mark, PaneHeader, Tabs } from './primitives';
 
 /** problemsOfError reads the problems of a 400 of the front, each in words, or the sentence of the error. */
 export function problemsOfError(e: unknown): string[] {
@@ -63,7 +70,7 @@ export function SavePlaybook({ bridge, confirm = 'Save playbook', onClose, onSav
       const body = playbookBodyOf(b, members);
       await savePlaybook(name, old && typeof old.revision === 'number' ? { ...body, revision: old.revision } : body);
       setBusy(false);
-      showSaid('Saved the playbook ' + titleOfName(name) + '.');
+      showSaid('Saved the playbook ' + titleOfName(name) + '.', { label: 'See the playbook', href: bookHref(name) });
       onClose();
       if (onSaved) onSaved(name);
       return;
@@ -129,61 +136,405 @@ export function PlaybookPick({ value, onChange, label = 'Playbook', error, empty
   );
 }
 
-/** PlaybookShelf lists the playbooks, each with its goal and its seats, and Delete after a dialog that asks first. */
+/** PlaybookShelf leads from the choice of a playbook to the tab Playbooks of Duties, where each playbook has its page with Rename and Delete. */
 export function PlaybookShelf() {
   const list = usePlaybooks((s) => s.list);
-  const [asking, setAsking] = useState<Playbook | null>(null);
-  const [busy, setBusy] = useState(false);
-  const head = useRef<HTMLElement>(null);
   if (!list || list.length === 0) return null;
   return (
-    <details class="advanced duty-books">
-      <summary ref={head}>
-        <Glyph name="back" size={16} />
-        See the playbooks
-      </summary>
-      <ul class="duty-book-list">
-        {list.map((p) => {
-          const n = seatsOf(p).length;
-          return (
-            <li class="duty-book">
-              <span class="duty-book-main">
-                <span class="t-sub">{titleOfName(p.name)}</span>
-                {p.goal && <span class="t-meta">{p.goal}</span>}
-                <span class="t-meta">{n === 1 ? '1 seat' : n + ' seats'}</span>
-              </span>
-              <Button size="s" kind="quiet" aria-label={'Delete ' + titleOfName(p.name)} onClick={() => setAsking(p)}>
-                Delete
-              </Button>
-            </li>
-          );
-        })}
-      </ul>
-      {asking && (
-        <Confirm
-          title={'Delete ' + titleOfName(asking.name) + '?'}
-          confirm="Delete"
-          danger
-          busy={busy}
-          onCancel={() => setAsking(null)}
-          onConfirm={async () => {
-            setBusy(true);
-            const ok = await attempt(() => removePlaybook(asking.name));
-            setBusy(false);
-            if (ok) {
-              setAsking(null);
-              showSaid('Deleted the playbook ' + titleOfName(asking.name) + '.');
-              // Its row and its key are gone, so the focus goes to the head of the list.
-              setTimeout(() => {
-                const a = document.activeElement;
-                if (head.current && (!a || a === document.body)) head.current.focus();
-              }, 0);
-            }
-          }}
-        >
-          <p>A duty that opens a bridge from it stops until you pick another playbook.</p>
-        </Confirm>
-      )}
-    </details>
+    <p class="duty-books">
+      <a href={hrefOf({ place: 'duties', tab: 'playbooks' })}>See the playbooks</a>
+    </p>
   );
+}
+
+/* ---------- the tab Playbooks of Duties ---------- */
+
+/** DutyTabs switch the list of the Duties place between its duties and its playbooks. */
+export function DutyTabs({ current }: { current: 'duties' | 'playbooks' }) {
+  return (
+    <div class="duty-tabs">
+      <Tabs
+        label="Duties and playbooks"
+        current={current}
+        items={[
+          { id: 'duties', label: 'Duties', href: hrefOf({ place: 'duties' }) },
+          { id: 'playbooks', label: 'Playbooks', href: hrefOf({ place: 'duties', tab: 'playbooks' }) },
+        ]}
+      />
+    </div>
+  );
+}
+
+const bookHref = (name: string) => hrefOf({ place: 'duties', tab: 'playbooks', playbook: name });
+
+/** usersOf names the duties that open a bridge from a playbook, among the duties that the page lists. */
+const usersOf = (duties: Duty[] | null, name: string): Duty[] => (duties || []).filter((d) => !!(d.do && d.do.open && d.do.open.playbook === name));
+
+/** matchesBook reports whether a playbook holds the words of a search, in its name or its goal. */
+const matchesBook = (p: Playbook, q: string) => [titleOfName(p.name), p.name, p.goal || ''].some((x) => x.toLowerCase().includes(q.toLowerCase()));
+
+/** PlaybookList is the list pane of the tab Playbooks: each playbook with the first line of its goal and its seats. */
+export function PlaybookList({ current }: { current?: string }) {
+  const list = usePlaybooks((s) => s.list);
+  const off = usePlaybooks((s) => s.off);
+  const error = usePlaybooks((s) => s.error);
+  const [q, setQ] = useState('');
+  const rows = useRoving<HTMLDivElement>();
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    loadPlaybooks().catch(() => {});
+  }, []);
+  const words = q.trim();
+  const shown = (list || []).filter((p) => !words || matchesBook(p, words));
+  const count = list ? list.length : 0;
+  return (
+    <section class="screen duty-list book-list" aria-labelledby="books-title">
+      <PaneHeader id="books-title" title="Playbooks" headingRef={heading} focusable count={list && !off ? count : undefined} countLabel={count === 1 ? '1 playbook' : count + ' playbooks'} />
+      <DutyTabs current="playbooks" />
+      {count > 0 && (
+        <div class="list-find">
+          <Find label="Find a playbook" value={q} onInput={setQ} />
+        </div>
+      )}
+      <div class="scroll" ref={rows}>
+        <div role="list" class="duty-rows">
+          {shown.map((p) => {
+            const seats = seatsOf(p);
+            const on = p.name === current;
+            const goal = firstLine(p.goal || '');
+            return (
+              <div role="listitem">
+                <a class={'duty-row' + (on ? ' sel' : '')} href={bookHref(p.name)} data-item aria-current={on ? 'page' : undefined}>
+                  {seats[0] ? <Mark agent={seats[0].agent} size={32} selected={on} /> : <span class="mark s32 mark-empty" aria-hidden="true" />}
+                  <span class="duty-row-main">
+                    <span class="duty-row-top">
+                      <span class="duty-row-title">{titleOfName(p.name)}</span>
+                    </span>
+                    {goal && <span class="duty-row-when">{goal}</span>}
+                    <span class="duty-row-meta">
+                      <span>{seats.length === 1 ? '1 seat' : seats.length + ' seats'}</span>
+                    </span>
+                  </span>
+                </a>
+              </div>
+            );
+          })}
+        </div>
+        {!list && !error && <p class="empty">Loading the playbooks.</p>}
+        {error && !list && (
+          <p class="empty" role="alert">
+            {error}
+          </p>
+        )}
+        {off && <p class="empty">This workbench keeps no playbooks.</p>}
+        {list && !off && count === 0 && (
+          <div class="empty">
+            <p>No playbook yet. Save one from a bridge: open More, then Save as playbook.</p>
+          </div>
+        )}
+        {list && words && count > 0 && shown.length === 0 && <p class="empty">No playbook holds those words.</p>}
+      </div>
+    </section>
+  );
+}
+
+/** The words of the placement of a bridge, as New bridge says them. */
+const PLACEMENT_WORDS: Record<string, string> = { queue: 'Keep warm workers', spawn: 'Fresh sandbox per seat' };
+
+/** The words of the caps of a bridge and of what the manager can do, as New bridge says them. */
+const CAP_WORDS: [keyof Caps, string][] = [
+  ['maxMessages', 'Most messages'],
+  ['maxTurns', 'Most turns'],
+  ['maxFanoutPerMinute', 'Most messages a minute'],
+  ['maxPairMessages', 'Most messages between two members'],
+];
+const MANAGER_WORDS: [keyof Delegation, string][] = [
+  ['approve', 'Decide for members'],
+  ['budget', 'Change the budgets of members'],
+  ['members', 'Add and remove members'],
+  ['report', 'Write a report on close'],
+];
+
+/** PlaybookMain is the main pane of the tab Playbooks: one playbook, or, without one, the first playbook where two panes show. */
+export function PlaybookMain({ name }: { name?: string }) {
+  if (name) return <PlaybookView name={name} />;
+  return <PlaybookHome />;
+}
+
+function PlaybookHome() {
+  const list = usePlaybooks((s) => s.list);
+  const off = usePlaybooks((s) => s.off);
+  const first = list && list.length ? list[0].name : '';
+  useEffect(() => {
+    if (first && typeof window.matchMedia === 'function' && window.matchMedia(TWO_PANES).matches) go(bookHref(first), true);
+  }, [first]);
+  return (
+    <EmptyPane back={{ href: hrefOf({ place: 'duties', tab: 'playbooks' }), label: 'Playbooks' }}>
+      <p>{off ? 'This workbench keeps no playbooks.' : !list ? 'Loading the playbooks.' : list.length === 0 ? PLAYBOOK_IS : 'Pick a playbook.'}</p>
+    </EmptyPane>
+  );
+}
+
+/** PLAYBOOK_IS says what a playbook is, on the empty tab. */
+export const PLAYBOOK_IS = 'A playbook is a bridge that you saved to open again: its goal, its seats, and its caps.';
+
+/** The width from which two panes show side by side, as App names it. */
+const TWO_PANES = '(min-width: 800px)';
+
+/**
+ * PlaybookView is the page of one playbook: its goal, its seats, how its
+ * bridge runs, and the duties that open a bridge from it, with Make a duty
+ * and, in More, Rename and Delete. The page reads the playbook whole for
+ * its caps and what the manager can do.
+ */
+function PlaybookView({ name }: { name: string }) {
+  const listed = usePlaybooks((s) => (s.list ? s.list.find((p) => p.name === name) : undefined));
+  const loaded = usePlaybooks((s) => !!s.list);
+  const duties = useDuties((s) => s.list);
+  const [whole, setWhole] = useState<Playbook | null>(null);
+  const [failed, setFailed] = useState('');
+  const [asking, setAsking] = useState<'rename' | 'delete' | null>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    setWhole(null);
+    setFailed('');
+    setAsking(null);
+    loadPlaybooks().catch(() => {});
+    loadDuties().catch(() => {});
+    readPlaybook(name).then(setWhole, (e) => setFailed(e instanceof ApiError && e.status === 404 ? 'gone' : e instanceof Error ? e.message : 'The action failed. Try it again.'));
+  }, [name]);
+  // A page that a move opens gives its heading the focus that fell to the body.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const a = document.activeElement;
+      if (heading.current && (!a || a === document.body)) heading.current.focus();
+    }, 0);
+    return () => clearTimeout(t);
+  }, [name, !!(whole || listed)]);
+  const p = whole || listed;
+  const title = titleOfName(name);
+  const back = { href: hrefOf({ place: 'duties', tab: 'playbooks' }), label: 'Playbooks', to: 'list' as const };
+  if (!p) {
+    return (
+      <section class="screen duty book" aria-labelledby="book-title">
+        <PaneHeader id="book-title" title={title} size="title" level={1} back={back} headingRef={heading} focusable />
+        <div class="empty center">
+          <p>{failed === 'gone' || (loaded && failed) ? 'This playbook is not here. It was removed, or you cannot see it.' : failed || 'Loading the playbook.'}</p>
+        </div>
+      </section>
+    );
+  }
+  const seats = seatsOf(p);
+  const users = usersOf(duties, name);
+  const caps = CAP_WORDS.filter(([k]) => p.caps && typeof p.caps[k] === 'number' && (p.caps[k] as number) > 0);
+  const manager = MANAGER_WORDS.filter(([k]) => p.delegation && p.delegation[k]);
+  const seed = { act: 'open' as const, playbook: name, agent: seats[0] ? seats[0].agent : undefined };
+  return (
+    <section class="screen duty book" aria-labelledby="book-title">
+      <PaneHeader id="book-title" title={<span title={title}>{title}</span>} size="title" level={1} back={back} headingRef={heading} focusable />
+      <div class="scroll pad duty-body">
+        <div class="duty-keys">
+          <Button size="s" href={hrefOf({ place: 'duties', fresh: true, seed })}>
+            Make a duty
+          </Button>
+          <Menu
+            label="More"
+            kind="secondary"
+            items={[
+              { label: 'Rename', onSelect: () => setAsking('rename') },
+              { label: 'Delete', danger: true, onSelect: () => setAsking('delete') },
+            ]}
+          />
+        </div>
+        <section class="duty-sec" aria-labelledby="book-goal">
+          <h2 class="t-sub duty-sec-head" id="book-goal">
+            Goal
+          </h2>
+          {p.goal ? <p class="duty-message book-goal">{p.goal}</p> : <p class="t-meta">No goal.</p>}
+        </section>
+        <section class="duty-sec" aria-labelledby="book-seats">
+          <h2 class="t-sub duty-sec-head" id="book-seats">
+            Seats <Chip label={seats.length === 1 ? '1 seat' : seats.length + ' seats'}>{seats.length}</Chip>
+          </h2>
+          <ul class="book-seats">
+            {seats.map((m) => (
+              <li class="book-seat">
+                <Mark agent={m.agent} size={24} />
+                <span class="book-seat-main">
+                  <span class="t-sub">{m.handle}</span>
+                  {m.task && <span class="t-meta">{firstLine(m.task)}</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+        <section class="duty-sec" aria-labelledby="book-runs">
+          <h2 class="t-sub duty-sec-head" id="book-runs">
+            How its bridge runs
+          </h2>
+          <ul class="duty-lines">
+            <li>{PLACEMENT_WORDS[p.placement] || PLACEMENT_WORDS.queue}</li>
+            {caps.map(([k, w]) => (
+              <li>{w + ': ' + (p.caps as Partial<Caps>)[k]}</li>
+            ))}
+            {whole && <li>{manager.length ? 'The manager can: ' + manager.map(([, w]) => w.toLowerCase()).join(', ') + '.' : 'The manager decides nothing for the members.'}</li>}
+          </ul>
+        </section>
+        <section class="duty-sec" aria-labelledby="book-users">
+          <h2 class="t-sub duty-sec-head" id="book-users">
+            Duties that open it <Chip label={users.length === 1 ? '1 duty' : users.length + ' duties'}>{users.length}</Chip>
+          </h2>
+          {users.length === 0 ? (
+            <p class="t-meta">No duty opens a bridge from it.</p>
+          ) : (
+            <ul class="prof-duties">
+              {users.map((d) => (
+                <li>
+                  <a class="prof-link" href={hrefOf({ place: 'duties', name: d.name })}>
+                    {dutyTitle(d)}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
+      {asking === 'rename' && <RenamePlaybook name={name} users={users} onClose={() => setAsking(null)} />}
+      {asking === 'delete' && (
+        <DeletePlaybook
+          name={name}
+          users={users}
+          onClose={() => setAsking(null)}
+          onDone={() => {
+            go(hrefOf({ place: 'duties', tab: 'playbooks' }));
+            setTimeout(() => {
+              const h = document.getElementById('books-title');
+              const a = document.activeElement;
+              if (h && (!a || a === document.body)) h.focus();
+            }, 0);
+          }}
+        />
+      )}
+    </section>
+  );
+}
+
+/** usersWords says how many duties open a bridge from a playbook. */
+const usersWords = (n: number) => (n === 1 ? '1 duty opens a bridge from it.' : n + ' duties open a bridge from it.');
+
+/** DeletePlaybook asks before it deletes a playbook, and says what a duty that opens a bridge from it does then. */
+function DeletePlaybook({ name, users, onClose, onDone }: { name: string; users: Duty[]; onClose: () => void; onDone: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const title = titleOfName(name);
+  return (
+    <Confirm
+      title={'Delete ' + title + '?'}
+      confirm="Delete"
+      danger
+      busy={busy}
+      onCancel={onClose}
+      onConfirm={async () => {
+        setBusy(true);
+        const ok = await attempt(() => removePlaybook(name));
+        setBusy(false);
+        if (!ok) return;
+        onClose();
+        showSaid('Deleted the playbook ' + title + '.');
+        onDone();
+      }}
+    >
+      {users.length > 0 && <p>{usersWords(users.length)}</p>}
+      <p>A duty that opens a bridge from it stops until you pick another playbook.</p>
+    </Confirm>
+  );
+}
+
+/**
+ * RenamePlaybook gives a playbook a new name. The server keys a playbook by
+ * its name, so the page saves it whole under the new name, moves each duty
+ * that opens a bridge from it to the new name, and then deletes the old
+ * name. A duty that does not move keeps the old playbook, and the page
+ * says which one.
+ */
+function RenamePlaybook({ name, users, onClose }: { name: string; users: Duty[]; onClose: () => void }) {
+  const list = usePlaybooks((s) => s.list);
+  const [words, setWords] = useState(() => titleOfName(name));
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const next = slugOf(words);
+  const save = async () => {
+    const why = words.trim() && !next ? 'A name needs at least one letter from a to z, or a digit.' : playbookReason(next);
+    if (why) {
+      setError(why);
+      return;
+    }
+    if (next === name) {
+      onClose();
+      return;
+    }
+    if ((list || []).some((p) => p.name === next)) {
+      setError('A playbook of this name exists. Pick another name.');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      const whole = await readPlaybook(name);
+      await savePlaybook(next, bodyOfPlaybook(whole));
+    } catch (e) {
+      setBusy(false);
+      setError(problemsOfError(e).join(' '));
+      return;
+    }
+    // Each duty that opens a bridge from the playbook moves to the new name, with the revision that it has now.
+    const stuck: string[] = [];
+    for (const d of users) {
+      try {
+        const now = await api.duty(d.name);
+        await saveDuty(d.name, { ...now, do: { ...now.do, open: { ...(now.do.open || { playbook: name }), playbook: next } } });
+      } catch {
+        stuck.push(dutyTitle(d));
+      }
+    }
+    setBusy(false);
+    onClose();
+    const newTitle = titleOfName(next);
+    if (stuck.length) {
+      showError(new Error('Saved the playbook as ' + newTitle + '. ' + listWords(stuck) + (stuck.length === 1 ? ' still opens' : ' still open') + ' a bridge from ' + titleOfName(name) + ', so that playbook stays too.'));
+    } else {
+      const ok = await attempt(() => removePlaybook(name));
+      if (ok) showSaid('Renamed the playbook to ' + newTitle + '.', { label: 'See the playbook', href: bookHref(next) });
+    }
+    go(bookHref(next));
+  };
+  return (
+    <Confirm title={'Rename ' + titleOfName(name)} confirm="Rename" busy={busy} onCancel={onClose} onConfirm={save}>
+      <Field label="Name" error={error}>
+        <Input
+          value={words}
+          maxLength={80}
+          invalid={!!error}
+          aria-describedby={next && !error ? 'rename-slug' : undefined}
+          onInput={(e) => {
+            setWords((e.target as HTMLInputElement).value);
+            setError('');
+          }}
+        />
+        {next && !error && (
+          <span class="t-meta duty-slug" id="rename-slug">
+            It saves as {next}.
+          </span>
+        )}
+      </Field>
+      {users.length > 0 && <p>{users.length === 1 ? 'The duty that opens a bridge from it moves to the new name.' : 'The ' + users.length + ' duties that open a bridge from it move to the new name.'}</p>}
+    </Confirm>
+  );
+}
+
+/** bodyOfPlaybook is the body of a save of a playbook that the page read: everything but its name, revision, owner, and time. */
+function bodyOfPlaybook(p: Playbook): PlaybookBody {
+  const body: PlaybookBody = { goal: p.goal || '', placement: p.placement || 'queue', seats: seatsOf(p).map((m) => ({ handle: m.handle, agent: m.agent, task: m.task })) };
+  if (p.caps && Object.keys(p.caps).length) body.caps = p.caps;
+  if (p.delegation && Object.keys(p.delegation).length) body.delegation = p.delegation;
+  return body;
 }

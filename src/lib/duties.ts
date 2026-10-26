@@ -8,7 +8,7 @@
 import type { CheckFirst, CheckFound, CheckWhere, Day, Duty, DutyDecided, DutyDo, DutyEvent, DutyProblem, DutyRecord, DutyRun, DutySecret, Repeat, Schedule, Tool } from '../api/types';
 import type { Light } from './presence';
 import { costText } from './cost';
-import { personName } from './words';
+import { personName, plainText } from './words';
 import type { DutySeed } from './route';
 import { globMatch } from './glob';
 
@@ -534,6 +534,23 @@ export function firstLine(text: string): string {
   const c = sentence.slice(0, 80);
   const space = c.lastIndexOf(' ');
   return (space > 40 ? c.slice(0, space) : c) + '…';
+}
+
+/**
+ * answerLine is the first line of the answer of a run, as a line of the
+ * history shows it: the first line with words, without the marks of
+ * Markdown, cut at a word past 100 characters.
+ */
+export function answerLine(output: string): string {
+  const line = String(output || '')
+    .split('\n')
+    .map((l) => plainText(l))
+    .find((l) => /[A-Za-z0-9]/.test(l));
+  if (!line) return '';
+  if (line.length <= 100) return line;
+  const c = line.slice(0, 100);
+  const space = c.lastIndexOf(' ');
+  return (space > 50 ? c.slice(0, space) : c) + '…';
 }
 
 /** titleOfName makes a name into words: daily-homelab-report is Daily homelab report. */

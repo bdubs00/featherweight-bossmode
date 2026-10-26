@@ -252,14 +252,11 @@ describe('What', () => {
     expect(document.querySelector('dialog.confirm')).toBeTruthy();
   });
 
-  it('opens a bridge from a playbook, with a goal and the turns of the bridge, and deletes a playbook after it asks', async () => {
-    // A route of 204 answers no body.
-    const del: Route = () => ({ status: 204 });
+  it('opens a bridge from a playbook, with a goal and the turns of the bridge, and leads to the tab Playbooks', async () => {
     api = fakeApi({
       'GET /v1/duties': { duties: [], paused: false },
       'GET /v1/duties/options': ALL,
       'GET /v1/playbooks': { playbooks: [{ name: 'weekly-patching', goal: 'Patch the lab hosts and report.', placement: 'queue', seats: [{ handle: 'patcher', agent: 'migrator', task: 'Patch.' }], revision: 3, updatedAt: '2026-10-20T10:00:00Z' }] },
-      'DELETE /v1/playbooks/weekly-patching': del,
       'PUT /v1/duties/new?dryRun=true': dry(),
       // The first save of the front finds the turns of the bridge too few, by its path.
       'PUT /v1/duties/patch?dryRun=true': (c: Call, n: number) => ({ body: { duty: c.body, readback: READBACK, next: [], problems: n === 1 ? ['limits.budget.maxTurns: A bridge of this playbook needs at least 20 turns.'] : [] } }),
@@ -300,16 +297,9 @@ describe('What', () => {
     expect((lastPut().body as DutyRecord).limits).toEqual({ budget: { maxTurns: 40 }, overlap: 'skip', catchUp: '1h' });
     expect(text(document.querySelector('dialog.confirm'))).toContain('The bridge gets at most 40 turns.');
     click(keyNamed(document.querySelector('dialog.confirm')!, 'Cancel'));
-    // The list of the playbooks, with Delete after a dialog that asks first.
-    const shelf = el.querySelector('details.duty-books') as HTMLDetailsElement;
-    expect(text(shelf.querySelector('.duty-book'))).toBe('Weekly patching Patch the lab hosts and report. 1 seat Delete');
-    click(shelf.querySelector('button[aria-label="Delete Weekly patching"]'));
-    const ask = document.querySelector('dialog.confirm')!;
-    expect(text(ask.querySelector('h2'))).toBe('Delete Weekly patching?');
-    click(keyNamed(ask, 'Delete'));
-    await settle();
-    expect(api.calls.some((c) => c.method === 'DELETE' && c.path === '/v1/playbooks/weekly-patching')).toBe(true);
-    expect(el.querySelector('details.duty-books')).toBeNull();
+    // The playbooks have a tab of their own, with Rename and Delete.
+    expect(el.querySelector('.duty-books a')!.getAttribute('href')).toBe('#playbooks');
+    expect(el.querySelector('.duty-books')!.textContent).toBe('See the playbooks');
   });
 
   it('asks the manager with a message', async () => {

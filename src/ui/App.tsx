@@ -25,7 +25,7 @@ import { dismissBuild, useNewBuild } from '../lib/build';
 import { applyTheme, themeOf } from '../lib/theme';
 import { canonicalPath, columnOf, go, parentOf, parseRoute, placeOf, type Place, type Route } from '../lib/route';
 import { isTyping } from './keys';
-import { clearNotice, clearSaid, showError, useNotice, useSaid } from './notice';
+import { clearNotice, clearSaid, currentSaidLink, showError, useNotice, useSaid } from './notice';
 import { EmptyPane, Shell, shownOf } from './Shell';
 import { BridgeList } from './BridgeList';
 import { Channel } from './Channel';
@@ -44,6 +44,7 @@ import { Appearance } from './Appearance';
 import { SkillActions, SkillList, SkillMain } from './Skills';
 import { RoutineAgent, RoutineList, RoutineMain } from './Routines';
 import { DutyList, DutyMain } from './Duties';
+import { PlaybookList, PlaybookMain } from './Playbooks';
 import { Signin } from './Signin';
 import { Button, Card, Led } from './primitives';
 
@@ -191,7 +192,7 @@ function panesOf(r: Route): Panes {
         details: r.agent && r.name ? <RoutineAgent agent={r.agent} name={r.name} /> : null,
       };
     case 'duties':
-      return { list: <DutyList current={r.name} />, main: <DutyMain name={r.name} edit={r.edit} fresh={r.fresh} seed={r.seed} />, details: null };
+      return r.tab === 'playbooks' ? { list: <PlaybookList current={r.playbook} />, main: <PlaybookMain name={r.playbook} />, details: null } : { list: <DutyList current={r.name} />, main: <DutyMain name={r.name} edit={r.edit} fresh={r.fresh} seed={r.seed} run={r.run} />, details: null };
     case 'pages': {
       let main: ComponentChildren;
       if (r.mode === 'create') main = <PageEditor path={r.path} create />;
@@ -230,9 +231,15 @@ function Notice({ text }: { text: string }) {
 
 /** Said is the notice of an action that worked: its sentence, with Dismiss. It goes by itself after a few seconds. */
 function Said({ text }: { text: string }) {
+  const link = currentSaidLink();
   return (
     <div class="notice" role="status">
       <p>{text}</p>
+      {link && (
+        <Button kind="secondary" size="s" href={link.href} onClick={clearSaid}>
+          {link.label}
+        </Button>
+      )}
       <Button kind="quiet" size="s" onClick={clearSaid}>
         Dismiss
       </Button>

@@ -1003,6 +1003,21 @@ stands for a value.
 | `Open the duty <name>` (the tooltip of the chip of a duty in Activity) | change | `Open the duty <name in words>` | done |
 | the grey lights `not run yet`, `paused`, and `finished` | change | the same words, with a hollow light for not run yet and the two bars of a pause for paused | done |
 
+### The held changes of 2026-10-26: the run of a duty (D6) and the tab Playbooks (D9)
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `Open the run`, a link to the dashboard at /ui, in the history, after Run now, and on a row of a duty in Activity | change | `Open the run` opens the run in a pane under its line of the history, at `#duties/<name>/run/<run>`: its title, its status, a failure, the answer, What it did, the limits, the reactions, the files, and the conversation, as the run pane of a seat shows them. Its key then says `Hide the run`. No link of a duty leads to /ui. | done |
+| new | add | the first line of the answer of a run, under its line of the history, without the marks of Markdown, cut at a word past 100 characters. The page reads it from the run, which wakes no worker. | done |
+| `duty:nightly-report` (the sender of the first message of a run of a duty) | change | `The duty Nightly report` | done |
+| `See the playbooks` with the list, its goals, its seats, and Delete, under the choice of a playbook of a duty | change | `See the playbooks`, a link to the tab Playbooks | done |
+| new | add | the tabs `Duties` and `Playbooks` under the header of the list of Duties, named `Duties and playbooks` for a screen reader | done |
+| new | add | the list `Playbooks` with its count chip, `Find a playbook`, each playbook with the first line of its goal and `1 seat` or `<n> seats`, and `Loading the playbooks.`, `This workbench keeps no playbooks.`, `No playbook yet. Save one from a bridge: open More, then Save as playbook.`, `No playbook holds those words.` | done |
+| new | add | the page of a playbook: `Goal` (or `No goal.`), `Seats` with each handle and the first line of its task, `How its bridge runs` with `Keep warm workers` or `Fresh sandbox per seat`, each cap as `Most turns: 40`, and `The manager can: decide for members, write a report on close.` or `The manager decides nothing for the members.`, then `Duties that open it` with a link to each, or `No duty opens a bridge from it.` The key `Make a duty`, and in More `Rename` and `Delete`. An empty tab says `A playbook is a bridge that you saved to open again: its goal, its seats, and its caps.`, and a gone one `This playbook is not here. It was removed, or you cannot see it.` | done |
+| new | add | the dialog `Rename <title>` with `Name`, `It saves as <short name>.`, `The duty that opens a bridge from it moves to the new name.` or `The <n> duties that open a bridge from it move to the new name.`, the key `Rename`, the error `A playbook of this name exists. Pick another name.`, the notice `Renamed the playbook to <title>.`, and `Saved the playbook as <title>. <duty> still opens a bridge from <old title>, so that playbook stays too.` when a duty does not move | done |
+| the dialog `Delete <title>?` | change | adds `1 duty opens a bridge from it.` or `<n> duties open a bridge from it.` before `A duty that opens a bridge from it stops until you pick another playbook.` | done |
+| `Saved the playbook <name>.` | change | the same, with the key `See the playbook`, which opens its page | done |
+
 ## 10. Packages
 
 The section uses the words package, Python package, and Program. These

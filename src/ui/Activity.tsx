@@ -495,9 +495,9 @@ export function ActivityMain({ item }: { item?: string }) {
                 {word && <Led tone={tone || 'grey'} word={word} />}
                 {r.reason && <span class="inbox-reason">{r.reason}</span>}
               </p>
-              {r.run && (
+              {r.run && r.duty && (
                 <p>
-                  <a href={'/ui#run/' + encodeURIComponent(r.run)}>Open the run</a>
+                  <a href={hrefOf({ place: 'duties', name: r.duty, run: r.run })}>Open the run</a>
                 </p>
               )}
             </div>
