@@ -97,7 +97,7 @@ describe('the Chat place', () => {
     configure(CHAT);
     const el = mount(<ChatList current="run-chat-1" />);
     await vi.waitFor(() => expect(el.querySelectorAll('.chat-row').length).toBe(1));
-    expect(calls.find((c) => c.path.startsWith('/v1/fleet/runs'))!.path).toBe('/v1/fleet/runs?agent=chat&principal=alice%40example.com');
+    expect(calls.find((c) => c.path.startsWith('/v1/fleet/runs'))!.path).toBe('/v1/fleet/runs?agent=chat&principal=alice%40example.com&hidden=true');
     const row = el.querySelector('.chat-row')!;
     expect(row.querySelector('.brow-title')!.textContent).toBe('Summarize the notes');
     expect(row.querySelector('.status-word')!.textContent).toBe('answered');

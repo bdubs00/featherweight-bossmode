@@ -3,7 +3,7 @@ import { act } from 'preact/test-utils';
 import { store } from '../state/store';
 import { forgetManagerRun } from '../state/actions';
 import type { BossConfig, Item, Run } from '../api/types';
-import { Manager, ManagerDot, POLL_MS, forgetSeen, markSeen, unreadOf } from './Manager';
+import { Manager, ManagerDot, POLL_MS, SEEN_KEY, forgetSeen, forgetSeenCache, markSeen, unreadOf } from './Manager';
 import { blocksOf } from './Conversation';
 import { parseSlash } from '../lib/mention';
 import { click, fakeApi, keyNamed, mount, problem, settle, typeIn, unmountAll } from './testkit-c';
@@ -305,6 +305,18 @@ describe('the answers of the manager that the person has not opened', () => {
     expect(bar.querySelector('.place-dot')!.textContent).toBe('The manager answered.');
     act(() => markSeen(store.get().runs['run-dot']));
     expect(bar.querySelector('.place-dot')).toBeNull();
+    forgetSeen();
+  });
+
+  it('read the conversations when the page starts, so an answer that came while the page was closed lights the place', async () => {
+    forgetSeen();
+    // The person saw run-late at seq 2 before the page closed; the manager answered later.
+    localStorage.setItem(SEEN_KEY, JSON.stringify({ 'run-late': 2 }));
+    forgetSeenCache();
+    api = fakeApi({ 'GET /v1/fleet/runs': { runs: [conv('run-late', 'completed', 6, { output: 'Done.' })] } });
+    const bar = mount(<ManagerDot />);
+    await vi.waitFor(() => expect(api.calls.some((c) => c.path.startsWith('/v1/fleet/runs?agent=manager'))).toBe(true));
+    await vi.waitFor(() => expect(bar.querySelector('.place-dot')).not.toBeNull());
     forgetSeen();
   });
 });

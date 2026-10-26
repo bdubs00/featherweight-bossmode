@@ -8,7 +8,7 @@ import { NO_PATCH, conversationsOf, FIND_PAST_FROM, PastConversations, patchConv
 import { Manager, ManagerList } from './Manager';
 import { AgentChat } from './Fleet';
 import { click, fakeApi, keyNamed, mount, problem, settle, typeIn, unmountAll } from './testkit-c';
-import { clearNotice } from './notice';
+import { clearNotice, currentSaid, undoSaid } from './notice';
 
 const ME = 'alice@example.com';
 const day = (d: number, h = 9) => new Date(Date.UTC(2026, 9, d, h)).toISOString();
@@ -72,7 +72,7 @@ describe('the past conversations', () => {
     api = fakeApi(listing([conv('run-new', { title: 'Plan the k3s upgrade', createdAt: day(22) }), conv('run-old', { title: 'Which hosts run Proxmox?', createdAt: day(20) }), conv('run-bridge', { metadata: { 'fw.batch': 'bridge:01x' } })]));
     let el = mount(<ManagerList />);
     await settle();
-    expect(api.calls.some((c) => c.path === '/v1/fleet/runs?agent=manager&principal=alice%40example.com&limit=200')).toBe(true);
+    expect(api.calls.some((c) => c.path === '/v1/fleet/runs?agent=manager&principal=alice%40example.com&limit=200&hidden=true')).toBe(true);
     expect(el.querySelector('#manager-list-title')!.textContent).toContain('Manager');
     expect([...el.querySelectorAll('.chip .sr')].map((x) => x.textContent)).toEqual(['2 conversations']);
     const rows = [...el.querySelectorAll('a.chat-row')];
@@ -130,12 +130,43 @@ describe('the past conversations', () => {
     click(row.querySelector('button[aria-label="More for Delete me"]'));
     click([...row.querySelectorAll('[role="menu"] button')].find((b) => b.textContent === 'Delete'));
     const dialog = document.querySelector('dialog.confirm')!;
-    expect(dialog.querySelector('h2')!.textContent).toBe('Delete Delete me?');
-    expect(dialog.textContent).toContain('It leaves your lists. The agent keeps no copy of it, and the archive of the server keeps it.');
+    expect(dialog.querySelector('h2')!.textContent).toBe('Delete this conversation?');
+    expect(dialog.textContent).toContain('\u201cDelete me\u201d leaves your lists. An admin can still read it.');
     click([...dialog.querySelectorAll('button')].find((b) => b.textContent === 'Delete'));
     await settle();
     expect(api.calls.find((c) => c.method === 'PATCH')).toMatchObject({ path: '/v1/conversations/run-del', body: { hidden: true } });
     expect(el.textContent).not.toContain('Delete me');
+    // The notice takes the delete back: the conversation comes back to the list.
+    expect(currentSaid()).toBe('Deleted.');
+    act(() => undoSaid());
+    await settle();
+    expect(api.calls.filter((c) => c.method === 'PATCH').map((c) => c.body)).toEqual([{ hidden: true }, { hidden: false }]);
+    expect(el.textContent).toContain('Delete me');
+  });
+
+  it('say that a conversation opened by its link is deleted, and put it back', async () => {
+    api = fakeApi({ ...listing([conv('run-new')]), 'GET /v1/runs/run-hid': conv('run-hid'), 'GET /v1/runs/run-hid/transcript': { run: conv('run-hid'), items: [], next: 0, prev: 0 }, 'GET /v1/runs/run-hid/result': {}, 'PATCH /v1/conversations/run-hid': () => ({ status: 204 }) });
+    // A list with the deleted ones marks it hidden.
+    act(() => store.dispatch({ type: 'manager-chats', runs: [conv('run-new'), conv('run-hid', { hidden: true })] }));
+    const el = mount(<Manager run="run-hid" />);
+    await settle();
+    expect(el.querySelector('.deleted-line')!.textContent).toContain('You deleted this conversation.');
+    click(keyNamed(el, 'Put it back in my list'));
+    await settle();
+    expect(api.calls.find((c) => c.method === 'PATCH')).toMatchObject({ path: '/v1/conversations/run-hid', body: { hidden: false } });
+    expect(el.querySelector('.deleted-line')).toBeNull();
+  });
+
+  it('never open a deleted conversation as the newest one, though the settings name it', async () => {
+    act(() => store.dispatch({ type: 'config', config: { ...CONFIG, manager: { ...CONFIG.manager!, run: 'run-gone2' } } }));
+    act(() => store.dispatch({ type: 'manager-chats', runs: [conv('run-new'), conv('run-gone2', { hidden: true })] }));
+    expect(managerRunOf(store.get())).toBe('');
+    // A server without hidden lists leaves the deleted one out, which says the same.
+    act(() => store.dispatch({ type: 'manager-chats', runs: [conv('run-new')] }));
+    act(() => store.dispatch({ type: 'config', config: { ...CONFIG, manager: { ...CONFIG.manager!, run: 'run-gone3' } } }));
+    expect(managerRunOf(store.get())).toBe('');
+    act(() => store.dispatch({ type: 'config', config: CONFIG }));
+    expect(managerRunOf(store.get())).toBe('run-new');
   });
 
   it('say so when the server cannot rename a conversation yet, and keep the row', async () => {

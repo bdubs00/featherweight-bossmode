@@ -234,12 +234,15 @@ describe('the profile', () => {
     act(() => item.click());
     const dialog = document.querySelector('dialog.confirm')!;
     expect(dialog.querySelector('h2')!.textContent).toBe('Delete migrator?');
-    expect(dialog.textContent).toContain('migrator, its workers, and the files on its workers go.');
-    expect(dialog.textContent).toContain('Your past conversations with it stay readable.');
+    expect(dialog.textContent).toContain('This deletes migrator, its workers, and the files on them. Its seats on bridges stop working.');
+    expect(dialog.textContent).toContain('You cannot undo this. Your past conversations with it stay readable.');
     act(() => ([...dialog.querySelectorAll('button')].find((b) => b.textContent === 'Delete agent') as HTMLButtonElement).click());
     await vi.waitFor(() => expect(calls.some((c) => c.method === 'DELETE' && c.path === '/v1/pools/crew')).toBe(true));
     await vi.waitFor(() => expect(location.hash).toBe('#fleet'));
     expect(currentSaid()).toBe('Deleted migrator. Its workers stop once they are idle.');
+    // The page drops the agent at once, though a read of the fleet lists its workers until they are idle.
+    expect(store.get().fleet!.pools!.find((p) => p.agent === 'migrator')!.deleting).toBe(true);
+    expect(el.textContent).toContain('This agent no longer exists.');
     clearSaid();
     history.replaceState(null, '', location.pathname);
   });
@@ -431,5 +434,13 @@ describe('the profile', () => {
     } finally {
       g.restore();
     }
+  });
+
+  it('says that the worker of a new agent starts, and no gap of the server, while every worker starts', async () => {
+    act(() => store.dispatch({ type: 'fleet', fleet: { ...STREAM_FLEET, pools: STREAM_FLEET.pools!.map((p) => (p.name === 'crew' ? { ...p, deleting: false, tasks: [{ name: 'crew-0', phase: 'Pending', current: true }] } : p)) } }));
+    const el = mount(<Profile agent="migrator" />);
+    await vi.waitFor(() => expect(el.querySelector('.worker-starting')).not.toBeNull());
+    expect(el.querySelector('.worker-starting')!.textContent).toBe('Its worker is starting.');
+    expect(el.querySelector('.worker-gaps')).toBeNull();
   });
 });

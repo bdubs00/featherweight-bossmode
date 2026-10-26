@@ -35,13 +35,13 @@ import { attempt, showError } from './notice';
 import { AttachedFiles } from './AttachedFiles';
 import { NO_FILES_WITH_COMMAND, describeFiles, refusalOf } from '../lib/attachments';
 import { Composer } from './Composer';
-import { Conversation, startRun, takeUpOf, usePoll, useTranscript } from './Conversation';
+import { ContinuedFrom, Conversation, startRun, takeUpOf, usePoll, useTranscript } from './Conversation';
 import { useResult } from './RunPane';
 import { FollowBox, Msg, Quiet } from './Thread';
 import { useLiveAnswer } from './Live';
 import { Avatar, Button, Chip, Find, Help, Led, Mark, PaneHeader } from './primitives';
 import { Menu } from './common';
-import { ConversationMenu } from './History';
+import { ConversationMenu, DeletedLine } from './History';
 import { askOfRun } from '../lib/duties';
 
 /** The number of items of a list of picks above which it gets a field to find one. */
@@ -572,7 +572,20 @@ function ChatRun({ chat, runId }: { chat: QuickChat; runId: string }) {
         }
       />
       <FollowBox end={end}>
-        <Conversation run={run} result={res} t={t} agentLabel={chat.agent} tail={tail} live={live} />
+        <Conversation
+          run={run}
+          result={res}
+          t={t}
+          agentLabel={chat.agent}
+          tail={tail}
+          live={live}
+          head={
+            <>
+              {run && run.hidden && <DeletedLine r={run} />}
+              <ContinuedFrom run={run} href={(id) => hrefOf({ place: 'chat', run: id })} />
+            </>
+          }
+        />
       </FollowBox>
       <Composer draft={'chat:' + runId} label={'Message to ' + chat.agent} placeholder="Ask a question" commands={commands} attach onSend={(text, _to, files) => send(text, files)} />
     </section>

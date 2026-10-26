@@ -22,6 +22,7 @@ import { AttachedFiles } from './AttachedFiles';
 import { DecisionCard } from './Decision';
 import { Avatar, Button, Mark } from './primitives';
 import { Msg, Quiet, StepText, StepsFold } from './Thread';
+import { CONTINUES_KEY, chatTitle } from '../lib/chat';
 import { LiveLines, type LiveAnswer } from './Live';
 
 export interface TranscriptState {
@@ -335,6 +336,55 @@ const within5 = (a: Item, b: Item) => {
   return d >= 0 && d < 5 * 60_000;
 };
 
+/** The first line of the summary of an earlier conversation that an older server put in front of the first message of a continued run. */
+export const SUMMARY_HEAD = 'Earlier in this conversation:';
+
+/**
+ * splitSummary parts the first message of a continued run that an older
+ * server wrote: the summary of the earlier conversation, its lines in the
+ * words of the page (the person is You, and the agent has its name), and
+ * the words of the person after it. A message without a summary gives
+ * none.
+ */
+export function splitSummary(text: string, agent: string): { summary: string[]; rest: string } {
+  if (!text.startsWith(SUMMARY_HEAD)) return { summary: [], rest: text };
+  const end = text.indexOf('\n\n');
+  const head = end >= 0 ? text.slice(0, end) : text;
+  const rest = end >= 0 ? text.slice(end + 2) : '';
+  const summary = head
+    .slice(SUMMARY_HEAD.length)
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .map((l) => (l.startsWith('The person: ') ? 'You: ' + l.slice(12) : l.startsWith('You: ') ? agent + ': ' + l.slice(5) : l));
+  return { summary, rest };
+}
+
+/**
+ * ContinuedFrom is the quiet line at the top of a run that continues an
+ * earlier conversation, as the server marks it in workbench.continues,
+ * with a link to that conversation, or a key where the place has no
+ * address of a conversation.
+ */
+export function ContinuedFrom({ run, href, onOpen }: { run: Run | undefined; href?: (id: string) => string; onOpen?: (id: string) => void }) {
+  const id = run && run.metadata ? run.metadata[CONTINUES_KEY] || '' : '';
+  const earlier = useSelect((s) => (id ? s.runs[id] : undefined));
+  if (!id) return null;
+  const title = earlier ? chatTitle(earlier) : 'an earlier conversation';
+  return (
+    <Quiet>
+      Continued from{' '}
+      {href ? (
+        <a href={href(id)}>{title}</a>
+      ) : (
+        <button type="button" class="link-key" onClick={() => onOpen && onOpen(id)}>
+          {title}
+        </button>
+      )}
+    </Quiet>
+  );
+}
+
 export interface ConversationProps {
   run: Run | undefined;
   result?: Result | null;
@@ -345,6 +395,8 @@ export interface ConversationProps {
   tail?: ComponentChildren;
   /** The answer that the model writes now, from the live stream of a one-on-one view. It follows the tail. */
   live?: LiveAnswer;
+  /** What comes before the first item, such as the line of a deleted conversation and the link to the conversation that it continues. */
+  head?: ComponentChildren;
 }
 
 export function Conversation(props: ConversationProps) {
@@ -368,6 +420,7 @@ export function Conversation(props: ConversationProps) {
           </Button>
         </div>
       )}
+      {props.head}
       {t.loading && <p class="tline">Loading the conversation.</p>}
       {t.gone && <p class="tline">This run is gone.</p>}
       {t.problem && <p class="tline">{t.problem}</p>}
@@ -388,9 +441,21 @@ export function Conversation(props: ConversationProps) {
         switch (it.kind) {
           case 'user': {
             const who = it.who || me;
+            // An older server put the summary of an earlier conversation in front of the first message: it folds, and the person's own words follow.
+            const { summary, rest } = splitSummary(it.text || '', props.agentLabel);
             return (
               <Msg face={<Avatar subject={who} display={who === me ? meName : undefined} size={32} />} name={whoName(who, principal)} at={it.time} compact={compact}>
-                {it.text && <p class="tmsg-plain">{it.text}</p>}
+                {summary.length > 0 && (
+                  <details class="summary-fold">
+                    <summary>Earlier in this conversation</summary>
+                    <ul>
+                      {summary.map((l) => (
+                        <li>{l}</li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+                {rest && <p class="tmsg-plain">{rest}</p>}
                 <AttachedFiles files={it.files} />
               </Msg>
             );

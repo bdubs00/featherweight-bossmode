@@ -153,6 +153,9 @@ describe('the Skills place', () => {
     await settle(8);
     expect(el.querySelector('h1')!.textContent).toBe('Run a command');
     expect(el.querySelector('.skill-call')!.textContent).toBe('bash');
+    // The title says the whole description, so it shows once.
+    expect(el.querySelector('.c-lede')).toBeNull();
+    expect(el.textContent!.match(/Run a command/g)!.length).toBe(1);
     expect(el.querySelector('#loaders')!.textContent).toBe('Agents that can use it 2');
     expect([...el.querySelectorAll('.loaders li')].map((x) => x.textContent)).toEqual(['migrator', 'scribe']);
   });

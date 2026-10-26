@@ -280,7 +280,7 @@ export function NewAgent() {
     setBusy(false);
     // The new agent opens, and its conversation says when its worker can take a message.
     if (made) {
-      showSaid('Made the agent ' + made + '. Its workers start now.');
+      showSaid('Made the agent ' + made + '. ' + (Number(f.workers) === 1 ? 'Its worker starts now.' : 'Its workers start now.'));
       go({ place: 'fleet', agent: made });
     }
   };

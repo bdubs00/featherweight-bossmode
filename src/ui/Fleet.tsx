@@ -14,7 +14,7 @@ import { spanWords } from '../lib/words';
 import { go, hrefOf, parseRoute, type Route } from '../lib/route';
 import { awakeCount, statusOf } from '../lib/status';
 import { store, useSelect } from '../state/store';
-import { selectFacts } from '../state/reducer';
+import { deletedRun, selectFacts } from '../state/reducer';
 import { closed, loadAgentSkills, loadAgents, loadFleet, rereadRun } from '../state/actions';
 import { selectAgents } from '../state/agents';
 import { ensureRosters, ensureRuns, refreshAfterReset } from '../state/fetchers';
@@ -24,7 +24,7 @@ import { parseSlash } from '../lib/mention';
 import { useRoving } from './keys';
 import { attempt, showError } from './notice';
 import { Composer } from './Composer';
-import { Conversation, focusComposer, startRun, takeUpOf, useTranscript, usePoll } from './Conversation';
+import { ContinuedFrom, Conversation, focusComposer, startRun, takeUpOf, useTranscript, usePoll } from './Conversation';
 import { useResult } from './RunPane';
 import { FollowBox, Quiet } from './Thread';
 import { useLiveAnswer } from './Live';
@@ -321,6 +321,7 @@ export function FleetList({ current, member }: { current?: string; member?: stri
       <PaneHeader
         id="fleet-list-title"
         title="Fleet"
+        focusable
         count={loaded ? count : undefined}
         countLabel={count === 1 ? '1 member' : count + ' members'}
         actions={
@@ -438,15 +439,23 @@ export function AgentChat({ agent }: { agent: string }) {
     loadAgentSkills(agent).catch(() => {});
   }, [agent]);
   const manager = config && config.manager && config.manager.agent === agent ? config.manager : null;
+  // The list of the conversations with the manager says which ones the person deleted.
+  const managerListed = useSelect((s) => s.managerChats.loaded);
   // The conversation of this tab comes first, then the newest one of the manager.
-  const [runId, setRunId] = useState(() => readRun(agent) || (manager ? manager.run : ''));
+  // The newest conversation of the manager opens, unless the person deleted it.
+  const managerRun = () => (manager && manager.run && !deletedRun(store.get(), manager.run) ? manager.run : '');
+  const [runId, setRunId] = useState(() => readRun(agent) || managerRun());
   const run = useSelect((s) => (runId ? s.runs[runId] : undefined));
   const res = useResult(runId);
   const t = useTranscript(runId);
   usePoll(runId);
   useEffect(() => {
-    setRunId(readRun(agent) || (manager ? manager.run : ''));
+    setRunId(readRun(agent) || managerRun());
   }, [agent, manager && manager.run]);
+  // The list can come after the first draw: a deleted newest conversation of the manager then leaves the pane.
+  useEffect(() => {
+    if (manager && runId && runId === manager.run && !readRun(agent) && deletedRun(store.get(), runId)) setRunId('');
+  }, [managerListed, runId]);
   const light = useSelect((s) => statusOf(selectFacts(s), { agent }));
   // The member of the fleet that serves the agent, or why none can take a message yet.
   const workers = useMemo(() => workersOf(facts, agent).workers, [facts, agent]);
@@ -540,7 +549,15 @@ export function AgentChat({ agent }: { agent: string }) {
       />
       <FollowBox end={end}>
         {runId ? (
-          <Conversation run={run} result={res} t={t} agentLabel={agent} live={live} tail={archived ? <Quiet tone="grey">{ARCHIVED_LINE}</Quiet> : undefined} />
+          <Conversation
+            run={run}
+            result={res}
+            t={t}
+            agentLabel={agent}
+            live={live}
+            tail={archived ? <Quiet tone="grey">{ARCHIVED_LINE}</Quiet> : undefined}
+            head={<ContinuedFrom run={run} onOpen={(id) => open(id)} />}
+          />
         ) : (
           <div class="thread">
             <p class="thread-empty">

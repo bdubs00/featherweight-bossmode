@@ -100,8 +100,9 @@ export function peopleOf(s: PeopleInput): PeopleGroup[] {
     groups.push({ key: id, title: b.title, href: hrefOf({ place: 'bridge', id, pane: 'none' }), rows, count: ordered.filter((m) => !m.fired).length });
   }
   if (complete && s.agents) {
+    const going = deletingAgents(s.fleet);
     const rows: PersonRow[] = s.agents
-      .filter((a) => !seated.has(a.name))
+      .filter((a) => !seated.has(a.name) && !going.has(a.name))
       .map((a) => a.name)
       .sort()
       .map((name) => {
@@ -368,9 +369,24 @@ export function agentGone(s: { fleet: Fleet | null; agents: Agent[] | null; conf
   if (!agent || !s.fleet || !s.agents) return false;
   const c = s.config;
   if (c && ((c.manager && c.manager.agent === agent) || (c.chat && c.chat.agent === agent))) return false;
+  // An agent whose pool the server deletes is gone, though its workers stay until they are idle.
+  if (deletingAgents(s.fleet).has(agent)) return true;
   if (s.agents.some((a) => a.name === agent)) return false;
   if ((s.fleet.pools || []).some((p) => p.agent === agent)) return false;
   return !(s.fleet.members || []).some((m) => (m.agents || []).some((a) => !!a && a.name === agent));
+}
+
+/**
+ * deletingAgents names the agents whose every pool the server deletes: a
+ * person deleted the agent, and its workers stop once they are idle. The
+ * page shows such an agent nowhere.
+ */
+export function deletingAgents(fleet: Fleet | null | undefined): Set<string> {
+  const out = new Set<string>();
+  const pools = fleet ? fleet.pools || [] : [];
+  for (const p of pools) if (p.deleting && p.agent) out.add(p.agent);
+  for (const p of pools) if (!p.deleting) out.delete(p.agent);
+  return out;
 }
 
 /** The member that takes a message to an agent, or "" with the reason why none can. */

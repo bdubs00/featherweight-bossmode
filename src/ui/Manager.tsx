@@ -31,12 +31,12 @@ import { Avatar, Menu } from './common';
 import { go } from '../lib/route';
 import { askOfRun } from '../lib/duties';
 import { Help, Led, Mark, PaneHeader } from './primitives';
-import { conversationsOf } from './History';
+import { DeletedLine, conversationsOf } from './History';
 import { HistoryList, type HistoryWords } from './Chat';
 import { chatTitle } from '../lib/chat';
 import { hrefOf } from '../lib/route';
 import { Composer } from './Composer';
-import { Conversation, POLL_MS, focusComposer, startRun, usePoll, useTranscript } from './Conversation';
+import { ContinuedFrom, Conversation, POLL_MS, focusComposer, startRun, usePoll, useTranscript } from './Conversation';
 import { FollowBox, Msg, Quiet } from './Thread';
 import { useLiveAnswer } from './Live';
 import { ARCHIVED_LINE, answerSeqs, lastSeq, works } from '../lib/chat';
@@ -84,6 +84,11 @@ export function forgetSeen(): void {
     // No storage.
   }
   for (const f of [...seenListeners]) f();
+}
+
+/** forgetSeenCache drops the copy of the marks in memory, so the next read takes them from the storage, as a new page does. For the tests. */
+export function forgetSeenCache(): void {
+  seen = null;
 }
 
 /** markSeen notes that the person sees a conversation as far as its seq. */
@@ -188,6 +193,13 @@ function useMarkSeen(run: Run | undefined): void {
  */
 export function ManagerDot() {
   const unread = useManagerUnread();
+  // The app bar reads the conversations of the person with the manager when the page starts, so an answer that came while the page was closed lights the place.
+  const agent = useSelect((s) => (s.config && s.config.manager ? s.config.manager.agent : ''));
+  const me = useSelect((s) => (s.me && s.me.principal ? s.me.principal.subject : ''));
+  const loaded = useSelect((s) => s.managerChats.loaded);
+  useEffect(() => {
+    if (agent && me && !loaded) loadManagerChats().catch(() => {});
+  }, [agent, me]);
   if (unread.size === 0) return null;
   return (
     <span class="place-dot" role="status">
@@ -393,7 +405,22 @@ export function Manager({ run: routeRun, fresh }: { run?: string; fresh?: boolea
         }
       />
       <FollowBox end={end}>
-        {!runId && !sent ? <p class="thread-empty">Ask about the fleet, or ask for a bridge.</p> : <Conversation run={run} result={res} t={t} agentLabel={agent} tail={tail} live={live} />}
+        {!runId && !sent ? <p class="thread-empty">Ask about the fleet, or ask for a bridge.</p> : (
+          <Conversation
+            run={run}
+            result={res}
+            t={t}
+            agentLabel={agent}
+            tail={tail}
+            live={live}
+            head={
+              <>
+                {run && run.hidden && <DeletedLine r={run} />}
+                <ContinuedFrom run={run} href={(id) => hrefOf({ place: 'manager', run: id })} />
+              </>
+            }
+          />
+        )}
       </FollowBox>
       <Composer draft="manager" label="Message to the manager" placeholder="Ask the manager" commands={commands} attach onSend={(text, _to, files) => send(text, files)} />
     </section>

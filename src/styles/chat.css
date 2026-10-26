@@ -221,3 +221,35 @@ button.brow:focus-visible {
     margin-left: 0;
   }
 }
+
+/* ---------- a continued conversation and a deleted one ---------- */
+/* The key of Continued from where a place has no address of a conversation: it reads as the link that it stands for. */
+.link-key {
+  appearance: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+/* The summary that an older server put in front of a first message folds, so the words of the person stand alone. */
+.summary-fold {
+  margin: 0 0 var(--s-2);
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+  color: var(--muted);
+}
+.summary-fold > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.summary-fold ul {
+  margin: var(--s-1) 0 0;
+  padding-left: var(--s-4);
+}
+.deleted-line {
+  margin: var(--s-2) auto var(--s-3);
+  max-width: 560px;
+}

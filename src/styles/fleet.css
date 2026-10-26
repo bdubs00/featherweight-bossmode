@@ -888,6 +888,11 @@ button.liked-more {
 .worker-old {
   display: inline-flex;
 }
+.worker-starting {
+  margin: var(--s-2) 0 0;
+  font-size: var(--t-meta);
+  color: var(--muted);
+}
 .today {
   display: flex;
   flex-wrap: wrap;

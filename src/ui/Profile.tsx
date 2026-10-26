@@ -194,6 +194,8 @@ function Workers({ agent, owner, pool, setPool }: { agent: string; owner: boolea
   const runs = useSelect((s) => s.runs);
   const facts = useSelect(selectFacts);
   const workers = useMemo(() => workersOf(facts, agent).workers, [facts, agent]);
+  // While every worker of a new agent starts, the server names gaps that pass on their own, so the section says that the workers start.
+  const starting = !!pool && pool.wanted > 0 && (workers.length === 0 ? true : workers.every((w) => w.phase === 'Pending' || w.phase === ''));
   // The open runs of the fleet name the seat that each worker serves. Until the page reads them, it reads the newest run of each seat.
   const openRuns = useSelect((s) => s.openRuns);
   const runIds = openRuns ? '' : seats.map((x) => newestRun(x.member)).join(',');
@@ -233,7 +235,8 @@ function Workers({ agent, owner, pool, setPool }: { agent: string; owner: boolea
           })}
         </ul>
       )}
-      {pool && pool.gaps && pool.gaps.length > 0 && (
+      {pool && starting && <p class="worker-starting">{workers.length > 1 ? 'Its workers are starting.' : 'Its worker is starting.'}</p>}
+      {pool && !starting && pool.gaps && pool.gaps.length > 0 && (
         // The gaps are the words of the server for an admin, so they sit in a fold under one plain line.
         <div class="worker-gaps">
           <p>{GAPS_LINE}</p>
@@ -252,6 +255,13 @@ function Workers({ agent, owner, pool, setPool }: { agent: string; owner: boolea
       )}
     </section>
   );
+}
+
+/** dropAgent takes a deleted agent out of the page: out of the profiles of the front, and its pool marked as deleting, as the server marks it. */
+function dropAgent(agent: string): void {
+  const s = store.get();
+  if (s.agents) store.dispatch({ type: 'agents', agents: s.agents.filter((a) => a.name !== agent) });
+  if (s.fleet) store.dispatch({ type: 'fleet', fleet: { ...s.fleet, pools: (s.fleet.pools || []).map((p) => (p.agent === agent ? { ...p, deleting: true } : p)) } });
 }
 
 /**
@@ -281,14 +291,20 @@ function DeleteAgent({ agent, title }: { agent: string; title: string }) {
             setBusy(false);
             setAsk(false);
             if (!ok) return;
+            // The page drops the agent at once: the server deletes its workers once they are idle, so a read of the fleet still lists them a while.
+            dropAgent(agent);
             forgetProfiles();
-            await Promise.allSettled([loadAgents(), loadFleet()]);
             showSaid('Deleted ' + title + '. Its workers stop once they are idle.');
             go('#fleet');
+            requestAnimationFrame(() => {
+              const head = document.getElementById('fleet-list-title');
+              if (head) head.focus();
+            });
+            Promise.allSettled([loadAgents(), loadFleet()]);
           }}
         >
-          <p>{title}, its workers, and the files on its workers go. A seat of it on a bridge gets no worker again.</p>
-          <p>Your past conversations with it stay readable.</p>
+          <p>This deletes {title}, its workers, and the files on them. Its seats on bridges stop working.</p>
+          <p>You cannot undo this. Your past conversations with it stay readable.</p>
         </Confirm>
       )}
     </>
