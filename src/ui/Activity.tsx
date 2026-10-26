@@ -204,7 +204,7 @@ const dutyHref = (name: string) => hrefOf({ place: 'duties', name });
 /** DutyChip names the duty of a run, and opens it. */
 function DutyChip({ name }: { name: string }) {
   return (
-    <a class="chip chip-plain duty-chip" href={dutyHref(name)} title={'Open the duty ' + name}>
+    <a class="chip chip-plain duty-chip" href={dutyHref(name)} title={'Open the duty ' + titleOfName(name)}>
       {titleOfName(name)}
     </a>
   );

@@ -90,6 +90,23 @@
 .rt-list .scroll {
   padding-bottom: var(--s-4);
 }
+/* The question mark of Routines are off sits near the end of a narrow
+   pane, where its definition fits on neither side of the key. So the
+   definition takes the width of the empty state, under its line. */
+.rt-list .empty {
+  position: relative;
+}
+.rt-list .empty .help {
+  position: static;
+}
+.rt-list .empty .help-pop,
+.rt-list .empty .help-pop.flip {
+  top: calc(100% - var(--s-3));
+  left: var(--s-4);
+  right: var(--s-4);
+  width: auto;
+  max-width: none;
+}
 
 /* ---------- the header of a routine ---------- */
 /* The title takes the width that the status, the tabs, and More leave. */

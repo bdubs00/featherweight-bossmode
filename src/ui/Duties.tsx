@@ -6,7 +6,10 @@
 // holds one duty with its history, or the editor of New duty and Edit
 // (DutyEditor.tsx). docs/CONTRACT.md, section 16, names the routes. A duty
 // that the configuration of the server set up first says so, and a duty
-// that the setup of the server locks shows no key that changes it.
+// that the setup of the server locks shows no key that changes it. While a
+// run of the duty works, the page reads the duty again every few seconds,
+// so its state and its history follow the run. A key that changes the duty
+// keeps the focus, and the focus that a move drops goes to the heading.
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { Duty, DutyRun } from '../api/types';
@@ -25,7 +28,9 @@ import {
   checkWords,
   decidedWords,
   dutyLight,
+  dutyShape,
   dutyTitle,
+  dutyWhat,
   importedOf,
   limitWords,
   lockedOf,
@@ -40,14 +45,17 @@ import {
   titleOfName,
   toWords,
 } from '../lib/duties';
+import type { Light } from '../lib/presence';
+import { phraseOf } from '../lib/tools';
 import { useSelect } from '../state/store';
 import { loadDuties, loadDuty, loadSharedChannels, pauseAll, pauseDuty, removeDuty, runDutyNow, useDuties } from '../state/duties';
+import { useToolCatalog } from '../state/tools';
 import { useRoving } from './keys';
-import { attempt, showError } from './notice';
+import { attempt, showError, showSaid } from './notice';
 import { Confirm, Menu, When } from './common';
 import { Button, Chip, Field, Find, Input, Led, LineLed, Mark, PaneHeader } from './primitives';
 import { EmptyPane } from './Shell';
-import { DutyEditor, useAgentName } from './DutyEditor';
+import { DutyEditor, focusLost, useAgentName, useFocusLost } from './DutyEditor';
 
 /** The width from which two panes show side by side, as App names it. */
 const TWO_PANES = '(min-width: 800px)';
@@ -59,6 +67,23 @@ const dutyHref = (name: string) => hrefOf({ place: 'duties', name });
 
 /** runHref links a run of a duty on the page at /ui, as a heart and a ticket of a routine do. */
 const runHref = (run: string) => '/ui#run/' + encodeURIComponent(run);
+
+/**
+ * How often the page of a duty reads the duty again: every fast
+ * milliseconds while a run of the duty waits for a worker or works, and
+ * for after milliseconds after Run now, and every slow milliseconds while
+ * a run waits for an answer. A test sets them.
+ */
+export const following = { fast: 3000, slow: 15000, after: 60000 };
+
+/** The states of a run of a duty that change soon by themselves. */
+const MOVING = ['queued', 'running', 'suspended', 'retrying'];
+
+/** DutyLed is the light of a duty. The grey lights take a shape of their own: hollow for not run yet, and two bars for paused. */
+function DutyLed({ light, class: cls }: { light: Light; class?: string }) {
+  const shape = dutyShape(light);
+  return <Led tone={light.tone} word={light.word} label={light.label} still={light.still} class={[cls, shape ? 'duty-led-' + shape : ''].filter(Boolean).join(' ') || undefined} />;
+}
 
 /** OffWords say that the front keeps no duties. */
 function OffWords() {
@@ -84,7 +109,7 @@ export function sortDuties(list: Duty[]): Duty[] {
 /** matchesDuty reports whether a duty holds the words of a search, in what it does, its name, its agent, or its time. */
 function matchesDuty(d: Duty, q: string): boolean {
   const w = q.toLowerCase();
-  return [dutyTitle(d), d.name, d.agent, d.readback || ''].some((x) => x.toLowerCase().includes(w));
+  return [dutyTitle(d), dutyWhat(d), d.name, d.agent, d.readback || ''].some((x) => x.toLowerCase().includes(w));
 }
 
 function DutyRow({ d, on, allPaused, named }: { d: Duty; on: boolean; allPaused: boolean; named: boolean }) {
@@ -99,11 +124,11 @@ function DutyRow({ d, on, allPaused, named }: { d: Duty; on: boolean; allPaused:
       <span class="duty-row-main">
         <span class="duty-row-top">
           <span class="duty-row-title">{dutyTitle(d)}</span>
-          <Led tone={light.tone} word={light.word} label={light.label} still={light.still} />
+          <DutyLed light={light} />
         </span>
         {when && <span class="duty-row-when">{when}</span>}
         <span class="duty-row-meta">
-          {named && <span class="clip">{titleOfName(d.name)}</span>}
+          {named && <span class="clip">{d.name}</span>}
           <span class="clip">{agentName}</span>
           {next && <span>Next {next}</span>}
           <span>{costText(today)} today</span>
@@ -164,13 +189,18 @@ export function DutyList({ current }: { current?: string }) {
   const admin = useSelect((s) => !!(s.me && s.me.admin));
   const [q, setQ] = useState('');
   const rows = useRoving<HTMLDivElement>();
+  const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     loadDuties().catch(() => {});
   }, []);
+  // In a narrow window the list is the only pane, so its heading takes a focus that a move dropped, such as Cancel of New duty.
+  const narrow = typeof window.matchMedia === 'function' && !window.matchMedia(TWO_PANES).matches;
+  useFocusLost(narrow ? heading : { current: null }, []);
   const words = q.trim();
   const shown = useMemo(() => sortDuties((list || []).filter((d) => !words || matchesDuty(d, words))), [list, words]);
-  // Two duties that say the same show their names too, so a person can
-  // tell them apart.
+  // Two duties whose names read the same, such as daily-report and
+  // daily_report, show their short names too, so a person can tell them
+  // apart.
   const same = useMemo(() => {
     const seen = new Map<string, number>();
     for (const d of list || []) seen.set(dutyTitle(d), (seen.get(dutyTitle(d)) || 0) + 1);
@@ -181,6 +211,8 @@ export function DutyList({ current }: { current?: string }) {
     <section class="screen duty-list" aria-labelledby="duties-title">
       <PaneHeader
         id="duties-title"
+        headingRef={heading}
+        focusable
         title="Duties"
         count={list && !off ? count : undefined}
         countLabel={count === 1 ? '1 duty' : count + ' duties'}
@@ -324,18 +356,39 @@ function DutyView({ name }: { name: string }) {
   const canChange = useCanChange(d) && !locked;
   const agentName = useAgentName(d ? d.agent : '');
   const faces = useSelect((s) => s.faces);
-  const nameOfAgent = (a: string) => (faces[a] && faces[a].displayName) || a;
+  const nameOfAgent = (a: string) => (faces[a] && faces[a].displayName) || titleOfName(a);
   const [failed, setFailed] = useState('');
   const [said, setSaid] = useState<Said>(null);
   const [busy, setBusy] = useState(false);
+  // The keys stay enabled while an action works, so they keep the focus. This ref turns a second press away.
+  const working = useRef(false);
   const [asking, setAsking] = useState(false);
+  // True for a while after Run now: the new run may not be in the history yet.
+  const [started, setStarted] = useState(false);
   const shared = useDuties((s) => s.shared);
+  const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     setFailed('');
     setSaid(null);
     setAsking(false);
+    setStarted(false);
     loadDuty(name).catch((e) => setFailed(e instanceof Error ? e.message : 'The action failed. Try it again.'));
   }, [name]);
+  useFocusLost(heading, [name, !!d]);
+  // While a run of the duty works, or just after Run now, the page reads the duty again, so the state and the history follow it.
+  const newest = d ? (d.history && d.history[0]) || (d.state && d.state.lastRun) || null : null;
+  const moving = !!newest && MOVING.includes(newest.state);
+  const waits = !!newest && newest.state === 'input-required';
+  useEffect(() => {
+    if (!moving && !started && !waits) return;
+    const t = setInterval(() => loadDuty(name).catch(() => {}), moving || started ? following.fast : following.slow);
+    return () => clearInterval(t);
+  }, [name, moving, started, waits]);
+  useEffect(() => {
+    if (!started) return;
+    const t = setTimeout(() => setStarted(false), following.after);
+    return () => clearTimeout(t);
+  }, [started]);
   // A duty that names a shared channel reads the labels of the shared channels once.
   const names = d && d.notify ? [...channelsIn(d.notify.failure), ...channelsIn(d.notify.needsYou)] : [];
   useEffect(() => {
@@ -361,7 +414,7 @@ function DutyView({ name }: { name: string }) {
   if (!d) {
     return (
       <section class="screen duty" aria-labelledby="duty-title">
-        <PaneHeader id="duty-title" title={titleOfName(name)} size="title" level={1} back={back} />
+        <PaneHeader id="duty-title" title={titleOfName(name)} size="title" level={1} back={back} headingRef={heading} focusable />
         <div class="empty center">
           <p>{gone && off ? <OffWords /> : gone ? 'This duty is not here. It was removed, or you cannot see it.' : failed || 'Loading the duty.'}</p>
         </div>
@@ -371,12 +424,15 @@ function DutyView({ name }: { name: string }) {
   const title = dutyTitle(d);
   const light = dutyLight(d, allPaused);
   const run = async (f: () => Promise<void>) => {
+    if (working.current) return;
+    working.current = true;
     setBusy(true);
     try {
       await f();
     } catch (e) {
       showError(e);
     }
+    working.current = false;
     setBusy(false);
   };
   const runNow = () =>
@@ -384,6 +440,7 @@ function DutyView({ name }: { name: string }) {
       setSaid(null);
       const r = await runDutyNow(name);
       setSaid(r.run ? { run: r.run } : r.skipped ? { skipped: r.skipped } : typeof r.run === 'string' ? { started: true } : { skipped: 'The duty started no run.' });
+      if (r.run || typeof r.run === 'string') setStarted(true);
     });
   const items = canChange ? [{ label: 'Delete', danger: true, onSelect: () => setAsking(true) }] : [];
   const next = (d.next || []).slice(0, 5);
@@ -391,8 +448,8 @@ function DutyView({ name }: { name: string }) {
   const reason = d.state && d.state.pausedReason;
   return (
     <section class="screen duty" aria-labelledby="duty-title">
-      <PaneHeader id="duty-title" title={<span title={title}>{title}</span>} size="title" level={1} back={back}>
-        <Led tone={light.tone} word={light.word} label={light.label} still={light.still} class="duty-status" />
+      <PaneHeader id="duty-title" title={<span title={title}>{title}</span>} size="title" level={1} back={back} headingRef={heading} focusable>
+        <DutyLed light={light} class="duty-status" />
       </PaneHeader>
       <div class="scroll pad duty-body">
         {importedOf(d) && <p class="duty-said duty-origin">{ORIGIN_LINE}</p>}
@@ -402,12 +459,12 @@ function DutyView({ name }: { name: string }) {
           </p>
         )}
         <div class="duty-keys">
-          <Button size="s" disabled={busy} onClick={runNow}>
+          <Button size="s" aria-disabled={busy || undefined} onClick={runNow}>
             Run now
           </Button>
           {canChange && (
             <>
-              <Button size="s" disabled={busy} onClick={() => run(() => pauseDuty(name, !d.paused))}>
+              <Button size="s" aria-disabled={busy || undefined} onClick={() => run(() => pauseDuty(name, !d.paused))}>
                 {d.paused ? 'Resume' : 'Pause'}
               </Button>
               <Button size="s" href={hrefOf({ place: 'duties', name, edit: true })}>
@@ -460,14 +517,7 @@ function DutyView({ name }: { name: string }) {
           <DoWords d={d} agentName={agentName} title={title} locked={locked} />
         </section>
         {/* The readback of the front says what the check looks for, so the section shows only without it. */}
-        {d.checkFirst && !d.readback && (
-          <section class="duty-sec" aria-labelledby="duty-check">
-            <h2 class="t-sub duty-sec-head" id="duty-check">
-              Check first
-            </h2>
-            <p>{checkWords(d.checkFirst, agentName)}</p>
-          </section>
-        )}
+        {d.checkFirst && !d.readback && <CheckSection check={d.checkFirst} agentName={agentName} />}
         <section class="duty-sec" aria-labelledby="duty-limits">
           <h2 class="t-sub duty-sec-head" id="duty-limits">
             Limits
@@ -508,13 +558,29 @@ function DutyView({ name }: { name: string }) {
             run(async () => {
               await removeDuty(name);
               setAsking(false);
+              showSaid('Deleted the duty ' + title + '.');
               go('#duties');
+              // The duty and its keys are gone, so the focus goes to the heading of the list.
+              setTimeout(() => focusLost(document.getElementById('duties-title') || document.getElementById('duty-title')), 0);
             })
           }
         >
           <p>The duty stops for good, and its history goes with it. A run that works now goes on.</p>
         </Confirm>
       )}
+    </section>
+  );
+}
+
+/** CheckSection says the check of a duty in words, each tool by what it does, for a duty whose readback does not say it. */
+function CheckSection({ check, agentName }: { check: NonNullable<Duty['checkFirst']>; agentName: string }) {
+  const catalog = useToolCatalog();
+  return (
+    <section class="duty-sec" aria-labelledby="duty-check">
+      <h2 class="t-sub duty-sec-head" id="duty-check">
+        Check first
+      </h2>
+      <p>{checkWords(check, agentName, (t) => phraseOf(catalog, t))}</p>
     </section>
   );
 }

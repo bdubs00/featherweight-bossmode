@@ -330,6 +330,32 @@ export function whenError(f: WhenForm): string {
   return '';
 }
 
+/** DATES_ERROR says that the last day of a schedule comes before its first day, with the words of the two fields. */
+export const DATES_ERROR = 'The last day comes before the first day.';
+
+/** datesError says what is wrong with the two dates of the sentence, or "". The page says it before it asks the server. */
+export const datesError = (f: Pick<WhenForm, 'start' | 'end'>): string => (f.start && f.end && f.end < f.start ? DATES_ERROR : '');
+
+/**
+ * nextTime is the time that Add a time adds: an hour after the last time,
+ * else the next free hour of the day, so the new time never repeats one
+ * that the sentence holds. A full day gives "".
+ */
+export function nextTime(times: string[]): string {
+  const minutes = (t: string) => {
+    const m = /^(\d{1,2}):(\d{2})$/.exec(t);
+    return m ? Number(m[1]) * 60 + Number(m[2]) : NaN;
+  };
+  const held = new Set(times.map(minutes).filter((n) => Number.isFinite(n)));
+  const last = minutes(times[times.length - 1] || '');
+  const from = Number.isFinite(last) ? last : 8 * 60;
+  for (let step = 1; step <= 24; step++) {
+    const n = (from + step * 60) % 1440;
+    if (!held.has(n)) return String(Math.floor(n / 60)).padStart(2, '0') + ':' + String(n % 60).padStart(2, '0');
+  }
+  return '';
+}
+
 /* ---------- the check ---------- */
 
 /** quote shows a value of a filter: a text as it is, anything else as JSON. */
@@ -356,16 +382,23 @@ export function whereWords(w: CheckWhere): string {
 /** hostOf is an address without its scheme, as a person reads it. */
 const hostOf = (url: string) => url.replace(/^https?:\/\//, '').replace(/\/$/, '');
 
+/** toolName is the name of a tool as a person reads it: the tools of the server lose their prefix, so front.pages_list is pages_list. */
+export const toolName = (tool: string): string => String(tool || '').replace(/^front\./, '');
+
 /**
  * checkWords reads a check back in words, from the record and never from
  * the words of a model: what it looks at, where the list is, the filters,
- * and when the agent wakes.
+ * and when the agent wakes. toolWords names a tool in words, such as Read
+ * the wiki for pages_list. Without it, the tool keeps its name.
  */
-export function checkWords(c: CheckFirst, agent: string): string {
+export function checkWords(c: CheckFirst, agent: string, toolWords: (tool: string) => string = toolName): string {
   const who = agent || 'the agent';
   const out: string[] = [];
   if (c.look.http && c.look.http.url) out.push('Look at ' + hostOf(c.look.http.url) + '.');
-  else if (c.look.tool) out.push('Call the tool ' + c.look.tool + ' of ' + who + '.');
+  else if (c.look.tool) {
+    const words = toolWords(c.look.tool);
+    out.push(words && words !== c.look.tool && words !== toolName(c.look.tool) ? 'Call a tool of ' + who + ': ' + lowerFirst(words) + '.' : 'Call the tool ' + toolName(c.look.tool) + ' of ' + who + '.');
+  }
   out.push(c.items ? 'Take the list at ' + c.items + '.' : 'Take the whole answer as the list.');
   if (c.where && c.where.length) out.push('Keep the items where ' + listWords(c.where.map(whereWords)) + '.');
   const wake = c.wake || { when: 'new' };
@@ -385,6 +418,8 @@ export function foundWords(c: CheckFound, agent: string): string {
 }
 
 const cap = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);
+/** lowerFirst puts the first letter of a phrase in lower case, unless the first word is all capitals, such as VPN. */
+const lowerFirst = (s: string) => (s && !/^[A-Z]{2,}\b/.test(s) ? s[0].toLowerCase() + s.slice(1) : s);
 
 /** itemWords names one item that a check found: its key, else its first text, else its JSON, cut at 80 characters. */
 export function itemWords(item: unknown, key: string): string {
@@ -537,13 +572,31 @@ export function templatedOf(d: Pick<Duty, 'origin' | 'template' | 'do' | 'source
   return !x.post && !x.open && !x.manager && !(x.ask && x.ask.message && x.ask.message.trim());
 }
 
-/** dutyTitle says what a duty does, from its message, else from its name. */
-export function dutyTitle(d: Pick<DutyRecord, 'name' | 'do'>): string {
+/**
+ * dutyTitle is the name of a duty as a person reads it: daily-report is
+ * Daily report. The person gave the name, so the list, the page of the
+ * duty, its dialogs, and Activity all call the duty by it.
+ */
+export const dutyTitle = (d: Pick<DutyRecord, 'name'>): string => titleOfName(d.name);
+
+/** dutyWhat says what a duty does in one line: the first line of its message, the playbook that it opens, or "". */
+export function dutyWhat(d: Pick<DutyRecord, 'do'>): string {
   const x = d.do || {};
   const message = (x.ask && x.ask.message) || (x.post && x.post.message) || (x.manager && x.manager.message) || '';
   if (message.trim()) return firstLine(toWords(message));
-  if (x.open && x.open.playbook) return 'Open a bridge from ' + x.open.playbook;
-  return titleOfName(d.name);
+  if (x.open && x.open.playbook) return 'Open a bridge from the playbook ' + titleOfName(x.open.playbook);
+  return '';
+}
+
+/**
+ * dutyShape tells apart the grey lights of a duty, which share one tone: a
+ * duty that has not run yet shows a hollow light, a paused duty shows the
+ * two bars of a pause, and every other grey light stays whole.
+ */
+export function dutyShape(light: Pick<Light, 'word'>): '' | 'hollow' | 'pause' {
+  if (light.word === 'not run yet') return 'hollow';
+  if (light.word === 'paused') return 'pause';
+  return '';
 }
 
 /* ---------- events ---------- */
@@ -555,7 +608,7 @@ export const EVENT_WORDS: Record<string, string> = {
   'question.waiting': 'When a question waits too long',
   'page.changed': 'When a page changes',
   'routine.ready': 'When a routine is ready',
-  'cap.reached': 'When a cap is reached',
+  'cap.reached': 'When a duty reaches its most per day',
 };
 
 /** The fields that each event takes beside its kind: an agent that narrows it, how long a question waits, or a path of the wiki. */
@@ -602,7 +655,7 @@ export function eventWords(e: DutyEvent, name: (agent: string) => string = (a) =
 /** startWords says what starts a duty that has no schedule. */
 export function startWords(d: Pick<DutyRecord, 'when'>, name?: (agent: string) => string): string {
   const w = d.when || {};
-  if (w.webhook) return 'When another app calls';
+  if (w.webhook) return 'When another app calls the server';
   if (w.event) return eventWords(w.event, name);
   return '';
 }
@@ -616,7 +669,9 @@ const turnsText = (n: number) => n + (n === 1 ? ' turn' : ' turns');
 /**
  * limitWords reads the limits of a duty back in words. The budget follows
  * the action: a post spends nothing of its own, and an open gives the
- * turns of the whole bridge. Only ask and manager have a cap of a day. A
+ * turns of the whole bridge. Only ask and manager have a cap of a day,
+ * and a run of theirs without a cost limit says so. A duty that an event
+ * or another app starts has no times, so its words name a start, and a
  * missed time concerns a schedule only, so a duty without one leaves it
  * out.
  */
@@ -629,7 +684,8 @@ export function limitWords(l: DutyRecord['limits'] | undefined, schedule = true,
     if (b.maxTurns) out.push('The bridge gets at most ' + turnsText(b.maxTurns) + '.');
   } else {
     const run: string[] = [];
-    if (b.maxCostUSD) run.push(costText(b.maxCostUSD));
+    if (!b.maxCostUSD) out.push('A run has no cost limit.');
+    else run.push(costText(b.maxCostUSD));
     if (b.maxTurns) run.push(turnsText(b.maxTurns));
     if (b.maxTokens) run.push(b.maxTokens.toLocaleString() + ' tokens');
     if (b.maxToolCalls) run.push(b.maxToolCalls + (b.maxToolCalls === 1 ? ' tool call' : ' tool calls'));
@@ -637,7 +693,8 @@ export function limitWords(l: DutyRecord['limits'] | undefined, schedule = true,
     if (l.perDayUSD) out.push('The duty spends at most ' + costText(l.perDayUSD) + ' a day.');
   }
   const overlap = l.overlap || 'skip';
-  out.push(overlap === 'queue' ? 'A time that comes while the last run works runs after it.' : overlap === 'allow' ? 'A time that comes while the last run works runs anyway.' : 'A time that comes while the last run works is skipped.');
+  const comes = schedule ? 'A time that comes while the last run works' : 'A start that comes while the last run works';
+  out.push(comes + (overlap === 'queue' ? ' runs after it.' : overlap === 'allow' ? ' runs anyway.' : ' is skipped.'));
   const c = l.catchUp === undefined ? '1h' : l.catchUp;
   if (schedule) out.push(seconds(c) === 0 ? 'A missed time does not run.' : 'A missed time runs once, within ' + spanText(c) + '.');
   return out;
@@ -721,6 +778,34 @@ export function nameReason(name: string, taken: string[]): string {
   if (RESERVED.includes(name)) return 'The names new and options are kept for the page. Pick another name.';
   if (taken.includes(name)) return 'A duty of this name exists. Pick another name.';
   return '';
+}
+
+/**
+ * slugOf makes the short name that the server keeps from the name that a
+ * person writes: Walk Duty 1 is walk-duty-1. A letter with an accent loses
+ * it, every other sign becomes a hyphen, and a long name ends at a word,
+ * within 63 characters.
+ */
+export function slugOf(words: string): string {
+  const s = String(words || '')
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/-{2,}/g, '-')
+    .replace(/^[-_]+|[-_]+$/g, '');
+  if (s.length <= 63) return s;
+  const c = s.slice(0, 63);
+  const i = c.lastIndexOf('-');
+  return (i > 20 ? c.slice(0, i) : c).replace(/[-_]+$/, '');
+}
+
+/** nameWordsReason says why the name that a person writes cannot name a duty, or "": its short name decides. */
+export function nameWordsReason(words: string, taken: string[]): string {
+  if (!String(words || '').trim()) return 'Give the duty a name.';
+  const slug = slugOf(words);
+  if (!slug) return 'A name needs at least one letter from a to z, or a digit.';
+  return nameReason(slug, taken);
 }
 
 /* ---------- the form ---------- */
@@ -1212,7 +1297,8 @@ export function formErrors(f: DutyForm, opts: { fresh: boolean; name: string; ta
   } else if (!opts.keepsWhen && !f.say) {
     const w = whenError(f.when);
     if (w) e.when = w;
-    if (f.when.start && f.when.end && f.when.end < f.when.start) e.dates = 'The last day comes before the first day.';
+    const d = datesError(f.when);
+    if (d) e.dates = d;
   }
   if (f.act === 'post' && !f.bridge) e.bridge = 'Pick the bridge.';
   if (f.act === 'open' && !f.playbook) e.playbook = 'Pick a playbook.';
@@ -1234,7 +1320,7 @@ export function formErrors(f: DutyForm, opts: { fresh: boolean; name: string; ta
   if (hasCheck(f.check) && f.check.where.some((r) => r.field.trim() && (r.test === 'atLeast' || r.test === 'atMost') && !Number.isFinite(Number(r.text.trim() || 'x'))))
     e.where = 'At least and at most need a number.';
   if (opts.fresh) {
-    const why = nameReason(opts.name, opts.taken);
+    const why = nameWordsReason(opts.name, opts.taken);
     if (why) e.name = why;
   }
   return e;
@@ -1335,4 +1421,71 @@ export function askOfRun(run: { input?: string } | undefined, items: { kind: str
   if (input) return input;
   const first = items.find((x) => x.kind === 'user' && x.text && x.text.trim());
   return first && first.text ? first.text.trim() : '';
+}
+
+/* ---------- the words of Make this a duty ---------- */
+
+const DAY_WORDS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday', 'mon', 'tue', 'tues', 'wed', 'thu', 'thur', 'thurs', 'fri', 'sat', 'sun', 'mondays', 'tuesdays', 'wednesdays', 'thursdays', 'fridays', 'saturdays', 'sundays'];
+const MONTH_WORDS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december', 'jan', 'feb', 'mar', 'apr', 'jun', 'jul', 'aug', 'sep', 'sept', 'oct', 'nov', 'dec'];
+/** The words that make a repeat. A run of schedule words needs one, so at 5pm alone is no schedule. A duty repeats, so a day of the week counts. */
+const REPEAT_WORDS = ['every', 'each', 'daily', 'nightly', 'hourly', 'weekly', 'monthly', 'weekday', 'weekdays', 'weekends', 'once', 'twice', 'month', ...DAY_WORDS];
+/** The words that a schedule in words can hold beside the repeat. */
+const SCHEDULE_WORDS = new Set([
+  ...REPEAT_WORDS,
+  ...DAY_WORDS,
+  ...MONTH_WORDS,
+  'other', 'day', 'days', 'week', 'weeks', 'weekend', 'month', 'months', 'hour', 'hours', 'minute', 'minutes', 'mins',
+  'at', 'on', 'and', 'from', 'to', 'until', 'till', 'between', 'the', 'of', 'in', 'a', 'an',
+  'first', 'second', 'third', 'fourth', 'last', 'morning', 'mornings', 'afternoon', 'evening', 'evenings', 'night', 'noon', 'midnight',
+  'am', 'pm', 'a.m', 'p.m', 'a.m.', 'p.m.', 'utc', 'time',
+]);
+/** The joining words that a run of schedule words never starts or ends on. */
+const EDGE_WORDS = new Set(['at', 'on', 'and', 'from', 'to', 'until', 'till', 'between', 'the', 'of', 'in', 'a', 'an', 'time']);
+
+/** scheduleWord reports whether a word can be part of a schedule in words: a word of the list, a time such as 8am or 9:30, a number, or a day of the month such as 1st. */
+function scheduleWord(w: string): boolean {
+  const x = w.toLowerCase();
+  return SCHEDULE_WORDS.has(x) || /^\d{1,2}(:\d{2})?(am|pm|a\.m\.?|p\.m\.?)?$/.test(x) || /^\d{1,2}(st|nd|rd|th)$/.test(x);
+}
+
+/**
+ * scheduleWordsIn finds the words of a schedule in a message, such as
+ * every Monday at 8am in "Every Monday at 8am, read the wiki.", so Make
+ * this a duty can read them back. It takes the longest run of schedule
+ * words within a clause that holds a repeat, without a joining word at
+ * either end. A message without one gives "".
+ */
+export function scheduleWordsIn(text: string): string {
+  let best = '';
+  for (const clause of String(text || '').split(/[,;!?\n()]|[:.](?!\d)/)) {
+    const words = clause
+      .trim()
+      .split(/\s+/)
+      .map((w) => w.replace(/^["'“”‘’]+|["'“”‘’]+$/g, ''))
+      .filter(Boolean);
+    let i = 0;
+    while (i < words.length) {
+      if (!scheduleWord(words[i])) {
+        i++;
+        continue;
+      }
+      let j = i;
+      while (j < words.length && scheduleWord(words[j])) j++;
+      let run = words.slice(i, j);
+      while (run.length && EDGE_WORDS.has(run[0].toLowerCase())) run = run.slice(1);
+      while (run.length && EDGE_WORDS.has(run[run.length - 1].toLowerCase())) run = run.slice(0, -1);
+      const said = run.join(' ');
+      if (run.some((w) => REPEAT_WORDS.includes(w.toLowerCase())) && said.length > best.length) best = said;
+      i = j;
+    }
+  }
+  return best;
+}
+
+/** moneyIn finds the first amount of dollars in a message, such as 0.05 in "A run gets at most $0.05.", as the field of a cost holds it, or "". */
+export function moneyIn(text: string): string {
+  const m = /\$\s?(\d+(?:[.,]\d{1,4})?)(?!\d)/.exec(String(text || ''));
+  if (!m) return '';
+  const n = money(m[1]);
+  return n > 0 ? m[1].replace(',', '.') : '';
 }

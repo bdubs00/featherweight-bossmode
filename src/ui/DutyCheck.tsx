@@ -6,7 +6,9 @@
 // or call a tool of the agent, picked from its profile, with its input as
 // names and values. The filters keep some items, each a field, a test, and
 // a value. Nobody types a secret, a regex, or code. GET /v1/duties/options
-// names what the front serves, and the section offers nothing else.
+// names what the front serves, and the section offers nothing else. A tool
+// shows by what it does, and its name stays out of sight unless two tools
+// say the same.
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
@@ -26,6 +28,7 @@ import {
   problemsBy,
   secretsFor,
   splitProblem,
+  toolName,
   type CheckForm,
   type WhereRow,
   type WhereTest,
@@ -83,9 +86,25 @@ export interface CheckProps {
   onAgentProblems?: (list: string[]) => void;
   open: boolean;
   onToggle: (open: boolean) => void;
+  /** The words of Write the check for me, which the editor keeps in its draft. Without them, the section keeps its own. */
+  words?: string;
+  onWords?: (words: string) => void;
 }
 
-/** ToolPick is the choice of a tool of the agent, from its profile, each tool with its phrase. */
+/**
+ * toolChoices names each tool of a choice by what it does. A tool without
+ * a phrase keeps its name, without the prefix of the server, and two tools
+ * that say the same add their names, so a person tells them apart.
+ */
+export function toolChoices(tools: string[], phrase: (t: string) => string): [string, string][] {
+  const said = tools.map((t) => {
+    const p = phrase(t);
+    return p && p !== t ? p : toolName(t);
+  });
+  return tools.map((t, i) => [t, said.filter((x) => x === said[i]).length > 1 && said[i] !== toolName(t) ? said[i] + ' (' + toolName(t) + ')' : said[i]]);
+}
+
+/** ToolPick is the choice of a tool of the agent, from its profile, each tool by what it does. */
 function ToolPick({ agent, value, onChange }: { agent: string; value: string; onChange: (tool: string) => void }) {
   const profile = useProfile(agent);
   const catalog = useToolCatalog();
@@ -94,17 +113,16 @@ function ToolPick({ agent, value, onChange }: { agent: string; value: string; on
     const list = checkTools(profile ? profile.tools : [], catalog);
     return value && !list.includes(value) ? [value, ...list] : list;
   }, [profile, catalog, value]);
-  const words = (t: string) => {
-    const p = phraseOf(catalog, t);
-    return p === t ? t : p + ', ' + t;
-  };
+  const choices = useMemo(() => toolChoices(tools, (t) => phraseOf(catalog, t)), [tools, catalog]);
   if (!agent) return <p class="t-meta">Pick the agent first. Its tools show here.</p>;
   return (
     <Field label="Tool">
       <select class="recess" value={value} onChange={(e) => onChange((e.target as HTMLSelectElement).value)}>
         <option value="">{profile === undefined ? 'Loading the tools' : tools.length ? 'Pick a tool' : 'This agent has no tool to call'}</option>
-        {tools.map((t) => (
-          <option value={t}>{words(t)}</option>
+        {choices.map(([t, w]) => (
+          <option value={t} title={toolName(t)}>
+            {w}
+          </option>
         ))}
       </select>
     </Field>
@@ -199,11 +217,25 @@ function CheckFields({ check, onChange, agent, options, error, whereError }: Pic
         </>
       )}
       <div class="field-row">
-        <Field label="Where the list is">
-          <Input value={check.items} spellcheck={false} placeholder="result.records" onInput={(e) => set({ items: (e.target as HTMLInputElement).value })} />
+        <Field
+          label={
+            <>
+              Where the list is{' '}
+              <Help label="How to name the list">The place of the list in the answer, with a dot between the names, such as result.records. Leave it empty to take the whole answer as the list.</Help>
+            </>
+          }
+        >
+          <Input value={check.items} spellcheck={false} placeholder="The whole answer" onInput={(e) => set({ items: (e.target as HTMLInputElement).value })} />
         </Field>
-        <Field label="What makes an item new">
-          <Input value={check.key} spellcheck={false} placeholder="number" onInput={(e) => set({ key: (e.target as HTMLInputElement).value })} />
+        <Field
+          label={
+            <>
+              What makes an item new{' '}
+              <Help label="How to name the field">The field of an item that no other item shares, such as number or id. Leave it empty to compare whole items.</Help>
+            </>
+          }
+        >
+          <Input value={check.key} spellcheck={false} placeholder="The whole item" onInput={(e) => set({ key: (e.target as HTMLInputElement).value })} />
         </Field>
       </div>
       <Filters rows={check.where} onChange={(where) => set({ where })} error={whereError} />
@@ -239,7 +271,9 @@ type Tried = { found: CheckFound } | { error: string } | null;
  */
 export function CheckFirst(p: CheckProps) {
   const { check, onChange, agent, agentName, pathName, writeName, record, options, open, onToggle } = p;
-  const [words, setWords] = useState('');
+  const [ownWords, setOwnWords] = useState('');
+  const words = p.words !== undefined ? p.words : ownWords;
+  const setWords = p.onWords || setOwnWords;
   const [writer, setWriter] = useState(true);
   const [writing, setWriting] = useState(false);
   const [waited, setWaited] = useState(0);
@@ -326,6 +360,8 @@ export function CheckFirst(p: CheckProps) {
     onChange(c);
   };
   const problems = p.problems || [];
+  const catalog = useToolCatalog();
+  const toolWords = (t: string) => phraseOf(catalog, t);
   return (
     <details class="advanced duty-check" open={open} onToggle={(e) => onToggle((e.target as HTMLDetailsElement).open)}>
       <summary>
@@ -372,13 +408,13 @@ export function CheckFirst(p: CheckProps) {
             {attempted && !writing && (
               <div class="duty-tried">
                 <p class="t-meta">What {agentName} tried</p>
-                <p class="duty-readback">{attempted.readback || (attempted.checkFirst && attempted.checkFirst.look ? checkWords(attempted.checkFirst, agentName) : '')}</p>
+                <p class="duty-readback">{attempted.readback || (attempted.checkFirst && attempted.checkFirst.look ? checkWords(attempted.checkFirst, agentName, toolWords) : '')}</p>
               </div>
             )}
           </div>
         )}
         {(manual || !writer) && <CheckFields check={check} onChange={change} agent={agent} options={options} error={p.error} whereError={p.whereError} />}
-        {on && written && <p class="duty-readback">{wrote || checkWords(written, agentName)}</p>}
+        {on && written && <p class="duty-readback">{wrote || checkWords(written, agentName, toolWords)}</p>}
         {problems.length > 0 && (
           <ul class="duty-problems" role="alert">
             {problems.map((x) => (

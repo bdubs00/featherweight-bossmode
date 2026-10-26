@@ -519,3 +519,47 @@
   flex-direction: column;
   overflow-wrap: anywhere;
 }
+
+/* ---------- the walk of 2026-10-26 ---------- */
+/* The grey lights of a duty take a shape of their own, so not run yet,
+   paused, and finished never look the same: a hollow light, the two bars
+   of a pause, and a whole light. */
+.duty-led-hollow .led {
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--led-grey);
+}
+.duty-led-pause .led {
+  background: linear-gradient(90deg, var(--led-grey) 0 3px, transparent 3px 6px, var(--led-grey) 6px);
+  box-shadow: none;
+  border-radius: 0;
+}
+/* A heading of the editor with its question mark beside it. */
+.duty-sec-top {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin-bottom: var(--s-2);
+}
+.duty-sec-top > .duty-sec-head {
+  margin-bottom: 0;
+}
+/* The line of a draft that came back, with the key that discards it. */
+.duty-form > .duty-kept {
+  margin-top: 0;
+}
+/* The short name that a name in words saves as. */
+.duty-slug {
+  overflow-wrap: anywhere;
+}
+/* A duty runs later, so the free workers of now say nothing: the picker of
+   Who leaves them out. */
+.duty-edit .pick-row .status {
+  display: none;
+}
+/* A question mark in the label of a field takes no more height than the
+   words, so the controls of a row of fields stay on one line. */
+.duty-form .field-label .help,
+.duty-form legend .help {
+  vertical-align: middle;
+  margin-block: -3px;
+}

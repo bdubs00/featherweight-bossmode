@@ -10,7 +10,21 @@ import { forgetToolCatalog } from '../state/tools';
 import { DutyEditor, timing } from './DutyEditor';
 import { clearNotice } from './notice';
 import { bridge, seat } from './testkit-b';
-import { click, fakeApi, fieldOf, keyNamed, mount, settle, typeIn, unmountAll, type Call, type Route } from './testkit-c';
+import { click, fakeApi, keyNamed, mount, settle, typeIn, unmountAll, type Call, type Route } from './testkit-c';
+
+/** labelOf is the label of a field as a person reads it, without the question mark of its help. */
+function labelOf(l: Element): string {
+  const c = l.cloneNode(true) as Element;
+  c.querySelectorAll('.help').forEach((h) => h.remove());
+  return (c.textContent || '').trim();
+}
+
+/** fieldOf finds the control of a field by its label. */
+function fieldOf(root: ParentNode, label: string): HTMLInputElement | null {
+  const f = [...root.querySelectorAll('label.field')].find((l) => labelOf(l.querySelector('.field-label')!) === label);
+  return f ? (f.querySelector('input, textarea, select') as HTMLInputElement | null) : null;
+}
+
 
 const ALICE: Whoami = { principal: { subject: 'alice@example.com', name: 'Alice' }, roles: { migrator: 'owner' }, admin: false, canCreate: true };
 const ALL: DutyOptions = {
@@ -34,6 +48,8 @@ beforeAll(() => {
   timing.preview = 0;
 });
 beforeEach(() => {
+  // A draft of the editor lives in the storage of the tab. Each test starts without one.
+  sessionStorage.clear();
   forgetDuties();
   forgetPlaybooks();
   forgetProfiles();
@@ -133,7 +149,7 @@ describe('When', () => {
     change(fieldOf(el, 'Of the agent'), 'migrator');
     await settle();
     expect((lastPut().body as DutyRecord).when).toEqual({ event: { kind: 'bridge.closed', agent: 'migrator' } });
-    expect(text(el.querySelector('.duty-readback-box .duty-readback'))).toBe('When a bridge of migrator closes.');
+    expect(text(el.querySelector('.duty-readback-box .duty-readback'))).toBe('When a bridge of Migrator closes.');
     expect(keyNamed(el, 'What happened')).toBeTruthy();
     change(fieldOf(el, 'What happens'), 'question.waiting');
     expect(fieldOf(el, 'Waits longer than')!.value).toBe('1h');
@@ -152,7 +168,7 @@ describe('When', () => {
     api = fakeApi({ 'GET /v1/duties': { duties: [], paused: false }, 'GET /v1/duties/options': ALL, 'PUT /v1/duties/new?dryRun=true': dry({ readback: '' }) });
     const el = mount(<DutyEditor />);
     await settle();
-    const legends = () => [...el.querySelectorAll('section[aria-labelledby="duty-limits-head"] legend')].map((l) => l.textContent);
+    const legends = () => [...el.querySelectorAll('section[aria-labelledby="duty-limits-head"] legend')].map(labelOf);
     expect(fieldOf(el, 'Catch up a missed time')).toBeTruthy();
     click(radio(el, 'duty-start', 'event'));
     expect(fieldOf(el, 'Catch up a missed time')).toBeNull();
@@ -177,7 +193,7 @@ describe('When', () => {
     expect(radio(el, 'duty-start', 'event')!.checked).toBe(true);
     expect(fieldOf(el, 'What happens')!.value).toBe('routine.ready');
     expect(optionsOf(fieldOf(el, 'What happens'))).toEqual(['Pick what happens', 'When a bridge closes', 'When a routine is ready']);
-    expect((fieldOf(el, 'Ask migrator') as unknown as HTMLTextAreaElement).value).toBe('Read [What happened].');
+    expect((fieldOf(el, 'Ask Migrator') as unknown as HTMLTextAreaElement).value).toBe('Read [What happened].');
   });
 
   it('takes a first and a last day, and refuses a last day before the first', async () => {
@@ -192,7 +208,7 @@ describe('When', () => {
     expect((lastPut().body as DutyRecord).when.schedule).toMatchObject({ repeat: 'weekdays', start: '2026-11-02', end: '2026-12-18' });
     typeIn(fieldOf(el, 'Last day'), '2026-10-01');
     fill(el);
-    typeIn(fieldOf(el, 'Ask migrator'), 'Report.');
+    typeIn(fieldOf(el, 'Ask Migrator'), 'Report.');
     click(keyNamed(el, 'Save duty'));
     await settle();
     expect(text(fieldOf(el, 'Last day')!.closest('label')!.querySelector('.field-error'))).toBe('The last day comes before the first day.');
@@ -253,7 +269,7 @@ describe('What', () => {
     fill(el);
     click(radio(el, 'duty-do', 'open'));
     await settle();
-    expect(fieldOf(el, 'Ask migrator')).toBeNull();
+    expect(fieldOf(el, 'Ask Migrator')).toBeNull();
     expect(optionsOf(fieldOf(el, 'Playbook'))).toEqual(['Pick a playbook', 'Weekly patching: Patch the lab hosts and report.']);
     // The budget of an open is the turns of the bridge, and nothing else.
     expect(fieldOf(el, 'The most a run can cost')).toBeNull();
@@ -268,8 +284,8 @@ describe('What', () => {
     change(fieldOf(el, 'Playbook'), 'weekly-patching');
     typeIn(fieldOf(el, 'Goal'), 'Patch on ');
     click(keyNamed(el, "Today's date"));
-    // The name drops the joining word at its end.
-    expect(fieldOf(el, 'Name')!.value).toBe('patch');
+    // The name drops the joining word at its end, and reads as words.
+    expect(fieldOf(el, 'Name')!.value).toBe('Patch');
     typeIn(turns(), '12');
     click(keyNamed(el, 'Save duty'));
     await settle();
@@ -315,7 +331,7 @@ describe('What', () => {
     api = fakeApi({ 'GET /v1/duties': { duties: [], paused: false }, 'GET /v1/duties/options': ALL, 'PUT /v1/duties/new?dryRun=true': dry(), 'PUT /v1/duties/check-the-backups?dryRun=true': dry() });
     let el = mount(<DutyEditor seed={{ agent: 'migrator', act: 'manager', message: 'Check the backups.' }} />);
     await settle();
-    expect(text(el.querySelector('.duty-who'))).toContain('migrator');
+    expect(text(el.querySelector('.duty-who'))).toContain('Migrator');
     expect(radio(el, 'duty-do', 'manager')!.checked).toBe(true);
     expect((fieldOf(el, 'Ask the manager') as unknown as HTMLTextAreaElement).value).toBe('Check the backups.');
     // No silent cost: the budget stays empty.
@@ -327,14 +343,14 @@ describe('What', () => {
     el = mount(<DutyEditor seed={{ agent: 'migrator', act: 'manager', message: 'Check the backups.' }} />);
     await settle();
     expect(radio(el, 'duty-do', 'manager')).toBeNull();
-    expect((fieldOf(el, 'Ask migrator') as unknown as HTMLTextAreaElement).value).toBe('Check the backups.');
+    expect((fieldOf(el, 'Ask Migrator') as unknown as HTMLTextAreaElement).value).toBe('Check the backups.');
   });
 });
 
 describe('Limits', () => {
   const POST_WORDS = 'A post spends nothing of its own. The seats of the bridge spend from their own budgets.';
   const limits = (el: HTMLElement) => el.querySelector('section[aria-labelledby="duty-limits-head"]')!;
-  const labels = (el: HTMLElement) => [...limits(el).querySelectorAll('.field-label')].map((l) => l.textContent);
+  const labels = (el: HTMLElement) => [...limits(el).querySelectorAll('.field-label')].map(labelOf);
 
   it('follow the action at once: ask shows the budget, a post spends nothing of its own, and an open asks for the turns of the bridge', async () => {
     api = fakeApi({ 'GET /v1/duties': { duties: [], paused: false }, 'GET /v1/duties/options': ALL, 'GET /v1/playbooks': { playbooks: [] }, 'PUT /v1/duties/new?dryRun=true': dry(), 'PUT /v1/duties/review-what-changed?dryRun=true': dry() });
@@ -348,7 +364,7 @@ describe('Limits', () => {
     // A post hides the budget and the cap of a day, and says why in their place. Overlap and catch up stay.
     expect(labels(el)).toEqual(['Catch up a missed time']);
     expect(text(limits(el).querySelector('.duty-spends'))).toBe(POST_WORDS);
-    expect([...limits(el).querySelectorAll('legend')].map((l) => l.textContent)).toEqual(['If the last run still works']);
+    expect([...limits(el).querySelectorAll('legend')].map(labelOf)).toEqual(['If the last run still works']);
     change(fieldOf(el, 'Bridge'), 'b1');
     typeIn(fieldOf(el, 'Message'), 'Review what changed.');
     click(keyNamed(el, 'Save duty'));
@@ -411,7 +427,9 @@ describe('Check first', () => {
     expect(text(el.querySelector('details.duty-check'))).toContain('Pick the agent first. Its tools show here.');
     pick(el, 'Migrator');
     await settle();
-    expect(optionsOf(fieldOf(el, 'Tool'))).toEqual(['Pick a tool', 'Find incidents, servicenow.query_incidents', 'servicenow.get_incident', 'Run shell commands, bash']);
+    // Each tool shows what it does. Its name stays in the tooltip, and a tool without words keeps its name.
+    expect(optionsOf(fieldOf(el, 'Tool'))).toEqual(['Pick a tool', 'Find incidents', 'servicenow.get_incident', 'Run shell commands']);
+    expect((fieldOf(el, 'Tool') as unknown as HTMLSelectElement).options[1].title).toBe('servicenow.query_incidents');
     change(fieldOf(el, 'Tool'), 'servicenow.query_incidents');
     click(keyNamed(el, 'Add a value'));
     typeIn(el.querySelector('input[aria-label="Name 1"]'), 'query');
@@ -420,13 +438,14 @@ describe('Check first', () => {
     typeIn(el.querySelector('input[aria-label="Field of filter 1"]'), 'priority');
     change(select(el, 'Test of filter 1'), 'atMost');
     typeIn(el.querySelector('input[aria-label="Value of filter 1"]'), 'two');
-    typeIn(fieldOf(el, 'Ask migrator'), 'Triage.');
+    typeIn(fieldOf(el, 'Ask Migrator'), 'Triage.');
     typeIn(fieldOf(el, 'The most a run can cost'), '1');
     click(keyNamed(el, 'Save duty'));
     await settle();
     expect(text(el.querySelector('[aria-label="Keep the items where"] .field-error'))).toBe('At least and at most need a number.');
     typeIn(el.querySelector('input[aria-label="Value of filter 1"]'), '2');
-    expect(text(el.querySelector('details.duty-check .duty-readback'))).toBe('Call the tool servicenow.query_incidents of migrator. Take the whole answer as the list. Keep the items where priority is at most 2. Wake migrator only for items that it did not see before.');
+    // The readback says the tool by what it does.
+    expect(text(el.querySelector('details.duty-check .duty-readback'))).toBe('Call a tool of Migrator: find incidents. Take the whole answer as the list. Keep the items where priority is at most 2. Wake Migrator only for items that it did not see before.');
     click(keyNamed(el, 'Save duty'));
     await settle();
     expect((lastPut().body as DutyRecord).checkFirst).toEqual({ look: { tool: 'servicenow.query_incidents', input: { query: 'priority<=2' } }, where: [{ field: 'priority', atMost: 2 }], wake: { when: 'new' } });
@@ -475,7 +494,7 @@ describe('Check first', () => {
       expect(JSON.parse(String(seen!.body))).toEqual({ words: 'a new P1 shows up', agent: 'migrator' });
       const wait = el.querySelector('.duty-wait')!;
       expect(wait.getAttribute('role')).toBe('status');
-      expect(text(wait)).toBe('migrator writes the check, then tries it once. This can take up to two minutes. 0 seconds so far.');
+      expect(text(wait)).toBe('Migrator writes the check, then tries it once. This can take up to two minutes. 0 seconds so far.');
       expect((keyNamed(el, 'Write the check for me') as HTMLButtonElement).disabled).toBe(true);
       click(keyNamed(el, 'Cancel'));
       await settle();
@@ -502,7 +521,7 @@ describe('Check first', () => {
     typeIn(fieldOf(el, 'Wake the agent only when'), 'a new P1');
     click(keyNamed(el, 'Write the check for me'));
     await settle();
-    expect(text(fieldOf(el, 'Wake the agent only when')!.closest('label')!.querySelector('.field-error'))).toBe('migrator did not answer within two minutes. Try again, or set the check up by hand.');
+    expect(text(fieldOf(el, 'Wake the agent only when')!.closest('label')!.querySelector('.field-error'))).toBe('Migrator did not answer within two minutes. Try again, or set the check up by hand.');
   });
 });
 
@@ -519,10 +538,10 @@ describe('the problems of the front', () => {
     const el = mount(<DutyEditor />);
     await settle();
     fill(el);
-    typeIn(fieldOf(el, 'Ask migrator'), 'Sum up.');
+    typeIn(fieldOf(el, 'Ask Migrator'), 'Sum up.');
     click(keyNamed(el, 'Save duty'));
     await settle();
-    expect(text(fieldOf(el, 'Ask migrator')!.closest('label')!.querySelector('.field-error'))).toBe('The message names no file.');
+    expect(text(fieldOf(el, 'Ask Migrator')!.closest('label')!.querySelector('.field-error'))).toBe('The message names no file.');
     expect(text(fieldOf(el, 'The most a run can cost')!.closest('label')!.querySelector('.field-error'))).toBe('A run of migrator costs at least $1.');
     expect(text(el.querySelector('section[aria-labelledby="duty-away-head"] .duty-problems'))).toBe('Too long.');
     expect((el.querySelector('details.duty-check') as HTMLDetailsElement).open).toBe(true);
@@ -558,7 +577,7 @@ describe('the name of a draft', () => {
     expect(lastPut().path).toBe('/v1/duties/new?dryRun=true');
     typeIn(nameField(), 'new');
     expect(why()).toBe('The names new and options are kept for the page. Pick another name.');
-    typeIn(fieldOf(el, 'Ask migrator'), 'Sum up the week.');
+    typeIn(fieldOf(el, 'Ask Migrator'), 'Sum up the week.');
     click(keyNamed(el, 'Save duty'));
     await settle();
     expect(document.querySelector('dialog.confirm')).toBeNull();
@@ -605,7 +624,7 @@ describe('the refusals of Write the check for me', () => {
     }));
     expect(wordsError(el)).toBe('The check found no list at result.records. The answer holds a list at data.items.');
     const tried = el.querySelector('.duty-tried')!;
-    expect(text(tried)).toBe('What migrator tried Call the tool servicenow.query_incidents of migrator. Take the list at result.records.');
+    expect(text(tried)).toBe('What Migrator tried Call the tool servicenow.query_incidents of migrator. Take the list at result.records.');
     // The record stays out of the form: the fields by hand stay closed, and the duty has no check.
     expect(fieldOf(el, 'Tool')).toBeNull();
     expect(keyNamed(el, 'Remove the check')).toBeUndefined();
@@ -613,7 +632,7 @@ describe('the refusals of Write the check for me', () => {
 
   it('read a record that the agent tried in words when the 422 holds no readback', async () => {
     const el = await writeWith(() => ({ status: 422, body: { detail: 'no list', error: 'no list', checkFirst: { look: { http: { url: 'https://queue.example.com/api' } }, wake: { when: 'any' } } } }));
-    expect(text(el.querySelector('.duty-tried'))).toBe('What migrator tried Look at queue.example.com/api. Take the whole answer as the list. Wake migrator when the check finds an item.');
+    expect(text(el.querySelector('.duty-tried'))).toBe('What Migrator tried Look at queue.example.com/api. Take the whole answer as the list. Wake Migrator when the check finds an item.');
   });
 
   it('show a problem of the words under the words, and one of the agent under the agent picker', async () => {

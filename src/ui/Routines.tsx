@@ -4,7 +4,9 @@
 // tabs Steps, Evidence, and Runbook. A routine that needs you opens on the
 // card of its sign-off. The details pane holds the week of its agent.
 // docs/DESIGN.md, section 11.9, names the screen, and docs/ROUTINES.md of
-// the kernel holds the contract.
+// the kernel holds the contract. A server without routines answers 404 to
+// the list: the list says so once, the main pane says what a routine is,
+// and the page asks the server no more until the next load.
 
 import { useEffect, useLayoutEffect, useMemo, useState } from 'preact/hooks';
 import type { RoutineRecord, RoutineSummary, Standing } from '../api/routines';
@@ -37,7 +39,7 @@ import {
   units,
 } from '../lib/routines';
 import { useSelect } from '../state/store';
-import { loadRoutine, loadRoutines, loadWeek, move, useRoutines, useRoutinesView } from '../state/routines';
+import { loadRoutine, loadRoutines, loadWeek, move, routines, useRoutines, useRoutinesView } from '../state/routines';
 import { useRoving } from './keys';
 import { showError } from './notice';
 import { ApiError } from '../api/client';
@@ -96,17 +98,20 @@ function RoutineRow({ r, on }: { r: RoutineRecord; on: boolean }) {
   );
 }
 
-/** OffWords say that the front keeps no routines, with where they are turned on behind the question mark. */
+/** OffWords say that the front keeps no routines, with who turns them on behind the question mark. */
 function OffWords() {
   return (
     <>
       Routines are off.{' '}
       <Help label="Where routines are turned on">
-        The setting <code>workbench.routines.enabled</code> turns them on. The server keeps them on its bus, which must be <code>nats</code> or <code>mem</code>.
+        An admin turns routines on in the setup of the server, with the setting <code>workbench.routines.enabled</code>.
       </Help>
     </>
   );
 }
+
+/** ROUTINE_IS says what a routine is, in the main pane while routines are off, so the list alone says that they are off. */
+export const ROUTINE_IS = 'A routine does work that an agent repeats, in the same steps and without the model, once a person signs it off.';
 
 /** RoutineList is the list pane: the routines in the order of attention, with Find a routine and the retired ones behind a toggle. */
 export function RoutineList({ agent, name }: { agent?: string; name?: string }) {
@@ -119,7 +124,8 @@ export function RoutineList({ agent, name }: { agent?: string; name?: string }) 
   const list = useRoving<HTMLDivElement>();
   useRoutinesView();
   useEffect(() => {
-    loadRoutines().catch(() => {});
+    // A server that answered 404 keeps no routines until the page loads again, so a visit asks it nothing.
+    if (!routines.get().off) loadRoutines().catch(() => {});
   }, []);
   const all = useMemo(() => (order || []).map((k) => byKey[k]).filter(Boolean), [order, byKey]);
   const current = agent && name ? keyOf(agent, name) : '';
@@ -232,7 +238,7 @@ function RoutineHome() {
   }, [href]);
   return (
     <EmptyPane back={{ href: '#routines', label: 'Routines' }}>
-      <p>{off ? <OffWords /> : error && !order ? error : !order ? 'Loading the routines.' : order.length === 0 ? 'No routine yet.' : 'Pick a routine.'}</p>
+      <p>{off ? ROUTINE_IS : error && !order ? error : !order ? 'Loading the routines.' : order.length === 0 ? 'No routine yet.' : 'Pick a routine.'}</p>
     </EmptyPane>
   );
 }
@@ -307,6 +313,7 @@ function RoutineView({ agent, name, tab }: { agent: string; name: string; tab: R
     setFailed('');
     setLater(false);
     setChanged(false);
+    if (routines.get().off) return;
     loadRoutine(agent, name).catch((e) => setFailed(e instanceof Error ? e.message : 'The action failed. Try it again.'));
   }, [key]);
   const back = { href: '#routines', label: 'Routines', to: 'list' as const };
@@ -315,7 +322,7 @@ function RoutineView({ agent, name, tab }: { agent: string; name: string; tab: R
       <section class="screen routine" aria-labelledby="routine-title">
         <PaneHeader id="routine-title" title={title} size="title" level={1} back={back} />
         <div class="empty center">
-          <p>{gone && off ? <OffWords /> : gone ? 'This routine is not here. It was removed, or you cannot see it.' : failed || 'Loading the routine.'}</p>
+          <p>{off ? narrow ? <OffWords /> : 'This routine does not show while routines are off.' : gone ? 'This routine is not here. It was removed, or you cannot see it.' : failed || 'Loading the routine.'}</p>
         </div>
       </section>
     );
@@ -713,6 +720,7 @@ export function RoutineAgent({ agent, name }: { agent: string; name: string }) {
   useRoutinesView();
   useEffect(() => {
     setFailed('');
+    if (routines.get().off) return;
     loadWeek(agent).catch((e) => setFailed(e instanceof Error ? e.message : 'The action failed. Try it again.'));
   }, [agent]);
   const display = (face && face.displayName) || agent;

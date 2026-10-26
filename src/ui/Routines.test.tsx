@@ -4,7 +4,7 @@ import type { EvidenceDay, RoutineRecord } from '../api/routines';
 import type { Whoami } from '../api/types';
 import { store } from '../state/store';
 import { forgetRoutines } from '../state/routines';
-import { RoutineAgent, RoutineList, RoutineMain } from './Routines';
+import { ROUTINE_IS, RoutineAgent, RoutineList, RoutineMain } from './Routines';
 import { clearNotice, currentNotice } from './notice';
 import { click, fakeApi, keyNamed, mount, settle, typeIn, unmountAll, type Call } from './testkit-c';
 
@@ -168,19 +168,29 @@ describe('the list of routines', () => {
     expect(el.querySelector('[role=alert]')!.textContent).toContain('The store did not answer.');
   });
 
-  it('says that routines are off on a front that keeps none, with the setting behind the question mark', async () => {
+  it('says once that routines are off on a front that keeps none, with who turns them on behind the question mark, and asks no more', async () => {
     api = fakeApi({ 'GET /v1/routines': () => ({ status: 404, body: { detail: 'not found' } }) });
     const list = mount(<RoutineList />);
     const main = mount(<RoutineMain tab="steps" />);
     await settle();
+    expect(list.textContent).toContain('Routines are off.');
+    expect(list.querySelector('[aria-label="Where routines are turned on"]')).not.toBeNull();
+    // The main pane says what a routine is, so the two panes never say the same.
+    expect(main.textContent).not.toContain('Routines are off.');
+    expect(main.textContent).toContain(ROUTINE_IS);
     for (const el of [list, main]) {
-      expect(el.textContent).toContain('Routines are off.');
-      expect(el.querySelector('[aria-label="Where routines are turned on"]')).not.toBeNull();
       expect(el.querySelector('[role=alert]')).toBeNull();
-      expect(el.textContent).not.toMatch(/not found|No routine yet|Loading/);
+      expect(el.textContent).not.toMatch(/not found|No routine yet|Loading|nats|bus/);
     }
     expect(list.querySelector('.find')).toBeNull();
     expect(list.querySelector('.pane-head .chip')).toBeNull();
+    // Another visit asks the server nothing until the page loads again.
+    unmountAll();
+    const before = api.calls.length;
+    mount(<RoutineList />);
+    mount(<RoutineMain tab="steps" agent="triage" name="acknowledge-a-new-ticket" />);
+    await settle();
+    expect(api.calls.length).toBe(before);
   });
 });
 
