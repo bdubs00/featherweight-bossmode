@@ -59,7 +59,8 @@ export function fakeFetch(routes: [string, RegExp, (body: unknown) => unknown][]
       if (m === method && re.test(path)) {
         const out = h(body);
         if (out instanceof Response) return out;
-        return new Response(out === null ? '' : JSON.stringify(out), { status: out === null ? 204 : 200, headers: { 'Content-Type': 'application/json' } });
+        // A 204 carries no body: a Response with a body and status 204 throws.
+        return out === null ? new Response(null, { status: 204 }) : new Response(JSON.stringify(out), { status: 200, headers: { 'Content-Type': 'application/json' } });
       }
     }
     return new Response(JSON.stringify({ status: 404, detail: 'no route ' + path }), { status: 404, headers: { 'Content-Type': 'application/problem+json' } });
