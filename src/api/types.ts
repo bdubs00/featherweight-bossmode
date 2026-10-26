@@ -659,6 +659,14 @@ export interface Page extends PageMeta {
   version: number;
 }
 
+/** A page that someone removed, from GET /v1/pages/removed: its path, its title, its last version before the removal, and when it went. */
+export interface RemovedPage {
+  path: string;
+  title: string;
+  version: number;
+  removedAt: string;
+}
+
 /** One version of a page. A removal has deleted set, and no text, hash, or writer. */
 export interface PageVersion {
   version: number;

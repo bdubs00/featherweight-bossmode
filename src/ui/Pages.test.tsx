@@ -60,6 +60,55 @@ describe('the tree of the wiki', () => {
   });
 });
 
+describe('the removed pages', () => {
+  const REMOVED = [{ path: 'walk/walk-page-6.md', title: 'Walk page 6', version: 41, removedAt: new Date(Date.now() - 3 * 3600_000).toISOString() }];
+
+  it('fold at the end of the tree, closed, and restore a page, which then opens', async () => {
+    api = fakeApi({
+      'GET /v1/pages': { pages: [meta('runbooks/deploy.md')] },
+      'GET /v1/pages/removed': { removed: REMOVED },
+      'GET /v1/pages/walk/walk-page-6.md?version=41': { ...page('# Walk page 6\n\nText.', 'h41'), path: 'walk/walk-page-6.md', version: 41 },
+      'PUT /v1/pages/walk/walk-page-6.md': { ...page('# Walk page 6\n\nText.', 'h42'), path: 'walk/walk-page-6.md', version: 42 },
+    });
+    act(() => store.dispatch({ type: 'pages', pages: [meta('runbooks/deploy.md')] }));
+    const el = mount(<PageTree />);
+    await settle();
+    const head = el.querySelector('#folder-removed') as HTMLButtonElement;
+    expect(head.textContent).toBe('Removed pages1');
+    expect(head.getAttribute('aria-expanded')).toBe('false');
+    expect(el.querySelector('.removed-row')).toBeNull();
+    click(head);
+    const row = el.querySelector('.removed-row')!;
+    expect(row.querySelector('.t-sub')!.textContent).toBe('Walk page 6');
+    expect(row.querySelector('time')!.textContent).toBe('removed 3 hours ago');
+    click(keyNamed(row as HTMLElement, 'Restore'));
+    await settle();
+    const put = api.calls.find((c) => c.method === 'PUT')!;
+    expect(put.path).toBe('/v1/pages/walk/walk-page-6.md');
+    expect(put.headers['If-None-Match']).toBe('*');
+    expect(put.body).toEqual({ text: '# Walk page 6\n\nText.', summary: 'Put back after a removal' });
+    expect(currentSaid()).toBe('Put back Walk page 6.');
+    expect(location.hash).toBe('#pages/walk/walk-page-6.md');
+    clearSaid();
+  });
+
+  it('do not show while the list is empty, nor on a server without the list', async () => {
+    api = fakeApi({ 'GET /v1/pages': { pages: [meta('runbooks/deploy.md')] }, 'GET /v1/pages/removed': { removed: [] } });
+    act(() => store.dispatch({ type: 'pages', pages: [meta('runbooks/deploy.md')] }));
+    const empty = mount(<PageTree />);
+    await settle();
+    expect(empty.querySelector('#folder-removed')).toBeNull();
+    api.restore();
+    // A server without the route answers 404.
+    api = fakeApi({ 'GET /v1/pages': { pages: [meta('runbooks/deploy.md')] } });
+    const old = mount(<PageTree />);
+    await settle();
+    expect(api.calls.some((c) => c.path === '/v1/pages/removed')).toBe(true);
+    expect(old.querySelector('#folder-removed')).toBeNull();
+    expect(currentNotice()).toBe('');
+  });
+});
+
 describe('the history of a page', () => {
   it('names the page by its title, and by its file without one', async () => {
     api = fakeApi({ 'GET /v1/pages/homelab/proxmox/blanks.md/history': { versions: [] }, 'GET /v1/pages/runbooks/deploy.md/history': { versions: [] } });

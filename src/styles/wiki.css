@@ -652,3 +652,18 @@ code.slash {
     max-width: none;
   }
 }
+
+/* A removed page in the fold Removed pages: its link to the page, which says that it was removed, and Restore beside it. */
+.removed-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding-right: var(--s-2);
+}
+.removed-row .wrow {
+  flex: 1;
+  min-width: 0;
+}
+.removed-row .t-sub {
+  color: var(--muted);
+}

@@ -8,12 +8,12 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { ApiError } from '../api/client';
 import { api } from '../api/routes';
-import type { Page, PageMeta, PageVersion, SearchHit } from '../api/types';
+import type { Page, PageMeta, PageVersion, RemovedPage, SearchHit } from '../api/types';
 import { useSelect } from '../state/store';
 import { loadPages } from '../state/actions';
 import { stripFrontMatter } from '../lib/markdown';
 import { INDEX_PATH, byPagePath, pageName, pageReason, withSuffix } from '../lib/pagepath';
-import { personName, since } from '../lib/words';
+import { ago, personName, since } from '../lib/words';
 import { go, hrefOf } from '../lib/route';
 import { useRoving } from './keys';
 import { SAID_MS, attempt, showError, showSaid, showUndo } from './notice';
@@ -104,6 +104,81 @@ export function withoutTitle(body: string, title: string): string {
   const m = /^\s*#[ \t]+(.+?)[ \t]*#*[ \t]*(\r?\n|$)/.exec(body);
   if (!m || m[1].trim().toLowerCase() !== title.trim().toLowerCase()) return body;
   return body.slice(m[0].length).replace(/^\s*\n/, '');
+}
+
+/**
+ * putBack writes the text of a removed page as the page again, a new
+ * version over the removal, says so, and opens the page. Undo of Remove
+ * page and Restore of a removed page take this one path.
+ */
+export async function putBack(path: string, text: string, title: string): Promise<void> {
+  await api.putPage(path, text, '*', 'Put back after a removal');
+  await loadPages();
+  showSaid('Put back ' + title + '.');
+  go({ place: 'pages', path, mode: 'read' });
+}
+
+/**
+ * RemovedPages is the fold at the end of the tree: the removed pages that
+ * did not come back, each with its title, when it went in words, and
+ * Restore, which reads its last version and puts it back. It starts
+ * closed, and it does not show while the list is empty or the server has
+ * no list of removed pages. It reads the list again when the set of the
+ * pages of the wiki changes, as after a removal or a restore.
+ */
+export function RemovedPages() {
+  const paths = useSelect((s) => Object.keys(s.pages.byPath).sort().join('\n'));
+  const [removed, setRemoved] = useState<RemovedPage[] | null>(null);
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState('');
+  useEffect(() => {
+    let live = true;
+    api
+      .removedPages()
+      .then((r) => live && setRemoved(r))
+      .catch(() => live && setRemoved(null));
+    return () => {
+      live = false;
+    };
+  }, [paths]);
+  if (!removed || removed.length === 0) return null;
+  const restore = async (r: RemovedPage) => {
+    setBusy(r.path);
+    await attempt(async () => {
+      const p = await api.page(r.path, r.version);
+      await putBack(r.path, p.text, r.title || pageName(r.path));
+    });
+    setBusy('');
+  };
+  return (
+    <div class="group removed-pages" role="group" aria-labelledby="folder-removed">
+      <button type="button" class="group-head" id="folder-removed" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <Glyph name="back" size={14} />
+        <span class="clip">Removed pages</span>
+        <Chip>{removed.length}</Chip>
+      </button>
+      {open && (
+        <div class="c-rows" role="list">
+          {removed.map((r) => (
+            <div role="listitem" class="removed-row">
+              <a class="wrow" href={hrefOf({ place: 'pages', path: r.path, mode: 'read' })} data-item>
+                <span class="t-sub clip">{r.title || pageName(r.path)}</span>
+                <span class="meta">
+                  <span>{pageName(r.path)}</span>
+                  <time dateTime={r.removedAt} title={new Date(r.removedAt).toLocaleString()}>
+                    {'removed ' + ago(r.removedAt)}
+                  </time>
+                </span>
+              </a>
+              <Button size="s" disabled={busy === r.path} aria-label={'Restore ' + (r.title || pageName(r.path))} onClick={() => restore(r)}>
+                Restore
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 /** Since is a short meta of a moment, with the full time in a tooltip. */
@@ -236,6 +311,7 @@ export function PageTree({ current }: { current?: string }) {
                 </>
               );
             })}
+            {loaded && <RemovedPages />}
           </>
         )}
       </div>
@@ -379,17 +455,7 @@ export function PageView({ path, version }: { path: string; version?: number }) 
     if (!ok) return;
     // Undo puts the text back as the page, a new version over the removal.
     const text = page.text;
-    showUndo(
-      'Removed ' + title + '.',
-      () =>
-        attempt(async () => {
-          await api.putPage(path, text, '*', 'Put back after a removal');
-          await loadPages();
-          showSaid('Put back ' + title + '.');
-          go({ place: 'pages', path, mode: 'read' });
-        }),
-      SAID_MS,
-    );
+    showUndo('Removed ' + title + '.', () => attempt(() => putBack(path, text, title)), SAID_MS);
     go('#pages');
   };
   // Restore saves an old version as the newest one: over the newest version, or as the page again when it was removed.

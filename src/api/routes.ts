@@ -38,6 +38,7 @@ import type {
   Page,
   PageMeta,
   PageVersion,
+  RemovedPage,
   Placement,
   Playbook,
   Pool,
@@ -266,6 +267,14 @@ export const api = {
       headers: ifMatch === '*' ? { 'If-None-Match': '*' } : { 'If-Match': '"' + ifMatch + '"' },
     }),
   /** removePage removes a page. ifMatch is the hash that the person saw, so a newer version stays. The history keeps every version. */
+  /** removedPages lists the removed pages that did not come back, newest first, or null from a server without the route. */
+  removedPages: () =>
+    call<{ removed: RemovedPage[] }>('/v1/pages/removed')
+      .then((r) => (r && r.removed) || [])
+      .catch((e) => {
+        if (e instanceof ApiError && e.status === 404) return null;
+        throw e;
+      }),
   removePage: (path: string, ifMatch?: string) => call<null>('/v1/pages/' + encPath(path), { method: 'DELETE', headers: ifMatch ? { 'If-Match': '"' + ifMatch + '"' } : {} }),
   history: (path: string) => call<{ path: string; versions: PageVersion[] }>('/v1/pages/' + encPath(path) + '/history').then((r) => (r && r.versions) || []),
   search: (q: string, signal?: AbortSignal) =>
