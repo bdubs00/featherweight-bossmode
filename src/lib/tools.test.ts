@@ -34,6 +34,8 @@ describe('abilitiesOf', () => {
   it('names a whole server once, as a glob or by the name of a source of the catalog', () => {
     expect(abilitiesOf(['ansible.*'], CATALOG).map((x) => x.text)).toEqual(['Use the tools of ansible']);
     expect(abilitiesOf(['github'], CATALOG).map((x) => x.text)).toEqual(['Use the tools of github']);
+    // No text of the page says front: its tools are the bridges, the wiki, and the fleet.
+    expect(abilitiesOf(['front.*'], CATALOG).map((x) => x.text)).toEqual(['Use the bridges, the wiki, and the fleet']);
   });
 
   it('takes the first sentence of a description without a phrase, the words of the kernel without the catalog, and the name last', () => {

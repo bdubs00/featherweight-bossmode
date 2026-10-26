@@ -54,10 +54,11 @@ export const NOT_ON_A_BRIDGE = 'Not on a bridge';
 /** newestRun is the id of the newest run of a seat, or "". */
 export const newestRun = (m: Pick<Member, 'runs'>): string => (m.runs && m.runs.length ? m.runs[m.runs.length - 1] : '');
 
-/** capacityWords says how many workers of an agent are free: 1 free, 2 free, or waiting for a worker. An agent with no worker gets no words. */
+/** capacityWords says how many workers of an agent are free: 1 worker free, 2 workers free, or waiting for a worker. An agent with no worker gets no words. */
 export function capacityWords(w: Workers): string {
   if (w.workers.length === 0) return '';
-  return w.free > 0 ? w.free + ' free' : 'waiting for a worker';
+  if (w.free === 1) return '1 worker free';
+  return w.free > 0 ? w.free + ' workers free' : 'waiting for a worker';
 }
 
 /**
@@ -375,9 +376,7 @@ export interface Reach {
  * such member, the reason says why, in the words of the composer.
  */
 export function reachOf(fleet: Fleet | null | undefined, workers: Worker[], agent: string): Reach {
-  const served = (fleet ? fleet.members || [] : [])
-    .filter((m) => (m.agents || []).some((a) => !!a && a.name === agent))
-    .sort((a, b) => (a.state === 'live' ? 0 : 1) - (b.state === 'live' ? 0 : 1))[0];
+  const served = (fleet ? fleet.members || [] : []).filter((m) => (m.agents || []).some((a) => !!a && a.name === agent)).sort((a, b) => (a.state === 'live' ? 0 : 1) - (b.state === 'live' ? 0 : 1))[0];
   if (served) return { member: served.name, why: '' };
   const up = workers.find((w) => w.phase === 'Running') || workers.find((w) => w.phase === 'Suspended');
   if (up) return { member: up.member, why: '' };

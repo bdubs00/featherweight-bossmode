@@ -69,7 +69,11 @@ export function PackagesSection({ agent, pool, owner }: { agent: string; pool: s
   const [askOff, setAskOff] = useState(false);
   // The workers that sleep, by name: a change reaches them only when they wake.
   const facts = useSelect(selectFacts);
-  const sleeping = new Set(workersOf(facts, agent).workers.filter((w) => w.phase === 'Suspended').map((w) => w.name));
+  const sleeping = new Set(
+    workersOf(facts, agent)
+      .workers.filter((w) => w.phase === 'Suspended')
+      .map((w) => w.name),
+  );
 
   useEffect(() => {
     live.current = true;
@@ -268,7 +272,9 @@ export function PackagesSection({ agent, pool, owner }: { agent: string; pool: s
             setAskOff(false);
           }}
         >
-          <p>The workers of {agent} lose {offWords(p)}.</p>
+          <p>
+            The workers of {agent} lose {offWords(p)}.
+          </p>
         </Confirm>
       )}
       {(problem || error) && !(p.on && owner) && (

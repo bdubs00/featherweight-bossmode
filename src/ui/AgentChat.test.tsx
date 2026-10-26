@@ -129,7 +129,15 @@ describe('the conversation with an agent on no bridge', () => {
   });
 
   it('says what the agent does in an empty conversation', () => {
-    act(() => store.dispatch({ type: 'agents', agents: [{ name: 'migrator', role: 'owner', description: 'Moves Puppet modules to Ansible.' }, { name: 'manager', role: 'operator' }] }));
+    act(() =>
+      store.dispatch({
+        type: 'agents',
+        agents: [
+          { name: 'migrator', role: 'owner', description: 'Moves Puppet modules to Ansible.' },
+          { name: 'manager', role: 'operator' },
+        ],
+      }),
+    );
     const el = mount(<AgentChat agent="migrator" />);
     expect(el.querySelector('.thread-empty')!.textContent).toBe('Start a conversation with migrator. Moves Puppet modules to Ansible.');
     expect((el.querySelector('#composer') as HTMLTextAreaElement).disabled).toBe(false);

@@ -44,6 +44,9 @@ export interface Folder {
   pages: PageMeta[];
 }
 
+/** The headings over the work folders of the bridges and of the agents in the tree. */
+const KIND_HEADS: Record<string, string> = { bridge: 'Bridges', agent: 'Agents' };
+
 /** The order of the kinds of folders: the pages that people keep first, the work folders of bridges and agents last. */
 const KIND_ORDER: Folder['kind'][] = ['root', 'people', 'bridge', 'agent'];
 
@@ -206,26 +209,31 @@ export function PageTree({ current }: { current?: string }) {
                 <Button href="#create">New page</Button>
               </div>
             )}
-            {folders.map((f) => {
+            {folders.map((f, i) => {
               const open = !shut[f.path];
               const id = 'folder-' + (f.path || 'root');
+              // The work folders of the bridges and of the agents each start under a heading of their own.
+              const kindHead = (f.kind === 'bridge' || f.kind === 'agent') && (i === 0 || folders[i - 1].kind !== f.kind) ? KIND_HEADS[f.kind] : '';
               return (
-                <div class="group" role="group" aria-labelledby={f.path ? id : undefined} aria-label={f.path ? undefined : 'Pages'}>
-                  {f.path && (
-                    <button type="button" class="group-head" id={id} aria-expanded={open} title={f.title !== f.path ? f.path : undefined} onClick={() => setShut({ ...shut, [f.path]: open })}>
-                      <Glyph name="back" size={14} />
-                      <span class="clip">{f.title}</span>
-                      <Chip>{f.pages.length}</Chip>
-                    </button>
-                  )}
-                  {open && (
-                    <div class="c-rows" role="list">
-                      {f.pages.map((p) => (
-                        <PageRow p={p} current={current} />
-                      ))}
-                    </div>
-                  )}
-                </div>
+                <>
+                  {kindHead && <h2 class="group-title t-heading">{kindHead}</h2>}
+                  <div class="group" role="group" aria-labelledby={f.path ? id : undefined} aria-label={f.path ? undefined : 'Pages'}>
+                    {f.path && (
+                      <button type="button" class="group-head" id={id} aria-expanded={open} title={f.title !== f.path ? f.path : undefined} onClick={() => setShut({ ...shut, [f.path]: open })}>
+                        <Glyph name="back" size={14} />
+                        <span class="clip">{f.title}</span>
+                        <Chip>{f.pages.length}</Chip>
+                      </button>
+                    )}
+                    {open && (
+                      <div class="c-rows" role="list">
+                        {f.pages.map((p) => (
+                          <PageRow p={p} current={current} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
               );
             })}
           </>

@@ -36,6 +36,8 @@ export const MAX_WORKERS = 32;
 export const DEFAULT_COMPACTION = 262144;
 /** The efforts that the kernel takes. */
 export const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
+/** The words of each effort, as a person picks it. The value stays the word of the kernel. */
+export const EFFORT_WORDS: Record<string, string> = { low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra high', max: 'Highest' };
 /** The time zone of the browser, which the placeholder of the field names. */
 const BROWSER_ZONE = (() => {
   try {
@@ -332,9 +334,9 @@ export function NewAgent() {
               </Field>
               <Field label="Effort">
                 <select class="recess" value={f.effort} onChange={(e) => set('effort', (e.target as HTMLSelectElement).value)}>
-                  <option value="">Default</option>
+                  <option value="">The default</option>
                   {EFFORTS.map((x) => (
-                    <option value={x}>{x}</option>
+                    <option value={x}>{EFFORT_WORDS[x] || x}</option>
                   ))}
                 </select>
               </Field>

@@ -1226,12 +1226,17 @@ button.liked-more {
     width: var(--h-row);
     height: var(--h-row);
   }
-  a.people-title,
   .prof-link,
   .member-where a {
     display: inline-flex;
     align-items: center;
     min-height: var(--h-row);
+  }
+  /* A flex box hides the ellipsis of its text, so the title of a group stays a block and its line height makes the target. */
+  a.people-title {
+    display: block;
+    min-height: var(--h-row);
+    line-height: var(--h-row);
   }
   .board-light {
     width: var(--h-row);

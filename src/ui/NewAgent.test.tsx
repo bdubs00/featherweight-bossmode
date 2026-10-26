@@ -89,6 +89,10 @@ describe('NewAgent', () => {
     expect(adv.querySelector('summary')!.textContent).toBe('Advanced');
     expect(fieldOf(adv, 'Compact at, in tokens')!.value).toBe(String(DEFAULT_COMPACTION));
     expect(['Model', 'Effort', 'Turns', 'Tokens', 'Cost in dollars', 'Compaction model', 'Ask before', 'Never run', 'Time zone'].every((l) => fieldOf(adv, l))).toBe(true);
+    // The efforts read as words, and the value stays the word of the kernel.
+    const effort = adv.querySelector('select') as HTMLSelectElement;
+    expect([...effort.options].map((o) => o.textContent)).toEqual(['The default', 'Low', 'Medium', 'High', 'Extra high', 'Highest']);
+    expect([...effort.options].map((o) => o.value)).toEqual(['', 'low', 'medium', 'high', 'xhigh', 'max']);
   });
 
   it('sends the profile and the workers to PUT /v1/agents/{name}, and shows the workers', async () => {
