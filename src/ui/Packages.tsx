@@ -34,6 +34,20 @@ export const NOTE_TEXT = 'Workers take a change in about a minute. Work in progr
 
 const KINDS: PackageKind[] = ['python', 'tools'];
 
+/**
+ * refusalText is the sentence of a refused change. The server words a
+ * refused name as one sentence that starts with the name in quotes, such
+ * as "bad name;rm" holds a semicolon; ..., and the section shows it as it
+ * is: the cut at the first full stop of a plain error would cut a name
+ * such as ruamel.yaml. Another error keeps the words of the client.
+ */
+export function refusalText(e: unknown): string {
+  if (!(e instanceof ApiError)) return 'The change failed. Try it again.';
+  const detail = e.problem && typeof e.problem.detail === 'string' ? e.problem.detail.trim() : '';
+  if (detail.startsWith('"') || detail === 'Write the name of a package.') return detail;
+  return e.message;
+}
+
 /** offWords names what the workers lose when packages turn off: a few names, else a count. */
 export function offWords(p: Packages): string {
   const names = [...p.python, ...p.tools].map((x) => x.name);
@@ -130,7 +144,7 @@ export function PackagesSection({ agent, pool, owner }: { agent: string; pool: s
       setP(normalize(v, pool));
       return true;
     } catch (e) {
-      if (live.current && !(e instanceof SigninNeeded)) setError(e instanceof ApiError ? e.message : 'The change failed. Try it again.');
+      if (live.current && !(e instanceof SigninNeeded)) setError(refusalText(e));
       return false;
     } finally {
       saving.current = false;

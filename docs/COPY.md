@@ -960,7 +960,7 @@ install as it is, which can hold any word.
 | new | add | the version that a ready worker installed, in muted words after the name of each package | done |
 | new | add | the refusal of the front `There is no Python package named <name>.` | done |
 | new | add | the switch `The agent can ask for a package. You approve each one.` | done |
-| new | add | the errors `Write the name of a package.`, `A package name cannot start with a dash.`, `A package name cannot hold a control character.`, `A package name holds 200 characters at most.`, `<name> is in the list already.`, `A list holds 100 packages at most.`, `That is not the name of a Python package. Write a name such as pyyaml, with a version such as >=6 when you need one.`, and `That is not the name of a program. Write a name such as jq, with a version such as =1.7 when you need one.` | done |
+| new | add | the errors `Write the name of a package.` and `"<name>" <reason>.`, the sentence of the server for a refused name, such as `"bad name;rm" holds a semicolon; a condition after a semicolon is not available, so write the name and the version alone, such as pyyaml>=6.`, which the page says before the call with the rule of the kernel (src/lib/packages.ts) and shows as it is from the server; then `<name> is in the list already.` and `A list holds 100 packages at most.` | done |
 
 ### src/ui/Decision.tsx and src/lib/words.ts: the card of a package
 

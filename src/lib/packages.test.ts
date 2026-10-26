@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Fleet, Packages } from '../api/types';
-import { bodyOf, keyOf, lineOf, nameProblem, normalize, poolOfAgent, shouldPoll, versionsOf } from './packages';
+import { bodyOf, keyOf, lineOf, nameProblem, normalize, poolOfAgent, requirementClause, shouldPoll, versionsOf } from './packages';
 
 const base: Packages = { pool: 'crew', available: true, on: true, ask: true, python: [{ name: 'ansible-lint' }], tools: [], applying: false, workers: [] };
 const w = (task: string, state: string) => ({ task, state }) as Packages['workers'] extends (infer T)[] | undefined ? T : never;
@@ -50,21 +50,77 @@ describe('shouldPoll', () => {
 });
 
 describe('nameProblem', () => {
-  it('refuses what the kernel refuses, and a package in the list already', () => {
+  it('refuses what the server refuses, in its sentence, and a package in the list already', () => {
     expect(nameProblem(base, 'python', '  ')).toBe('Write the name of a package.');
-    expect(nameProblem(base, 'python', '-e .')).toBe('A package name cannot start with a dash.');
-    expect(nameProblem(base, 'python', 'six\u0007')).toBe('A package name cannot hold a control character.');
-    expect(nameProblem(base, 'python', 'x'.repeat(201))).toBe('A package name holds 200 characters at most.');
+    expect(nameProblem(base, 'python', '-e .')).toBe('"-e ." starts with a dash.');
+    expect(nameProblem(base, 'python', 'six\u0007')).toBe('"six\\u0007" holds a control character.');
+    expect(nameProblem(base, 'python', 'x'.repeat(201))).toBe('"' + 'x'.repeat(201) + '" is longer than 200 characters.');
+    expect(nameProblem(base, 'python', 'bad name;rm')).toBe('"bad name;rm" holds a semicolon; a condition after a semicolon is not available, so write the name and the version alone, such as pyyaml>=6.');
+    expect(nameProblem(base, 'python', 'bad name')).toBe('"bad name" holds a space inside the name.');
+    expect(nameProblem(base, 'tools', 'walk tool')).toBe('"walk tool" is not a program: write a conda name with an optional version and build, such as jq, nodejs>=22, or nodejs 22.*.');
+    expect(nameProblem(base, 'tools', 'conda-forge::jq')).toBe('"conda-forge::jq" names a channel; a channel is not available, so name a package of conda-forge, such as jq.');
     expect(nameProblem(base, 'python', 'ANSIBLE-LINT')).toBe('ANSIBLE-LINT is in the list already.');
     expect(nameProblem(base, 'tools', 'ansible-lint')).toBe('');
     expect(nameProblem({ ...base, tools: Array.from({ length: 100 }, (_, i) => ({ name: 'p' + i })) }, 'tools', 'jq')).toBe('A list holds 100 packages at most.');
-    expect(nameProblem(base, 'python', 'pyyaml>=6')).toBe('');
-    expect(nameProblem(base, 'python', 'requests[socks]>=2.31,<3')).toBe('');
-    // A space, a marker after ;, or an address is no name of a package.
-    expect(nameProblem(base, 'python', 'bad name;rm')).toBe('That is not the name of a Python package. Write a name such as pyyaml, with a version such as >=6 when you need one.');
-    expect(nameProblem(base, 'python', 'https://example.com/x.whl')).toMatch(/^That is not the name of a Python package/);
-    expect(nameProblem(base, 'tools', 'conda-forge::ripgrep=14.1')).toBe('');
-    expect(nameProblem(base, 'tools', 'rm -rf')).toBe('That is not the name of a program. Write a name such as jq, with a version such as =1.7 when you need one.');
+  });
+});
+
+// The cases of pkglist_test.go of the kernel, so the page and the server refuse the same names.
+describe('requirementClause', () => {
+  it('takes a name of PEP 508 with extras and versions for Python', () => {
+    for (const ok of ['six', 'PyYAML', 'ruamel.yaml', 'zope_interface', 'a', 'a1', 'pyyaml>=6', 'pyyaml >= 6', 'pyyaml>=6,<7', 'pyyaml >=6, <7', 'pyyaml (>=6)', 'pyyaml~=6.0', 'pyyaml===6.0.1', 'pyyaml!=5.*', 'torch==2.4.0+cpu', 'pkg==1.0.post1', 'pkg==1!2.0', 'ansible-lint[yaml]==24.9.2', 'requests[socks, security]>=2', 'requests [socks]', 'a'.repeat(200)])
+      expect([ok, requirementClause('python', ok)]).toEqual([ok, '']);
+    const bad: Record<string, string> = {
+      '': 'is empty',
+      '--index-url=http://evil': 'starts with a dash',
+      'pyyaml\n--pre': 'control character',
+      'a\tb': 'control character',
+      ['a'.repeat(201)]: 'longer than 200',
+      'bad name;rm': 'holds a semicolon',
+      "six; python_version > '3'": 'holds a quote',
+      'six; sys_platform == linux': 'holds a semicolon',
+      'requests @ https://e.org/r.whl': 'names a URL',
+      'git+https://e.org/r.git': 'names a URL',
+      'bad name': 'holds a space inside the name',
+      'six"': 'holds a quote',
+      'six`': 'holds a quote',
+      '>=6': 'is not a Python package',
+      'six-': 'is not a Python package',
+      '.six': 'is not a Python package',
+      'six>': 'is not a Python package',
+      'six>=6 7': 'is not a Python package',
+      'six[': 'is not a Python package',
+      'six[a,]': 'is not a Python package',
+      'six(>=6': 'is not a Python package',
+      'six>=6)': 'is not a Python package',
+      'six=6': 'is not a Python package',
+      'six>=6$': 'is not a Python package',
+      'six\\': 'is not a Python package',
+      'pyyaml\n]': 'control character',
+    };
+    for (const [req, want] of Object.entries(bad)) expect([req, requirementClause('python', req)]).toEqual([req, expect.stringContaining(want)]);
+  });
+
+  it('takes a conda name with a version and a build for a program, and no channel', () => {
+    for (const ok of ['jq', 'nodejs>=22', 'nodejs 22.*', 'nodejs  >=22,<23', 'openssl 3.* *_0', 'python_abi', 'nodejs==22.1.0=h123_0', 'ripgrep 14.1|14.2', 'a'.repeat(200)])
+      expect([ok, requirementClause('tools', ok)]).toEqual([ok, '']);
+    const bad: Record<string, string> = {
+      'conda-forge::jq': 'names a channel',
+      "jq[version='>=1.7']": 'holds a quote',
+      'jq[version=1.7]': 'is not a program',
+      _libgcc_mutex: 'is not a program',
+      'jq 1.7 h1 extra': 'is not a program',
+      'jq;rm': 'is not a program',
+      'walk tool': 'is not a program',
+      'jq 1.7 h$1': 'is not a program',
+      'jq/1.7': 'is not a program',
+      'jq\r': 'control character',
+    };
+    for (const [req, want] of Object.entries(bad)) expect([req, requirementClause('tools', req)]).toEqual([req, expect.stringContaining(want)]);
+  });
+
+  it('never passes a quote, a backslash, or a line break, which a manifest of TOML cannot hold', () => {
+    for (const kind of ['python', 'tools'] as const) for (const req of ['a"b', "a'b", 'a\\b', 'a\nb', 'a\rb', 'a\u2028b']) expect([kind, req, requirementClause(kind, req) !== '']).toEqual([kind, req, true]);
   });
 });
 
