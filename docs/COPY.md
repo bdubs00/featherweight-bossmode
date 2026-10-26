@@ -726,6 +726,8 @@ column Now names the string of the approved boards where one changed.
 | `triage, signed off just now` (a row of the board) | change | `triage, 0 this week`, the meta of every live row. The quiet card says when. | done |
 | new | add | `Loading the routines.`, `No routine yet.`, `No routine holds those words.`, `Pick a routine.` | done |
 | new | add | `Routines are off.` with the question mark `Where routines are turned on` and `The setting workbench.routines.enabled turns them on. The server keeps them on its bus, which must be nats or mem.`, on a front that answers 404 to the list | done |
+| `The setting workbench.routines.enabled turns them on. The server keeps them on its bus, which must be nats or mem.` | change | `An admin turns routines on in the setup of the server, with the setting workbench.routines.enabled.` The definition opens under the line, in the width of the list, so a narrow list never cuts it. | done |
+| `Routines are off.` in the main pane beside the list | change | `A routine does work that an agent repeats, in the same steps and without the model, once a person signs it off.`, so the two panes never say the same. A routine address says `This routine does not show while routines are off.`, and `Routines are off.` where the main pane is the only pane. After the 404, the page asks the server nothing more until it loads again. | done |
 
 ### src/ui/Routines.tsx: a routine
 
@@ -930,6 +932,35 @@ stands for a value.
 |---|---|---|---|
 | new | add | in Tell me about, once the settings list a shared channel: `You`, then each shared channel as `The <label> channel`, each with `Failures` and `Questions` | done |
 | `Failures and questions.` (the readback of Tell me about on the page of a duty) | change | the same, then for each shared channel that the duty names `The <label> channel hears of failures.`, `of questions.`, or `of failures and questions.` | done |
+
+### The walk of 2026-10-26: Duties, Check first, and the playbooks
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| the title of a duty, the first line of its message, such as `In one line, name one thing you check first in a review.` | change | the name of the duty in words, such as `Daily report`, in the list, on its page, in `Delete <name>?`, and on a profile. What it does stays under What it does, and Find a duty still reads it. Two names that read the same show their short names in the meta. | done |
+| `Name` with the placeholder `daily-report` and `A name holds 1 to 63 of a to z, 0 to 9, hyphens, and underscores.` for `Walk Duty 1` | change | `Name` in words with the placeholder `Daily report`, and under it `It saves as walk-duty-1.` The page makes the short name. The errors `Give the duty a name.` and `A name needs at least one letter from a to z, or a digit.` | done |
+| new | add | `Your unsaved changes are back.` with the key `Discard them`, over a form that a person left without Save or Cancel, and `Your unsaved changes are back. The duty changed since you made them, and Save puts yours in its place.` for an edit of a duty that changed since | done |
+| `When a cap is reached` | change | `When a duty reaches its most per day` | done |
+| `default` and `triage` in `Of the agent`, and an agent without a face in lower case | change | only the agents that workers run, each by its face, else by its name with a capital, such as `Triage`, as the picker shows it. The same holds for Who, the words of an event, and Check first. | done |
+| `1 free` in the picker of Who | remove | a duty runs later, so the free workers of now say nothing | done |
+| `When another app calls. The page keeps this start.` | change | `When another app calls the server. You cannot change this start here.` | done |
+| `End 2026-12-01 is before start 2026-12-10.` (the server, under a readback of the old schedule) | change | `The last day comes before the first day.` under Last day as soon as both days are set. The page asks the server nothing for those days, and an empty readback does not show. | done |
+| the readback of the sentence under a problem of the words of the box | remove | the readback hides while the words hold a problem, and comes back at the next change | done |
+| a first day that earlier words set, such as the anchor of every other Tuesday, kept by the next words | change | the next words set the days. Only days that the person set by hand stay. `Only between two dates` shows on whenever the sentence holds a day. | done |
+| `Add a time` adds the same time again | change | it adds the next hour that the sentence does not hold | done |
+| new | add | the question marks `What a turn is` (`A turn is one step of the agent: it thinks once, then uses its tools. The run stops after this many turns.`), `When this happens` beside If the last run still works, `What a missed time is`, `What away means`, `Where you hear of it` (`Activity always shows a failure and a question. Where to reach me, in the menu of your account, also sends them to your phone or your chat.`), and `What the agent does here` beside Who for a post, an open, and Ask the manager | done |
+| `Write the report of [Today's date] to the wiki.` (the placeholder over the message that comes from the setup of the server) | remove | the field stays empty, and the line under it says where the message comes from | done |
+| `The goal of the playbook` (the placeholder after a pick) | change | the first line of the goal of the playbook, with `An empty goal keeps the goal of the playbook.` | done |
+| Cancel and Back of New duty from Make this a duty go to Duties | change | they go back to where Make this a duty came from: `Back to the chat`, `Back to the manager`, `Back to the bridge`, or `Back to the conversation`. A message that names when, such as every Monday at 8am, goes to Say it in your own words and the sentence, and an amount, such as $0.05, to The most a run can cost. | done |
+| `A time that comes while the last run works runs anyway.` for a duty that an event or another app starts | change | `A start that comes while the last run works runs anyway.`, and `is skipped.` or `runs after it.` | done |
+| a duty of ask or manager without a cost limit, whose Limits said nothing of it | add | `A run has no cost limit.` | done |
+| new | add | `Deleted the duty <name>.` and `Deleted the playbook <name>.`, the notice of a delete | done |
+| `Find incidents, servicenow.query_incidents` and `Run shell commands, bash` in Tool, and `front.pages_list` for a tool without words | change | `Find incidents` and `Run shell commands`, with the name of the tool in the tooltip, `<phrase> (<tool>)` for two tools that say the same, and `pages_list` for a tool without words | done |
+| the placeholders `result.records` and `number` of Where the list is and What makes an item new | change | `The whole answer` and `The whole item`, with the question marks `How to name the list` and `How to name the field` | done |
+| `Call the tool front.pages_list of Docs Scribe.` | change | `Call a tool of Docs Scribe: list the pages of the wiki.` for a tool with words, else the name without `front.` | done |
+| `Name` of Save as playbook, with the placeholder `weekly-patching` | change | the name in words with the placeholder `Weekly patching`, `It saves as weekly-patching.`, and `Saved the playbook Weekly patching.` | done |
+| `Open the duty <name>` (the tooltip of the chip of a duty in Activity) | change | `Open the duty <name in words>` | done |
+| the grey lights `not run yet`, `paused`, and `finished` | change | the same words, with a hollow light for not run yet and the two bars of a pause for paused | done |
 
 ## 10. Packages
 
