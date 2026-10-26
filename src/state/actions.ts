@@ -222,6 +222,29 @@ export async function answerQuestion(id: string, handle: string, seq: number, te
   return sendMessage(id, { text, to: [handle], replyTo: seq });
 }
 
+/** The sentence of a server that has no route to end a question without an answer yet. */
+export const NO_SETTLE = 'This server cannot end a question without an answer yet. Answer it instead.';
+
+/**
+ * settleQuestion ends the question of a seat without an answer: the seat
+ * does not wake, and the card becomes the message that it is. A question
+ * that ended already, as after an answer from another tab, ends here too.
+ * A server without the route says so in words, and the card stays.
+ */
+export async function settleQuestion(id: string, handle: string, seq: number): Promise<void> {
+  try {
+    await api.settleQuestion(id, seq);
+  } catch (e) {
+    // A route that the server does not know answers 404 or 405 with no problem of its own, or 501.
+    if (e instanceof ApiError && (e.status === 501 || ((e.status === 404 || e.status === 405) && !(e.problem && e.problem.detail)))) throw new Error(NO_SETTLE);
+    // A question that no longer waits answers 404 or 409 with its reason: it ended already.
+    if (!(e instanceof ApiError && (e.status === 404 || e.status === 409))) throw e;
+  }
+  const r = store.get().rosters[id];
+  const m = r ? r.byHandle[handle] : undefined;
+  if (m && m.question === seq) store.dispatch({ type: 'member', bridge: id, member: { ...m, question: 0 } });
+}
+
 export async function react(id: string, seq: number, reaction: ReactionKind, note?: string): Promise<void> {
   const e = await api.react(id, seq, reaction, note);
   store.dispatch({ type: 'entry', bridge: id, entry: e });

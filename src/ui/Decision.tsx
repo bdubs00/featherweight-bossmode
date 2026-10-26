@@ -19,7 +19,7 @@ import { PLAN_TEXT_LINES, alwaysByRule, planOf, verbOf, type PlanFiles, type Pla
 import { commandOf, decisionTitle, editOf, envCallOf, envEffect, rawInput, toolName, whyWords } from '../lib/words';
 import { whoName } from '../lib/lines';
 import { useSelect } from '../state/store';
-import { alwaysAllow, answerQuestion, decide } from '../state/actions';
+import { alwaysAllow, answerQuestion, decide, settleQuestion } from '../state/actions';
 import { attempt } from './notice';
 import { Markdown, When } from './common';
 import { Button, Card, Command, Field, Input, LineLed, TextArea } from './primitives';
@@ -434,7 +434,8 @@ export function QuestionCard({ d, who, onDecide, settle }: { d: Decision; who: s
  * Your answer, and Answer. A key or Answer sends your answer to the seat,
  * in reply to its question, and the front gives it to the seat, which
  * starts its next turn. body draws the words of the seat, as the message
- * draws them.
+ * draws them. No answer needed ends the question without an answer: the
+ * seat does not wake, and the card becomes the message that it is.
  */
 export function AskCard({ bridge, e, who, body, settle }: { bridge: string; e: Entry; who: string; body: ComponentChildren; settle?: boolean }) {
   const [busy, setBusy] = useState(false);
@@ -448,6 +449,12 @@ export function AskCard({ bridge, e, who, body, settle }: { bridge: string; e: E
     const ok = await attempt(() => answerQuestion(bridge, handle, e.seq, t));
     setBusy(false);
     if (ok) setText('');
+  };
+  const noAnswer = async () => {
+    if (busy) return;
+    setBusy(true);
+    await attempt(() => settleQuestion(bridge, handle, e.seq));
+    setBusy(false);
   };
   return (
     <Card class="decide question ask" title="Needs your answer" tone="amber" settle={settle} label={'Question from ' + who}>
@@ -470,6 +477,9 @@ export function AskCard({ bridge, e, who, body, settle }: { bridge: string; e: E
       >
         <TextArea name="answer" aria-label="Your answer" placeholder="Your answer" value={text} onInput={(ev) => setText((ev.target as HTMLTextAreaElement).value)} />
         <div class="card-actions">
+          <Button kind="quiet" disabled={busy} onClick={noAnswer}>
+            No answer needed
+          </Button>
           <Button type="submit" kind="primary" disabled={busy || !text.trim()}>
             Answer
           </Button>

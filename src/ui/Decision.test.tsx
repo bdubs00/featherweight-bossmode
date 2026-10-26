@@ -5,6 +5,8 @@ import { store } from '../state/store';
 import { AskCard, DecisionCard, canAlways, mayDecide } from './Decision';
 import { bridgeOf, fakeFetch, mount, settle, unmountAll } from './testkit-a';
 import { clearNotice, currentNotice } from './notice';
+import { setFetch } from '../api/client';
+import { NO_SETTLE } from '../state/actions';
 
 afterEach(unmountAll);
 
@@ -365,6 +367,46 @@ describe('the card of a question of a seat', () => {
       expect(f.seen[1].body).toEqual({ text: 'lab-1 first, then lab-2.', to: ['reviewer'], replyTo: 12 });
     } finally {
       f.restore();
+    }
+  });
+});
+
+describe('No answer needed on the card of a question of a seat', () => {
+  const q = { seq: 12, at: '2026-10-23T04:24:00Z', from: { kind: 'agent' as const, handle: 'reviewer', run: 'run-rev' }, to: ['operator'], text: 'Shall I go on with nginx?', ask: {} };
+  const seat = (question: number) => ({ handle: 'reviewer', agent: 'reviewer', task: 'Review', runs: ['run-rev'], fired: false, muted: false, presence: 'needs-you' as const, activity: null, question });
+  const question = () => store.get().rosters['b-ask'].byHandle.reviewer.question;
+  const noAnswer = (el: HTMLElement) => [...el.querySelectorAll('.card-actions button')].find((b) => b.textContent === 'No answer needed') as HTMLButtonElement;
+
+  it('ends the question without an answer, so the seat does not wake and the card leaves', async () => {
+    act(() => store.dispatch({ type: 'bridge', bridge: { ...bridgeOf('b-ask'), members: [seat(12)] } }));
+    const f = fakeFetch([['POST', /\/v1\/bridges\/b-ask\/questions\/12\/settle$/, () => null]]);
+    try {
+      const el = mount(<AskCard bridge="b-ask" e={q} who="reviewer" body={<p>{q.text}</p>} />);
+      // A quiet key beside Answer: the orange key stays Answer.
+      expect(keys(el)).toEqual(['No answer needed', 'Answer']);
+      act(() => noAnswer(el).click());
+      await settle();
+      expect(f.seen.map((x) => [x.method, x.path])).toEqual([['POST', '/v1/bridges/b-ask/questions/12/settle']]);
+      expect(question()).toBe(0);
+      expect(currentNotice()).toBe('');
+    } finally {
+      f.restore();
+    }
+  });
+
+  it('says in words when the server has no way to end a question yet, and the question stays', async () => {
+    clearNotice();
+    act(() => store.dispatch({ type: 'bridge', bridge: { ...bridgeOf('b-ask'), members: [seat(12)] } }));
+    const old = setFetch(async () => new Response('404 page not found', { status: 404, headers: { 'Content-Type': 'text/plain' } }));
+    try {
+      const el = mount(<AskCard bridge="b-ask" e={q} who="reviewer" body={<p>{q.text}</p>} />);
+      act(() => noAnswer(el).click());
+      await settle();
+      expect(currentNotice()).toBe(NO_SETTLE);
+      expect(question()).toBe(12);
+    } finally {
+      setFetch(old);
+      clearNotice();
     }
   });
 });

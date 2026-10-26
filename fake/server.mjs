@@ -1021,6 +1021,17 @@ on('POST', '/v1/bridges/([^/]+)/messages/(\\d+)/reactions', async (c, id, seqTex
   }
   return e;
 });
+// A person ends the open question of a seat without an answer. The seat does not wake.
+on('POST', '/v1/bridges/([^/]+)/questions/(\\d+)/settle', (c, id, seqText) => {
+  const b = bridgeOr404(id);
+  const seq = Number(seqText);
+  const m = b.members.find((x) => x.question === seq);
+  if (!m) refuse(404, `no question waits at entry ${seq} of the bridge ${id}`);
+  setMember(id, m, { question: 0 });
+  system(id, 'answered', `${c.person.name.toLowerCase()} ended the question of ${m.handle} without an answer`);
+  c.status = 204;
+  return undefined;
+});
 on('POST', '/v1/bridges/([^/]+)/members', async (c, id) => {
   const b = bridgeOr404(id);
   if (b.state !== 'open') refuse(409, 'the bridge is closed');
