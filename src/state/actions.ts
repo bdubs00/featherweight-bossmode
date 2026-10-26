@@ -501,7 +501,8 @@ export async function loadChats(): Promise<void> {
   const chat = s.config && s.config.chat;
   const me = s.me && s.me.principal ? s.me.principal.subject : '';
   if (!chat || !chat.agent) return;
-  const runs = await once('chats', () => api.fleetRuns({ agent: chat.agent, principal: me }));
+  // The deleted chats come too, marked hidden, so a link to one says that it is deleted.
+  const runs = await once('chats', () => api.fleetRuns({ agent: chat.agent, principal: me, hidden: true }));
   store.dispatch({ type: 'chats', runs });
 }
 
@@ -515,7 +516,8 @@ export async function loadManagerChats(): Promise<void> {
   const m = s.config && s.config.manager;
   const me = s.me && s.me.principal ? s.me.principal.subject : '';
   if (!m || !m.agent) return;
-  const runs = await once('manager-chats', () => api.fleetRuns({ agent: m.agent, principal: me, limit: 200 }));
+  // The deleted conversations come too, marked hidden, so the page never opens one as the newest.
+  const runs = await once('manager-chats', () => api.fleetRuns({ agent: m.agent, principal: me, limit: 200, hidden: true }));
   store.dispatch({ type: 'manager-chats', runs });
 }
 

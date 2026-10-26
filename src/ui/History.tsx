@@ -13,9 +13,9 @@ import { api } from '../api/routes';
 import { ApiError } from '../api/client';
 import type { Run } from '../api/types';
 import { store, useSelect } from '../state/store';
-import { attempt } from './notice';
+import { SAID_MS, attempt, showUndo } from './notice';
 import { Confirm, Menu } from './common';
-import { Field, Input } from './primitives';
+import { Button, Field, Input } from './primitives';
 import { ago, since } from '../lib/words';
 import { CHAT_VIEW, chatStatus, chatTitle, findChats, historyGroups, newestFirst } from '../lib/chat';
 import { useRoving } from './keys';
@@ -93,6 +93,31 @@ export async function patchConversation(r: Run, change: { title?: string; hidden
 }
 
 /**
+ * DeletedLine is the line of a conversation that the person deleted and
+ * opened by its link: it says so, and its key puts the conversation back
+ * in the lists.
+ */
+export function DeletedLine({ r }: { r: Run }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <p class="note-line deleted-line" role="status">
+      <span>You deleted this conversation.</span>
+      <Button
+        size="s"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          await attempt(() => patchConversation(r, { hidden: false }));
+          setBusy(false);
+        }}
+      >
+        Put it back in my list
+      </Button>
+    </p>
+  );
+}
+
+/**
  * ConversationMenu is the menu of a row of a list of conversations:
  * Rename, which takes one line of at most 100 characters, and Delete,
  * which asks first. Delete takes the conversation off the lists of the
@@ -127,7 +152,10 @@ export function ConversationMenu({ r, onHidden }: { r: Run; onHidden?: (r: Run) 
     const ok = await attempt(() => patchConversation(r, { hidden: true }));
     setBusy(false);
     setAsk('');
-    if (ok && onHidden) onHidden(r);
+    if (!ok) return;
+    // A delete can be taken back for a moment, and the conversation then comes back to the lists.
+    showUndo('Deleted.', () => attempt(() => patchConversation(r, { hidden: false })), SAID_MS);
+    if (onHidden) onHidden(r);
   };
   return (
     <>
@@ -154,8 +182,10 @@ export function ConversationMenu({ r, onHidden }: { r: Run; onHidden?: (r: Run) 
         </Confirm>
       )}
       {ask === 'delete' && (
-        <Confirm title={'Delete ' + title + '?'} confirm="Delete" danger busy={busy} onCancel={() => setAsk('')} onConfirm={remove}>
-          <p>It leaves your lists. The agent keeps no copy of it, and the archive of the server keeps it.</p>
+        <Confirm title="Delete this conversation?" confirm="Delete" danger busy={busy} onCancel={() => setAsk('')} onConfirm={remove}>
+          <p>
+            {'\u201c' + title + '\u201d'} leaves your lists. An admin can still read it.
+          </p>
         </Confirm>
       )}
     </>
@@ -210,7 +240,7 @@ export function PastConversations({ agent, label, current, onPick, onClose, onHi
   useEffect(() => {
     let live = true;
     api
-      .fleetRuns({ agent, principal: me, limit: READ_LIMIT })
+      .fleetRuns({ agent, principal: me, limit: READ_LIMIT, hidden: true })
       .then((rs) => live && setRuns(conversationsOf(rs, agent, me)))
       .catch((e: Error) => live && setError(e.message || 'The workbench did not answer. Try again.'));
     return () => {

@@ -54,8 +54,8 @@ beforeEach(() => {
     ['GET', /^\/v1\/runs\/run-chat-old\/transcript/, () => ({ run: OLD_CHAT, items: items(OLD_CHAT), next: 0, prev: 0 })],
     ['GET', /^\/v1\/runs\/run-chat-new$/, () => NEW_CHAT],
     ['GET', /^\/v1\/runs\/run-chat-new\/transcript/, () => ({ run: NEW_CHAT, items: items(NEW_CHAT), next: 0, prev: 0 })],
-    // The first read of run-stale finds it on its worker, and a read after the 409 finds it in the archive.
-    ['GET', /^\/v1\/runs\/run-stale$/, () => (++staleReads > 1 ? { ...OLD, id: 'run-stale' } : STALE)],
+    // A read of run-stale finds it on its worker until a message meets the 409, and then in the archive.
+    ['GET', /^\/v1\/runs\/run-stale$/, () => (++staleReads > 0 && posts().some((c) => c.path === '/v1/runs/run-stale/messages') ? { ...OLD, id: 'run-stale' } : STALE)],
     ['GET', /^\/v1\/runs\/run-stale\/transcript/, () => ({ run: STALE, items: items(STALE), next: 0, prev: 0 })],
     ['GET', /^\/v1\/tools$/, () => ({ tools: [] })],
   ]);
@@ -165,6 +165,8 @@ describe('an archived conversation with an agent', () => {
 
   it('starts a new conversation when a message answers 409 and the run reads as archived', async () => {
     act(() => store.dispatch({ type: 'config', config: { manager: { agent: 'manager', member: 'default/boss-0', run: 'run-stale' }, placement: 'queue', maxMembers: 16, chat: CHAT } }));
+    // The list of the person holds the conversation, so the page opens it as the newest.
+    act(() => store.dispatch({ type: 'manager-chats', runs: [OLD, STALE] }));
     const el = mount(<AgentChat agent="manager" />);
     await vi.waitFor(() => expect(el.querySelector('.thread')!.textContent).toContain('Which workers slept?'));
     send(el, 'Again');

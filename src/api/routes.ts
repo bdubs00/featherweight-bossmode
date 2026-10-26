@@ -230,8 +230,9 @@ export const api = {
    * keeps every run that is not finished. The front answers from its view,
    * so the read wakes no worker.
    */
-  fleetRuns: (q: { agent?: string; principal?: string; state?: string; limit?: number }) =>
-    call<{ runs: Run[]; total?: number }>('/v1/fleet/runs' + query({ agent: q.agent, principal: q.principal, state: q.state, limit: q.limit })).then((r) => (r && r.runs) || []),
+  /** fleetRuns lists runs. hidden adds the conversations that the caller deleted, each with hidden set, so the page knows them as deleted. */
+  fleetRuns: (q: { agent?: string; principal?: string; state?: string; limit?: number; hidden?: boolean }) =>
+    call<{ runs: Run[]; total?: number }>('/v1/fleet/runs' + query({ agent: q.agent, principal: q.principal, state: q.state, limit: q.limit, hidden: q.hidden ? 'true' : undefined })).then((r) => (r && r.runs) || []),
   /** patchConversation renames a conversation, or deletes it from the lists, for the caller alone. An empty title goes back to the title of the run. */
   patchConversation: (id: string, change: { title?: string; hidden?: boolean }) => call<unknown>('/v1/conversations/' + encodeURIComponent(id), { method: 'PATCH', body: change }),
   sendRun: (id: string, content: string, files?: Attachment[]) =>

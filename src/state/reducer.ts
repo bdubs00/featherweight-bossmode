@@ -657,5 +657,19 @@ export function membersOf(r: Roster | undefined): Member[] {
 export function managerRunOf(state: State): string {
   const me = state.me && state.me.principal ? state.me.principal.subject : '';
   if (state.managerPick && state.managerPick.by === me) return state.managerPick.run;
-  return state.config && state.config.manager ? state.config.manager.run : '';
+  const run = state.config && state.config.manager ? state.config.manager.run : '';
+  // The settings name the newest run, which the person can have deleted: a deleted conversation never opens as the newest.
+  return run && !deletedRun(state, run) ? run : '';
+}
+
+/**
+ * deletedRun reports whether the person deleted a conversation from the
+ * lists: a list marked it hidden, or the list of the conversations with
+ * the manager, which the page read with the deleted ones, leaves it out,
+ * as a server leaves out a run that it hides.
+ */
+export function deletedRun(state: Pick<State, 'runs' | 'managerChats'>, id: string): boolean {
+  const r = state.runs[id];
+  if (r && r.hidden) return true;
+  return state.managerChats.loaded && !state.managerChats.ids.includes(id);
 }
