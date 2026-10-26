@@ -6,8 +6,11 @@
 // action does, with Deny and the verb of the action. j and k move, Enter
 // opens, a allows, d denies, r replies, and s seats a stopped seat again.
 // c continues a seat at its limit, and e is Done on a message, which clears
-// it for you through the read mark of its bridge. After a decision the main
-// pane opens the next item that needs you, else it shows the decided card
+// it for you through the read mark of its bridge. A decision of a or d
+// waits HOLD_MS before it goes out: the notice says Allowed. or Denied.
+// with Undo, the row says what it holds, the focus stays on the row, and u
+// on the row takes the decision back too. After a decision the main pane
+// opens the next item that needs you, else it shows the decided card
 // settled.
 // The main pane shows the row that has the focus: a decision as its card.
 // Where the main pane shows beside the list and no row is picked, it shows
@@ -25,12 +28,12 @@ import { decide } from '../state/actions';
 import { useInboxRows, type InboxView } from '../state/activity';
 import { ensureChannels, ensureEntries, ensureResults } from '../state/fetchers';
 import { cardOf, keyAction, type InboxRow } from '../state/inbox';
-import { useSelect } from '../state/store';
+import { store, useSelect } from '../state/store';
 import { selectFacts } from '../state/reducer';
 import { awakeFor } from '../lib/status';
 import { AskCard, DecisionCard } from './Decision';
 import { useRoving } from './keys';
-import { attempt } from './notice';
+import { attempt, dropUndo, showSaid, showUndo } from './notice';
 import { Empty, Markdown, When } from './common';
 import { SeatAgainKey, continueSeat, seatAgain } from './SeatAgain';
 import { markDone, madeOf, settledOf, useMade } from '../state/done';
@@ -124,6 +127,113 @@ function afterDecision(r: InboxRow, rows: InboxRow[]): void {
   settledRow = r;
   if (pickedKey !== r.key) pick(r.key);
   else for (const f of [...pickListeners]) f();
+}
+
+/* ---------- a decision of a key, held a moment ---------- */
+
+/** HOLD_MS is how long a decision of the keys a and d waits before it goes out, so Undo can take it back. */
+export const HOLD_MS = 5000;
+
+let holdMs = HOLD_MS;
+
+/** holdFor sets how long a decision of a key waits, for the tests. */
+export function holdFor(ms: number = HOLD_MS): void {
+  holdMs = ms;
+}
+
+interface Held {
+  key: string;
+  bridge: string;
+  run: string;
+  id: string;
+  decision: 'allow' | 'deny';
+  timer: ReturnType<typeof setTimeout>;
+  undo: () => void;
+  /** The decision that the page knew made on the card when the key held this one, so a decision on the card in the meantime shows. */
+  made: unknown;
+}
+
+/** The decisions that wait to go out, by the key of their row. */
+const held = new Map<string, Held>();
+const heldListeners = new Set<() => void>();
+const tellHeld = () => {
+  for (const f of [...heldListeners]) f();
+};
+
+/** useHeld names the decision that a row holds: allow, deny, or "". */
+function useHeld(key: string): '' | 'allow' | 'deny' {
+  const [v, setV] = useState<'' | 'allow' | 'deny'>(() => (held.get(key) ? held.get(key)!.decision : ''));
+  useEffect(() => {
+    const f = () => setV(held.get(key) ? held.get(key)!.decision : '');
+    heldListeners.add(f);
+    f();
+    return () => {
+      heldListeners.delete(f);
+    };
+  }, [key]);
+  return v;
+}
+
+/** rowEl finds the row of a key in the list. */
+const rowEl = (key: string): HTMLElement | undefined => [...document.querySelectorAll<HTMLElement>('.inbox-row[data-key]')].find((x) => x.getAttribute('data-key') === key);
+
+/**
+ * holdDecision holds the decision of a key on a row for holdMs, with the
+ * notice Allowed. or Denied. and Undo. The other key on the same row
+ * changes the decision that it holds. After the wait, the decision goes
+ * out, unless the card was decided in the meantime, such as on its card.
+ */
+export function holdDecision(r: InboxRow, decision: 'allow' | 'deny'): void {
+  const d = r.decision;
+  if (!d) return;
+  const was = held.get(r.key);
+  if (was && was.decision === decision) return;
+  if (was) clearTimeout(was.timer);
+  const undo = () => undoHold(r.key);
+  const h: Held = {
+    key: r.key,
+    bridge: r.bridge,
+    run: d.run,
+    id: d.id,
+    decision,
+    undo,
+    made: madeOf(d.run, d.id),
+    timer: setTimeout(() => {
+      held.delete(r.key);
+      tellHeld();
+      dropUndo(undo);
+      if (!stillWaits(h)) return;
+      // A question of a duty on no bridge leaves the inbox of the duties, so the inbox reads again.
+      attempt(() => decide(h.run, h.id, h.decision).then(() => (h.bridge ? undefined : loadInbox())));
+    }, holdMs),
+  };
+  held.set(r.key, h);
+  tellHeld();
+  showUndo(decision === 'allow' ? 'Allowed.' : 'Denied.', undo, holdMs);
+}
+
+/** undoHold takes back the decision that a row holds, so nothing goes out, and gives the focus back to the row. */
+export function undoHold(key: string): void {
+  const h = held.get(key);
+  if (!h) return;
+  clearTimeout(h.timer);
+  held.delete(key);
+  tellHeld();
+  dropUndo(h.undo);
+  showSaid('Undone. Nothing went out.');
+  const el = rowEl(key);
+  if (el) el.focus();
+}
+
+/** stillWaits reports whether the decision of a hold still waits: a card that the channel shows decided, or that the person decided on its card in the meantime, needs none. */
+function stillWaits(h: Held): boolean {
+  if (madeOf(h.run, h.id) !== h.made) return false;
+  const s = store.get();
+  const card = h.bridge ? cardOf(s.channels[h.bridge], h.run, h.id) : undefined;
+  if (card && card.decision && card.decision.state !== 'pending') return false;
+  // A run that waits for no decision, or for another one, took this decision already.
+  const run = s.runs[h.run];
+  return !(run && (run.pending === null || (run.pending && run.pending.id !== h.id)));
 }
 
 /** doneOf is the entry that Done clears for a row: a message. A decision and a message that asks you leave when you answer them. */
@@ -231,8 +341,10 @@ function RowFace({ r }: { r: InboxRow }) {
   return <Mark agent={r.agent || (r.handle || '').replace(/-\d+$/, '')} size={32} />;
 }
 
-/** RowStatus is the light and the word of a row. */
+/** RowStatus is the light and the word of a row. A row whose decision waits to go out says it. */
 function RowStatus({ r }: { r: InboxRow }) {
+  const hold = useHeld(r.key);
+  if (hold) return <Led tone="grey" word={hold === 'allow' ? 'allowed' : 'denied'} label="It goes out in a few seconds. Undo takes it back." />;
   if (r.status === 'needs-you') return <Led tone="amber" word="needs you" />;
   if (r.kind === 'duty-paused') return <Led tone="grey" word="paused" />;
   if (r.kind === 'duty-failed') return <Led tone="red" word="failed" />;
@@ -365,14 +477,18 @@ export function ActivityList({ item }: { item?: string }) {
     if (!el.hasAttribute || !el.hasAttribute('data-item')) return;
     const r = rows.find((x) => x.key === el.getAttribute('data-key'));
     if (!r || e.key === 'Enter') return;
+    // u takes back the decision that the row holds.
+    if (e.key === 'u' && held.has(r.key)) {
+      e.preventDefault();
+      undoHold(r.key);
+      return;
+    }
     const act = keyAction(e.key, r);
     if (!act) return;
     e.preventDefault();
     const d = r.decision;
-    // A question of a duty on no bridge leaves the inbox of the duties, so the inbox reads again.
-    const after = () => (r.bridge ? undefined : loadInbox());
-    if (act === 'allow' && d) attempt(() => decide(d.run, d.id, 'allow').then(after));
-    else if (act === 'deny' && d) attempt(() => decide(d.run, d.id, 'deny').then(after));
+    // A decision of a key waits a moment, with Undo, and the focus stays on its row.
+    if ((act === 'allow' || act === 'deny') && d) holdDecision(r, act);
     else if (act === 'answer') {
       pick(r.key);
       if (window.matchMedia(TWO_PANES).matches) {

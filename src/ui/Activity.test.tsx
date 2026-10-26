@@ -1,15 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'preact/test-utils';
 import { store } from '../state/store';
-import { ActivityList, ActivityMain, pick } from './Activity';
+import { ActivityList, ActivityMain, holdFor, pick } from './Activity';
 import { AppBar } from './Shell';
-import { currentNotice } from './notice';
+import { clearSaid, currentNotice, currentSaid, undoSaid } from './notice';
 import { at, fakeFetch, mount, run, seat, bridge, unmountAll, type Call } from './testkit-b';
 
 let calls: Call[] = [];
 let restore = () => {};
 
 beforeEach(() => {
+  // A decision of a key waits a moment before it goes out. The tests wait little.
+  holdFor(0);
   const f = fakeFetch([['POST', /\/approvals\//, () => ({})]]);
   calls = f.calls;
   restore = f.restore;
@@ -76,6 +78,38 @@ describe('the inbox', () => {
     key(second, 'd');
     await vi.waitFor(() => expect(calls.filter((c) => c.method === 'POST').length).toBe(2));
     expect(calls.filter((c) => c.method === 'POST')[1]).toEqual({ method: 'POST', path: '/v1/runs/run-late/approvals/ap-late', body: { decision: 'deny' } });
+  });
+
+  it('holds a decision of a key a moment with Undo, keeps the focus on its row, and sends it after the wait', async () => {
+    holdFor(80);
+    const el = mount(<ActivityList />);
+    const first = rows(el)[0];
+    act(() => first.focus());
+    key(first, 'd');
+    // Nothing goes out yet: the notice says Denied. with Undo, and the row says what it holds.
+    expect(currentSaid()).toBe('Denied.');
+    expect(first.querySelector('.status-word')!.textContent).toBe('denied');
+    expect(document.activeElement).toBe(first);
+    expect(calls.filter((c) => c.method === 'POST')).toEqual([]);
+    // u takes it back, and nothing goes out after the wait.
+    key(first, 'u');
+    expect(currentSaid()).toBe('Undone. Nothing went out.');
+    expect(first.querySelector('.status-word')!.textContent).toBe('needs you');
+    expect(document.activeElement).toBe(first);
+    await new Promise((r) => setTimeout(r, 120));
+    expect(calls.filter((c) => c.method === 'POST')).toEqual([]);
+    // Undo of the notice takes a decision back too.
+    key(first, 'a');
+    expect(currentSaid()).toBe('Allowed.');
+    act(() => undoSaid());
+    await new Promise((r) => setTimeout(r, 120));
+    expect(calls.filter((c) => c.method === 'POST')).toEqual([]);
+    // A decision that nobody takes back goes out after the wait.
+    key(first, 'a');
+    await new Promise((r) => setTimeout(r, 40));
+    expect(calls.filter((c) => c.method === 'POST')).toEqual([]);
+    await vi.waitFor(() => expect(calls.filter((c) => c.method === 'POST')).toEqual([{ method: 'POST', path: '/v1/runs/run-early/approvals/ap-early', body: { decision: 'allow' } }]));
+    act(() => clearSaid());
   });
 
   it('opens the decision that waits longest where the main pane shows beside the list, and moves neither the route nor the focus', () => {

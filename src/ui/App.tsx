@@ -26,7 +26,7 @@ import { dismissBuild, useNewBuild } from '../lib/build';
 import { applyTheme, themeOf } from '../lib/theme';
 import { canonicalPath, columnOf, go, parentOf, parseRoute, placeOf, type Place, type Route } from '../lib/route';
 import { isTyping } from './keys';
-import { clearNotice, clearSaid, showError, useNotice, useSaid } from './notice';
+import { clearNotice, clearSaid, showError, undoSaid, useNotice, useSaid, useUndo } from './notice';
 import { EmptyPane, Shell, shownOf } from './Shell';
 import { BridgeList } from './BridgeList';
 import { Channel } from './Channel';
@@ -229,11 +229,16 @@ function Notice({ text }: { text: string }) {
   );
 }
 
-/** Said is the notice of an action that worked: its sentence, with Dismiss. It goes by itself after a few seconds. */
-function Said({ text }: { text: string }) {
+/** Said is the notice of an action that worked: its sentence, with Undo for an action that waits to go out, and Dismiss. It goes by itself after a few seconds. */
+function Said({ text, undo }: { text: string; undo: boolean }) {
   return (
     <div class="notice" role="status">
       <p>{text}</p>
+      {undo && (
+        <Button kind="secondary" size="s" onClick={undoSaid}>
+          Undo
+        </Button>
+      )}
       <Button kind="quiet" size="s" onClick={clearSaid}>
         Dismiss
       </Button>
@@ -266,6 +271,7 @@ export function App() {
   const [auth, setAuth] = useState<Auth>({ kind: 'loading' });
   const notice = useNotice();
   const said = useSaid();
+  const undo = useUndo();
   const fresh = useNewBuild();
   const open = route.place === 'bridge' ? route.id : '';
   const config = useSelect((s) => s.config);
@@ -486,5 +492,5 @@ export function App() {
 
   const panes = panesOf(route);
   const place = placeIn(route);
-  return <Shell route={route} place={place} list={panes.list} main={panes.main} details={panes.details} notice={notice ? <Notice text={notice} /> : said ? <Said text={said} /> : fresh ? <NewBuild /> : null} onSignOut={signOut} />;
+  return <Shell route={route} place={place} list={panes.list} main={panes.main} details={panes.details} notice={notice ? <Notice text={notice} /> : said ? <Said text={said} undo={undo} /> : fresh ? <NewBuild /> : null} onSignOut={signOut} />;
 }

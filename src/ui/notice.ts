@@ -2,7 +2,9 @@
 // an alert until the person dismisses it or the next action works. A
 // short sentence about an action that worked, such as Saved the playbook
 // weekly-patching., takes the same place for a few seconds, as a status.
-// A failed action takes its place.
+// A failed action takes its place. A sentence can carry Undo, as Denied.
+// does while a decision of a key waits to go out; a failed action hides it
+// and leaves its Undo, which shows again when the failure is dismissed.
 
 import { useEffect, useState } from 'preact/hooks';
 import { ApiError, SigninNeeded } from '../api/client';
@@ -10,6 +12,7 @@ import { holdFocus } from './keys';
 
 let text = '';
 let said = '';
+let undo: (() => void) | null = null;
 let saidTimer: ReturnType<typeof setTimeout> | null = null;
 const listeners = new Set<() => void>();
 
@@ -26,7 +29,8 @@ export function showError(e: unknown): void {
   if (e instanceof DOMException && e.name === 'AbortError') return;
   console.error(e);
   text = e instanceof ApiError ? e.message : e instanceof Error && e.message ? e.message : 'The action failed. Try it again.';
-  clearSaid();
+  // A sentence with Undo outlives the failure, so the person can still take the action back.
+  if (!undo) clearSaid();
   tell();
 }
 
@@ -34,8 +38,30 @@ export function showError(e: unknown): void {
 export function showSaid(words: string): void {
   if (saidTimer) clearTimeout(saidTimer);
   said = words;
+  undo = null;
   saidTimer = setTimeout(clearSaid, SAID_MS);
   tell();
+}
+
+/** showUndo shows a short sentence with the key Undo for ms, such as Denied. while a decision waits to go out. Undo runs onUndo. */
+export function showUndo(words: string, onUndo: () => void, ms: number): void {
+  if (saidTimer) clearTimeout(saidTimer);
+  said = words;
+  undo = onUndo;
+  saidTimer = setTimeout(clearSaid, ms);
+  tell();
+}
+
+/** undoSaid takes back the action of the sentence that shows, and hides it. */
+export function undoSaid(): void {
+  const f = undo;
+  clearSaid();
+  if (f) f();
+}
+
+/** dropUndo hides the sentence of onUndo, once the action that it can take back went out. */
+export function dropUndo(onUndo: () => void): void {
+  if (undo === onUndo) clearSaid();
 }
 
 /** currentSaid is the sentence about an action that worked, or "" when none shows. */
@@ -47,6 +73,7 @@ export function currentSaid(): string {
 export function clearSaid(): void {
   if (saidTimer) clearTimeout(saidTimer);
   saidTimer = null;
+  undo = null;
   if (!said) return;
   said = '';
   tell();
@@ -78,6 +105,12 @@ export function useNotice(): string {
 export function useSaid(): string {
   useNotice();
   return said;
+}
+
+/** useUndo tells whether the sentence that shows carries Undo. */
+export function useUndo(): boolean {
+  useNotice();
+  return !!undo;
 }
 
 /**
