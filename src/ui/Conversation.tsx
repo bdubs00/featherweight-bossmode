@@ -213,7 +213,9 @@ export function usePoll(runId: string, also = false): void {
   const lost = useSelect((s) => !!runId && !!s.lost[runId]);
   // A run that a worker of the fleet holds comes on the stream with each change, so a poll would only read it twice.
   const streamed = useSelect((s) => onStream(s.fleet, runId ? s.runs[runId] : undefined));
-  const active = !!runId && !lost && !streamed && (also || state === 'queued' || state === 'running');
+  // An archived run never changes again, so the page reads it once.
+  const archived = useSelect((s) => !!runId && !!s.runs[runId] && !!s.runs[runId].archived);
+  const active = !!runId && !lost && !streamed && !archived && (also || state === 'queued' || state === 'running');
   useEffect(() => {
     if (!active) return;
     const t = setInterval(() => {
@@ -284,7 +286,8 @@ export function Conversation(props: ConversationProps) {
   const me = principal ? principal.subject : '';
   const meName = principal ? principal.name : undefined;
   const agent = run ? run.agent : '';
-  const pending = run ? decisionOf(run, props.result) : null;
+  // An archived run waits for nothing: its worker is gone, so it takes no decision.
+  const pending = run && !run.archived ? decisionOf(run, props.result) : null;
   const blocks = blocksOf(t.items);
   const live = props.live;
   const face = <Mark agent={agent} size={32} />;

@@ -11,10 +11,13 @@ import { costParts } from './cost';
 /** The metadata that marks a run that the quick chat started. */
 export const CHAT_VIEW = { key: 'fw.view', value: 'quickchat' } as const;
 
-/** works reports whether a run works now: it waits for a worker, or the model or a tool works. */
-export function works(run: Pick<Run, 'state'> | undefined | null): boolean {
-  return !!run && (run.state === 'queued' || run.state === 'running');
+/** works reports whether a run works now: it waits for a worker, or the model or a tool works. An archived run never works again. */
+export function works(run: (Pick<Run, 'state'> & Partial<Pick<Run, 'archived'>>) | undefined | null): boolean {
+  return !!run && !run.archived && (run.state === 'queued' || run.state === 'running');
 }
+
+/** The line of an archived conversation, which every view of a conversation shows. */
+export const ARCHIVED_LINE = 'This conversation is from a worker that was replaced. You can read it, and your next message starts a new conversation.';
 
 /** answerSeqs are the seqs of the answers of a transcript: its assistant items. */
 export function answerSeqs(items: Item[]): number[] {

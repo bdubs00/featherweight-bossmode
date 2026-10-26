@@ -447,6 +447,26 @@ export function ended(state: RunState | string | undefined): boolean {
   return state === 'failed' || state === 'canceled';
 }
 
+/** rereadRun reads a run again and keeps it, or answers undefined when the read fails. */
+export async function rereadRun(id: string): Promise<Run | undefined> {
+  try {
+    const r = await api.run(id);
+    if (r && r.id) store.dispatch({ type: 'run', run: r });
+    return r || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * closed reports whether a conversation takes no more message, so the next
+ * message starts a new one: its run failed or was stopped, or the front
+ * answers it from its archive because its worker was replaced.
+ */
+export function closed(run: Pick<Run, 'state' | 'archived'> | undefined): boolean {
+  return !!run && (ended(run.state) || !!run.archived);
+}
+
 /* ---------- the quick chat ---------- */
 
 /**
@@ -489,8 +509,8 @@ export function forgetManagerRun(): void {
 
 /**
  * askManager sends a message to the manager: a follow-up of the
- * conversation, or the first message of a new run when there is none or
- * the last one ended. The files go with the message in either case, and
+ * conversation, or the first message of a new run when there is none, the
+ * last one ended, or the front keeps it in its archive. The files go with the message in either case, and
  * the workspace of the manager run keeps them. It returns the run.
  */
 export async function askManager(text: string, files?: Attachment[]): Promise<string> {
@@ -499,13 +519,14 @@ export async function askManager(text: string, files?: Attachment[]): Promise<st
   if (!m) throw new Error('No manager is set up.');
   const id = managerRunOf(s);
   const run = id ? s.runs[id] : undefined;
-  if (id && !ended(run && run.state)) {
+  if (id && !closed(run)) {
     try {
       await api.sendRun(id, text, files);
       return id;
     } catch (e) {
-      // A run that ended since the page read it refuses the message, and
-      // the message starts a new conversation.
+      // A run that ended since the page read it, or whose worker was
+      // replaced, refuses the message, and the message starts a new
+      // conversation.
       if (!(e instanceof ApiError) || e.status !== 409) throw e;
     }
   }

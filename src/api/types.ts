@@ -357,6 +357,13 @@ export interface Run {
    * cancels, and sends. A front before this field sends none.
    */
   can?: { view: boolean; operate: boolean };
+  /**
+   * True for a run that the front answers from its archive, because the
+   * worker that held it was replaced. The page shows it to read, and a
+   * message to it answers 409, so the next message starts a new
+   * conversation.
+   */
+  archived?: boolean;
 }
 
 /** The usage of a run, as the kernel sums it. Every field is a sum. */

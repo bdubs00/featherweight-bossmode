@@ -104,9 +104,11 @@ export function phaseOf(phase: string): Light {
  * The status of a run, in the words of the page. A finished run whose
  * input is empty and that has no title is a run that the front knows
  * without its texts, such as from its index after a restart, so the page
- * cannot tell whether it answered.
+ * cannot tell whether it answered. An archived run that had not finished
+ * ended when its worker was replaced.
  */
-export function runStatus(r: Pick<Run, 'state' | 'output'> & Partial<Pick<Run, 'input' | 'title'>>): Light {
+export function runStatus(r: Pick<Run, 'state' | 'output'> & Partial<Pick<Run, 'input' | 'title' | 'archived'>>): Light {
+  if (r.archived && r.state !== 'completed' && r.state !== 'failed' && r.state !== 'canceled') return { word: 'ended', tone: 'grey', label: 'Its worker was replaced. You can read it.' };
   switch (r.state) {
     case 'input-required':
       return { word: 'needs you', tone: 'amber', label: 'Waits for your approval or your answer.' };

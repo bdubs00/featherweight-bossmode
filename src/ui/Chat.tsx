@@ -13,17 +13,18 @@
 
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { api } from '../api/routes';
+import { ApiError } from '../api/client';
 import type { Agent, AttachedFile, Attachment, InlineProfile, QueuedData, QuickChat, Run, Skill } from '../api/types';
 import { store, useSelect } from '../state/store';
 import { forgetProfiles, useProfile } from '../state/profiles';
 import { forgetQueued, useQueued } from '../state/queued';
-import { loadAgentSkills, loadChats, loadSkills } from '../state/actions';
+import { closed, loadAgentSkills, loadChats, loadSkills, rereadRun } from '../state/actions';
 import { slashCommands } from '../state/people';
 import { runStatus } from '../lib/presence';
 import { go, hrefOf } from '../lib/route';
 import { parseSlash } from '../lib/mention';
 import { since } from '../lib/words';
-import { answerSeqs, chatTitle, findChats, historyGroups, isQuickChat, lastSeq, newestFirst, startBody, toolPicks, usageParts, works } from '../lib/chat';
+import { ARCHIVED_LINE, answerSeqs, chatTitle, findChats, historyGroups, isQuickChat, lastSeq, newestFirst, startBody, toolPicks, usageParts, works } from '../lib/chat';
 import { abilitiesOf, joined, summaryOf, type Ability } from '../lib/tools';
 import { forgetToolCatalog, useToolCatalog } from '../state/tools';
 import { Abilities } from './Abilities';
@@ -437,7 +438,9 @@ function ChatRun({ chat, runId }: { chat: QuickChat; runId: string }) {
       if (firstSent && firstSent.run === runId) firstSent = null;
     }
   }, [userCount]);
-  const stopped = !!run && (run.state === 'failed' || run.state === 'canceled');
+  // A chat that failed or stopped, or whose worker was replaced, takes no message.
+  const archived = !!run && !!run.archived;
+  const stopped = closed(run);
   const lastUser = t.items.map((x) => x.kind).lastIndexOf('user');
   const answered = lastUser >= 0 && t.items.slice(lastUser + 1).some((x) => x.kind === 'assistant' || x.kind === 'ask' || (x.kind === 'end' && !!x.isError));
   const waiting = !stopped && (!!sent || (lastUser >= 0 && !answered && !(run && run.state === 'completed'))) && !(run && run.state === 'input-required');
@@ -457,28 +460,32 @@ function ChatRun({ chat, runId }: { chat: QuickChat; runId: string }) {
       return false;
     }
     setSent({ text, users: userCount, files: describeFiles(files) });
+    // A chat that stopped takes no message: the next one starts a new chat with the same picks.
+    const startNew = async () => {
+      // A list that the page does not know stays out, so the list of the agent holds.
+      const p: InlineProfile = { tools: picks.tools || undefined, skills: picks.skills || undefined };
+      const r = await api.start(chat.member, startBody(chat.agent, text, p, files)).catch((e) => {
+        throw refusalOf(e, files.length);
+      });
+      picksOf.set(r.id, p);
+      firstSent = { run: r.id, text, files: describeFiles(files) };
+      store.dispatch({ type: 'run', run: r });
+      go({ place: 'chat', run: r.id }, true);
+    };
     const ok = await attempt(async () => {
-      if (stopped) {
-        // A chat that stopped takes no message: the next one starts a new chat with the same picks.
-        // A list that the page does not know stays out, so the list of the agent holds.
-        const p: InlineProfile = { tools: picks.tools || undefined, skills: picks.skills || undefined };
-        const r = await api.start(chat.member, startBody(chat.agent, text, p, files)).catch((e) => {
-          throw refusalOf(e, files.length);
-        });
-        picksOf.set(r.id, p);
-        firstSent = { run: r.id, text, files: describeFiles(files) };
-        store.dispatch({ type: 'run', run: r });
-        go({ place: 'chat', run: r.id }, true);
-        return;
-      }
+      if (stopped) return startNew();
       if (skill) {
         const r = await api.runSkill(runId, skill);
         if (r && r.id) store.dispatch({ type: 'run', run: r });
         return;
       }
-      await api.sendRun(runId, text, files).catch((e) => {
+      try {
+        await api.sendRun(runId, text, files);
+      } catch (e) {
+        // A chat that ended since the page read it, or whose worker was replaced, refuses the message, and the message starts a new chat.
+        if (e instanceof ApiError && e.status === 409 && closed(await rereadRun(runId))) return startNew();
         throw refusalOf(e, files.length);
-      });
+      }
       store.dispatch({ type: 'run', run: await api.run(runId) });
     });
     if (!ok) setSent(null);
@@ -504,7 +511,7 @@ function ChatRun({ chat, runId }: { chat: QuickChat; runId: string }) {
           </Msg>
         </div>
       )}
-      {stopped && <Quiet tone="grey">Stopped. Your next message starts a new chat.</Quiet>}
+      {stopped && <Quiet tone="grey">{archived ? ARCHIVED_LINE : 'Stopped. Your next message starts a new chat.'}</Quiet>}
     </>
   );
   const title = run ? chatTitle(run) : sent ? chatTitle({ input: sent.text || sent.files.map((f) => f.name).join(', ') }) : 'Chat';

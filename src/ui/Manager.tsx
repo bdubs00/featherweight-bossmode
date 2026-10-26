@@ -20,7 +20,7 @@ import { useEffect, useMemo, useState } from 'preact/hooks';
 import { api } from '../api/routes';
 import type { AttachedFile, Attachment, Result } from '../api/types';
 import { store, useSelect } from '../state/store';
-import { askManager, ended, loadAgentSkills, loadManagerChats, setManagerRun } from '../state/actions';
+import { askManager, closed, loadAgentSkills, loadManagerChats, setManagerRun } from '../state/actions';
 import { managerRunOf } from '../state/reducer';
 import { slashCommands } from '../state/people';
 import { parseSlash } from '../lib/mention';
@@ -39,7 +39,7 @@ import { Composer } from './Composer';
 import { Conversation, POLL_MS, usePoll, useTranscript } from './Conversation';
 import { FollowBox, Msg, Quiet } from './Thread';
 import { useLiveAnswer } from './Live';
-import { answerSeqs, lastSeq, works } from '../lib/chat';
+import { ARCHIVED_LINE, answerSeqs, lastSeq, works } from '../lib/chat';
 
 export { POLL_MS };
 
@@ -111,7 +111,9 @@ export function Manager({ run: routeRun, fresh }: { run?: string; fresh?: boolea
     if (agent) loadAgentSkills(agent).catch(() => {});
   }, [agent]);
 
-  const stopped = !!run && ended(run.state);
+  // A conversation that failed or stopped, or whose worker was replaced, takes no message: the next one starts a new conversation.
+  const stopped = closed(run);
+  const archived = !!run && !!run.archived;
   const t = useTranscript(runId);
   // The poll runs while the run works, and while an answer to the person is on its way.
   usePoll(runId, !!runId && (!!sent || !run));
@@ -189,7 +191,7 @@ export function Manager({ run: routeRun, fresh }: { run?: string; fresh?: boolea
           </Msg>
         </div>
       )}
-      {stopped && <Quiet tone="grey">Stopped. Your next message starts a new conversation.</Quiet>}
+      {stopped && <Quiet tone="grey">{archived ? ARCHIVED_LINE : 'Stopped. Your next message starts a new conversation.'}</Quiet>}
     </>
   );
 

@@ -7,6 +7,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
+import { ApiError } from '../api/client';
 import type { Attachment, OrphanList } from '../api/types';
 import { NO_FILES_WITH_COMMAND, refusalOf } from '../lib/attachments';
 import { spanWords } from '../lib/words';
@@ -14,7 +15,7 @@ import { go, hrefOf, parseRoute, type Route } from '../lib/route';
 import { awakeCount, statusOf } from '../lib/status';
 import { store, useSelect } from '../state/store';
 import { selectFacts } from '../state/reducer';
-import { loadAgentSkills, loadAgents, loadFleet } from '../state/actions';
+import { closed, loadAgentSkills, loadAgents, loadFleet, rereadRun } from '../state/actions';
 import { selectAgents } from '../state/agents';
 import { ensureRosters, ensureRuns, refreshAfterReset } from '../state/fetchers';
 import { filterPeople, firstPerson, newestRun, peopleCount, peopleOf, slashCommands, type PeopleGroup, type PersonRow } from '../state/people';
@@ -24,9 +25,9 @@ import { attempt, showError } from './notice';
 import { Composer } from './Composer';
 import { Conversation, useTranscript, usePoll } from './Conversation';
 import { useResult } from './RunPane';
-import { FollowBox } from './Thread';
+import { FollowBox, Quiet } from './Thread';
 import { useLiveAnswer } from './Live';
-import { answerSeqs, lastSeq, works } from '../lib/chat';
+import { ARCHIVED_LINE, answerSeqs, lastSeq, works } from '../lib/chat';
 import { Profile } from './Profile';
 import { EmptyPane } from './Shell';
 import { Confirm, Menu } from './common';
@@ -413,7 +414,9 @@ export function AgentChat({ agent }: { agent: string }) {
   const live = useLiveAnswer(runId, { working: works(run), seq: run ? run.seq : 0, mark: lastSeq(t.items, run), answers });
   // The end of the conversation: its newest item, the live answer, and a card that waits.
   const end = [t.items.length ? t.items[t.items.length - 1].seq : 0, live.text.length, live.tool, run && run.pending ? run.pending.id : ''].join(':');
-  const stopped = !!run && ['failed', 'canceled'].includes(run.state);
+  // A conversation that failed or stopped, or whose worker was replaced, takes no message: the next one starts a new conversation.
+  const stopped = closed(run);
+  const archived = !!run && !!run.archived;
   const [past, setPast] = useState(false);
   // open shows a conversation in this tab, or an empty one with "", and the tab remembers it.
   const open = (id: string) => {
@@ -427,24 +430,28 @@ export function AgentChat({ agent }: { agent: string }) {
       showError(new Error(NO_FILES_WITH_COMMAND));
       return false;
     }
+    const startNew = async () => {
+      const r = await api.start(member, files.length ? { agent, input: text, files } : { agent, input: text }).catch((e) => {
+        throw refusalOf(e, files.length);
+      });
+      store.dispatch({ type: 'run', run: r });
+      setRunId(r.id);
+      keepRun(agent, r.id);
+    };
     return attempt(async () => {
-      if (fresh) {
-        const r = await api.start(member, files.length ? { agent, input: text, files } : { agent, input: text }).catch((e) => {
-          throw refusalOf(e, files.length);
-        });
-        store.dispatch({ type: 'run', run: r });
-        setRunId(r.id);
-        keepRun(agent, r.id);
-        return;
-      }
+      if (fresh) return startNew();
       if (skill) {
         const r = await api.runSkill(runId, skill);
         if (r && r.id) store.dispatch({ type: 'run', run: r });
         return;
       }
-      await api.sendRun(runId, text, files).catch((e) => {
+      try {
+        await api.sendRun(runId, text, files);
+      } catch (e) {
+        // A conversation that ended since the page read it, or whose worker was replaced, refuses the message, and the message starts a new one.
+        if (e instanceof ApiError && e.status === 409 && closed(await rereadRun(runId))) return startNew();
         throw refusalOf(e, files.length);
-      });
+      }
       const r = await api.run(runId);
       store.dispatch({ type: 'run', run: r });
     });
@@ -473,7 +480,7 @@ export function AgentChat({ agent }: { agent: string }) {
         }
       />
       <FollowBox end={end}>
-        {runId ? <Conversation run={run} result={res} t={t} agentLabel={agent} live={live} /> : <div class="thread" />}
+        {runId ? <Conversation run={run} result={res} t={t} agentLabel={agent} live={live} tail={archived ? <Quiet tone="grey">{ARCHIVED_LINE}</Quiet> : undefined} /> : <div class="thread" />}
       </FollowBox>
       <Composer draft={'agent:' + agent} label={'Message to ' + agent} placeholder={'Message ' + agent} disabled={member ? '' : 'Keep 0'} commands={commands} attach onSend={(text, _to, files) => send(text, files)} />
       {past && (

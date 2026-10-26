@@ -54,10 +54,11 @@ export function factsOf(fleet: Fleet | null | undefined, runs: Record<string, Ru
   return { fleet: fleet || null, runs, openRuns, lost };
 }
 
-/** runOf is a run that the page holds and the fleet did not lose. */
+/** runOf is a run that the page holds and the fleet did not lose. A run of the archive is on no worker, so it does not count. */
 function runOf(f: Facts, id: string): Run | undefined {
   if (!id || (f.lost && f.lost[id])) return undefined;
-  return f.runs[id];
+  const r = f.runs[id];
+  return r && r.archived ? undefined : r;
 }
 
 /** The run states that are not finished: a worker that holds such a run is busy. */
@@ -107,7 +108,7 @@ function indexOf(f: Facts): Index {
   if (fleet) {
     const held = new Map<string, string[]>();
     for (const r of Object.values(f.runs)) {
-      if (!r || !r.member || !OPEN.has(r.state) || (f.lost && f.lost[r.id])) continue;
+      if (!r || !r.member || r.archived || !OPEN.has(r.state) || (f.lost && f.lost[r.id])) continue;
       const k = shortName(r.member);
       held.set(k, [...(held.get(k) || []), r.id]);
     }
