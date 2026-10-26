@@ -91,6 +91,25 @@ describe('the direct thread', () => {
     expect(stepsOf(denied)[0].bridge).toBeUndefined();
   });
 
+  it('words a package step by how it went, so a denied request never reads as done', () => {
+    const call = (seq: number, id: string, command: string, manager: string, pkg: string): Item => ({ seq, time: at(seq), kind: 'tool', tool: 'env', callId: id, input: { command, manager, package: pkg } });
+    const items: Item[] = [
+      call(1, 'a', 'add', 'python', 'tabulate'),
+      { seq: 2, time: at(2), kind: 'result', tool: 'env', callId: 'a', text: 'added tabulate' },
+      call(3, 'b', 'add', 'tools', 'jq-extra'),
+      { seq: 4, time: at(4), kind: 'result', tool: 'env', callId: 'b', isError: true, text: 'denied by token' },
+      call(5, 'c', 'remove', 'python', 'rich'),
+      { seq: 6, time: at(6), kind: 'result', tool: 'env', callId: 'c', isError: true, text: 'denied' },
+      call(7, 'd', 'add', 'python', 'httpie'),
+    ];
+    expect(stepsOf(items).map((s) => [s.text, !!s.isError, !!s.worded])).toEqual([
+      ['Added the Python package tabulate', false, true],
+      ['Did not add the program jq-extra', true, true],
+      ['Did not remove the Python package rich', true, true],
+      ['Adding the Python package httpie', false, true],
+    ]);
+  });
+
   it('words the tools of the front, and links a page that a call wrote', () => {
     const items: Item[] = [
       { seq: 1, time: at(1), kind: 'tool', tool: 'front.pages_write', callId: 'p', input: { path: 'k3s/runbook.md', text: '# R' } },

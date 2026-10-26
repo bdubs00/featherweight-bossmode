@@ -4,7 +4,7 @@
 // The functions here are pure, so the tests read them without a page.
 
 import type { Entry, Item } from '../api/types';
-import { commandOf, inputFields, toolBase } from '../lib/words';
+import { commandOf, envCallOf, envWhat, inputFields, toolBase } from '../lib/words';
 import { stepWords } from '../lib/steps';
 import { hrefOf } from '../lib/route';
 import { decidedRuns, hiddenLine, napOf, napRuns } from '../lib/lines';
@@ -89,6 +89,10 @@ const PAGE_WORDS: Record<string, [string, string, string]> = {
   pages_read: ['Read', 'Reading', 'Did not read'],
 };
 
+/** The words of an add and of a remove of env: done, on its way, and failed or denied. */
+const ENV_ADD: [string, string, string] = ['Added', 'Adding', 'Did not add'];
+const ENV_REMOVE: [string, string, string] = ['Removed', 'Removing', 'Did not remove'];
+
 const text = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
 
 /** openedBridge reads the id of the bridge that bridge_open opened from its result: "Opened the bridge <id> ...". */
@@ -107,8 +111,14 @@ export function stepOf(it: Item, file?: Item, result?: Item): Step {
   const base = { key: 'step-' + it.seq, at: it.time, ...(result && result.isError ? { isError: true } : {}) };
   const f = file || (it.kind === 'file' ? it : undefined);
   if (f) return { ...base, text: (f.text === 'created' ? 'Created ' : f.text === 'deleted' ? 'Removed ' : 'Edited ') + (f.path || 'a file') };
-  // The command of env, such as add, is no shell command.
-  if (toolBase(it.tool) === 'env') return { ...base, text: stepWords('env', it.input) };
+  // The command of env, such as add, is no shell command. An add or a remove
+  // says how it went, so a denied request never reads as done.
+  if (toolBase(it.tool) === 'env') {
+    const c = envCallOf('env', it.input);
+    const verbs = c && c.command === 'add' ? ENV_ADD : c && c.command === 'remove' ? ENV_REMOVE : null;
+    if (!c || !verbs) return { ...base, text: stepWords('env', it.input) };
+    return { ...base, text: (!result ? verbs[1] : result.isError ? verbs[2] : verbs[0]) + ' ' + envWhat(c), worded: true };
+  }
   const cmd = commandOf(it.input);
   if (cmd) return { ...base, text: 'Ran', cmd: cmd.length > 80 ? cmd.slice(0, 79) + '…' : cmd };
   const words = FRONT_WORDS[toolBase(it.tool)];
