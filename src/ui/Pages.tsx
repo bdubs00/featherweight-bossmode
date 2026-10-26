@@ -161,10 +161,9 @@ export function RemovedPages() {
         <div class="c-rows" role="list">
           {removed.map((r) => (
             <div role="listitem" class="removed-row">
-              <a class="wrow" href={hrefOf({ place: 'pages', path: r.path, mode: 'read' })} data-item>
+              <a class="wrow" href={hrefOf({ place: 'pages', path: r.path, mode: 'read' })} title={r.path} data-item>
                 <span class="t-sub clip">{r.title || pageName(r.path)}</span>
                 <span class="meta">
-                  <span>{pageName(r.path)}</span>
                   <time dateTime={r.removedAt} title={new Date(r.removedAt).toLocaleString()}>
                     {'removed ' + ago(r.removedAt)}
                   </time>
