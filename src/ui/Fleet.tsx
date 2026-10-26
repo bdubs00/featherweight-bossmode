@@ -164,7 +164,7 @@ export function OrphanNote() {
         {tasks} lost {n === 1 ? 'its' : 'their'} parent.{' '}
         <Help label="What a child Task without its parent is">
           An agent starts a child Task for a piece of work, and the Task that started it removes it when the work ends. Here that Task is gone, for example because a pool replaced it.{' '}
-          {after > 0 ? 'The front removes each one once it sleeps for ' + spanWords(after) + ', and Remove removes them now.' : 'Nothing removes ' + (n === 1 ? 'this one' : 'these') + ' but Remove.'}
+          {after > 0 ? 'The server removes each one once it sleeps for ' + spanWords(after) + ', and Remove removes them now.' : 'Nothing removes ' + (n === 1 ? 'this one' : 'these') + ' but Remove.'}
         </Help>
       </p>
       <Button size="s" onClick={() => setAsking(true)}>

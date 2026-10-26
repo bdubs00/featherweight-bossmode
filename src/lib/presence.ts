@@ -119,7 +119,7 @@ export function runStatus(r: Pick<Run, 'state' | 'output'> & Partial<Pick<Run, '
       return { word: 'working', tone: 'green', label: 'Runs, or pauses between two steps.' };
     case 'completed':
       if (r.output) return { word: 'ready', tone: 'grey', label: 'Finished with an answer to review.' };
-      if (r.input === '' && !r.title) return { word: 'finished', tone: 'grey', label: 'Finished. Its texts show once the front reads its worker.' };
+      if (r.input === '' && !r.title) return { word: 'finished', tone: 'grey', label: 'Finished. Its messages show once its worker answers.' };
       return { word: 'ended', tone: 'grey', label: 'Finished with no answer.' };
     case 'failed':
       return { word: 'failed', tone: 'red', label: 'Stopped with an error.' };

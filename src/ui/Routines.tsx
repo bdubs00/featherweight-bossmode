@@ -102,7 +102,7 @@ function OffWords() {
     <>
       Routines are off.{' '}
       <Help label="Where routines are turned on">
-        The setting <code>workbench.routines.enabled</code> turns them on. The front keeps them on its bus, which must be <code>nats</code> or <code>mem</code>.
+        The setting <code>workbench.routines.enabled</code> turns them on. The server keeps them on its bus, which must be <code>nats</code> or <code>mem</code>.
       </Help>
     </>
   );

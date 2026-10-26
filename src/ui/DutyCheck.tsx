@@ -120,7 +120,7 @@ function SecretPick({ options, url, value, onChange }: { options: DutyOptions; u
       label={
         <>
           Secret{' '}
-          <Help label="What the secret is">A setting of the front that holds the token of the address. The page never sees the token. Only the secrets for the host of the address show.</Help>
+          <Help label="What the secret is">A setting of the server that holds the token of the address. The page never sees the token. Only the secrets for the host of the address show.</Help>
         </>
       }
       class="narrow"
@@ -312,7 +312,7 @@ export function CheckFirst(p: CheckProps) {
     try {
       const a = await api.dryRunDuty(pathName, record(), true);
       if (a.check) setTried({ found: a.check });
-      else setTried({ error: (a.problems || []).map((x) => splitProblem(x).text).filter(Boolean)[0] || 'The front ran no check.' });
+      else setTried({ error: (a.problems || []).map((x) => splitProblem(x).text).filter(Boolean)[0] || 'No check ran.' });
     } catch (e) {
       setTried({ error: messageOf(e) });
     }

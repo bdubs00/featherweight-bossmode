@@ -237,7 +237,7 @@ describe('the orphan Tasks', () => {
       unmountAll();
       return text;
     };
-    expect(await help(86400)).toContain('The front removes each one once it sleeps for 1 day, and Remove removes them now.');
+    expect(await help(86400)).toContain('The server removes each one once it sleeps for 1 day, and Remove removes them now.');
     expect(await help(0)).toContain('Nothing removes these but Remove.');
     expect(await help()).toContain('Nothing removes these but Remove.');
   });

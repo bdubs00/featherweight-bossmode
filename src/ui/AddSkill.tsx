@@ -92,7 +92,7 @@ function PreviewView({ p, busy, conflict, onInstall, onCancel }: { p: Preview; b
       </div>
       {p.description && <p class="preview-lede">{p.description}</p>}
       {p.frontMatter.length > 0 && (
-        <ul class="fm" aria-label="Front matter">
+        <ul class="fm" aria-label="The fields of the skill">
           {p.frontMatter.map(([k, v]) => (
             <li>
               <span class="fm-key">{k}</span>

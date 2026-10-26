@@ -370,7 +370,7 @@ export function problemTexts(p: Partial<Record<ChannelSlot, string[]>> | undefin
 
 /** testWords says what a test did for one place: sent, or the reason in words. */
 export function testWords(r: NotifyTestResult | undefined, label: string): { ok: boolean; words: string } {
-  if (!r) return { ok: false, words: 'The front sent nothing to ' + label + '.' };
+  if (!r) return { ok: false, words: 'Nothing went to ' + label + '.' };
   if (r.sent) return { ok: true, words: 'Sent to ' + label + '. Look for it there.' };
   const why = r.error ? oneSentence(r.error) : '';
   return { ok: false, words: 'Not sent to ' + label + '.' + (why ? ' ' + why : '') };

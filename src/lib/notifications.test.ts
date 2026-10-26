@@ -150,6 +150,6 @@ describe('a test', () => {
   it('says what it did for one place', () => {
     expect(testWords({ channel: 'phone', sent: true }, 'My phone')).toEqual({ ok: true, words: 'Sent to My phone. Look for it there.' });
     expect(testWords({ channel: 'ha', sent: false, error: 'the address answered 404 not found' }, 'Home Assistant')).toEqual({ ok: false, words: 'Not sent to Home Assistant. The address answered 404 not found.' });
-    expect(testWords(undefined, 'My phone')).toEqual({ ok: false, words: 'The front sent nothing to My phone.' });
+    expect(testWords(undefined, 'My phone')).toEqual({ ok: false, words: 'Nothing went to My phone.' });
   });
 });

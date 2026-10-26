@@ -204,7 +204,7 @@ export function Notifications({ onClose }: { onClose: () => void }) {
     }
     // Without an id, the test would go to every place.
     if (!id) {
-      said({ busy: false, ok: false, words: 'The test failed. The front gave this place no id.' });
+      said({ busy: false, ok: false, words: 'The test failed. The server gave this place no id.' });
       return;
     }
     said({ busy: true, ok: true, words: '' });
