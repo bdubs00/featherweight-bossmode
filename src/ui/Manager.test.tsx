@@ -3,7 +3,7 @@ import { act } from 'preact/test-utils';
 import { store } from '../state/store';
 import { forgetManagerRun } from '../state/actions';
 import type { BossConfig, Item, Run } from '../api/types';
-import { Manager, POLL_MS } from './Manager';
+import { Manager, ManagerDot, POLL_MS, forgetSeen, markSeen, unreadOf } from './Manager';
 import { blocksOf } from './Conversation';
 import { parseSlash } from '../lib/mention';
 import { click, fakeApi, keyNamed, mount, problem, settle, typeIn, unmountAll } from './testkit-c';
@@ -277,5 +277,34 @@ describe('the thread', () => {
     expect(option.querySelector('.arg-hint')!.textContent).toBe('<role>');
     typeIn(el.querySelector('#composer'), '/ansible-style ');
     expect(el.querySelector('.composer .address .arg-hint')!.textContent).toBe('/ansible-style <role>');
+  });
+});
+
+describe('the answers of the manager that the person has not opened', () => {
+  const ME = 'alice@example.com';
+  const conv = (id: string, state: Run['state'], seq: number, extra: Partial<Run> = {}): Run => ({ id, agent: 'manager', state, seq, principal: ME, input: 'Q ' + id, createdAt: T, updatedAt: T, ...extra });
+
+  it('name a conversation that moved past the seq that the person saw and waits for the person, and never an old one met first', () => {
+    const seen: Run[] = [];
+    const runs = [conv('a', 'completed', 5), conv('b', 'running', 9), conv('c', 'completed', 3), conv('d', 'input-required', 7), conv('e', 'completed', 8, { archived: true }), conv('f', 'completed', 4)];
+    const out = unreadOf(runs, 'manager', ME, { a: 3, b: 2, c: 3, d: 1, e: 1 }, (r) => seen.push(r));
+    expect([...out].sort()).toEqual(['a', 'd']);
+    // f is new to the page: it counts as seen as it is.
+    expect(seen.map((r) => r.id)).toEqual(['f']);
+  });
+
+  it('light the place Manager while an answer waits, and put it out once the person opens the conversation', async () => {
+    forgetSeen();
+    act(() => store.dispatch({ type: 'run', run: conv('run-dot', 'running', 2) }));
+    const bar = mount(<ManagerDot />);
+    await settle();
+    // The page meets the conversation working, and notes it as seen as it is.
+    expect(bar.querySelector('.place-dot')).toBeNull();
+    act(() => store.dispatch({ type: 'run', run: conv('run-dot', 'completed', 5, { output: 'Two bridges.' }) }));
+    expect(bar.querySelector('.place-dot')).not.toBeNull();
+    expect(bar.querySelector('.place-dot')!.textContent).toBe('The manager answered.');
+    act(() => markSeen(store.get().runs['run-dot']));
+    expect(bar.querySelector('.place-dot')).toBeNull();
+    forgetSeen();
   });
 });

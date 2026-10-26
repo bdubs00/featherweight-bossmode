@@ -24,7 +24,7 @@ import { parseSlash } from '../lib/mention';
 import { useRoving } from './keys';
 import { attempt, showError } from './notice';
 import { Composer } from './Composer';
-import { Conversation, focusComposer, useTranscript, usePoll } from './Conversation';
+import { Conversation, focusComposer, startRun, takeUpOf, useTranscript, usePoll } from './Conversation';
 import { useResult } from './RunPane';
 import { FollowBox, Quiet } from './Thread';
 import { useLiveAnswer } from './Live';
@@ -476,7 +476,8 @@ export function AgentChat({ agent }: { agent: string }) {
       return false;
     }
     const startNew = async () => {
-      const r = await api.start(member, files.length ? { agent, input: text, files } : { agent, input: text }).catch((e) => {
+      // A message in an archived conversation takes it up in a new one, which starts with a summary of it.
+      const r = await startRun(member, files.length ? { agent, input: text, files } : { agent, input: text }, takeUpOf(runId)).catch((e) => {
         throw refusalOf(e, files.length);
       });
       store.dispatch({ type: 'run', run: r });
@@ -559,6 +560,10 @@ export function AgentChat({ agent }: { agent: string }) {
             store.dispatch({ type: 'run', run: r });
             open(r.id);
             setPast(false);
+          }}
+          onHidden={(r) => {
+            // A deleted conversation that the pane shows leaves it too.
+            if (r.id === runId) open('');
           }}
         />
       )}

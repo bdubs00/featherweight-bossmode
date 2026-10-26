@@ -119,6 +119,36 @@ describe('an archived conversation with the manager', () => {
     await vi.waitFor(() => expect(posts().length).toBe(1));
     expect(posts()[0].path).toBe('/v1/runs?member=default%2Fboss-0');
     expect(calls.some((c) => c.path === '/v1/runs/run-old/messages')).toBe(false);
+    // The new conversation takes up the archived one: the server puts a summary of it in front of the message.
+    expect((posts()[0].body as { continues?: string }).continues).toBe('run-old');
+  });
+
+  it('starts the new conversation without continues on a server that does not know the field', async () => {
+    restore();
+    let tries = 0;
+    const f = fakeFetch([
+      ['GET', /^\/v1\/fleet\/runs\?/, () => ({ runs: [OLD], total: 1 })],
+      [
+        'POST',
+        /^\/v1\/runs\?member=/,
+        (b) =>
+          ++tries === 1 && (b as { continues?: string }).continues
+            ? new Response(JSON.stringify({ status: 400, detail: 'the body is not valid: json: unknown field "continues"' }), { status: 400, headers: { 'Content-Type': 'application/problem+json' } })
+            : NEW,
+      ],
+      ['GET', /^\/v1\/runs\/run-old$/, () => OLD],
+      ['GET', /^\/v1\/runs\/run-old\/transcript/, () => ({ run: OLD, items: items(OLD), next: 0, prev: 0 })],
+      ['GET', /^\/v1\/runs\/run-new$/, () => NEW],
+      ['GET', /^\/v1\/runs\/run-new\/transcript/, () => ({ run: NEW, items: items(NEW), next: 0, prev: 0 })],
+      ['GET', /^\/v1\/tools$/, () => ({ tools: [] })],
+    ]);
+    calls = f.calls;
+    restore = f.restore;
+    const el = mount(<Manager />);
+    await vi.waitFor(() => expect(el.textContent).toContain(ARCHIVED_LINE));
+    send(el, 'Again');
+    await vi.waitFor(() => expect(posts().length).toBe(2));
+    expect(posts().map((c) => (c.body as { continues?: string }).continues)).toEqual(['run-old', undefined]);
   });
 });
 
@@ -129,6 +159,7 @@ describe('an archived conversation with an agent', () => {
     send(el, 'Again');
     await vi.waitFor(() => expect(posts().length).toBe(1));
     expect(posts()[0].path).toBe('/v1/runs?member=default%2Fboss-0');
+    expect((posts()[0].body as { continues?: string }).continues).toBe('run-old');
     await vi.waitFor(() => expect(el.textContent).not.toContain(ARCHIVED_LINE));
   });
 
@@ -159,5 +190,6 @@ describe('an archived quick chat', () => {
     await vi.waitFor(() => expect(posts().length).toBe(1));
     expect(posts()[0].path).toBe('/v1/runs?member=default%2Fboss-0');
     expect((posts()[0].body as { agent: string }).agent).toBe('chat');
+    expect((posts()[0].body as { continues?: string }).continues).toBe('run-chat-old');
   });
 });

@@ -364,6 +364,10 @@ export interface Run {
    * conversation.
    */
   archived?: boolean;
+  /** The title that the caller gave the conversation, from the lists of the caller (PATCH /v1/conversations/{run}). */
+  myTitle?: string;
+  /** True when the caller deleted the conversation from the lists. The server keeps the run in its archive. */
+  hidden?: boolean;
 }
 
 /** The usage of a run, as the kernel sums it. Every field is a sum. */
@@ -422,6 +426,8 @@ export interface NewRun {
   profile?: InlineProfile;
   metadata?: Record<string, string>;
   files?: Attachment[];
+  /** The id of an earlier conversation that the run takes up: the server puts a summary of it in front of the input. */
+  continues?: string;
 }
 
 /** The decision of a result (dashboard.Decision). */

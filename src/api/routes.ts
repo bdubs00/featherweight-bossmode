@@ -230,6 +230,8 @@ export const api = {
    */
   fleetRuns: (q: { agent?: string; principal?: string; state?: string; limit?: number }) =>
     call<{ runs: Run[]; total?: number }>('/v1/fleet/runs' + query({ agent: q.agent, principal: q.principal, state: q.state, limit: q.limit })).then((r) => (r && r.runs) || []),
+  /** patchConversation renames a conversation, or deletes it from the lists, for the caller alone. An empty title goes back to the title of the run. */
+  patchConversation: (id: string, change: { title?: string; hidden?: boolean }) => call<unknown>('/v1/conversations/' + encodeURIComponent(id), { method: 'PATCH', body: change }),
   sendRun: (id: string, content: string, files?: Attachment[]) =>
     call<unknown>(run(id) + '/messages', { method: 'POST', body: files && files.length ? { content, files } : { content } }),
   decide: (id: string, approval: string, decision: 'allow' | 'deny', note?: string, content?: unknown) => {
@@ -260,6 +262,8 @@ export const api = {
       body: summary ? { text, summary } : { text },
       headers: ifMatch === '*' ? { 'If-None-Match': '*' } : { 'If-Match': '"' + ifMatch + '"' },
     }),
+  /** removePage removes a page. ifMatch is the hash that the person saw, so a newer version stays. The history keeps every version. */
+  removePage: (path: string, ifMatch?: string) => call<null>('/v1/pages/' + encPath(path), { method: 'DELETE', headers: ifMatch ? { 'If-Match': '"' + ifMatch + '"' } : {} }),
   history: (path: string) => call<{ path: string; versions: PageVersion[] }>('/v1/pages/' + encPath(path) + '/history').then((r) => (r && r.versions) || []),
   search: (q: string, signal?: AbortSignal) =>
     call<{ q: string; results: SearchHit[]; cut: boolean }>('/v1/pages/search' + query({ q }), { signal }),

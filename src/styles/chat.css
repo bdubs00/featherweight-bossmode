@@ -13,6 +13,42 @@
 .chat-row time {
   flex: none;
 }
+/* A row of a list of conversations holds its link and the menu of the row,
+   Rename and Delete, at the right of its first line. */
+.chat-item {
+  position: relative;
+}
+.chat-item > .chat-row .brow-top {
+  padding-right: calc(var(--h-small) + var(--s-1));
+}
+.chat-item > .pop {
+  position: absolute;
+  top: var(--s-2);
+  right: var(--s-2);
+}
+/* An answer of the manager that the person has not opened: a dot after the title of its row, and on the place Manager. */
+.unread-dot,
+.place-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-led);
+  background: var(--accent);
+}
+.chat-row.unread .brow-title {
+  font-weight: 700;
+}
+.place-dot {
+  position: absolute;
+  top: 8px;
+  right: 16px;
+}
+@media (max-width: 799px) {
+  .place-dot {
+    top: 4px;
+    right: calc(50% - 18px);
+  }
+}
 /* A closed conversation reads, and takes no message: its title is muted. */
 .chat-row.closed .brow-title {
   font-weight: 400;

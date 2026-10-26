@@ -4,10 +4,11 @@ import { store } from '../state/store';
 import { forgetManagerRun } from '../state/actions';
 import { managerRunOf } from '../state/reducer';
 import type { BossConfig, Run } from '../api/types';
-import { conversationsOf, FIND_PAST_FROM, PastConversations } from './History';
+import { NO_PATCH, conversationsOf, FIND_PAST_FROM, PastConversations, patchConversation } from './History';
 import { Manager, ManagerList } from './Manager';
 import { AgentChat } from './Fleet';
 import { click, fakeApi, keyNamed, mount, problem, settle, typeIn, unmountAll } from './testkit-c';
+import { clearNotice } from './notice';
 
 const ME = 'alice@example.com';
 const day = (d: number, h = 9) => new Date(Date.UTC(2026, 9, d, h)).toISOString();
@@ -18,6 +19,10 @@ let api: ReturnType<typeof fakeApi> | null = null;
 beforeEach(() => {
   sessionStorage.clear();
   forgetManagerRun();
+  // A name or a deletion of an earlier test stays in the store, so each test starts without them.
+  act(() => {
+    for (const r of Object.values(store.get().runs)) if (r.myTitle) store.dispatch({ type: 'run', run: { ...r, myTitle: '' } });
+  });
   act(() => {
     store.dispatch({ type: 'config', config: CONFIG });
     store.dispatch({ type: 'me', me: { principal: { subject: ME }, roles: {}, admin: false, canCreate: true } });
@@ -84,6 +89,76 @@ describe('the past conversations', () => {
     el = mount(<ManagerList fresh />);
     await settle();
     expect(el.querySelector('a.chat-row[aria-current="page"]')).toBeNull();
+  });
+
+  it('show the name that the person gave a conversation, and leave out a deleted one', async () => {
+    api = fakeApi(listing([conv('run-new', { title: 'Plan the k3s upgrade', myTitle: 'k3s plan', createdAt: day(22) }), conv('run-old', { title: 'Old' }), conv('run-gone', { title: 'Gone', hidden: true })]));
+    const el = mount(<ManagerList />);
+    await settle();
+    expect([...el.querySelectorAll('a.chat-row .brow-title')].map((x) => x.textContent)).toEqual(['k3s plan', 'Old']);
+  });
+
+  it('rename a conversation from the menu of its row, in one line of at most 100 characters', async () => {
+    api = fakeApi({ ...listing([conv('run-ren', { title: 'Rename me' })]), 'PATCH /v1/conversations/run-ren': () => ({ status: 204 }) });
+    const el = mount(<ManagerList run="run-new" />);
+    await settle();
+    const titles = () => [...el.querySelectorAll('a.chat-row .brow-title')].map((x) => x.textContent);
+    const row = [...el.querySelectorAll('.chat-item')].find((x) => x.textContent!.includes('Rename me'))!;
+    click(row.querySelector('button[aria-label="More for Rename me"]'));
+    click([...row.querySelectorAll('[role="menu"] button')].find((b) => b.textContent === 'Rename'));
+    const dialog = document.querySelector('dialog.confirm')!;
+    expect(dialog.querySelector('h2')!.textContent).toBe('Rename the conversation');
+    const field = dialog.querySelector('input') as HTMLInputElement;
+    expect(field.value).toBe('Rename me');
+    expect(field.maxLength).toBe(100);
+    typeIn(field, '  Proxmox   hosts ');
+    click([...dialog.querySelectorAll('button')].find((b) => b.textContent === 'Rename'));
+    await settle();
+    expect(api.calls.find((c) => c.method === 'PATCH')).toMatchObject({ path: '/v1/conversations/run-ren', body: { title: 'Proxmox hosts' } });
+    expect(titles()).toContain('Proxmox hosts');
+    expect(titles()).not.toContain('Rename me');
+    // A later read of the run alone keeps the name of the person.
+    act(() => store.dispatch({ type: 'run', run: conv('run-ren', { title: 'Rename me', seq: 4 }) }));
+    expect(titles()).toContain('Proxmox hosts');
+  });
+
+  it('delete a conversation from the lists after a confirmation that says what keeps it', async () => {
+    api = fakeApi({ ...listing([conv('run-del', { title: 'Delete me' })]), 'PATCH /v1/conversations/run-del': () => ({ status: 204 }) });
+    const el = mount(<ManagerList run="run-new" />);
+    await settle();
+    const row = [...el.querySelectorAll('.chat-item')].find((x) => x.textContent!.includes('Delete me'))!;
+    click(row.querySelector('button[aria-label="More for Delete me"]'));
+    click([...row.querySelectorAll('[role="menu"] button')].find((b) => b.textContent === 'Delete'));
+    const dialog = document.querySelector('dialog.confirm')!;
+    expect(dialog.querySelector('h2')!.textContent).toBe('Delete Delete me?');
+    expect(dialog.textContent).toContain('It leaves your lists. The agent keeps no copy of it, and the archive of the server keeps it.');
+    click([...dialog.querySelectorAll('button')].find((b) => b.textContent === 'Delete'));
+    await settle();
+    expect(api.calls.find((c) => c.method === 'PATCH')).toMatchObject({ path: '/v1/conversations/run-del', body: { hidden: true } });
+    expect(el.textContent).not.toContain('Delete me');
+  });
+
+  it('say so when the server cannot rename a conversation yet, and keep the row', async () => {
+    api = fakeApi({ ...listing([conv('run-np', { title: 'No route here' })]), 'PATCH /v1/conversations/run-np': () => problem(404, 'no route /v1/conversations/run-np') });
+    const el = mount(<ManagerList />);
+    await settle();
+    const row = [...el.querySelectorAll('.chat-item')].find((x) => x.textContent!.includes('No route here'))!;
+    click(row.querySelector('button[aria-label="More for No route here"]'));
+    click([...row.querySelectorAll('[role="menu"] button')].find((b) => b.textContent === 'Delete'));
+    click([...document.querySelectorAll('dialog.confirm button')].find((b) => b.textContent === 'Delete'));
+    await settle();
+    expect(api.calls.some((c) => c.method === 'PATCH')).toBe(true);
+    expect(el.textContent).toContain('No route here');
+    clearNotice();
+    // The router of a server without the route answers 404 with no problem, or 405, and either reads as one sentence.
+    await expect(patchConversation(conv('run-np'), { hidden: true })).rejects.toThrow(NO_PATCH);
+    api.restore();
+    api = fakeApi({ 'PATCH /v1/conversations/run-np': () => ({ status: 405 }) });
+    await expect(patchConversation(conv('run-np'), { title: 'x' })).rejects.toThrow('This server cannot rename or delete a conversation yet.');
+    // A 404 with a problem of its own, such as a run that the person cannot see, says its own sentence.
+    api.restore();
+    api = fakeApi({ 'PATCH /v1/conversations/run-np': () => problem(404, 'No run run-np is visible to you.') });
+    await expect(patchConversation(conv('run-np'), { title: 'x' })).rejects.toThrow('No run run-np is visible to you.');
   });
 
   it('open the conversation of the address, and follow it up', async () => {
