@@ -332,7 +332,8 @@ export function PageView({ path, version }: { path: string; version?: number }) 
     if (page && heading.current) heading.current.focus();
   }, [page && page.path]);
   // The history numbers the versions of the page from 1, and names the newest one, which Restore replaces.
-  const versions = usePageHistory(path, hash || (page ? page.hash : '') || (missing ? 'missing' : ''));
+  // A hash names the text, and a restored version has the text of an older one, so the version of the page reads the history again too.
+  const versions = usePageHistory(path, [hash || (page ? page.hash : ''), page ? page.version : '', missing ? 'missing' : ''].join(':'));
   const numbers = useMemo(() => pageNumbers(versions || []), [versions]);
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
