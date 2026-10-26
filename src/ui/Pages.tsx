@@ -16,7 +16,7 @@ import { INDEX_PATH, byPagePath, pageName, pageReason, withSuffix } from '../lib
 import { personName, since } from '../lib/words';
 import { go, hrefOf } from '../lib/route';
 import { useRoving } from './keys';
-import { attempt, showError, showSaid } from './notice';
+import { SAID_MS, attempt, showError, showSaid, showUndo } from './notice';
 import { Confirm, Markdown, Menu } from './common';
 import { keyWords, useCoarse } from './Composer';
 import { Glyph } from './icons';
@@ -376,10 +376,21 @@ export function PageView({ path, version }: { path: string; version?: number }) 
     });
     setBusy(false);
     setAsking(false);
-    if (ok) {
-      showSaid('Removed ' + title + '. Its history keeps it.');
-      go('#pages');
-    }
+    if (!ok) return;
+    // Undo puts the text back as the page, a new version over the removal.
+    const text = page.text;
+    showUndo(
+      'Removed ' + title + '.',
+      () =>
+        attempt(async () => {
+          await api.putPage(path, text, '*', 'Put back after a removal');
+          await loadPages();
+          showSaid('Put back ' + title + '.');
+          go({ place: 'pages', path, mode: 'read' });
+        }),
+      SAID_MS,
+    );
+    go('#pages');
   };
   // Restore saves an old version as the newest one: over the newest version, or as the page again when it was removed.
   const restore = async () => {

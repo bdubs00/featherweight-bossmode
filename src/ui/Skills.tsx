@@ -164,6 +164,11 @@ export function plainPhrase(description: string): string {
   return first.length > 0 && first.length <= 60 ? first : '';
 }
 
+/** sameWords reports whether a description says no more than its phrase: the same words, with or without the full stop. */
+export function sameWords(description: string, phrase: string): boolean {
+  return !!phrase && description.trim().replace(/[.\s]+$/, '') === phrase;
+}
+
 function GroupRows<T extends { name: string; description: string }>({ g, kind, idOf, current }: { g: Group<T>; kind: 'skill' | 'tool'; idOf: (x: T) => string; current?: SkillItem }) {
   const id = kind + '-' + g.key;
   return (
@@ -395,7 +400,8 @@ export function SkillMain({ item, add }: { item?: SkillItem; add?: boolean }) {
                 <code>{tool!.name}</code>
               </p>
             )}
-            <p class="c-lede">{tool!.description}</p>
+            {/* The description shows once: the title says it already when it is the plain phrase alone. */}
+            {!sameWords(tool!.description, plainPhrase(tool!.description)) && <p class="c-lede">{tool!.description}</p>}
             <AgentsThatLoad agents={[...new Set([...tool!.agents, ...toolUsers(tool!, lists)])].sort()} title="Agents that can use it" />
           </>
         )}

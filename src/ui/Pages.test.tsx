@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Bridge, PageMeta } from '../api/types';
 import { PageEditor, PageHistory, PageTree, PageView, foldersOf, newPath, pageNumbers, withoutTitle } from './Pages';
-import { clearSaid, currentNotice, currentSaid } from './notice';
+import { clearSaid, currentNotice, currentSaid, undoSaid } from './notice';
 import { act } from 'preact/test-utils';
 import { store } from '../state/store';
 import { parseRoute } from '../lib/route';
@@ -272,8 +272,18 @@ describe('the editor', () => {
     await settle();
     const del = api.calls.find((c) => c.method === 'DELETE')!;
     expect(del.headers['If-Match']).toBe('"h7"');
-    expect(currentSaid()).toBe('Removed Deploy. Its history keeps it.');
+    expect(currentSaid()).toBe('Removed Deploy.');
     expect(location.hash).toBe('#pages');
+    // Undo puts the text back as the page.
+    api.restore();
+    api = fakeApi({ 'PUT /v1/pages/runbooks/deploy.md': { ...page('# Deploy\n\nRun it.', 'h7'), version: 9 }, 'GET /v1/pages': { pages: [] } });
+    act(() => undoSaid());
+    await settle();
+    const put = api.calls.find((c) => c.method === 'PUT')!;
+    expect(put.headers['If-None-Match']).toBe('*');
+    expect(put.body).toEqual({ text: '# Deploy\n\nRun it.', summary: 'Put back after a removal' });
+    expect(currentSaid()).toBe('Put back Deploy.');
+    expect(location.hash).toBe('#pages/runbooks/deploy.md');
     clearSaid();
     api.restore();
     api = fakeApi({ 'GET /v1/pages/runbooks/deploy.md/history': { versions: [{ version: 8, hash: '', by: '', at: '', size: 0, deleted: true }, { version: 7, hash: 'h7', by: 'alice@example.com', at: '', size: 1 }] } });
