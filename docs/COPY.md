@@ -86,6 +86,7 @@ Capacity shows where seating happens:
 |---|---|---|---|
 | `bossmode` (title) | keep | | Lead |
 | `Bossmode needs JavaScript.` | keep | | Lead |
+| `bossmode` (the title of the document) | change | `Bossmode`, until the shell writes the title of the tab | done |
 
 ### src/ui/App.tsx
 
@@ -102,6 +103,10 @@ Capacity shows where seating happens:
 | `Dismiss` | keep | | done |
 | `Failed` (the word of the notice) | keep | | done |
 | new | add | `A new version of bossmode is out.`, in the place of the notice, with the keys `Reload` and `Dismiss`, when the stream names a build of the page that is not the build of the tab. It stays through a move to another screen, a notice of a failed action takes the place first, and Dismiss hides it until a later build. | done |
+| `Loading bossmode.` | change | `Loading the page.` | done |
+| `A new version of bossmode is out.` | change | `A new version of this page is ready.`, with `Reload` and `Dismiss` | done |
+| `The workbench refused one request. You are still signed in. Try again.` | change | `The server refused one request. You are still signed in. Try again.` | done |
+| `The workbench did not answer. Check the connection, then try again.` | change | `The server did not answer. Check the connection, then try again.` | done |
 
 ### src/ui/Shell.tsx
 
@@ -122,6 +127,11 @@ Capacity shows where seating happens:
 | new | add | `Fleet: <caption>, <figures>`, the name of the readout for a screen reader, such as `Fleet: 9 workers, 2 working, 7 asleep` | done |
 | `<name>, home` (logo well) | keep | | done |
 | the dashed well with a picture where the deployment names no logo | change | the monogram of the name of the organization, such as `H` for Homelab, else a muted `B` for bossmode. The letters are hidden from a screen reader, which reads `<name>, home`. | done |
+| new | add | the title of the tab: the count of what needs you, the place, and the deployment, such as `(2) Activity - Homelab`, or `Bridges - Bossmode` without a theme | done |
+| new | add | `Skip to the content`, the first link of the page, which shows only while it holds the focus | done |
+| `Graphite` (the theme in the account menu) | change | `Dark`, also in Appearance | done |
+| `token, account`, `TO`, and `token` over `token` in the menu head, for the access token of the fleet | change | `Your account`, a figure for the key, and `You` over `Signed in with an access token` | done |
+| `The page connects to the workbench again.` | change | `The page connects to the server again.` | done |
 
 ### src/ui/Signin.tsx
 
@@ -135,6 +145,7 @@ Capacity shows where seating happens:
 | `Use an access token` | keep | | done |
 | `Access token` | keep | | done |
 | `Continue` | keep | | done |
+| `Sign in` (the heading before the settings load) | change | `Sign in to Bossmode`, or `Sign in to <name>` with a theme, and the title of the tab `Sign in - <name>` | done |
 
 ### src/ui/common.tsx
 
@@ -162,6 +173,7 @@ Capacity shows where seating happens:
 | `The workbench answered with something that is not JSON.` | change | `The workbench answered with something that is not JSON. Reload the page.` | done |
 | the notice stays until Dismiss or the next action that works | change | when the person moves to another screen, the notice also clears | done |
 | new | add | a notice of an action that worked, such as `Saved the playbook <name>.`, a status with the key `Dismiss`. It goes after six seconds, stays through a move to another screen, and gives way to a notice of a failed action | done |
+| `The workbench did not answer. Check the connection and try again.` | change | `The server did not answer. Check the connection and try again.` | done |
 
 ### src/lib/presence.ts
 
@@ -247,6 +259,7 @@ Capacity shows where seating happens:
 | `2000+` | add | the unread count past the bound of the backend | done |
 | `Manager` row and `Your conversation` | remove | Manager is a place of the app bar | done |
 | `Places`, `Fleet`, `Pages` rows | remove | places of the app bar | done |
+| new | add | `No bridge matches <filter>.` with the key `Clear`, for a filter that matches no bridge. While a filter shows, `Closed` is a heading over the closed bridges that match, not a toggle. | done |
 
 ### src/ui/Channel.tsx
 
@@ -285,6 +298,9 @@ Capacity shows where seating happens:
 | the empty tab Decisions | add | `Nothing needs you.`, the words of Activity | done |
 | the tab Wiki | add | `Loading the pages.` and `New page`, the words of the wiki | done |
 | the pages under `bridges/<id>/` alone, by name (the tab Wiki) | change | every page of the work of the bridge: the title, then the seat that wrote it with its face, the path (without `bridges/<id>/` for a page of that folder), and `14 min`. A page that no seat wrote names its writer, such as `alice`. `Pages of this bridge` for a screen reader | done |
+| the tab Wiki with only `New page` | change | `No page yet. The members keep their notes and reports here, and you can write one too.` with the key `New page` | done |
+| new | add | `Nothing waits for you. The cards below were decided or answered.` above the cards of the tab Decisions when none waits | done |
+| `Members finish what they do. The channel takes no new message.` (Close bridge) | change | the same, then `You can reopen it from More.` | done |
 
 ### src/ui/Message.tsx
 
@@ -330,6 +346,7 @@ Capacity shows where seating happens:
 | `The bridge reached its cap of N messages`, `The bridge reached its cap of N a minute`, `<handle> stopped at a limit`, `<handle> cannot take messages`, `<a> and <b> reached their cap`, `The bridge reached a cap` (cap) | add | | done |
 | `You` (the author line of a message of the person who reads the page, a person of a line, and a decided card) | add | the subject or the name of `/v1/whoami` matches the sender or the decider. A person who signs in with the token of the fleet thus never reads `token` for themself. | done |
 | `Someone`, `token` (a line whose sentence names nobody, or the token of the fleet for another person) | add | | done |
+| `to operator` (the address line of a message to the person) | change | `to you` | done |
 
 ### src/ui/Decision.tsx
 
@@ -414,6 +431,8 @@ Capacity shows where seating happens:
 | new | add | the footer `This bridge` with turns, cost, and pages, from `usage`, for a bridge whose runs report usage. The pages are the pages of the work of the bridge, as the tab Wiki lists them, wherever its agents wrote them | done |
 | `N turns`, `$N so far`, `N pages` (the figures of the foot, at `--t-control`) | add | `1 turn` and `1 page` for one. A cost below one cent reads `under $0.01 so far`, never `$0.00`, from `src/lib/cost.ts` | done |
 | `Add` (the screen-reader name of the picker) | add | the picker carries the name of the key that opens it | done |
+| `Mute`, `Unmute` | change | the same, with the hints `It gets only the messages that name it.` and `It gets every message again.` A closed bridge offers `Open conversation` alone. | done |
+| `Back to Channel` | change | `Back to <bridge title>` | done |
 
 ### src/ui/Picker.tsx
 
@@ -525,6 +544,8 @@ Capacity shows where seating happens:
 | `Loading the conversation.` | keep | | B |
 | new | add | `This run is gone.`, in place of a conversation whose run the fleet does not hold, as after a worker that held it was replaced. A read that the page starts on its own never raises the notice. The sentence of another failure shows in the same place. | done |
 | new | add | `This read wakes the worker.`, one short line in place while the worker that holds the run sleeps. It shows on the tabs Run and Files of a seat and in the run pane of a bridge. The tab reads the run because the person opened it, and the line goes once the worker is awake. The Chat tab reads nothing of a worker that sleeps, so it needs no such line. The line is the one sentence of explanation of these views: without it, a worker that wakes for a read looks like a fault. | done |
+| the start time of a run beside its status, which read as its end | change | `started <time>`, and `started <time>, ended <time>` for a run that ended | done |
+| `[bridge "<title>" <id>] @<handle> from operator: ` and `Answer to your question in entry <n>: ` in the conversation of a run | remove | the words of the sender alone, under `You` or the handle of the seat that sent them | done |
 
 ### src/ui/Member.tsx and src/ui/Board.tsx
 
@@ -541,6 +562,7 @@ Capacity shows where seating happens:
 | `stopped` (a seat whose newest run was canceled) | add | the status beside `error`, with a grey light, and the key `Seat again` | done |
 | `at its limit` (a seat whose newest run stopped at a limit) | add | the status with a grey light over the composer, the plain line that names the limit, such as `Stopped at its turn limit`, and the key `Continue`. The More menu holds Continue before Seat again | B |
 | the reason of the bar over the composer of a stopped seat: a limit of the result, or the whole error, cut | change | the plain line of a failure, in ink, with the message of the provider in its tooltip, and the key `Seat again`, which acts at once. A stopped seat shows only its status and the key | done |
+| `Back to Fleet` (a seat that a bridge opened) | change | `Back to the members of <bridge title>`. The Fleet place keeps `Back to Fleet`. | done |
 
 ## 6. Screen C
 
@@ -618,6 +640,10 @@ Capacity shows where seating happens:
 | `The handle <h> is there twice.` | change | `<h> has a seat on this bridge already. Pick another handle.` | C |
 | `Member N needs an agent.`, `Member N needs a task.` | keep | | C |
 | `A spawn bridge needs a manager, and this workbench has none.` | change | `A fresh sandbox per seat needs a manager. Pick keep warm workers, or set up a manager.` | C |
+| `Keep warm workers`, `Fresh sandbox per seat` | add | the lines `Each seat starts at once on a worker that its agent keeps.` and `The manager starts a new worker for each seat, so a seat starts later.` | done |
+| `Caps` | add | the question mark `What the caps are` with `Each cap counts the whole bridge. The bridge stops at a cap until you raise it. An empty field keeps the usual cap of the server.`, and the placeholder `Usual` in each cap | done |
+| `Cancel` on a filled form | add | the dialog `Throw away this bridge?` with `The job and the seats that you wrote go. No bridge opens.` and the key `Throw away` | done |
+| Caps and `What the manager can do here` while the manager splits the job | remove | the manager picks them when it opens the bridge | done |
 
 ### src/ui/NewAgent.tsx, src/ui/Appearance.tsx, src/ui/Skills.tsx
 
@@ -906,6 +932,8 @@ stands for a value.
 | new | add | a problem of the front under the row of its place, and at the top of the dialog of another place as `<name>: <text>` or `Quiet hours: <text>` | done |
 | `Tell me about` with the switches `Questions`, `Failures`, and `A daily digest` | change | the same switches on each place, and in the dialog of a place | done |
 | `Quiet hours` with `Hold notifications at night`, `From`, `To`, and `Time zone`, and the error `Pick both times.` | keep | | done |
+| `This workbench sends no notifications.` | change | `The server sends no notifications.` | done |
+| `Save` with no change | change | `Save` stays off until something changes, and `Cancel` closes the dialog | done |
 
 ### src/ui/ChannelDialog.tsx
 
@@ -923,6 +951,7 @@ stands for a value.
 | new | add | `Channel` with `Pick a channel`, each shared channel by its label, and `<name>, no longer shared` | done |
 | new | add | `Tell me about` with the switches `Questions`, `Failures`, and `A daily digest` | done |
 | new | add | the errors `Pick a kind of place.`, `Give the place a name.`, `Write the address of the server, such as https://ntfy.sh.`, `This workbench has no ntfy server of its own. Write the address of one, such as https://ntfy.sh.`, `Write the topic that your phone follows.`, `A topic holds no space and no slash.`, `Paste the address from Slack.` (and Discord and Teams), `Paste the address of the app.`, `A Slack address starts with https://hooks.slack.com/.`, `A Discord address starts with https://discord.com/api/webhooks/.`, `The address starts with https://.`, `Write the address to mail.`, `Write an email address, such as you@example.com.`, `Pick the agent that reaches you.`, `Say how the agent should reach you.`, `A place through an agent needs a budget. Write the most a message can cost, such as 0.02.`, `Write an amount above 0, such as 0.02.`, and `Pick a shared channel.` | done |
+| `This workbench offers no place yet. Ask an admin.` | change | `The server offers no place yet. Ask an admin.` | done |
 
 ### src/ui/DutyEditor.tsx and src/ui/Duties.tsx: the shared channels
 
