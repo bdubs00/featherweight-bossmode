@@ -21,13 +21,20 @@
 // with the agent and the message of a chat or a bridge, from the address.
 // Tell me about also offers the shared channels of the operator, from GET
 // /v1/notifications, and keeps a shared channel that the duty names.
+//
+// The person writes the name of a duty in words, such as Walk duty 1, and
+// the page makes its short name, walk-duty-1, and shows it. A change of the
+// form stays as a draft in the tab until Save or Cancel, so a move to
+// another screen loses nothing. Make this a duty reads the schedule and the
+// cost that its message names, and Cancel goes back to the conversation.
 
 import type { RefObject } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
 import { ApiError, browserZone } from '../api/client';
 import type { Day, Duty, DutyDryRun } from '../api/types';
-import { go, hrefOf, type DutySeed } from '../lib/route';
+import { go, hrefOf, parseRoute, type DutySeed } from '../lib/route';
+import { worksSeats } from '../lib/agents';
 import {
   AT_TIMES,
   CATCH_UPS,
@@ -49,27 +56,34 @@ import {
   channelsIn,
   checkWords,
   chipText,
+  datesError,
   domOf,
   dutyProblems,
   eventLabel,
   eventOf,
   eventWords,
+  firstLine,
   formErrors,
   formOf,
   hasCheck,
   limitWords,
+  moneyIn,
   monthDayOf,
   nameOf,
-  nameReason,
+  nameWordsReason,
+  nextTime,
   nextWords,
   presetOf,
   recordOf,
   scheduleOf,
+  scheduleWordsIn,
   seededForm,
+  slugOf,
   sortDays,
   spanText,
   splitProblem,
   startWords,
+  titleOfName,
   whenError,
   whenFormOf,
   withChoice,
@@ -94,12 +108,13 @@ import { useSelect } from '../state/store';
 import { membersOf } from '../state/reducer';
 import { loadBridge } from '../state/actions';
 import { FALLBACK, loadDuties, loadDutyOptions, loadDuty, loadSharedChannels, saveDuty, useDuties } from '../state/duties';
+import { usePlaybooks } from '../state/playbooks';
 import { showError } from './notice';
 import { Confirm } from './common';
 import { Picker } from './Picker';
 import { CheckFirst } from './DutyCheck';
 import { PlaybookPick, PlaybookShelf } from './Playbooks';
-import { Button, Choices, Field, IconButton, Input, Mark, PaneHeader, TextArea, buttonClass } from './primitives';
+import { Button, Choices, Field, Help, IconButton, Input, Mark, PaneHeader, TextArea, buttonClass } from './primitives';
 
 /** The wait after a change of When before the page asks the front to read it back. A test sets it to 0. */
 export const timing = { preview: 400 };
@@ -120,10 +135,99 @@ const ACT_WORDS: Record<Act, string> = {
   manager: 'Ask the manager',
 };
 
-/** useAgentName is the name of an agent as its face names it. */
+/** useAgentName is the name of an agent as its face names it, else its name with a capital, as the picker shows it. */
 export function useAgentName(agent: string): string {
-  return useSelect((s) => (agent && s.faces[agent] && s.faces[agent].displayName) || agent);
+  return useSelect((s) => (agent && s.faces[agent] && s.faces[agent].displayName) || titleOfName(agent));
 }
+
+/** focusLost gives the focus to an element when the focus fell to the body, such as after a move to another screen or after a key that went away. */
+export function focusLost(el: HTMLElement | null | undefined): void {
+  const a = document.activeElement;
+  if (el && (!a || a === document.body)) el.focus();
+}
+
+/** useFocusLost gives the focus to a heading once it shows, when the focus fell to the body. */
+export function useFocusLost(ref: RefObject<HTMLElement>, deps: unknown[]): void {
+  useEffect(() => {
+    const t = setTimeout(() => focusLost(ref.current), 0);
+    return () => clearTimeout(t);
+  }, deps);
+}
+
+/* ---------- the draft and the way back ---------- */
+
+/** The draft of a duty in the storage of the tab: the form, the words of the box, the way back, and the revision that the draft began from. */
+interface DutyDraft {
+  form: DutyForm;
+  words: string;
+  from?: string;
+  revision?: number;
+  datesOwn?: boolean;
+}
+
+/** draftKey names the draft of New duty, of New duty from one seed, or of the edit of one duty. */
+const draftKey = (name?: string, seed?: DutySeed) => 'fw.bossmode.duty.' + (name ? 'edit/' + name : 'new' + (seed ? '?' + JSON.stringify(seed) : ''));
+
+function readDraft(key: string): DutyDraft | null {
+  try {
+    const raw = sessionStorage.getItem(key);
+    const d = raw ? (JSON.parse(raw) as DutyDraft) : null;
+    return d && d.form && typeof d.form === 'object' ? d : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeDraft(key: string, d: DutyDraft | null): void {
+  try {
+    if (d) sessionStorage.setItem(key, JSON.stringify(d));
+    else sessionStorage.removeItem(key);
+  } catch {
+    // No storage: the draft lives in the form only.
+  }
+}
+
+/** The address before the newest move of the tab. Make this a duty goes back there. */
+let before = '';
+if (typeof window !== 'undefined')
+  window.addEventListener('hashchange', (e) => {
+    try {
+      if (e.oldURL) before = new URL(e.oldURL).hash;
+    } catch {
+      // An address that does not read keeps the one before.
+    }
+  });
+
+/** cameFrom is the address that Make this a duty came from, or "" for a move inside Duties or none. */
+function cameFrom(): string {
+  if (!before || before === '#') return '';
+  return parseRoute(before).place === 'duties' ? '' : before;
+}
+
+/** backTo names the screen of an address, for the link back to it. */
+function backTo(hash: string): string {
+  switch (parseRoute(hash).place) {
+    case 'chat':
+      return 'the chat';
+    case 'manager':
+      return 'the manager';
+    case 'bridge':
+      return 'the bridge';
+    case 'fleet':
+    case 'member':
+      return 'the conversation';
+    case 'activity':
+      return 'Activity';
+  }
+  return 'the last screen';
+}
+
+/** WHO_HELP says what the agent of a duty does for an action that another does, behind the question mark of Who. */
+const WHO_HELP: Partial<Record<Act, string>> = {
+  post: 'The duty belongs to this agent: it shows on the profile of the agent, and Check first uses its tools. The post comes from the duty itself.',
+  open: 'The duty belongs to this agent: it shows on the profile of the agent, and Check first uses its tools. The seats of the playbook do the work.',
+  manager: 'The duty belongs to this agent: it shows on the profile of the agent, and Check first uses its tools. The manager does the work.',
+};
 
 /** messageOf is the sentence of a failed call. */
 const messageOf = (e: unknown) => (e instanceof Error && e.message ? e.message : 'The action failed. Try it again.');
@@ -161,8 +265,9 @@ function DayToggles({ days, label, onChange }: { days: Day[]; label: string; onC
   );
 }
 
-/** Times are the times of the day of a schedule, with Add a time, up to 12. */
+/** Times are the times of the day of a schedule, with Add a time, up to 12. A new time comes an hour after the last one, so it never repeats a time. */
 function Times({ times, onChange }: { times: string[]; onChange: (t: string[]) => void }) {
+  const added = nextTime(times);
   return (
     <span class="duty-times">
       {times.map((t, i) => (
@@ -171,8 +276,8 @@ function Times({ times, onChange }: { times: string[]; onChange: (t: string[]) =
           {times.length > 1 && <IconButton icon="close" label={'Remove time ' + (i + 1)} onClick={() => onChange(times.filter((_, j) => j !== i))} />}
         </span>
       ))}
-      {times.length < 12 && (
-        <Button size="s" kind="quiet" icon="plus" onClick={() => onChange([...times, times[times.length - 1] || '09:00'])}>
+      {times.length < 12 && added && (
+        <Button size="s" kind="quiet" icon="plus" onClick={() => onChange([...times, added])}>
           Add a time
         </Button>
       )}
@@ -261,26 +366,37 @@ function Sentence({ f, onChange }: { f: WhenForm; onChange: (f: WhenForm) => voi
   );
 }
 
-/** Dates are the first and the last day of a schedule, behind one switch. A duty with no dates runs from now on. */
-function Dates({ f, onChange, error }: { f: WhenForm; onChange: (f: WhenForm) => void; error?: string }) {
+/**
+ * Dates are the first and the last day of a schedule, behind one switch. A
+ * duty with no dates runs from now on. The switch shows on whenever the
+ * sentence holds a date, so no date hides. onOwn says that the person set
+ * the dates by hand.
+ */
+function Dates({ f, onChange, error, onOwn }: { f: WhenForm; onChange: (f: WhenForm) => void; error?: string; onOwn: () => void }) {
   const [on, setOn] = useState(() => !!(f.start || f.end));
+  const shown = on || !!(f.start || f.end);
   const turn = (v: boolean) => {
     setOn(v);
+    onOwn();
     if (!v) onChange({ ...f, start: undefined, end: undefined });
+  };
+  const set = (p: Partial<WhenForm>) => {
+    onOwn();
+    onChange({ ...f, ...p });
   };
   return (
     <div class="duty-dates">
       <label class="check">
-        <input type="checkbox" checked={on} onChange={(e) => turn((e.target as HTMLInputElement).checked)} />
+        <input type="checkbox" checked={shown} onChange={(e) => turn((e.target as HTMLInputElement).checked)} />
         <span>Only between two dates</span>
       </label>
-      {on && (
+      {shown && (
         <div class="field-row">
           <Field label="First day">
-            <Input type="date" value={f.start || ''} invalid={!!error} onInput={(e) => onChange({ ...f, start: (e.target as HTMLInputElement).value || undefined })} />
+            <Input type="date" value={f.start || ''} invalid={!!error} onInput={(e) => set({ start: (e.target as HTMLInputElement).value || undefined })} />
           </Field>
           <Field label="Last day" error={error}>
-            <Input type="date" value={f.end || ''} invalid={!!error} onInput={(e) => onChange({ ...f, end: (e.target as HTMLInputElement).value || undefined })} />
+            <Input type="date" value={f.end || ''} invalid={!!error} onInput={(e) => set({ end: (e.target as HTMLInputElement).value || undefined })} />
           </Field>
         </div>
       )}
@@ -292,8 +408,10 @@ function Dates({ f, onChange, error }: { f: WhenForm; onChange: (f: WhenForm) =>
 function EventFields({ e, kinds, onChange, error }: { e: EventForm; kinds: string[]; onChange: (e: EventForm) => void; error?: string }) {
   const agents = useSelect((s) => s.agents);
   const faces = useSelect((s) => s.faces);
+  const fleet = useSelect((s) => s.fleet);
   const fields = EVENT_FIELDS[e.kind] || [];
-  const names = (agents || []).map((a) => a.name);
+  // The agents that workers run, as the picker of a seat offers them. A profile that no worker runs, such as default, does nothing to watch.
+  const names = (agents || []).filter((a) => worksSeats(fleet, a.name)).map((a) => a.name);
   if (e.agent && !names.includes(e.agent)) names.push(e.agent);
   return (
     <>
@@ -310,7 +428,7 @@ function EventFields({ e, kinds, onChange, error }: { e: EventForm; kinds: strin
           <select class="recess" value={e.agent} onChange={(x) => onChange({ ...e, agent: (x.target as HTMLSelectElement).value })}>
             <option value="">Any agent</option>
             {names.map((n) => (
-              <option value={n}>{(faces[n] && faces[n].displayName) || n}</option>
+              <option value={n}>{(faces[n] && faces[n].displayName) || titleOfName(n)}</option>
             ))}
           </select>
         </Field>
@@ -343,15 +461,20 @@ interface Preview {
 /**
  * Readback shows the start in words: the readback of the front, else the
  * words of an event, and the next five times, in the zone of the browser.
- * The problems of the front that name When show in their place.
+ * The problems of the front that name When show in their place. While the
+ * words of the box hold a problem, the readback hides, so the schedule
+ * that stays never reads as the answer to those words.
  */
-function Readback({ p, zone, fallback, said }: { p: Preview; zone: string; fallback?: string; said?: string[] }) {
+function Readback({ p, zone, fallback, said, hidden }: { p: Preview; zone: string; fallback?: string; said?: string[]; hidden?: boolean }) {
+  if (hidden) return null;
   const a = p.answer;
   const readback = (a && a.readback) || '';
   // The problems of a save come first. Else those of the last read back.
   const problems = said && said.length ? said : a ? dutyProblems(a.problems).when || [] : [];
   const next = ((a && a.next) || []).slice(0, 5);
   const words = readback || fallback || '';
+  // A box with nothing to say, such as while the dates hold a problem, does not show.
+  if (!p.error && !problems.length && !a && !fallback && !p.busy) return null;
   return (
     <div class="duty-readback-box" aria-live="polite">
       {p.error ? (
@@ -448,10 +571,12 @@ export function DutyEditor({ name, seed }: { name?: string; seed?: DutySeed }) {
   const back = name ? { href: hrefOf({ place: 'duties', name }), label: 'the duty', to: 'here' as const } : { href: '#duties', label: 'Duties', to: 'list' as const };
   const heading = fresh ? 'New duty' : 'Edit duty';
   // Every duty opens in the editor, except a duty that the setup of the server locks.
+  const title = useRef<HTMLHeadingElement>(null);
+  useFocusLost(title, [name]);
   if (!fresh && (!base || lockedOf(base))) {
     return (
       <section class="screen duty-edit" aria-labelledby="duty-edit-title">
-        <PaneHeader id="duty-edit-title" title={heading} size="title" level={1} back={back} />
+        <PaneHeader id="duty-edit-title" title={heading} size="title" level={1} back={back} headingRef={title} focusable />
         <div class="empty center">
           <p>{base ? LOCKED_LINE : gone ? 'This duty is not here. It was removed, or you cannot see it.' : failed || 'Loading the duty.'}</p>
         </div>
@@ -472,7 +597,7 @@ interface FormProps {
 /** The problems of the front by the place of the form that shows them. */
 type Problems = Partial<Record<DutySlot | 'top', string[]>>;
 
-function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
+function EditorForm({ name, seed, base: read, heading, back: home }: FormProps) {
   const fresh = !name;
   // The form keeps the duty that it opened with, so a later read of the duty
   // never changes the revision that a save names: a change in the meantime
@@ -483,17 +608,33 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
   const options = useDuties((s) => s.options) || FALLBACK;
   const loaded = useDuties((s) => !!s.options);
   const shared = useDuties((s) => s.shared);
-  const [f, setF] = useState<DutyForm>(() => (base ? formOf(base, zone) : seededForm(seed, zone)));
+  // A draft of this form that the person left without Save or Cancel comes back.
+  const key = draftKey(name, seed);
+  const [kept] = useState(() => readDraft(key));
+  const [initial] = useState<DutyForm>(() => (base ? formOf(base, zone) : seededForm(seed, zone)));
+  const [f, setF] = useState<DutyForm>(() => (kept ? { ...initial, ...kept.form } : initial));
+  const [keptLine, setKeptLine] = useState(!!kept);
+  const keptStale = !!(kept && base && typeof kept.revision === 'number' && typeof base.revision === 'number' && kept.revision !== base.revision);
+  // Make this a duty goes back to the conversation that it came from.
+  const [from] = useState(() => (kept && kept.from) || (seed ? cameFrom() : ''));
+  const back: FormProps['back'] = from ? { href: from, label: backTo(from), to: 'here' } : home;
+  // True once the person set the dates by hand. Words that the server reads back then keep them.
+  const datesOwn = useRef(kept ? !!kept.datesOwn : !!(base && base.when && base.when.schedule && (base.when.schedule.start || base.when.schedule.end)));
+  const title = useRef<HTMLHeadingElement>(null);
+  useFocusLost(title, []);
+  const playbooks = usePlaybooks((s) => s.list);
   const [errors, setErrors] = useState<FormErrors | null>(null);
   const [problems, setProblems] = useState<Problems>({});
   const [review, setReview] = useState<DutyDryRun | null>(null);
   const [busy, setBusy] = useState(false);
   const [picking, setPicking] = useState(false);
   const [checkOpen, setCheckOpen] = useState(() => !!(base && base.checkFirst));
-  const [words, setWords] = useState('');
+  const [words, setWords] = useState(() => (kept ? kept.words || '' : ''));
   const [wordsBusy, setWordsBusy] = useState(false);
   const [wordsProblems, setWordsProblems] = useState<string[]>([]);
   const [preview, setPreview] = useState<Preview>({ answer: null, busy: false, error: '' });
+  // A reading of words that the person did not ask for, and that failed, asks for the readback of the sentence again.
+  const [nudge, setNudge] = useState(0);
   const pickKey = useRef<HTMLButtonElement>(null);
   const box = useRef<HTMLTextAreaElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -503,12 +644,14 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
   const keepsWhen = !!(base && base.when && base.when.webhook);
   // The message of a duty from the setup of the server never shows. An empty field keeps it, and a message replaces it.
   const templated = templatedOf(base);
-  const shownName = f.nameOwn ? f.name : nameOf(f.act === 'open' ? f.goal || f.playbook : f.message);
+  // The name in words, as the person wrote it or as the page makes it from what the duty does, and its short name.
+  const shownName = f.nameOwn ? f.name : titleOfName(nameOf(f.act === 'open' ? f.goal || f.playbook : f.message));
+  const slug = slugOf(shownName);
   // The reason of a name that cannot name a duty, shown as the person types, before a save.
-  const nameWhy = fresh && shownName.trim() ? nameReason(shownName.trim(), []) : '';
-  const pathName = name || (shownName.trim() && !nameWhy ? shownName.trim() : DRAFT);
+  const nameWhy = fresh && shownName.trim() ? nameWordsReason(shownName, []) : '';
+  const pathName = name || (slug && !nameWhy ? slug : DRAFT);
   const record = () => recordOf(f, base, pathName);
-  const nameOfAgent = (a: string) => (faces[a] && faces[a].displayName) || a;
+  const nameOfAgent = (a: string) => (faces[a] && faces[a].displayName) || titleOfName(a);
 
   // The choices that the front serves, and the choice that the duty holds, so an edit keeps it.
   const baseEvent = base && base.when && base.when.event ? base.when.event.kind : '';
@@ -535,8 +678,28 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
     if (errors) setErrors(null);
     if (Object.keys(problems).length) setProblems({});
   };
-  // A change of the sentence drops the words that the front read back without a schedule.
-  const setWhen = (when: WhenForm) => patch({ when, say: '' });
+  // A change of the sentence drops the words that the front read back without a schedule, and a problem of the words.
+  const setWhen = (when: WhenForm) => {
+    patch({ when, say: '' });
+    if (wordsProblems.length) setWordsProblems([]);
+  };
+
+  // Each change goes to the draft of the tab. A form as it opened keeps no draft.
+  useEffect(() => {
+    const dirty = JSON.stringify(f) !== JSON.stringify(initial) || !!words.trim();
+    writeDraft(key, dirty ? { form: f, words, from, revision: base && typeof base.revision === 'number' ? base.revision : undefined, datesOwn: datesOwn.current } : null);
+  }, [f, words]);
+
+  /** discard drops the draft and gives the form back as it opened. */
+  const discard = () => {
+    writeDraft(key, null);
+    setKeptLine(false);
+    setF(initial);
+    setWords('');
+    setWordsProblems([]);
+    setErrors(null);
+    setProblems({});
+  };
 
   // The front reads the start back a moment after each change of When.
   const whenKey = f.start === 'event' ? 'event\n' + JSON.stringify(eventOf(f.event)) : JSON.stringify(scheduleOf(f.when)) + '\n' + f.say;
@@ -545,7 +708,7 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
   useEffect(() => {
     if (keepsWhen) return;
     const n = ++seq.current;
-    if (f.start === 'event' ? !f.event.kind : !f.say && whenError(f.when)) {
+    if (f.start === 'event' ? !f.event.kind : !f.say && (whenError(f.when) || datesError(f.when))) {
       setPreview({ answer: null, busy: false, error: '' });
       return;
     }
@@ -565,11 +728,16 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
       }
     }, timing.preview);
     return () => clearTimeout(t);
-  }, [whenKey, keepsWhen]);
+  }, [whenKey, keepsWhen, nudge]);
 
-  /** readWords sends the words of the box. A schedule in the answer fills the sentence, and the readback shows. */
-  const readWords = async () => {
-    const said = words.trim();
+  /**
+   * readWords sends the words of the box. A schedule in the answer fills
+   * the sentence, and the readback shows. quiet is a reading that the
+   * person did not ask for, such as the words of Make this a duty: a
+   * problem then shows nothing, and the words wait in the box.
+   */
+  const readWords = async (text = words, quiet = false) => {
+    const said = text.trim();
     if (!said) {
       setWordsProblems(['Write when, such as every weekday at 9am.']);
       return;
@@ -581,8 +749,9 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
       const a = await api.dryRunDuty(pathName, { ...record(), when: { say: said } });
       const sched = a.duty && a.duty.when && a.duty.when.schedule;
       if (sched) {
-        // The dates of the form stay when the words name none.
-        const when = whenFormOf({ ...sched, start: sched.start || f.when.start, end: sched.end || f.when.end }, zone);
+        // The dates of the words win. The dates of the form stay only when the person set them by hand.
+        const keep = datesOwn.current;
+        const when = whenFormOf({ ...sched, start: sched.start || (keep ? f.when.start : undefined), end: sched.end || (keep ? f.when.end : undefined) }, zone);
         asked.current = JSON.stringify(scheduleOf(when)) + '\n';
         setF((x) => ({ ...x, when, say: '' }));
         setPreview({ answer: a, busy: false, error: '' });
@@ -592,14 +761,28 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
         setPreview({ answer: a, busy: false, error: '' });
       } else {
         const ps = dutyProblems(a.problems);
-        setWordsProblems(ps.when || (a.problems || []).map((x) => splitProblem(x).text).filter(Boolean));
+        if (!quiet) setWordsProblems(ps.when || (a.problems || []).map((x) => splitProblem(x).text).filter(Boolean));
         if (n === seq.current) setPreview((p) => ({ ...p, busy: false }));
+        if (quiet) setNudge((x) => x + 1);
       }
     } catch (e) {
-      setWordsProblems([messageOf(e)]);
+      if (!quiet) setWordsProblems([messageOf(e)]);
+      else setNudge((x) => x + 1);
     }
     setWordsBusy(false);
   };
+
+  // Make this a duty brings a message that can name when and what a run may cost, such as every Monday at 8am and at most $0.05. The page reads both into the form once.
+  useEffect(() => {
+    if (!fresh || !seed || !seed.message || kept) return;
+    const cost = moneyIn(seed.message);
+    if (cost && (f.act === 'ask' || f.act === 'manager') && !f.cost) setF((x) => ({ ...x, cost }));
+    const said = scheduleWordsIn(seed.message);
+    if (said) {
+      setWords(said);
+      readWords(said, true);
+    }
+  }, []);
 
   /** insert puts the words of a placeholder at the caret of the message, or of the goal of a playbook. */
   const insert = (p: Placeholder) => {
@@ -617,12 +800,20 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
     }, 0);
   };
 
-  /** showFirst brings the first error or problem of the form into sight, and the focus to its field. */
+  /**
+   * showFirst brings the first error or problem of the form into sight, and
+   * the focus to its control: the control itself, else the first control of
+   * its field or section, else the box of the problems of the whole form.
+   */
   const showFirst = () =>
     setTimeout(() => {
       const bad = formRef.current && (formRef.current.querySelector('[aria-invalid="true"], .field-error, .duty-problems') as HTMLElement | null);
-      if (bad && typeof bad.scrollIntoView === 'function') bad.scrollIntoView({ block: 'center' });
-      if (bad && bad.matches('input, textarea, select')) bad.focus();
+      if (!bad) return;
+      if (typeof bad.scrollIntoView === 'function') bad.scrollIntoView({ block: 'center' });
+      const box = bad.closest('.duty-problems-box') as HTMLElement | null;
+      const near = bad.closest('.field, fieldset, .duty-sec, .duty-check');
+      const control = bad.matches('input, textarea, select, button') ? bad : box ? box : near ? (near.querySelector('input, textarea, select, button') as HTMLElement | null) : null;
+      if (control) control.focus();
     }, 0);
 
   /** takeProblems shows the problems of the front beside their fields, and opens Check first for one of its own. */
@@ -637,7 +828,7 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
 
   const submit = async (e: Event) => {
     e.preventDefault();
-    const errs = formErrors(f, { fresh, name: shownName.trim(), taken: fresh && list ? list.map((d) => d.name) : [], keepsWhen, templated });
+    const errs = formErrors(f, { fresh, name: shownName, taken: fresh && list ? list.map((d) => d.name) : [], keepsWhen, templated });
     if (Object.keys(errs).length) {
       setErrors(errs);
       if (errs.count || errs.where) setCheckOpen(true);
@@ -658,6 +849,7 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
     setBusy(true);
     try {
       await saveDuty(pathName, record());
+      writeDraft(key, null);
       setReview(null);
       setBusy(false);
       go({ place: 'duties', name: pathName });
@@ -681,14 +873,27 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
   const reviewed = review ? (review.duty && review.duty.checkFirst) || checkOf(f.check) : null;
   const eventSaid = f.start === 'event' && f.event.kind ? eventWords(eventOf(f.event), nameOfAgent) + '.' : '';
   const messageLabel = f.act === 'post' ? 'Message' : f.act === 'manager' ? 'Ask the manager' : 'Ask ' + (agentName || 'the agent');
+  // The dates show their problem as soon as both are set, before the server reads them.
+  const datesWhy = err.dates || (f.start === 'schedule' && !f.say ? datesError(f.when) : '');
+  // The goal of a duty that opens a bridge replaces the goal of its playbook. An empty field keeps that goal, so the field shows it.
+  const book = f.act === 'open' && f.playbook && playbooks ? playbooks.find((p) => p.name === f.playbook) : undefined;
+  const bookGoal = book && book.goal ? firstLine(book.goal) : '';
   return (
     <section class="screen duty-edit" aria-labelledby="duty-edit-title">
-      <PaneHeader id="duty-edit-title" title={heading} size="title" level={1} back={back} />
+      <PaneHeader id="duty-edit-title" title={heading} size="title" level={1} back={back} headingRef={title} focusable />
       <form class="scroll pad" ref={formRef} onSubmit={submit} noValidate>
         <div class="make duty-form">
+          {keptLine && (
+            <p class="duty-said duty-kept" role="status">
+              <span>{keptStale ? 'Your unsaved changes are back. The duty changed since you made them, and Save puts yours in its place.' : 'Your unsaved changes are back.'}</span>
+              <Button size="s" kind="quiet" onClick={discard}>
+                Discard them
+              </Button>
+            </p>
+          )}
           {importedOf(base) && <p class="duty-said duty-origin">{ORIGIN_LINE}</p>}
           {pr.top && pr.top.length > 0 && (
-            <div class="duty-problems-box" role="alert">
+            <div class="duty-problems-box" role="alert" tabIndex={-1}>
               <p>The duty cannot save yet.</p>
               <ul class="duty-problems">
                 {pr.top.map((x) => (
@@ -699,9 +904,12 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
           )}
 
           <section class="duty-sec" aria-labelledby="duty-who-head">
-            <h2 class="t-sub duty-sec-head" id="duty-who-head">
-              Who
-            </h2>
+            <div class="duty-sec-top">
+              <h2 class="t-sub duty-sec-head" id="duty-who-head">
+                Who
+              </h2>
+              {WHO_HELP[f.act] && <Help label="What the agent does here">{WHO_HELP[f.act]}</Help>}
+            </div>
             {f.agent && (
               <p class="duty-who">
                 <Mark agent={f.agent} size={32} />
@@ -744,7 +952,7 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
               When
             </h2>
             {keepsWhen ? (
-              <p class="duty-readback">{startWords(base!)}. The page keeps this start.</p>
+              <p class="duty-readback">{startWords(base!)}. You cannot change this start here.</p>
             ) : (
               <>
                 {kinds.length > 0 && (
@@ -783,14 +991,17 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
                         ))}
                       </select>
                     </Field>
-                    <Dates f={f.when} onChange={setWhen} error={err.dates} />
+                    <Dates f={f.when} onChange={setWhen} error={datesWhy || undefined} onOwn={() => (datesOwn.current = true)} />
                     <div class="duty-say">
                       <Field label="Say it in your own words" error={wordsProblems.length === 1 ? wordsProblems[0] : undefined}>
                         <Input
                           value={words}
                           placeholder="every other Tuesday at 3pm"
                           invalid={wordsProblems.length > 0}
-                          onInput={(e) => setWords((e.target as HTMLInputElement).value)}
+                          onInput={(e) => {
+                            setWords((e.target as HTMLInputElement).value);
+                            if (wordsProblems.length) setWordsProblems([]);
+                          }}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
                               e.preventDefault();
@@ -799,7 +1010,7 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
                           }}
                         />
                       </Field>
-                      <Button size="s" disabled={wordsBusy} onClick={readWords}>
+                      <Button size="s" disabled={wordsBusy} onClick={() => readWords()}>
                         Read it back
                       </Button>
                     </div>
@@ -812,7 +1023,7 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
                     )}
                   </>
                 )}
-                <Readback p={preview} zone={zone} fallback={eventSaid} said={pr.when} />
+                <Readback p={preview} zone={zone} fallback={eventSaid} said={pr.when} hidden={f.start === 'schedule' && wordsProblems.length > 0} />
               </>
             )}
           </section>
@@ -847,8 +1058,13 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
                 <PlaybookPick value={f.playbook} onChange={(playbook) => patch({ playbook })} error={joinError(err.playbook, pr.playbook)} />
                 <PlaybookShelf />
                 <Field label="Goal" error={joinError(undefined, pr.goal)}>
-                  <TextArea ref={box} rows={3} value={f.goal} placeholder="The goal of the playbook" onInput={(e) => patch({ goal: (e.target as HTMLTextAreaElement).value })} />
+                  <TextArea ref={box} rows={3} value={f.goal} placeholder={bookGoal || 'The goal of the playbook'} onInput={(e) => patch({ goal: (e.target as HTMLTextAreaElement).value })} aria-describedby={bookGoal && !f.goal.trim() ? 'duty-goal-keeps' : undefined} />
                 </Field>
+                {bookGoal && !f.goal.trim() && (
+                  <p class="t-meta" id="duty-goal-keeps">
+                    An empty goal keeps the goal of the playbook.
+                  </p>
+                )}
               </>
             ) : (
               <Field label={messageLabel} error={joinError(err.message, pr.message)}>
@@ -857,7 +1073,7 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
                   rows={4}
                   value={f.message}
                   invalid={!!(err.message || pr.message)}
-                  placeholder={f.act === 'post' ? 'Review what changed since [The last run].' : f.act === 'manager' ? "Check the backups of [Today's date] and tell me what failed." : "Write the report of [Today's date] to the wiki."}
+                  placeholder={templated && f.act === 'ask' ? '' : f.act === 'post' ? 'Review what changed since [The last run].' : f.act === 'manager' ? "Check the backups of [Today's date] and tell me what failed." : "Write the report of [Today's date] to the wiki."}
                   onInput={(e) => patch({ message: (e.target as HTMLTextAreaElement).value })}
                   aria-describedby={templated && f.act === 'ask' && !f.message.trim() ? 'duty-template-line' : undefined}
                 />
@@ -897,7 +1113,14 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
                     <Input inputMode="decimal" value={f.cost} invalid={!!(err.cost || pr.cost)} placeholder="Required, such as 0.50" onInput={(e) => patch({ cost: (e.target as HTMLInputElement).value })} />
                   </span>
                 </Field>
-                <Field label="Most turns" error={joinError(err.turns, pr.turns)}>
+                <Field
+                  label={
+                    <>
+                      Most turns <Help label="What a turn is">A turn is one step of the agent: it thinks once, then uses its tools. The run stops after this many turns.</Help>
+                    </>
+                  }
+                  error={joinError(err.turns, pr.turns)}
+                >
                   <Input type="number" min={1} inputMode="numeric" value={f.turns} invalid={!!(err.turns || pr.turns)} placeholder="Optional" onInput={(e) => patch({ turns: (e.target as HTMLInputElement).value })} />
                 </Field>
                 <Field label="The most per day" error={joinError(err.perDay, pr.perDay)}>
@@ -910,7 +1133,12 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
             )}
             <Choices
               name="duty-overlap"
-              legend="If the last run still works"
+              legend={
+                <>
+                  If the last run still works{' '}
+                  <Help label="When this happens">{f.start === 'schedule' && !keepsWhen ? 'The next time can come before the run of the last time finishes.' : 'The duty can start again before its last run finishes.'} Skip the new start, run it after the last run, or run both at once.</Help>
+                </>
+              }
               value={f.overlap}
               options={[
                 { id: 'skip', label: 'Skip it' },
@@ -921,7 +1149,14 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
             />
             {/* Only a schedule has times that a front can miss. An event and another app start a run when they come. */}
             {f.start === 'schedule' && !keepsWhen && (
-              <Field label="Catch up a missed time" class="duty-narrow">
+              <Field
+                label={
+                  <>
+                    Catch up a missed time <Help label="What a missed time is">The server can miss a time, such as while it restarts. A missed time runs once when the server is back within this span. Later, the duty waits for its next time.</Help>
+                  </>
+                }
+                class="duty-narrow"
+              >
                 <select class="recess" value={f.catchUp} onChange={(e) => patch({ catchUp: (e.target as HTMLSelectElement).value })}>
                   {withChoice(CATCH_UPS, f.catchUp, (v) => 'Within ' + spanText(v)).map(([v, w]) => (
                     <option value={v}>{w}</option>
@@ -933,9 +1168,12 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
           </section>
 
           <section class="duty-sec" aria-labelledby="duty-away-head">
-            <h2 class="t-sub duty-sec-head" id="duty-away-head">
-              While you are away
-            </h2>
+            <div class="duty-sec-top">
+              <h2 class="t-sub duty-sec-head" id="duty-away-head">
+                While you are away
+              </h2>
+              <Help label="What away means">A run can stop at a question, such as a tool that asks first. Away means that you have not answered it yet. Then the manager can decide for you, or the question waits. After the wait, the answer below holds.</Help>
+            </div>
             <Choices
               name="duty-decider"
               label="Who decides a question of a run"
@@ -963,9 +1201,12 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
           </section>
 
           <section class="duty-sec" aria-labelledby="duty-tell-head">
-            <h2 class="t-sub duty-sec-head" id="duty-tell-head">
-              Tell me about
-            </h2>
+            <div class="duty-sec-top">
+              <h2 class="t-sub duty-sec-head" id="duty-tell-head">
+                Tell me about
+              </h2>
+              <Help label="Where you hear of it">Activity always shows a failure and a question. Where to reach me, in the menu of your account, also sends them to your phone or your chat.</Help>
+            </div>
             <div role="group" aria-labelledby={tellTo.length ? 'duty-tell-you' : 'duty-tell-head'}>
               {tellTo.length > 0 && (
                 <p class="t-meta duty-tell-name" id="duty-tell-you">
@@ -1001,12 +1242,26 @@ function EditorForm({ name, seed, base: read, heading, back }: FormProps) {
 
           {fresh && (
             <Field label="Name" error={joinError(err.name || nameWhy, pr.name)} class="duty-narrow">
-              <Input value={shownName} maxLength={63} spellcheck={false} invalid={!!(err.name || nameWhy || pr.name)} placeholder="daily-report" onInput={(e) => patch({ name: (e.target as HTMLInputElement).value.toLowerCase(), nameOwn: true })} />
+              <Input
+                value={shownName}
+                maxLength={80}
+                invalid={!!(err.name || nameWhy || pr.name)}
+                placeholder="Daily report"
+                aria-describedby={slug && !(err.name || nameWhy || pr.name) ? 'duty-slug' : undefined}
+                onInput={(e) => patch({ name: (e.target as HTMLInputElement).value, nameOwn: true })}
+              />
+              {slug && !(err.name || nameWhy || pr.name) && (
+                <span class="t-meta duty-slug" id="duty-slug">
+                  It saves as {slug}.
+                </span>
+              )}
             </Field>
           )}
 
           <div class="form-end">
-            <Button href={back.href}>Cancel</Button>
+            <Button href={back.href} onClick={() => writeDraft(key, null)}>
+              Cancel
+            </Button>
             <Button type="submit" kind="primary" disabled={busy}>
               Save duty
             </Button>

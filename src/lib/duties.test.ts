@@ -45,6 +45,15 @@ import {
   startWords,
   whereOf,
   whereRowsOf,
+  DATES_ERROR,
+  datesError,
+  dutyShape,
+  dutyWhat,
+  moneyIn,
+  nameWordsReason,
+  nextTime,
+  scheduleWordsIn,
+  slugOf,
 } from './duties';
 
 const duty = (over: Partial<Duty> = {}): Duty => ({
@@ -209,6 +218,26 @@ describe('the form of a duty', () => {
     expect(nameReason('new-report', [])).toBe('');
   });
 
+  it('makes the short name from the name in words, and says why a name in words cannot name a duty', () => {
+    expect(slugOf('Walk Duty 1')).toBe('walk-duty-1');
+    expect(slugOf('  Café / backups: nightly!  ')).toBe('cafe-backups-nightly');
+    expect(slugOf('daily_report')).toBe('daily_report');
+    expect(slugOf('—')).toBe('');
+    const long = slugOf('Summarize every ticket that came in over the weekend for the platform team and the ops team');
+    expect(long.length).toBeLessThanOrEqual(63);
+    expect(long.endsWith('-')).toBe(false);
+    expect(long).toBe('summarize-every-ticket-that-came-in-over-the-weekend-for-the');
+    expect(nameWordsReason('Walk Duty 1', [])).toBe('');
+    expect(nameWordsReason('  ', [])).toBe('Give the duty a name.');
+    expect(nameWordsReason('???', [])).toBe('A name needs at least one letter from a to z, or a digit.');
+    expect(nameWordsReason('New', [])).toBe('The names new and options are kept for the page. Pick another name.');
+    expect(nameWordsReason('Daily report', ['daily-report'])).toBe('A duty of this name exists. Pick another name.');
+    // The form checks the name in words.
+    const f = { ...emptyForm('UTC'), agent: 'x', message: 'Hi.', cost: '1' };
+    expect(formErrors(f, { fresh: true, name: 'Walk Duty 1', taken: ['walk-duty-1'], keepsWhen: false })).toEqual({ name: 'A duty of this name exists. Pick another name.' });
+    expect(formErrors(f, { fresh: true, name: 'Walk Duty 2', taken: ['walk-duty-1'], keepsWhen: false })).toEqual({});
+  });
+
   it('makes a name from what the duty does', () => {
     expect(nameOf("Write the report of [Today's date] to homelab/reports.")).toBe('write-the-report-of-to-homelab');
     expect(nameOf('')).toBe('');
@@ -240,6 +269,11 @@ describe('the check', () => {
       'Call the tool servicenow.query_incidents of Triage. Take the list at result.records. Keep the items where priority is one of 1 and 2. Wake Triage only for items whose number it did not see before.',
     );
     expect(checkWords({ look: { http: { url: 'https://example.com/api/queue' } }, wake: { when: 'atLeast', count: 5 } }, '')).toBe('Look at example.com/api/queue. Take the whole answer as the list. Wake the agent at 5 items or more.');
+    // A tool of the server loses its prefix, and a tool with words says what it does.
+    expect(checkWords({ look: { tool: 'front.pages_list' } }, 'Docs Scribe')).toBe('Call the tool pages_list of Docs Scribe. Take the whole answer as the list. Wake Docs Scribe only for items that it did not see before.');
+    expect(checkWords({ look: { tool: 'front.pages_list' } }, 'Docs Scribe', () => 'List the pages of the wiki')).toBe(
+      'Call a tool of Docs Scribe: list the pages of the wiki. Take the whole answer as the list. Wake Docs Scribe only for items that it did not see before.',
+    );
   });
 
   it('says what a check finds now', () => {
@@ -277,13 +311,21 @@ describe('a duty in words', () => {
 
   it('says what a duty does, its limits, who decides, and what you hear of', () => {
     const d = duty();
-    expect(dutyTitle(d)).toBe("Write the report of [Today's date].");
-    expect(dutyTitle({ name: 'weekly-patching', do: {} })).toBe('Weekly patching');
+    // The title is the name that the person gave, in words. What the duty does is its first line.
+    expect(dutyTitle(d)).toBe('Daily homelab report');
+    expect(dutyTitle({ name: 'weekly-patching' })).toBe('Weekly patching');
+    expect(dutyWhat(d)).toBe("Write the report of [Today's date].");
+    expect(dutyWhat({ do: { open: { playbook: 'weekly-patching' } } })).toBe('Open a bridge from the playbook Weekly patching');
+    expect(dutyWhat({ do: {} })).toBe('');
     expect(dutyLight(duty({ paused: true, state: { pausedReason: 'Three runs in a row failed.' } }))).toMatchObject({ word: 'paused', label: 'Three runs in a row failed.' });
     expect(dutyLight(d, true).word).toBe('paused');
     expect(limitWords(d.limits)).toEqual(['A run gets at most $0.50 and 40 turns.', 'The duty spends at most $2.00 a day.', 'A time that comes while the last run works is skipped.', 'A missed time runs once, within 1 hour.']);
-    // A duty without a schedule misses no time.
-    expect(limitWords(d.limits, false)).toEqual(['A run gets at most $0.50 and 40 turns.', 'The duty spends at most $2.00 a day.', 'A time that comes while the last run works is skipped.']);
+    // A duty without a schedule misses no time, and has starts, not times.
+    expect(limitWords(d.limits, false)).toEqual(['A run gets at most $0.50 and 40 turns.', 'The duty spends at most $2.00 a day.', 'A start that comes while the last run works is skipped.']);
+    expect(limitWords({ ...d.limits, overlap: 'allow' }, false)[2]).toBe('A start that comes while the last run works runs anyway.');
+    // A run of ask or manager without a cost limit says so.
+    expect(limitWords({ budget: { maxTurns: 40 }, overlap: 'skip', catchUp: '0' })).toEqual(['A run has no cost limit.', 'A run gets at most 40 turns.', 'A time that comes while the last run works is skipped.', 'A missed time does not run.']);
+    expect(limitWords({ budget: {} }, false, 'manager')).toEqual(['A run has no cost limit.', 'A start that comes while the last run works is skipped.']);
     expect(awayWords(d.whileAway)).toBe('The manager decides a question for you. After 2 hours without an answer, the answer is no.');
     expect(awayWords({ decider: 'nobody', timeout: '30m', then: 'cancel' })).toBe('Nobody decides a question for you. After 30 minutes without an answer, the run stops.');
     expect(tellWords(d.notify)).toBe('Failures and questions.');
@@ -350,6 +392,9 @@ describe('the problems of the front', () => {
 describe('events and actions', () => {
   it('say an event in words and write only the fields of its kind', () => {
     expect(eventWords({ kind: 'bridge.closed' })).toBe('When a bridge closes');
+    // A cap of a duty is its most per day, the words of its field.
+    expect(eventWords({ kind: 'cap.reached' })).toBe('When a duty reaches its most per day');
+    expect(startWords({ when: { webhook: { auth: { mode: 'bearer' } } } } as never)).toBe('When another app calls the server');
     expect(eventWords({ kind: 'bridge.closed', agent: 'triage' }, (a) => a.toUpperCase())).toBe('When a bridge of TRIAGE closes');
     expect(eventWords({ kind: 'question.waiting', after: '2h' })).toBe('When a question waits longer than 2 hours');
     expect(eventWords({ kind: 'page.changed', path: 'homelab/' })).toBe('When a page under homelab/ changes');
@@ -463,7 +508,7 @@ describe('the limits of each action', () => {
     expect(formErrors({ ...base, act: 'open', bridgeTurns: '0' }, opts)).toEqual({ turns: 'Write a whole number.' });
     expect(formErrors({ ...base, act: 'open', cost: '', bridgeTurns: '40' }, opts)).toEqual({});
     expect(OPEN_NEEDS_TURNS).toBe('A duty that opens a bridge needs the most turns of the whole bridge, such as 40.');
-    expect(limitWords(d.limits, false, 'open')).toEqual(['The bridge gets at most 40 turns.', 'A time that comes while the last run works is skipped.']);
+    expect(limitWords(d.limits, false, 'open')).toEqual(['The bridge gets at most 40 turns.', 'A start that comes while the last run works is skipped.']);
     expect(limitWords({ budget: { maxTurns: 1 } }, false, 'open')[0]).toBe('The bridge gets at most 1 turn.');
   });
 
@@ -475,5 +520,44 @@ describe('the limits of each action', () => {
     });
     expect(dutyProblems(ps, 'post')).toEqual({ top: ['A bridge counts turns. Give maxTurns, such as 40, and leave out the other limits.', 'A duty that opens a bridge needs the most turns of the whole bridge, such as 40.', 'Too much.'] });
     expect(dutyProblems(ps, 'ask')).toEqual({ cost: ['A bridge counts turns. Give maxTurns, such as 40, and leave out the other limits.'], turns: ['A duty that opens a bridge needs the most turns of the whole bridge, such as 40.'], perDay: ['Too much.'] });
+  });
+});
+
+describe('the walk of 2026-10-26', () => {
+  it('adds a time that the sentence does not hold yet', () => {
+    expect(nextTime(['08:00'])).toBe('09:00');
+    expect(nextTime(['08:00', '09:00'])).toBe('10:00');
+    expect(nextTime(['23:30'])).toBe('00:30');
+    expect(nextTime(['09:00', '08:00'])).toBe('10:00');
+    expect(nextTime([])).toBe('09:00');
+    expect(nextTime(Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0') + ':00'))).toBe('');
+  });
+
+  it('says a last day before the first day in the words of the two fields', () => {
+    expect(datesError({ start: '2026-12-10', end: '2026-12-01' })).toBe(DATES_ERROR);
+    expect(DATES_ERROR).toBe('The last day comes before the first day.');
+    expect(datesError({ start: '2026-12-01', end: '2026-12-10' })).toBe('');
+    expect(datesError({ start: '2026-12-01' })).toBe('');
+  });
+
+  it('tells the grey lights of a duty apart by their shape', () => {
+    expect(dutyShape(runLight(null))).toBe('hollow');
+    expect(dutyShape(dutyLight(duty({ paused: true })))).toBe('pause');
+    expect(dutyShape(runLight({ at: '', state: 'completed' }))).toBe('');
+  });
+
+  it('finds the words of a schedule and an amount in the message of Make this a duty', () => {
+    const m = 'Make a duty for docs-scribe: every Monday at 8am, read the wiki page homelab/inventory.md and reply with three short lines on what looks out of date. A run gets at most $0.05.';
+    expect(scheduleWordsIn(m)).toBe('every Monday at 8am');
+    expect(moneyIn(m)).toBe('0.05');
+    expect(scheduleWordsIn('Check the backups every weekday at 9am and tell me what failed')).toBe('every weekday at 9am');
+    expect(scheduleWordsIn('On the first Monday of the month at 9:30, sum up the month.')).toBe('first Monday of the month at 9:30');
+    expect(scheduleWordsIn('Every other Tuesday at 3pm (UTC) post the report.')).toBe('Every other Tuesday at 3pm');
+    // Words with no repeat are no schedule.
+    expect(scheduleWordsIn('Reply at 5 with the list.')).toBe('');
+    expect(scheduleWordsIn('Summarize the notes of today.')).toBe('');
+    expect(moneyIn('Spend at most $2 a run.')).toBe('2');
+    expect(moneyIn('No money here.')).toBe('');
+    expect(moneyIn('$0 is free.')).toBe('');
   });
 });

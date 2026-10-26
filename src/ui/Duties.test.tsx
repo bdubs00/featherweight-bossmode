@@ -7,7 +7,7 @@ import { nextShort, nextWords } from '../lib/duties';
 import { hrefOf } from '../lib/route';
 import { DUTY_IS, DutyList, DutyMain } from './Duties';
 import { Profile } from './Profile';
-import { clearNotice } from './notice';
+import { clearNotice, clearSaid, currentSaid } from './notice';
 import { click, fakeApi, keyNamed, mount, settle, typeIn, unmountAll } from './testkit-c';
 
 const ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -73,6 +73,8 @@ const MONTHLY = base({
 
 let api: ReturnType<typeof fakeApi>;
 beforeEach(() => {
+  // A draft of the editor lives in the storage of the tab. Each test starts without one.
+  sessionStorage.clear();
   forgetDuties();
   location.hash = '#duties';
   act(() => store.dispatch({ type: 'me', me: ALICE }));
@@ -80,6 +82,7 @@ beforeEach(() => {
 afterEach(() => {
   unmountAll();
   clearNotice();
+  clearSaid();
   if (api) api.restore();
 });
 
@@ -114,7 +117,8 @@ describe('the list of duties', () => {
     // A failed last run comes first, and a paused duty last.
     expect(rows.map((r) => r.getAttribute('href'))).toEqual(['#duties/watch-p1', '#duties/daily-report', '#duties/monthly-summary']);
     expect(rows.every((r) => r.querySelector('.mark'))).toBe(true);
-    expect(text(rows[1])).toBe(`Write the report of [Today's date]. finished Every weekday at 9:00 AM, New York time. scribe Next ${nextShort(NEXT[0])} $0.12 today`);
+    // The title is the name of the duty in words, and an agent without a face shows its name with a capital.
+    expect(text(rows[1])).toBe(`Daily report finished Every weekday at 9:00 AM, New York time. Scribe Next ${nextShort(NEXT[0])} $0.12 today`);
     expect(rows[1].getAttribute('aria-current')).toBe('page');
     expect(text(rows[0])).toContain('failed');
     expect(text(rows[2])).toContain('paused');
@@ -123,18 +127,24 @@ describe('the list of duties', () => {
     expect(keyNamed(el, 'Pause all duties')).toBeUndefined();
   });
 
-  it('shows the names of two duties that say the same, so a person can tell them apart', async () => {
+  it('names each duty by the name that the person gave, finds it by what it does, and tells apart two names that read the same', async () => {
     const MORNING = base({ name: 'morning-report', readback: 'Every day at 9:00 AM, UTC.', next: NEXT });
     const EVENING = base({ name: 'evening-report', readback: 'Every day at 6:00 PM, UTC.', next: NEXT });
-    api = fakeApi(listOf([MORNING, EVENING, WATCH]));
+    const TWIN = base({ name: 'morning_report', readback: 'Every day at 7:00 AM, UTC.', next: NEXT });
+    api = fakeApi(listOf([MORNING, EVENING, WATCH, TWIN]));
     const el = mount(<DutyList />);
     await settle();
-    const rows = [...el.querySelectorAll('.duty-row')];
-    const row = (name: string) => rows.find((r) => r.getAttribute('href') === '#duties/' + name)!;
-    expect(text(row('morning-report').querySelector('.duty-row-meta'))).toContain('Morning report');
-    expect(text(row('evening-report').querySelector('.duty-row-meta'))).toContain('Evening report');
-    // A duty whose words are its own shows no name.
-    expect(text(row('watch-p1').querySelector('.duty-row-meta'))).not.toContain('Watch p1');
+    const rows = () => [...el.querySelectorAll('.duty-row')];
+    const row = (name: string) => rows().find((r) => r.getAttribute('href') === '#duties/' + name)!;
+    expect(text(row('evening-report').querySelector('.duty-row-title'))).toBe('Evening report');
+    expect(text(row('watch-p1').querySelector('.duty-row-title'))).toBe('Watch p1');
+    // Two names that read the same show their short names.
+    expect(text(row('morning-report').querySelector('.duty-row-meta'))).toContain('morning-report');
+    expect(text(row('morning_report').querySelector('.duty-row-meta'))).toContain('morning_report');
+    expect(text(row('evening-report').querySelector('.duty-row-meta'))).not.toContain('evening-report');
+    // Find a duty also reads what it does.
+    typeIn(el.querySelector('input[type="search"]'), 'triage these');
+    expect(rows().map((r) => r.getAttribute('href'))).toEqual(['#duties/watch-p1']);
   });
 
   it('shows a start that goes again as retrying, with a still amber light, among the duties that work', async () => {
@@ -237,7 +247,7 @@ describe('the page of a duty', () => {
     const el = mount(<DutyMain name="watch-p1" />);
     await settle();
     expect(api.calls.find((c) => c.path === '/v1/duties/watch-p1')!.headers['X-Time-Zone']).toBe(ZONE);
-    expect(text(el.querySelector('h1'))).toBe('Triage these: [What the check found]');
+    expect(text(el.querySelector('h1'))).toBe('Watch p1');
     expect(text(el.querySelector('.pane-head'))).toContain('failed');
     expect(text(el.querySelector('.duty-readback'))).toBe(WATCH.readback);
     expect([...el.querySelectorAll('.duty-next li')].map(text)).toEqual(NEXT.slice(0, 5).map(nextWords));
@@ -292,7 +302,7 @@ describe('the page of a duty', () => {
     api = fakeApi(one({ ...WATCH, readback: '' }, RUNS));
     const el = mount(<DutyMain name="watch-p1" />);
     await settle();
-    expect(text(el.querySelector('section[aria-labelledby="duty-check"] p'))).toBe('Call the tool servicenow.query_incidents of triage. Take the list at result.records. Wake triage only for items whose number it did not see before.');
+    expect(text(el.querySelector('section[aria-labelledby="duty-check"] p'))).toBe('Call the tool servicenow.query_incidents of Triage. Take the list at result.records. Wake Triage only for items whose number it did not see before.');
   });
 
   it('says in the history who decided a question while you were away', async () => {
@@ -340,7 +350,7 @@ describe('the page of a duty', () => {
     await settle();
     const what = () => text(el.querySelector('section[aria-labelledby="duty-what"]'));
     const limits = () => text(el.querySelector('section[aria-labelledby="duty-limits"]'));
-    expect(what()).toBe("What it does scribe posts in Homelab operations to reviewer and tester Review Today's date.");
+    expect(what()).toBe("What it does Scribe posts in Homelab operations to reviewer and tester Review Today's date.");
     expect(el.querySelector('section[aria-labelledby="duty-what"] a[href="#bridge/b1"]')).toBeTruthy();
     // A post spends nothing of its own.
     expect(limits()).toBe('Limits A post spends nothing of its own. The seats of the bridge spend from their own budgets. A time that comes while the last run works is skipped. A missed time runs once, within 1 hour.');
@@ -350,10 +360,10 @@ describe('the page of a duty', () => {
     api = fakeApi(one(open));
     el = mount(<DutyMain name="patching" />);
     await settle();
-    expect(what()).toBe("What it does scribe opens a bridge from the playbook Weekly patching Patch on Today's date.");
-    expect(text(el.querySelector('.duty-readback'))).toBe('When a bridge of triage closes');
-    // The budget of an open is the turns of the bridge. An event misses no time, so the limits say nothing of one.
-    expect(limits()).toBe('Limits The bridge gets at most 40 turns. A time that comes while the last run works is skipped.');
+    expect(what()).toBe("What it does Scribe opens a bridge from the playbook Weekly patching Patch on Today's date.");
+    expect(text(el.querySelector('.duty-readback'))).toBe('When a bridge of Triage closes');
+    // The budget of an open is the turns of the bridge. An event has starts, not times, and misses none.
+    expect(limits()).toBe('Limits The bridge gets at most 40 turns. A start that comes while the last run works is skipped.');
     unmountAll();
     api.restore();
     const manager = base({ name: 'ask-boss', do: { manager: { message: 'Sum up the week.' } } });
@@ -424,12 +434,14 @@ describe('the page of a duty', () => {
     click(el.querySelector('button[aria-label="More"]'));
     click([...el.querySelectorAll('[role="menuitem"]')].find((b) => b.textContent === 'Delete'));
     const dialog = document.querySelector('dialog.confirm')!;
-    expect(text(dialog.querySelector('h2'))).toBe("Delete Write the report of [Today's date].?");
+    expect(text(dialog.querySelector('h2'))).toBe('Delete Daily report?');
     expect(api.calls.some((c) => c.method === 'DELETE')).toBe(false);
     click(keyNamed(dialog, 'Delete'));
     await settle();
     expect(api.calls.find((c) => c.method === 'DELETE')!.path).toBe('/v1/duties/daily-report');
     expect(location.hash).toBe('#duties');
+    // A short notice says that it worked.
+    expect(currentSaid()).toBe('Deleted the duty Daily report.');
   });
 
   it('offers only Run now to a person who cannot change the duty', async () => {
@@ -534,8 +546,8 @@ describe('the profile of an agent', () => {
     expect(sec.querySelector('h3')!.textContent).toBe('Duties');
     expect(sec.querySelector('.chip .sr')!.textContent).toBe('2 duties');
     expect([...sec.querySelectorAll('a')].map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
-      ["Write the report of [Today's date].", '#duties/daily-report'],
-      ['Sum up the month.', '#duties/monthly-summary'],
+      ['Daily report', '#duties/daily-report'],
+      ['Monthly summary', '#duties/monthly-summary'],
     ]);
   });
 

@@ -6,7 +6,21 @@ import { forgetDuties } from '../state/duties';
 import { nextWords } from '../lib/duties';
 import { DutyEditor, timing } from './DutyEditor';
 import { clearNotice } from './notice';
-import { click, fakeApi, fieldOf, keyNamed, mount, problem, settle, typeIn, unmountAll, type Call, type Route } from './testkit-c';
+import { click, fakeApi, keyNamed, mount, problem, settle, typeIn, unmountAll, type Call, type Route } from './testkit-c';
+
+/** labelOf is the label of a field as a person reads it, without the question mark of its help. */
+function labelOf(l: Element): string {
+  const c = l.cloneNode(true) as Element;
+  c.querySelectorAll('.help').forEach((h) => h.remove());
+  return (c.textContent || '').trim();
+}
+
+/** fieldOf finds the control of a field by its label. */
+function fieldOf(root: ParentNode, label: string): HTMLInputElement | null {
+  const f = [...root.querySelectorAll('label.field')].find((l) => labelOf(l.querySelector('.field-label')!) === label);
+  return f ? (f.querySelector('input, textarea, select') as HTMLInputElement | null) : null;
+}
+
 
 const ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
 const ALICE: Whoami = { principal: { subject: 'alice@example.com', name: 'Alice' }, roles: { migrator: 'owner' }, admin: false, canCreate: true };
@@ -37,6 +51,8 @@ beforeAll(() => {
   timing.preview = 0;
 });
 beforeEach(() => {
+  // A draft of the editor lives in the storage of the tab. Each test starts without one.
+  sessionStorage.clear();
   forgetDuties();
   location.hash = '#duties/new';
   act(() => {
@@ -266,19 +282,22 @@ describe('New duty', () => {
     expect(text(fieldOf(el, 'Ask the agent')!.closest('label')!.querySelector('.field-error'))).toBe('Write what the agent does.');
 
     pick(el, 'Migrator');
-    expect(text(el.querySelector('.duty-who'))).toContain('migrator');
+    // An agent without a face shows its name with a capital, as the picker shows it.
+    expect(text(el.querySelector('.duty-who'))).toContain('Migrator');
     expect(keyNamed(el, 'Change the agent')).toBeTruthy();
-    typeIn(fieldOf(el, 'Ask migrator'), 'Draft the notes of ');
+    typeIn(fieldOf(el, 'Ask Migrator'), 'Draft the notes of ');
     click(keyNamed(el, "Today's date"));
     await settle();
-    expect(fieldOf(el, 'Ask migrator')!.value).toBe("Draft the notes of [Today's date]");
-    expect(fieldOf(el, 'Name')!.value).toBe('draft-the-notes');
-    typeIn(fieldOf(el, 'Name'), 'taken');
+    expect(fieldOf(el, 'Ask Migrator')!.value).toBe("Draft the notes of [Today's date]");
+    // The name reads as words, and the page shows the short name that it saves as.
+    expect(fieldOf(el, 'Name')!.value).toBe('Draft the notes');
+    expect(text(el.querySelector('#duty-slug'))).toBe('It saves as draft-the-notes.');
+    typeIn(fieldOf(el, 'Name'), 'Taken');
     typeIn(cost, '0.50');
     click(keyNamed(el, 'Save duty'));
     await settle();
     expect(text(fieldOf(el, 'Name')!.closest('label')!.querySelector('.field-error'))).toBe('A duty of this name exists. Pick another name.');
-    typeIn(fieldOf(el, 'Name'), 'draft-the-notes');
+    typeIn(fieldOf(el, 'Name'), 'Draft the notes');
     click(keyNamed(el, 'Save duty'));
     await settle();
     const check = lastPut();
@@ -317,7 +336,7 @@ describe('New duty', () => {
     const el = mount(<DutyEditor />);
     await settle();
     pick(el, 'Migrator');
-    typeIn(fieldOf(el, 'Ask migrator'), 'Sum up.');
+    typeIn(fieldOf(el, 'Ask Migrator'), 'Sum up.');
     typeIn(fieldOf(el, 'The most a run can cost'), '1');
     click(keyNamed(el, 'Save duty'));
     await settle();
@@ -356,7 +375,7 @@ describe('the chips of a message', () => {
     await settle();
     expect(text(el.querySelector('h1'))).toBe('Edit duty');
     expect(fieldOf(el, 'Name')).toBeNull();
-    const box = fieldOf(el, 'Ask migrator') as unknown as HTMLTextAreaElement;
+    const box = fieldOf(el, 'Ask Migrator') as unknown as HTMLTextAreaElement;
     expect(box.value).toBe("Handle [What the check found]. The last report was [The last run's title] on [Today's date].");
     expect([...el.querySelectorAll('.duty-chips button')].map((b) => b.textContent)).toEqual(["Today's date", 'The time', 'What the check found', "The last run's title", 'The last run', 'How the last run ended', "This duty's name"]);
     expect(el.querySelector('.duty-chips button')!.getAttribute('aria-label')).toBe("Insert Today's date");
@@ -402,7 +421,7 @@ describe('the chips of a message', () => {
     });
     const el = mount(<DutyEditor name="on-call" />);
     await settle();
-    expect(text(el.querySelector('section[aria-labelledby="duty-when-head"]'))).toBe('When When another app calls. The page keeps this start.');
+    expect(text(el.querySelector('section[aria-labelledby="duty-when-head"]'))).toBe('When When another app calls the server. You cannot change this start here.');
     expect(select(el, 'Repeat')).toBeNull();
     // Another app starts a run when it calls, so no time can be missed.
     expect(fieldOf(el, 'Catch up a missed time')).toBeNull();
@@ -456,7 +475,7 @@ describe('Check first', () => {
     typeIn(fieldOf(el, 'Address'), 'https://example.com/api/queue');
     typeIn(fieldOf(el, 'Where the list is'), 'result.records');
     typeIn(fieldOf(el, 'What makes an item new'), 'number');
-    expect(text(el.querySelector('details.duty-check .duty-readback'))).toBe('Look at example.com/api/queue. Take the list at result.records. Wake migrator only for items whose number it did not see before.');
+    expect(text(el.querySelector('details.duty-check .duty-readback'))).toBe('Look at example.com/api/queue. Take the list at result.records. Wake Migrator only for items whose number it did not see before.');
     // A check offers its chip to the message.
     expect(keyNamed(el, 'What the check found')).toBeTruthy();
     click(keyNamed(el, 'Try the check'));
@@ -464,17 +483,17 @@ describe('Check first', () => {
     const tried = lastPut();
     expect(tried.path).toBe('/v1/duties/new?dryRun=true&test=true');
     expect((tried.body as DutyRecord).checkFirst).toEqual({ look: { http: { url: 'https://example.com/api/queue' } }, items: 'result.records', key: 'number', wake: { when: 'new' } });
-    expect(text(el.querySelector('.duty-found > p'))).toBe('Now: 2 items. They would wake migrator.');
+    expect(text(el.querySelector('.duty-found > p'))).toBe('Now: 2 items. They would wake Migrator.');
     expect([...el.querySelectorAll('.duty-items li')].map(text)).toEqual(['INC0012', 'INC0019']);
     // At a count needs a whole number on a save.
     click(el.querySelector('input[name="duty-wake"][value="atLeast"]'));
     typeIn(fieldOf(el, 'The most a run can cost'), '0.10');
-    typeIn(fieldOf(el, 'Ask migrator'), 'Handle the queue.');
+    typeIn(fieldOf(el, 'Ask Migrator'), 'Handle the queue.');
     click(keyNamed(el, 'Save duty'));
     await settle();
     expect(text(fieldOf(el, 'How many items')!.closest('label')!.querySelector('.field-error'))).toBe('Write a whole number of items.');
     typeIn(fieldOf(el, 'How many items'), '5');
-    expect(text(el.querySelector('details.duty-check .duty-readback'))).toContain('Wake migrator at 5 items or more.');
+    expect(text(el.querySelector('details.duty-check .duty-readback'))).toContain('Wake Migrator at 5 items or more.');
   });
 
   it('hides Write the check when the front answers 501', async () => {
@@ -533,7 +552,7 @@ describe('Check first', () => {
     expect(select(el, 'Test of filter 1')!.value).toBe('oneOf');
     expect((el.querySelector('input[aria-label="Value of filter 1"]') as HTMLInputElement).value).toBe('1, 2');
     expect(text(el.querySelector('details.duty-check .duty-readback'))).toBe('Every 15 minutes, look in ServiceNow for incidents with priority 1 or 2. Wake triage only for new ones.');
-    expect(text(el.querySelector('.duty-found > p'))).toBe('Now: 2 items. They would wake migrator.');
+    expect(text(el.querySelector('.duty-found > p'))).toBe('Now: 2 items. They would wake Migrator.');
   });
 });
 
@@ -654,7 +673,7 @@ describe('a duty from the setup of the server', () => {
     const el = mount(<DutyEditor name="renew-certificates" />);
     await settle();
     expect(text(el.querySelector('.duty-form > .duty-origin'))).toBe('First set up in the configuration of the server.');
-    const box = fieldOf(el, 'Ask migrator') as unknown as HTMLTextAreaElement;
+    const box = fieldOf(el, 'Ask Migrator') as unknown as HTMLTextAreaElement;
     expect(box.value).toBe('');
     expect(text(el.querySelector('#duty-template-line'))).toBe('The message comes from the setup of the server. Write a message to replace it.');
     expect(box.getAttribute('aria-describedby')).toBe('duty-template-line');
@@ -680,7 +699,7 @@ describe('a duty from the setup of the server', () => {
     });
     const el = mount(<DutyEditor name="renew-certificates" />);
     await settle();
-    typeIn(fieldOf(el, 'Ask migrator'), 'Renew the certificate that the event names.');
+    typeIn(fieldOf(el, 'Ask Migrator'), 'Renew the certificate that the event names.');
     expect(el.querySelector('#duty-template-line')).toBeNull();
     typeIn(fieldOf(el, 'The most a run can cost'), '0.30');
     click(keyNamed(el, 'Save duty'));
