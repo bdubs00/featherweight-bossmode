@@ -943,15 +943,16 @@ install as it is, which can hold any word.
 | Now | Verdict | New text | Who |
 |---|---|---|---|
 | new | add | the heading `Packages`, and for an owner the small key `Turn off` while packages are on | done |
-| new | add | off: `This agent uses only the programs of its image.`, and for an owner the key `Turn on packages` | done |
+| new | add | off: `This agent has only the programs that it came with.` (image was a word of a developer), and for an owner the key `Turn on packages` | done |
+| new | add | `Turn off packages?` with `The workers of <agent> lose <names>.` and the key `Turn off`, when a list holds a package | done |
 | new | add | the add row: the field `Package name` with the placeholder `such as ansible-lint`, the choice `Kind of package` of `Python package` and `Program`, and the key `Add` | done |
 | new | add | the lists `Python packages` and `Programs`, each package with the key `Remove <name>` | done |
-| new | add | the state line: `Ready on <n> of <m> workers.`, `Updating on <n> of <m> workers.`, or `The install failed on <worker>.` with the fold `Show the output` | done |
+| new | add | the state line: `Ready on <n> of <m> workers.`, `Updating on <n> of <m> workers.`, `The change waits for its worker to wake up.` or `The change waits for <n> workers to wake up.` when every worker that takes it sleeps, which hides the note, or `The install failed on <worker>.` with the fold `Show the output` | done |
 | new | add | the note `Workers take a change in about a minute. Work in progress does not stop.` | done |
 | new | add | the version that a ready worker installed, in muted words after the name of each package | done |
 | new | add | the refusal of the front `There is no Python package named <name>.` | done |
 | new | add | the switch `The agent can ask for a package. You approve each one.` | done |
-| new | add | the errors `Write the name of a package.`, `A package name cannot start with a dash.`, `A package name cannot hold a control character.`, `A package name holds 200 characters at most.`, `<name> is in the list already.`, and `A list holds 100 packages at most.` | done |
+| new | add | the errors `Write the name of a package.`, `A package name cannot start with a dash.`, `A package name cannot hold a control character.`, `A package name holds 200 characters at most.`, `<name> is in the list already.`, `A list holds 100 packages at most.`, `That is not the name of a Python package. Write a name such as pyyaml, with a version such as >=6 when you need one.`, and `That is not the name of a program. Write a name such as jq, with a version such as =1.7 when you need one.` | done |
 
 ### src/ui/Decision.tsx and src/lib/words.ts: the card of a package
 

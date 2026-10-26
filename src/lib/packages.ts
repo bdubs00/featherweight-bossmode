@@ -71,6 +71,8 @@ export interface PackageLine {
   text: string;
   /** The failure of the worker that the line names, for the fold of its output. */
   failure?: PackageFailure;
+  /** True when every worker that takes the change sleeps. */
+  asleep?: boolean;
 }
 
 const workers = (n: number) => (n === 1 ? 'worker' : 'workers');
@@ -83,14 +85,17 @@ const workers = (n: number) => (n === 1 ? 'worker' : 'workers');
  * running worker takes a change in place, so no change waits for an idle
  * worker.
  */
-export function lineOf(p: Packages): PackageLine | null {
+export function lineOf(p: Packages, asleep: (task: string) => boolean = () => false): PackageLine | null {
   if (!p.on) return null;
   const ws = p.workers || [];
   const failed = ws.find((w) => w.state === 'failed');
   if (failed) return { tone: 'red', text: `The install failed on ${failed.task}.`, failure: failed.failure || undefined };
   const total = ws.length;
-  const updating = ws.filter((w) => w.state === 'pending' || w.state === 'materializing').length;
+  const waits = ws.filter((w) => w.state === 'pending' || w.state === 'materializing');
+  const updating = waits.filter((w) => !asleep(w.task)).length;
   if (updating > 0) return { tone: 'amber', text: `Updating on ${updating} of ${total} ${workers(total)}.` };
+  // A worker that sleeps takes the change when a request wakes it, which can take hours, so the line says so and promises no time.
+  if (waits.length > 0) return { tone: 'grey', text: waits.length === 1 ? 'The change waits for its worker to wake up.' : `The change waits for ${waits.length} workers to wake up.`, asleep: true };
   if (total === 0 || (p.python.length === 0 && p.tools.length === 0)) return null;
   const ready = ws.filter((w) => w.state === 'ready').length;
   return { tone: ready === total ? 'green' : 'grey', text: `Ready on ${ready} of ${total} ${workers(total)}.` };
@@ -107,6 +112,20 @@ export function shouldPoll(p: Packages | null | undefined): boolean {
   return p.on && (p.workers || []).some((w) => w.state !== 'ready');
 }
 
+/** A version clause of a requirement, such as >=6 or ==2.31.0. */
+const VERSION = '(===|==|!=|~=|>=|<=|>|<)\\s*[A-Za-z0-9.*+!_-]+';
+
+/**
+ * PYTHON_NAME is a Python requirement that the section takes: a name of
+ * the package index, extras in brackets, and versions joined by commas,
+ * such as requests[socks]>=2.31,<3. A marker after ;, an address, and a
+ * space inside a name are no package name.
+ */
+export const PYTHON_NAME = new RegExp('^[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?(\\[[A-Za-z0-9._-]+(\\s*,\\s*[A-Za-z0-9._-]+)*\\])?(\\s*' + VERSION + '(\\s*,\\s*' + VERSION + ')*)?$');
+
+/** PROGRAM_NAME is a program that the section takes: a name, with a channel before :: and a version, such as jq or conda-forge::ripgrep=14.1. */
+export const PROGRAM_NAME = /^([A-Za-z0-9_.-]+::)?[A-Za-z0-9_][A-Za-z0-9._+-]*(\s*(==|=|!=|~=|>=|<=|>|<)\s*[A-Za-z0-9.*+!_-]+)?$/;
+
 /**
  * nameProblem checks a package that a person adds, and answers the reason
  * of a refusal in one sentence, or "". The kernel refuses the same names,
@@ -118,6 +137,8 @@ export function nameProblem(p: Packages, kind: PackageKind, raw: string): string
   if (name.startsWith('-')) return 'A package name cannot start with a dash.';
   if (/[\u0000-\u001f\u007f]/.test(name)) return 'A package name cannot hold a control character.';
   if (name.length > MAX_NAME) return `A package name holds ${MAX_NAME} characters at most.`;
+  if (kind === 'python' && !PYTHON_NAME.test(name)) return 'That is not the name of a Python package. Write a name such as pyyaml, with a version such as >=6 when you need one.';
+  if (kind === 'tools' && !PROGRAM_NAME.test(name)) return 'That is not the name of a program. Write a name such as jq, with a version such as =1.7 when you need one.';
   const list = p[kind];
   if (list.some((x) => x.name.toLowerCase() === name.toLowerCase())) return `${name} is in the list already.`;
   if (list.length >= MAX_ITEMS) return `A list holds ${MAX_ITEMS} packages at most.`;
