@@ -278,8 +278,11 @@ function parseSay(words, zone) {
 
 /* ---------- the record ---------- */
 
-/** problemsOf checks a record as the front does and turns say into a schedule. It answers the record that a save keeps and every problem. */
-function problemsOf(body, zone) {
+/** The refusal of a change of a locked duty, as the server says it. */
+const LOCKED = 'This duty is locked by the setup of this server. The person who runs the server can change it.';
+
+/** problemsOf checks a record as the server does and turns say into a schedule. It answers the record that a save keeps and every problem. templated lets an ask go with no message. */
+function problemsOf(body, zone, { templated = false } = {}) {
   const problems = [];
   const p = (field, message) => problems.push(field ? field + ': ' + message : message);
   const d = JSON.parse(JSON.stringify(body || {}));
@@ -311,7 +314,7 @@ function problemsOf(body, zone) {
   const x = d.do || {};
   const actions = ['ask', 'post', 'open', 'manager'].filter((k) => x[k]);
   if (actions.length !== 1) p('do', 'A duty does exactly one thing.');
-  if (x.ask && !String(x.ask.message || '').trim()) p('do.ask.message', 'Write what the agent does.');
+  if (x.ask && !templated && !String(x.ask.message || '').trim()) p('do.ask.message', 'Write what the agent does.');
   if (x.post) {
     const b = ctx.bridges.get(x.post.bridge);
     if (!b) p('do.post.bridge', 'Pick the bridge.');
@@ -344,7 +347,7 @@ function problemsOf(body, zone) {
     else if (look.http && look.http.secret) {
       const secret = SECRETS.find((x) => x.name === look.http.secret);
       const host = new URL(look.http.url).hostname.toLowerCase();
-      if (!secret) p('checkFirst.look.http.secret', 'The front has no secret ' + look.http.secret + '.');
+      if (!secret) p('checkFirst.look.http.secret', 'The server has no secret ' + look.http.secret + '.');
       else if (!secret.hosts.some((h) => hostGlob(h, host))) p('checkFirst.look.http.secret', 'The secret ' + secret.name + ' does not go to ' + host + '.');
     }
   }
@@ -543,23 +546,36 @@ export function register({ on, refuse, readJson, now, AGENTS, admin, S, publish 
     },
     runsOf(60, 3, (i, at) => ({ at, slot: at, run: 'duty-summary-' + i, state: 'failed', costUSD: 0.02, reason: 'The run reached its limit of turns.' })),
   );
-  // The entries of workbench.sources, as the front reads them: an agent, a
-  // start, and a readback, with no action, empty limits, no decisions while
-  // away, and no notifications. The routes never change them.
-  const WHERE = ' An operator sets it in the settings of the front, so it changes there.';
-  const source = (d) => D.set(d.name, { source: 'file', revision: 0, runAs: 'duty', do: {}, limits: { budget: {} }, ...d, history: [] });
-  source({
+  // The entries of workbench.sources, as the server imports them once into
+  // the store: ordinary duties with the origin config. The message of
+  // renew-certificates comes from a template of the setup, which no route
+  // shows. audit-access is locked, so a change, a pause, or a delete of it
+  // answers 409.
+  const imported = (d) => D.set(d.name, { source: 'store', revision: 1, runAs: 'duty', owner: '', limits: { budget: {} }, whileAway: { decider: 'manager', timeout: '2h', then: 'deny' }, notify: { failure: [], needsYou: [] }, ...d, origin: { kind: 'config', name: d.name }, history: [] });
+  imported({
     name: 'renew-certificates',
     agent: 'ops',
+    // alice runs the setup of the fake, so she can change this duty, as an operator of ops cannot otherwise.
+    owner: 'alice@example.com',
+    template: true,
     when: { webhook: { auth: { mode: 'bearer', secret: 'CERT_HOOK' } } },
-    readback: 'When another app calls the address of this source, each new event starts a run of ops.' + WHERE,
+    do: { ask: {} },
   });
-  source({
+  imported({
     name: 'helpdesk-tickets',
     agent: 'triage',
-    when: {},
-    checkFirst: { look: { http: { url: 'https://helpdesk.example.com/api/tickets' } }, items: 'tickets', wake: { when: 'new' } },
-    readback: 'Every 5m, it looks at helpdesk.example.com/api/tickets, and each new item starts a run of triage.' + WHERE,
+    when: { schedule: { repeat: 'every', every: '15m', timeZone: 'UTC' } },
+    checkFirst: { look: { http: { url: 'https://helpdesk.example.com/api/tickets' } }, items: 'tickets', key: 'id', wake: { when: 'new' } },
+    do: { ask: { message: 'Sort the new tickets of the helpdesk: {found}.' } },
+    limits: { budget: { maxCostUSD: 0.2 }, overlap: 'skip', catchUp: '1h' },
+  });
+  imported({
+    name: 'audit-access',
+    agent: 'ops',
+    locked: true,
+    when: { schedule: { repeat: 'daily', times: ['06:00'], timeZone: 'UTC' } },
+    do: { ask: { message: 'Audit the access log of last night, and list each login from a new address.' } },
+    limits: { budget: { maxCostUSD: 0.3 }, overlap: 'skip', catchUp: '1h' },
   });
   add(
     {
@@ -603,7 +619,7 @@ export function register({ on, refuse, readJson, now, AGENTS, admin, S, publish 
     const today = (h || []).filter((r) => Date.now() - Date.parse(r.at) < DAY).reduce((n, r) => n + (r.costUSD || 0), 0);
     const out = {
       ...rec,
-      readback: rec.source === 'file' ? rec.readback : withCheck(s ? readbackOf(s) : rec.when.webhook ? 'When another app calls.' : rec.when.event ? eventWords(rec.when.event) : '', rec),
+      readback: withCheck(s ? readbackOf(s) : rec.when.webhook ? 'When another app calls.' : rec.when.event ? eventWords(rec.when.event) : '', rec),
       next: s && !rec.paused ? nextOf(s) : [],
       state: { lastRun: (h && h[0]) || null, todayUSD: Math.round(today * 100) / 100, failuresInRow: (h || []).findIndex((r) => r.state !== 'failed') < 0 ? (h || []).length : (h || []).findIndex((r) => r.state !== 'failed'), pausedReason: (st && st.pausedReason) || '' },
     };
@@ -639,10 +655,11 @@ export function register({ on, refuse, readJson, now, AGENTS, admin, S, publish 
     const body = await readJson(c.req);
     if (body.name && body.name !== name) refuse(400, `the body names the duty "${body.name}" but the path names "${name}"`);
     const old = D.get(name);
-    if (old && old.source === 'file') refuse(409, 'the duty comes from the settings of the front, which the routes never change');
+    if (old && old.locked) refuse(409, LOCKED);
     if (old && !canChange(c, old)) refuse(403, `only an owner of ${old.agent} or an admin can change this duty`);
     const zone = zoneOf(c);
-    const { duty, problems } = problemsOf({ ...body, name }, zone);
+    // A duty whose message comes from the setup of the server asks its agent with no message of the person.
+    const { duty, problems } = problemsOf({ ...body, name }, zone, { templated: !!(old && old.template) });
     const dry = c.url.searchParams.get('dryRun') === 'true';
     const s = duty.when && duty.when.schedule;
     const start = s && !problems.some((p) => p.startsWith('when')) ? readbackOf(s) : duty.when && duty.when.webhook ? 'When another app calls.' : duty.when && duty.when.event && !problems.some((p) => p.startsWith('when')) ? eventWords(duty.when.event) : '';
@@ -663,6 +680,9 @@ export function register({ on, refuse, readJson, now, AGENTS, admin, S, publish 
     delete rec.revision;
     const runAs = rec.runAs === 'owner' && old && old.owner !== c.person.subject ? 'duty' : rec.runAs || 'duty';
     const next = { ...(old || {}), ...rec, runAs, source: 'store', owner: old ? old.owner : c.person.subject, revision: old ? old.revision + 1 : 1, history: old ? old.history : [], state: old ? old.state : undefined };
+    // A message of the person replaces the template of the setup.
+    next.template = !!(old && old.template) && !(rec.do && rec.do.ask && String(rec.do.ask.message || '').trim());
+    if (!next.template) delete next.template;
     if (!rec.checkFirst) delete next.checkFirst;
     D.set(name, next);
     c.status = old ? 200 : 201;
@@ -671,7 +691,7 @@ export function register({ on, refuse, readJson, now, AGENTS, admin, S, publish 
 
   on('PATCH', '/v1/duties/([^/]+)', async (c, raw) => {
     const d = find(raw);
-    if (d.source === 'file') refuse(409, 'the duty comes from the settings of the front, which the routes never change');
+    if (d.locked) refuse(409, LOCKED);
     if (!canChange(c, d)) refuse(403, `only an owner of ${d.agent} or an admin can pause this duty`);
     const body = await readJson(c.req);
     if (typeof body.paused !== 'boolean') refuse(400, 'paused must be true or false');
@@ -683,7 +703,7 @@ export function register({ on, refuse, readJson, now, AGENTS, admin, S, publish 
 
   on('DELETE', '/v1/duties/([^/]+)', (c, raw) => {
     const d = find(raw);
-    if (d.source === 'file') refuse(409, 'the duty comes from the settings of the front, which the routes never change');
+    if (d.locked) refuse(409, LOCKED);
     if (!canChange(c, d)) refuse(403, `only an owner of ${d.agent} or an admin can delete this duty`);
     D.delete(d.name);
     c.status = 204;
@@ -869,7 +889,7 @@ export function register({ on, refuse, readJson, now, AGENTS, admin, S, publish 
           ch.url = url;
           if (ch.kind === 'webhook') ch.secret = writeOnly(x.secret, was.secret);
           if (url && !/^https:\/\//.test(url)) problems.push(`${at}.url: The address starts with https://.`);
-          else if (url && privateHost(url)) problems.push(`${at}.url: The front posts to no private address that the operator did not allow.`);
+          else if (url && privateHost(url)) problems.push(`${at}.url: The server posts to no private address that the operator did not allow.`);
           break;
         case 'email': {
           const to = String((x.email && x.email.to) || '').trim();
