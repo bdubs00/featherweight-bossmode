@@ -22,11 +22,13 @@ export interface RoutinesState {
   weeks: Record<string, RoutineSummary | null>;
   /** The reason the list did not load. */
   error: string;
-  /** True when the front answers 404 to the list: it keeps no routines, because workbench.routines.enabled or its bus turns them off. */
+  /** True when the list answers off: the server keeps no routines, because workbench.routines.enabled or its bus turns them off. */
   off: boolean;
+  /** Why the routines are off, in the words of the server, or "". */
+  reason: string;
 }
 
-const initial: RoutinesState = { order: null, byKey: {}, gone: {}, weeks: {}, error: '', off: false };
+const initial: RoutinesState = { order: null, byKey: {}, gone: {}, weeks: {}, error: '', off: false, reason: '' };
 
 let state: RoutinesState = initial;
 const listeners = new Set<() => void>();
@@ -137,13 +139,14 @@ async function readList(): Promise<void> {
   watchStream();
   let list: RoutineRecord[];
   try {
-    list = await routinesApi.list();
-  } catch (e) {
-    // A front without routines mounts no route of them.
-    if (e instanceof ApiError && e.status === 404) {
-      set({ ...state, off: true, error: '' });
+    const r = await routinesApi.list();
+    // A server without routines answers the list with off and its reason.
+    if (r.off) {
+      set({ ...state, off: true, reason: r.reason, error: '' });
       return;
     }
+    list = r.routines;
+  } catch (e) {
     set({ ...state, error: e instanceof Error ? e.message : 'The action failed. Try it again.' });
     throw e;
   }
@@ -155,7 +158,7 @@ async function readList(): Promise<void> {
     const old = state.byKey[key];
     byKey[key] = old && old.evidence && old.updatedAt === r.updatedAt ? { ...r, evidence: old.evidence } : r;
   }
-  set({ ...state, order, byKey, error: '', off: false });
+  set({ ...state, order, byKey, error: '', off: false, reason: '' });
   await Promise.allSettled(list.filter((r) => r.standing !== 'retired').map((r) => loadRoutine(r.agent, r.routine.name)));
 }
 

@@ -171,9 +171,22 @@ export interface RoutineEvent {
 
 const one = (agent: string, name: string) => '/v1/routines/' + enc(agent) + '/' + enc(name);
 
+/** The answer of the list: the routines, and off with its reason in words while the server keeps no routines. */
+export interface RoutineList {
+  routines: RoutineRecord[];
+  off: boolean;
+  reason: string;
+}
+
 export const routinesApi = {
-  /** list reads the routines that the caller can view, newest change first, without evidence. Without an agent, it reads every agent. */
-  list: (agent?: string) => call<{ routines: RoutineRecord[] }>('/v1/routines' + query({ agent })).then((r) => (r && r.routines) || []),
+  /**
+   * list reads the routines that the caller can view, newest change first,
+   * without evidence. Without an agent, it reads every agent. While the
+   * server keeps no routines, it answers no routine, off true, and the
+   * reason in words.
+   */
+  list: (agent?: string) =>
+    call<Partial<RoutineList>>('/v1/routines' + query({ agent })).then((r): RoutineList => ({ routines: (r && r.routines) || [], off: !!(r && r.off), reason: (r && typeof r.reason === 'string' && r.reason.trim()) || '' })),
   /** get reads one routine with its evidence. */
   get: (agent: string, name: string) => call<RoutineRecord>(one(agent, name)),
   /**

@@ -4,9 +4,11 @@
 // tabs Steps, Evidence, and Runbook. A routine that needs you opens on the
 // card of its sign-off. The details pane holds the week of its agent.
 // docs/DESIGN.md, section 11.9, names the screen, and docs/ROUTINES.md of
-// the kernel holds the contract. A server without routines answers 404 to
-// the list: the list says so once, the main pane says what a routine is,
-// and the page asks the server no more until the next load.
+// the kernel holds the contract. A server without routines answers the
+// list with off and its reason: the list says so once, with the reason
+// behind its question mark, the main pane says what a routine is, and a
+// routine or the week of an agent asks the server nothing, since those
+// routes answer 404 while the routines are off.
 
 import { useEffect, useLayoutEffect, useMemo, useState } from 'preact/hooks';
 import type { RoutineRecord, RoutineSummary, Standing } from '../api/routines';
@@ -98,14 +100,16 @@ function RoutineRow({ r, on }: { r: RoutineRecord; on: boolean }) {
   );
 }
 
-/** OffWords say that the front keeps no routines, with who turns them on behind the question mark. */
+/** OFF_REASON is the reason of an older server, which says none. */
+const OFF_REASON = 'An admin turns routines on in the setup of the server.';
+
+/** OffWords say that the server keeps no routines, with its reason behind the question mark. */
 function OffWords() {
+  const reason = useRoutines((s) => s.reason);
   return (
     <>
       Routines are off.{' '}
-      <Help label="Where routines are turned on">
-        An admin turns routines on in the setup of the server, with the setting <code>workbench.routines.enabled</code>.
-      </Help>
+      <Help label="Where routines are turned on">{reason || OFF_REASON}</Help>
     </>
   );
 }
@@ -124,8 +128,7 @@ export function RoutineList({ agent, name }: { agent?: string; name?: string }) 
   const list = useRoving<HTMLDivElement>();
   useRoutinesView();
   useEffect(() => {
-    // A server that answered 404 keeps no routines until the page loads again, so a visit asks it nothing.
-    if (!routines.get().off) loadRoutines().catch(() => {});
+    loadRoutines().catch(() => {});
   }, []);
   const all = useMemo(() => (order || []).map((k) => byKey[k]).filter(Boolean), [order, byKey]);
   const current = agent && name ? keyOf(agent, name) : '';

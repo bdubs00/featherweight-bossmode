@@ -168,13 +168,14 @@ describe('the list of routines', () => {
     expect(el.querySelector('[role=alert]')!.textContent).toContain('The store did not answer.');
   });
 
-  it('says once that routines are off on a front that keeps none, with who turns them on behind the question mark, and asks no more', async () => {
-    api = fakeApi({ 'GET /v1/routines': () => ({ status: 404, body: { detail: 'not found' } }) });
+  it('says once that routines are off on a server that keeps none, with its reason behind the question mark', async () => {
+    api = fakeApi({ 'GET /v1/routines': { routines: [], off: true, reason: 'Routines are off on this server. An admin turns them on with the setting workbench.routines.enabled.' } });
     const list = mount(<RoutineList />);
     const main = mount(<RoutineMain tab="steps" />);
     await settle();
     expect(list.textContent).toContain('Routines are off.');
-    expect(list.querySelector('[aria-label="Where routines are turned on"]')).not.toBeNull();
+    click(list.querySelector('[aria-label="Where routines are turned on"]'));
+    expect(list.querySelector('.help-pop')!.textContent).toBe('Routines are off on this server. An admin turns them on with the setting workbench.routines.enabled.');
     // The main pane says what a routine is, so the two panes never say the same.
     expect(main.textContent).not.toContain('Routines are off.');
     expect(main.textContent).toContain(ROUTINE_IS);
@@ -184,13 +185,12 @@ describe('the list of routines', () => {
     }
     expect(list.querySelector('.find')).toBeNull();
     expect(list.querySelector('.pane-head .chip')).toBeNull();
-    // Another visit asks the server nothing until the page loads again.
+    // A routine and the week of an agent answer 404 while the routines are off, so the page asks for neither.
     unmountAll();
-    const before = api.calls.length;
-    mount(<RoutineList />);
     mount(<RoutineMain tab="steps" agent="triage" name="acknowledge-a-new-ticket" />);
+    mount(<RoutineAgent agent="triage" name="acknowledge-a-new-ticket" />);
     await settle();
-    expect(api.calls.length).toBe(before);
+    expect(api.calls.filter((c) => c.path !== '/v1/routines').map((c) => c.path)).toEqual([]);
   });
 });
 
