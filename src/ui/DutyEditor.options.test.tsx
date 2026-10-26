@@ -581,7 +581,7 @@ describe('the name of a draft', () => {
     click(keyNamed(el, 'Save duty'));
     await settle();
     expect(document.querySelector('dialog.confirm')).toBeNull();
-    typeIn(nameField(), 'sum-up-the-week');
+    typeIn(nameField(), 'Sum up the week');
     expect(nameField().closest('label')!.querySelector('.field-error')).toBeNull();
     // Write the check for me of a duty that is not saved yet goes to the draft, with the agent.
     openCheck(el);
@@ -590,7 +590,8 @@ describe('the name of a draft', () => {
     await settle();
     const write = api.calls.find((c) => c.method === 'POST')!;
     expect(write.path).toBe('/v1/duties/new/write-check');
-    expect(write.body).toEqual({ words: 'the queue has new items', agent: 'migrator' });
+    // The run that writes the check takes the budget of a run of the duty that the form holds.
+    expect(write.body).toEqual({ words: 'the queue has new items', agent: 'migrator', budget: { maxCostUSD: 0.4 } });
     click(keyNamed(el, 'Save duty'));
     await settle();
     expect(lastPut().path).toBe('/v1/duties/sum-up-the-week?dryRun=true');
@@ -611,7 +612,7 @@ describe('the refusals of Write the check for me', () => {
   };
   const wordsError = (el: HTMLElement) => text(fieldOf(el, 'Wake the agent only when')!.closest('label')!.querySelector('.field-error'));
 
-  it('show the whole reason of a 422, and what the agent tried, which the page does not take', async () => {
+  it('show the whole reason of a 422, and fill the fields with what the agent tried, so the person can fix it', async () => {
     const el = await writeWith(() => ({
       status: 422,
       body: {
@@ -619,20 +620,33 @@ describe('the refusals of Write the check for me', () => {
         detail: 'the check found no list at result.records. The answer holds a list at data.items',
         error: 'the check found no list at result.records. The answer holds a list at data.items',
         checkFirst: { look: { tool: 'servicenow.query_incidents', input: {} }, items: 'result.records', key: 'number', wake: { when: 'new' } },
-        readback: 'Call the tool servicenow.query_incidents of migrator. Take the list at result.records.',
+        readback: 'First it asks Migrator to find incidents.',
+        forDevelopers: 'It takes the items at result.records, and number makes an item new.',
       },
     }));
     expect(wordsError(el)).toBe('The check found no list at result.records. The answer holds a list at data.items.');
-    const tried = el.querySelector('.duty-tried')!;
-    expect(text(tried)).toBe('What Migrator tried Call the tool servicenow.query_incidents of migrator. Take the list at result.records.');
-    // The record stays out of the form: the fields by hand stay closed, and the duty has no check.
-    expect(fieldOf(el, 'Tool')).toBeNull();
-    expect(keyNamed(el, 'Remove the check')).toBeUndefined();
+    expect(text(el.querySelector('.duty-tried'))).toBe('The fields below hold what Migrator tried. Change them, then use Try the check.');
+    // The fields hold the record, with the readback of the server and its technical part in a closed fold.
+    expect(fieldOf(el, 'Where the list is')!.value).toBe('result.records');
+    expect(fieldOf(el, 'What makes an item new')!.value).toBe('number');
+    expect(keyNamed(el, 'Remove the check')).toBeTruthy();
+    const check = el.querySelector('details.duty-check')!;
+    expect(text(check.querySelector('.duty-readback:not(.duty-tried *)'))).toBe('First it asks Migrator to find incidents.');
+    const dev = check.querySelector('details.duty-dev') as HTMLDetailsElement;
+    expect(dev.open).toBe(false);
+    expect(text(dev.querySelector('summary'))).toBe('For developers');
+    expect(text(dev.querySelector('.duty-dev-text'))).toBe('It takes the items at result.records, and number makes an item new.');
   });
 
-  it('read a record that the agent tried in words when the 422 holds no readback', async () => {
+  it('read a record that the agent tried in words when the 422 holds no readback, and fill the fields with it', async () => {
     const el = await writeWith(() => ({ status: 422, body: { detail: 'no list', error: 'no list', checkFirst: { look: { http: { url: 'https://queue.example.com/api' } }, wake: { when: 'any' } } } }));
-    expect(text(el.querySelector('.duty-tried'))).toBe('What Migrator tried Look at queue.example.com/api. Take the whole answer as the list. Wake Migrator when the check finds an item.');
+    expect(fieldOf(el, 'Address')!.value).toBe('https://queue.example.com/api');
+    expect(text(el.querySelector('details.duty-check > .advanced-body > .duty-readback'))).toBe('Look at queue.example.com/api. Take the whole answer as the list. Wake Migrator when the check finds an item.');
+  });
+
+  it('show what the agent tried in words when the 422 holds only a readback', async () => {
+    const el = await writeWith(() => ({ status: 422, body: { detail: 'no list', error: 'no list', readback: 'First it looks at the queue.', forDevelopers: 'At queue.example.com/api.' } }));
+    expect(text(el.querySelector('.duty-tried'))).toBe('What Migrator tried First it looks at the queue. For developers At queue.example.com/api.');
   });
 
   it('show a problem of the words under the words, and one of the agent under the agent picker', async () => {

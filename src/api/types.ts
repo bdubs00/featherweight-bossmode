@@ -1113,6 +1113,8 @@ export interface DutyState {
 /** The record of a duty, as the page writes it. */
 export interface DutyRecord {
   name: string;
+  /** The name in the words of the person, such as Walk Duty 1, one line of at most 100 characters. The page shows it in place of the name. */
+  title?: string;
   agent: string;
   pool?: string;
   owner?: string;
@@ -1141,6 +1143,8 @@ export interface Duty extends DutyRecord {
   revision?: number;
   /** The schedule in words, such as Every weekday at 9:00 AM, New York time. */
   readback?: string;
+  /** The technical part of the readback, such as the address and the credential of a webhook, for the fold For developers. */
+  forDevelopers?: string;
   /** The next times, in UTC. */
   next?: string[];
   state?: DutyState;
@@ -1172,6 +1176,8 @@ export type DutyProblem = string;
 export interface DutyDryRun {
   duty?: Duty | null;
   readback?: string;
+  /** The technical part of the readback, for the fold For developers. */
+  forDevelopers?: string;
   next?: string[];
   problems?: DutyProblem[] | null;
   /** With test=true: what the check finds now. */
@@ -1182,6 +1188,8 @@ export interface DutyDryRun {
 export interface WrittenCheck {
   checkFirst: CheckFirst;
   readback?: string;
+  /** Where the check finds its items and what makes an item new, for the fold For developers. */
+  forDevelopers?: string;
   check?: CheckFound | null;
 }
 

@@ -304,11 +304,13 @@ export const api = {
   /**
    * writeCheck asks an agent for a check from the words of a person. agent
    * is the agent of the editor, which a duty that is not saved yet needs. For
-   * a saved duty, the agent of the duty wins. A 422 says why it could not,
-   * and a 504 says that two minutes passed. signal lets the person cancel.
+   * a saved duty, the agent of the duty wins. budget is the budget of a run
+   * of the duty as the form holds it: the server runs an agent without a
+   * budget of its own within it. A 422 says why it could not, and a 504
+   * says that two minutes passed. signal lets the person cancel.
    */
-  writeCheck: (name: string, words: string, agent: string, signal?: AbortSignal) =>
-    dutyCall<WrittenCheck>(duty(name) + '/write-check', { method: 'POST', body: { words, agent }, signal }),
+  writeCheck: (name: string, words: string, agent: string, signal?: AbortSignal, budget?: DutyRecord['limits']['budget']) =>
+    dutyCall<WrittenCheck>(duty(name) + '/write-check', { method: 'POST', body: budget ? { words, agent, budget } : { words, agent }, signal }),
   /** dutyOptions names what the front serves now: the secrets of a check, the events, the actions, and the looks. */
   dutyOptions: () => dutyCall<DutyOptions>('/v1/duties/options'),
   /** pauseAllDuties is the switch that pauses or resumes every duty, for an admin. */

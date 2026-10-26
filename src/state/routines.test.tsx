@@ -48,14 +48,14 @@ describe('the routines of the page', () => {
     expect(s.byKey['triage/b'].evidence).toBeUndefined();
   });
 
-  it('marks the routines off when the front answers 404 to the list, and on again once a list loads', async () => {
-    api = fakeApi({ 'GET /v1/routines': () => ({ status: 404, body: { detail: 'not found' } }) });
+  it('marks the routines off with the reason of the server when the list answers off, and on again once a list loads', async () => {
+    api = fakeApi({ 'GET /v1/routines': { routines: [], off: true, reason: 'Routines are off on this server. An admin turns them on with the setting workbench.routines.enabled.' } });
     await loadRoutines();
-    expect(routines.get()).toMatchObject({ off: true, error: '', order: null });
+    expect(routines.get()).toMatchObject({ off: true, reason: 'Routines are off on this server. An admin turns them on with the setting workbench.routines.enabled.', error: '', order: null });
     api.restore();
     api = fakeApi({ 'GET /v1/routines': { routines: [] } });
     await loadRoutines();
-    expect(routines.get()).toMatchObject({ off: false, order: [] });
+    expect(routines.get()).toMatchObject({ off: false, reason: '', order: [] });
   });
 
   it('reads a routine again on a routine event of the stream while the place is open, once for a burst', async () => {

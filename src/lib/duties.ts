@@ -573,11 +573,18 @@ export function templatedOf(d: Pick<Duty, 'origin' | 'template' | 'do' | 'source
 }
 
 /**
- * dutyTitle is the name of a duty as a person reads it: daily-report is
- * Daily report. The person gave the name, so the list, the page of the
- * duty, its dialogs, and Activity all call the duty by it.
+ * dutyTitle is the name of a duty as a person reads it: its title, the
+ * words that the person wrote, such as Walk Duty 1, else its short name in
+ * words, so daily-report is Daily report. The list, the page of the duty,
+ * its dialogs, and a profile all call the duty by it.
  */
-export const dutyTitle = (d: Pick<DutyRecord, 'name'>): string => titleOfName(d.name);
+export const dutyTitle = (d: Pick<DutyRecord, 'name' | 'title'>): string => (d.title && d.title.trim()) || titleOfName(d.name);
+
+/** MAX_TITLE is the longest title of a duty that the server keeps, in characters. */
+export const MAX_TITLE = 100;
+
+/** oneLine is a title as the server keeps it: one line, with one space between the words. */
+export const oneLine = (s: string): string => String(s || '').split(/\s+/).filter(Boolean).join(' ');
 
 /** dutyWhat says what a duty does in one line: the first line of its message, the playbook that it opens, or "". */
 export function dutyWhat(d: Pick<DutyRecord, 'do'>): string {
@@ -771,6 +778,26 @@ export function nameOf(message: string): string {
   return kept.join('-');
 }
 
+/**
+ * titleWordsOf makes the name of a duty in words from what it does: the
+ * words of nameOf, with the capitals of the message, such as Check the VPN
+ * logs. Its short name is the name that nameOf makes.
+ */
+export function titleWordsOf(message: string): string {
+  const words = String(message || '')
+    .replace(/\[[^\]]*\]/g, ' ')
+    .split(/[^A-Za-z0-9]+/)
+    .filter(Boolean)
+    .slice(0, 6);
+  const kept: string[] = [];
+  for (const w of words) {
+    if (kept.join('-').length + (kept.length ? 1 : 0) + w.length > 40) break;
+    kept.push(w);
+  }
+  while (kept.length > 1 && JOINING.has(kept[kept.length - 1].toLowerCase())) kept.pop();
+  return cap(kept.join(' '));
+}
+
 /** nameReason says why a name cannot name a duty, or "". */
 export function nameReason(name: string, taken: string[]): string {
   if (!name) return 'Give the duty a name.';
@@ -800,9 +827,10 @@ export function slugOf(words: string): string {
   return (i > 20 ? c.slice(0, i) : c).replace(/[-_]+$/, '');
 }
 
-/** nameWordsReason says why the name that a person writes cannot name a duty, or "": its short name decides. */
+/** nameWordsReason says why the name that a person writes cannot name a duty, or "": its length, then its short name, decide. */
 export function nameWordsReason(words: string, taken: string[]): string {
   if (!String(words || '').trim()) return 'Give the duty a name.';
+  if (oneLine(words).length > MAX_TITLE) return 'A name holds ' + MAX_TITLE + ' characters at most.';
   const slug = slugOf(words);
   if (!slug) return 'A name needs at least one letter from a to z, or a digit.';
   return nameReason(slug, taken);
@@ -1026,7 +1054,8 @@ export function formOf(d: Duty, zone: string): DutyForm {
   const opens = actOf(x) === 'open';
   return {
     ...f,
-    name: d.name,
+    // The name field of an edit holds the title. A duty without one shows its short name in words as the placeholder.
+    name: d.title || '',
     nameOwn: true,
     agent: d.agent,
     start: e ? 'event' : 'schedule',
@@ -1249,6 +1278,7 @@ export function recordOf(f: DutyForm, base: Duty | null, name: string): DutyReco
   const when = keepWhen ? b!.when : f.start === 'event' ? { event: eventOf(f.event) } : f.say ? { say: f.say } : { schedule: scheduleOf(f.when) };
   const r: DutyRecord = {
     name,
+    ...(oneLine(f.name) ? { title: oneLine(f.name) } : {}),
     agent: f.agent,
     when,
     do: doOf(f, b),
@@ -1322,14 +1352,14 @@ export function formErrors(f: DutyForm, opts: { fresh: boolean; name: string; ta
   if (opts.fresh) {
     const why = nameWordsReason(opts.name, opts.taken);
     if (why) e.name = why;
-  }
+  } else if (oneLine(opts.name).length > MAX_TITLE) e.name = 'A name holds ' + MAX_TITLE + ' characters at most.';
   return e;
 }
 
 /* ---------- the problems of the front ---------- */
 
 /** The first parts of a path that a problem can name: the fields of a duty, of the notifications, and of a playbook. */
-const ROOTS = ['name', 'agent', 'words', 'pool', 'owner', 'when', 'checkFirst', 'do', 'limits', 'whileAway', 'notify', 'runAs', 'paused', 'revision', 'channels', 'quietHours', 'goal', 'placement', 'seats', 'members', 'caps', 'delegation'];
+const ROOTS = ['name', 'title', 'agent', 'words', 'pool', 'owner', 'when', 'checkFirst', 'do', 'limits', 'whileAway', 'notify', 'runAs', 'paused', 'revision', 'channels', 'quietHours', 'goal', 'placement', 'seats', 'members', 'caps', 'delegation'];
 
 /** A problem of the front: the dotted path of its field, or "", and its words. */
 export interface Problem {
@@ -1376,6 +1406,7 @@ export function dutySlot(path: string, act: Act = 'ask'): DutySlot | 'top' {
   const leaf = parts[parts.length - 1];
   switch (parts[0]) {
     case 'name':
+    case 'title':
       return 'name';
     case 'agent':
       return 'agent';

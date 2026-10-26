@@ -56,6 +56,7 @@ import { Confirm, Menu, When } from './common';
 import { Button, Chip, Field, Find, Input, Led, LineLed, Mark, PaneHeader } from './primitives';
 import { EmptyPane } from './Shell';
 import { DutyEditor, focusLost, useAgentName, useFocusLost } from './DutyEditor';
+import { ForDevelopers } from './DutyCheck';
 
 /** The width from which two panes show side by side, as App names it. */
 const TWO_PANES = '(min-width: 800px)';
@@ -497,6 +498,7 @@ function DutyView({ name }: { name: string }) {
             When
           </h2>
           <p class="duty-readback">{d.readback || startWords(d, nameOfAgent) || 'No schedule.'}</p>
+          <ForDevelopers text={d.forDevelopers} />
           {next.length > 0 && !d.paused && !allPaused && (
             <>
               <p class="t-meta">Next, in your time</p>

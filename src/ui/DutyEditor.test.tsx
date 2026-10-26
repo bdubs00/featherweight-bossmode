@@ -302,8 +302,10 @@ describe('New duty', () => {
     await settle();
     const check = lastPut();
     expect(check.path).toBe('/v1/duties/draft-the-notes?dryRun=true');
+    // The record keeps the name in words as its title, beside the short name of the routes.
     const record = {
       name: 'draft-the-notes',
+      title: 'Draft the notes',
       agent: 'migrator',
       when: { schedule: WEEKDAYS },
       do: { ask: { message: 'Draft the notes of {date}' } },
@@ -374,7 +376,10 @@ describe('the chips of a message', () => {
     const el = mount(<DutyEditor name="watch-queue" />);
     await settle();
     expect(text(el.querySelector('h1'))).toBe('Edit duty');
-    expect(fieldOf(el, 'Name')).toBeNull();
+    // A duty without a title shows its short name in words as the placeholder, and its short name stays.
+    expect(fieldOf(el, 'Name')!.value).toBe('');
+    expect(fieldOf(el, 'Name')!.placeholder).toBe('Watch queue');
+    expect(text(el.querySelector('#duty-slug'))).toBe('Its short name stays watch-queue.');
     const box = fieldOf(el, 'Ask Migrator') as unknown as HTMLTextAreaElement;
     expect(box.value).toBe("Handle [What the check found]. The last report was [The last run's title] on [Today's date].");
     expect([...el.querySelectorAll('.duty-chips button')].map((b) => b.textContent)).toEqual(["Today's date", 'The time', 'What the check found', "The last run's title", 'The last run', 'How the last run ended', "This duty's name"]);

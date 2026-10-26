@@ -563,3 +563,13 @@
   vertical-align: middle;
   margin-block: -3px;
 }
+/* The fold For developers under a readback: the address of another app or
+   where a check finds its items, closed until a person opens it. */
+.duty-dev {
+  margin-top: var(--s-2);
+}
+.duty-dev-text {
+  margin: 0;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
