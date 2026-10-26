@@ -141,6 +141,8 @@ describe('the manager', () => {
     await settle();
     expect(el.querySelector('#manager-title')!.textContent).toContain('New conversation');
     expect(el.querySelector('.thread-empty')!.textContent).toBe('Ask about the fleet, or ask for a bridge.');
+    // A new conversation puts the focus in the message box.
+    await vi.waitFor(() => expect(document.activeElement).toBe(el.querySelector('#composer')));
     typeIn(el.querySelector('#composer'), 'Hello');
     click(keyNamed(el, 'Send'));
     await settle();

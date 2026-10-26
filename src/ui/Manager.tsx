@@ -36,7 +36,7 @@ import { HistoryList, type HistoryWords } from './Chat';
 import { chatTitle } from '../lib/chat';
 import { hrefOf } from '../lib/route';
 import { Composer } from './Composer';
-import { Conversation, POLL_MS, usePoll, useTranscript } from './Conversation';
+import { Conversation, POLL_MS, focusComposer, usePoll, useTranscript } from './Conversation';
 import { FollowBox, Msg, Quiet } from './Thread';
 import { useLiveAnswer } from './Live';
 import { ARCHIVED_LINE, answerSeqs, lastSeq, works } from '../lib/chat';
@@ -99,7 +99,11 @@ export function Manager({ run: routeRun, fresh }: { run?: string; fresh?: boolea
   useEffect(() => {
     setStartedHere('');
     if (routeRun) setManagerRun(routeRun);
-    else if (fresh) setManagerRun('');
+    else if (fresh) {
+      setManagerRun('');
+      // A new conversation starts with a message, so the focus goes to the box.
+      focusComposer();
+    }
   }, [routeRun, fresh]);
   const run = useSelect((s) => (runId ? s.runs[runId] : undefined));
   const skills = useSelect((s) => (s.skills ? s.skills.skills : null));
