@@ -53,22 +53,29 @@ describe('the reaction chips', () => {
     expect(el.querySelector('.msg')!.classList.contains('has-rx')).toBe(true);
   });
 
-  it('adds the same reaction on a click of a chip that is not yours, and never removes one', async () => {
+  it('adds the same reaction on a click of a chip that is not yours, and takes back your own on a click of its chip', async () => {
     const f = fakeFetch([['POST', /\/reactions$/, () => entries[0]]]);
     try {
       const el = row(1);
-      const up = el.querySelector('button.rchip') as HTMLButtonElement;
-      expect(el.querySelectorAll('button.rchip').length).toBe(1);
-      act(() => up.click());
+      const chips = [...el.querySelectorAll('button.rchip')] as HTMLButtonElement[];
+      // Both chips are keys: the thumb of Bob adds one of Alice, and the heart of Alice is pressed and takes it back.
+      expect(chips.length).toBe(2);
+      expect(chips.map((c) => c.getAttribute('aria-pressed'))).toEqual(['false', 'true']);
+      act(() => chips[0].click());
       await settle();
       expect(f.seen[0]).toEqual({ method: 'POST', path: '/v1/bridges/b-msg/messages/1/reactions', body: { reaction: 'up' } });
+      act(() => chips[1].click());
+      await settle();
+      // A heart of your own goes back with no note to ask for: the server removes a reaction that the same person sends again.
+      expect(el.querySelector('form.heart-note')).toBeNull();
+      expect(f.seen[1]).toEqual({ method: 'POST', path: '/v1/bridges/b-msg/messages/1/reactions', body: { reaction: 'heart' } });
     } finally {
       f.restore();
     }
   });
 
   it('asks for the optional note of a heart, with the keys Cancel and Heart', () => {
-    const el = row(1);
+    const el = row(7);
     act(() => (el.querySelector('button[aria-label="Heart"]') as HTMLButtonElement).click());
     const form = el.querySelector('form.heart-note')!;
     expect(form.querySelector('.field-label')!.textContent).toBe('What made this useful?');

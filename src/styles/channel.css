@@ -76,6 +76,14 @@
 .group-toggle:hover {
   color: var(--ink);
 }
+/* While a filter shows the closed bridges, their group has a heading, not a toggle. */
+.group-toggle.group-head {
+  line-height: var(--t-meta-lh);
+  cursor: default;
+}
+.group-toggle.group-head:hover {
+  color: var(--muted);
+}
 .turn-right {
   transform: rotate(180deg);
 }
@@ -934,6 +942,13 @@
 .cards .entries {
   margin-top: 0;
 }
+/* The line of the tab Decisions when no card waits, above the cards that were decided or answered. */
+.cards-none {
+  max-width: calc(var(--measure) + 92px);
+  margin: var(--s-2) auto var(--s-3);
+  padding: 0 var(--s-5);
+  color: var(--muted);
+}
 
 /* ---------- the members of a bridge ---------- */
 .roster {
@@ -1346,4 +1361,18 @@
   .channel .pane-head .tabs {
     gap: var(--s-3);
   }
+}
+
+/* ---------- the run pane of a bridge ---------- */
+/* The conversation of a run has no reactions in the corner of a message,
+   so its head keeps no room for them. The name of the sender never
+   shrinks: in the narrow details pane, the time goes to the next line. */
+.runpane .tmsg-head {
+  flex-wrap: wrap;
+  column-gap: var(--s-2);
+  padding-right: 0;
+}
+.runpane .tmsg-head b {
+  flex: none;
+  max-width: 100%;
 }

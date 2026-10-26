@@ -47,6 +47,6 @@ describe('the conversation of a seat at its limit', () => {
     await vi.waitFor(() => expect(calls.some((c) => c.method === 'PATCH')).toBe(true));
     expect(calls.find((c) => c.method === 'PATCH')).toEqual({ method: 'PATCH', path: '/v1/bridges/b1/members/checker', body: { continue: true } });
     act(() => (el.querySelector('button[aria-label="More for checker"]') as HTMLButtonElement).click());
-    expect([...el.querySelectorAll('[role="menuitem"]')].map((b) => b.textContent)).toEqual(['Profile', 'Mute', 'Continue', 'Seat again', 'Change task', 'Fire']);
+    expect([...el.querySelectorAll('[role="menuitem"]')].map((b) => b.querySelector('.t')!.textContent)).toEqual(['Profile', 'Mute', 'Continue', 'Seat again', 'Change task', 'Fire']);
   });
 });

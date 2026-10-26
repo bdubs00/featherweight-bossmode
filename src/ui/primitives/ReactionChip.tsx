@@ -1,7 +1,8 @@
 // ReactionChip shows one kind of reaction on an entry with its count: a
 // thumb up, a thumb down, or a heart. The heart is filled with the accent,
 // one of its three uses. A chip of the person's own reaction has an ink
-// edge. With onClick, the chip is a key that adds the same reaction.
+// edge. With onClick, the chip is a toggle key: it adds the same reaction,
+// and on the person's own reaction it takes the reaction back.
 
 import type { ReactionKind } from '../../api/types';
 import { Glyph } from '../icons';

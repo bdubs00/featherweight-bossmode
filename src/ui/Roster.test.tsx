@@ -106,7 +106,7 @@ describe('the members', () => {
     expect(status(el, 'migrator-1').querySelector('.member-keys')).toBeNull();
     expect(status(el, 'scribe').querySelector('.member-keys')).toBeNull();
     act(() => (status(el, 'notes').querySelector('button[aria-label="More for notes"]') as HTMLButtonElement).click());
-    const items = [...status(el, 'notes').querySelectorAll('[role="menuitem"]')].map((x) => x.textContent);
+    const items = [...status(el, 'notes').querySelectorAll('[role="menuitem"]')].map((x) => x.querySelector('.t')!.textContent);
     expect(items).toEqual(['Open conversation', 'Mute', 'Seat again', 'Change task', 'Fire']);
     act(() => ([...status(el, 'notes').querySelectorAll('[role="menuitem"]')].find((x) => x.textContent === 'Seat again') as HTMLButtonElement).click());
     await settle();

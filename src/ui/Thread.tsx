@@ -180,14 +180,17 @@ const GLYPH = { up: 'thumb-up', down: 'thumb-down', heart: 'heart' } as const;
 /**
  * Reactions sits at the top right of an entry: a chip for each reaction
  * with its count, and on hover or focus a key for each reaction that has
- * none yet. A heart asks for its note first.
+ * none yet. A heart asks for its note first. A press on a chip of the
+ * person's own reaction takes it back: the server removes a reaction that
+ * the same person sends again, and a thumb up and a thumb down of one
+ * person exclude each other.
  */
 function Reactions({ bridge, e, onHeart }: { bridge: string; e: Entry; onHeart: () => void }) {
   const me = useSelect((s) => (s.me && s.me.principal ? s.me.principal.subject : ''));
   const [busy, setBusy] = useState(false);
   const r = e.reactions || {};
-  const press = async (k: ReactionKind) => {
-    if (k === 'heart') return onHeart();
+  const press = async (k: ReactionKind, mine = false) => {
+    if (k === 'heart' && !mine) return onHeart();
     setBusy(true);
     await attempt(() => react(bridge, e.seq, k));
     setBusy(false);
@@ -197,7 +200,7 @@ function Reactions({ bridge, e, onHeart }: { bridge: string; e: Entry; onHeart: 
       {KINDS.map((k) => {
         const who = r[k] || [];
         const mine = !!me && who.includes(me);
-        if (who.length > 0) return <ReactionChip kind={k} count={who.length} mine={mine} names={who.map((x) => personName(x)).join(', ')} disabled={busy || mine} onClick={() => press(k)} />;
+        if (who.length > 0) return <ReactionChip kind={k} count={who.length} mine={mine} names={who.map((x) => personName(x)).join(', ')} disabled={busy} onClick={() => press(k, mine)} />;
         return <IconButton class="treact-add" icon={GLYPH[k]} label={NAMES[k]} disabled={busy} onClick={() => press(k)} />;
       })}
     </div>

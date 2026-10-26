@@ -362,6 +362,7 @@ function WikiTab({ id }: { id: string }) {
       {!loaded && failed && <Empty>{failed}</Empty>}
       {loaded && pages.length === 0 && (
         <div class="empty center">
+          <p>No page yet. The members keep their notes and reports here, and you can write one too.</p>
           <Button href={hrefOf({ place: 'pages', mode: 'create', path: head })}>New page</Button>
         </div>
       )}
@@ -416,22 +417,36 @@ export function cardOrder(entries: Entry[], waits: (e: Entry) => boolean = () =>
     .map((e) => e.seq);
 }
 
-/** waitingCards counts the cards and the questions that wait in the loaded part of a channel. */
-function waitingCards(ch: ChannelState | undefined, r: Roster | undefined): number {
+/**
+ * waitingCards counts the cards and the questions that wait in the loaded
+ * part of a channel. A closed bridge takes no answer, so its questions do
+ * not count.
+ */
+function waitingCards(ch: ChannelState | undefined, r: Roster | undefined, closed = false): number {
   if (!ch) return 0;
   let n = 0;
   for (const seq of ch.seqs) {
     const e = ch.bySeq[seq] as Entry;
-    if ((e.decision && e.decision.state === 'pending') || questionWaits(r, e)) n++;
+    if ((e.decision && e.decision.state === 'pending') || (!closed && questionWaits(r, e))) n++;
   }
   return n;
 }
 
+/** isClosed reports whether the page holds a bridge as closed. */
+const isClosed = (s: { bridges: { byId: Record<string, { state: string }> } }, id: string): boolean => !!s.bridges.byId[id] && s.bridges.byId[id].state === 'closed';
+
+/**
+ * DecisionsTab lists the cards of the bridge, the ones that wait first.
+ * When none waits, a line says so above the cards that were decided or
+ * answered, so a past card never reads as work that waits.
+ */
 function DecisionsTab({ id }: { id: string }) {
   const [loading, setLoading] = useState(true);
+  const waits = useSelect((s) => (s.channels[id] ? waitingCards(s.channels[id], s.rosters[id], isClosed(s, id)) : 0));
   const key = useSelect((s) => {
     const ch = s.channels[id];
-    return ch ? cardOrder(ch.seqs.map((q) => ch.bySeq[q] as Entry), (e) => questionWaits(s.rosters[id], e)).join(',') : '';
+    const closed = isClosed(s, id);
+    return ch ? cardOrder(ch.seqs.map((q) => ch.bySeq[q] as Entry), (e) => !closed && questionWaits(s.rosters[id], e)).join(',') : '';
   });
   const list = useRoving<HTMLDivElement>();
   useEffect(() => {
@@ -446,6 +461,11 @@ function DecisionsTab({ id }: { id: string }) {
   return (
     <div class="scroll tab-list cards">
       {seqs.length === 0 && <Empty>{loading ? 'Loading the channel.' : 'Nothing needs you.'}</Empty>}
+      {seqs.length > 0 && waits === 0 && !loading && (
+        <p class="cards-none" role="status">
+          Nothing waits for you. The cards below were decided or answered.
+        </p>
+      )}
       {seqs.length > 0 && (
         <div class="entries" ref={list}>
           {seqs.map((seq) => (
@@ -463,7 +483,7 @@ export function Channel({ id, tab: tabProp }: { id: string; tab?: BridgeTab }) {
   const b = useSelect((s) => s.bridges.byId[id]);
   const known = useSelect((s) => s.bridges.loaded);
   const loadedChannel = useSelect((s) => !!s.channels[id]);
-  const waiting = useSelect((s) => waitingCards(s.channels[id], s.rosters[id]));
+  const waiting = useSelect((s) => waitingCards(s.channels[id], s.rosters[id], isClosed(s, id)));
   const firstLoaded = useSelect((s) => (s.channels[id] ? s.channels[id].prev === 0 : false));
   const tab: BridgeTab = tabProp || 'posts';
   const [confirm, setConfirm] = useState<'close' | 'delegation' | 'playbook' | 'duty' | null>(null);
@@ -542,8 +562,8 @@ export function Channel({ id, tab: tabProp }: { id: string; tab?: BridgeTab }) {
     );
   }
   const closed = b.state === 'closed';
-  // The loaded part can miss an older card that waits. The count of members that need you covers it.
-  const decisions = firstLoaded ? waiting : Math.max(waiting, b.needsYou || 0);
+  // The loaded part can miss an older card that waits. The count of members that need you covers it, on a bridge that still takes answers.
+  const decisions = firstLoaded || closed ? waiting : Math.max(waiting, b.needsYou || 0);
   const base = { place: 'bridge' as const, id, pane: 'none' as const };
   const tabs = (
     <Tabs
@@ -606,7 +626,7 @@ export function Channel({ id, tab: tabProp }: { id: string; tab?: BridgeTab }) {
             if (ok) setConfirm(null);
           }}
         >
-          <p>Members finish what they do. The channel takes no new message.{b.delegation.report ? ' The manager writes a report.' : ''}</p>
+          <p>Members finish what they do. The channel takes no new message.{b.delegation.report ? ' The manager writes a report.' : ''} You can reopen it from More.</p>
         </Confirm>
       )}
       {confirm === 'delegation' && <Delegations id={id} value={b.delegation} onClose={() => setConfirm(null)} />}

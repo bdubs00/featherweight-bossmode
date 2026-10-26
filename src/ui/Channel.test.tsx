@@ -213,7 +213,7 @@ describe('the channel', () => {
     act(() => ([...el.querySelectorAll('.pane-actions button')].find((b) => b.textContent === 'Close bridge') as HTMLButtonElement).click());
     const dialog = el.querySelector('dialog.confirm')!;
     expect(dialog.querySelector('h2')!.textContent).toBe('Close Migrate the remaining Puppet modules?');
-    expect(dialog.querySelector('p')!.textContent).toBe('Members finish what they do. The channel takes no new message. The manager writes a report.');
+    expect(dialog.querySelector('p')!.textContent).toBe('Members finish what they do. The channel takes no new message. The manager writes a report. You can reopen it from More.');
     expect([...dialog.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Cancel', 'Close bridge']);
   });
 
@@ -242,6 +242,41 @@ describe('the channel', () => {
     await settle();
     expect(f.seen.some((x) => x.path.startsWith('/v1/bridges/b-gone'))).toBe(true);
     expect(currentNotice()).toBe('');
+  });
+});
+
+describe('a closed bridge', () => {
+  const S = 'b-shut';
+  const ask = entryOf(3, { from: { kind: 'agent', handle: 'reviewer', run: 'run-reviewer' }, to: ['operator'], text: 'Which host?', ask: {} });
+  const shut = () => ({ ...bridgeOf(S, { title: 'Done work', state: 'closed', lastSeq: 3, read: 3, needsYou: 1 }), members: [memberOf('reviewer', { question: 3 })] });
+  let g: ReturnType<typeof fakeFetch>;
+  beforeAll(() => {
+    g = fakeFetch([
+      ['GET', /^\/v1\/bridges\/b-shut$/, shut],
+      ['GET', /^\/v1\/bridges\/b-shut\/messages/, () => ({ bridge: S, messages: [sys(1, 'opened', 'alice opened the bridge.'), ask], next: 0, prev: 0 })],
+      ['GET', /^\/v1\/bridges\/b-shut\/pages$/, () => ({ bridge: S, pages: [], count: 0 })],
+      ['GET', /^\/v1\/pages$/, () => ({ pages: [] })],
+      ['PUT', /\/read$/, () => null],
+    ]);
+    act(() => store.dispatch({ type: 'bridges', bridges: [bridgeOf(B, { title: 'Migrate the remaining Puppet modules', lastSeq: 9, read: 9 }), shut()] }));
+  });
+  afterAll(() => g.restore());
+
+  it('counts no question as waiting, shows it as the message it is, and says that nothing waits', async () => {
+    const el = mount(<Channel id={S} tab="decisions" />);
+    await settle();
+    const tabs = [...el.querySelectorAll('nav.tabs a.tab')];
+    expect(tabs[2].querySelector('.chip-amber')).toBeNull();
+    expect(el.querySelector('.cards-none')!.textContent).toBe('Nothing waits for you. The cards below were decided or answered.');
+    expect(el.querySelector('.card-row.waiting')).toBeNull();
+    expect(el.querySelector('#entry-b-shut-3')!.textContent).toContain('Which host?');
+  });
+
+  it('says in the tab Wiki what the pages of a bridge are, with the key New page', async () => {
+    const el = mount(<Channel id={S} tab="wiki" />);
+    await settle();
+    expect(el.querySelector('.tab-list .empty p')!.textContent).toBe('No page yet. The members keep their notes and reports here, and you can write one too.');
+    expect([...el.querySelectorAll('.tab-list .empty a')].map((a) => a.textContent)).toEqual(['New page']);
   });
 });
 

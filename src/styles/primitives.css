@@ -396,6 +396,10 @@ select.recess {
 .back:hover {
   background: var(--raised);
 }
+/* A back link within the same pane, such as from a run to the members, shows at every width. */
+.back.to-here {
+  display: inline-flex;
+}
 
 /* The mark at the head of a conversation opens the profile of its agent. */
 .mark-link {

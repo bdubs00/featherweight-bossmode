@@ -78,4 +78,42 @@ describe('the list of bridges', () => {
     expect(matches('Migrate the remaining Puppet modules', 'puppet MIGRATE')).toBe(true);
     expect(matches('Migrate logrotate', 'nginx')).toBe(false);
   });
+
+  it('says when a filter matches no bridge, with the key Clear, and shows the closed bridges that match under a heading', () => {
+    const many = Array.from({ length: FILTER_FROM + 1 }, (_, i) => bridgeOf('m' + i, { title: 'Bridge ' + i, state: i === 2 ? 'closed' : 'open' }));
+    act(() => store.dispatch({ type: 'bridges', bridges: many }));
+    const el = mount(<BridgeList current="" />);
+    const field = el.querySelector('.list-find input') as HTMLInputElement;
+    const type = (v: string) =>
+      act(() => {
+        field.value = v;
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+    type('zzzz');
+    expect(el.querySelector('.empty[role="status"] p')!.textContent).toBe('No bridge matches zzzz.');
+    // A filter that matches a closed bridge shows it at once, under a heading and not a toggle that does nothing.
+    type('bridge 2');
+    expect(el.querySelector('button.group-toggle')).toBeNull();
+    expect(el.querySelector('h2.group-head')!.textContent).toBe('Closed1');
+    expect([...el.querySelectorAll('.brow-title')].map((t) => t.textContent)).toEqual(['Bridge 2']);
+    type('zzzz');
+    act(() => ([...el.querySelectorAll('button')].find((b) => b.textContent === 'Clear') as HTMLButtonElement).click());
+    expect(field.value).toBe('');
+    expect(el.querySelectorAll('a.brow').length).toBe(FILTER_FROM);
+  });
+
+  it('lists the closed bridges by their newest entry, the newest first, as each row shows it', () => {
+    act(() =>
+      store.dispatch({
+        type: 'bridges',
+        bridges: [
+          bridgeOf('c1', { title: 'Old talk', state: 'closed', createdAt: '2026-10-25T09:00:00Z', lastAt: '2026-10-21T10:00:00Z' }),
+          bridgeOf('c2', { title: 'Fresh talk', state: 'closed', createdAt: '2026-10-20T09:00:00Z', lastAt: '2026-10-25T10:00:00Z' }),
+        ],
+      }),
+    );
+    const el = mount(<BridgeList current="" />);
+    act(() => (el.querySelector('.group-toggle') as HTMLButtonElement).click());
+    expect([...el.querySelectorAll('.brow-title')].map((t) => t.textContent)).toEqual(['Fresh talk', 'Old talk']);
+  });
 });

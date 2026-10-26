@@ -2,9 +2,11 @@
 // with its unread count, one light in the order of attention: needs you,
 // then a seat that failed, then working, and the freshness of its newest
 // entry, such as 14 min, so a bridge that went quiet shows it. Then the closed bridges
-// behind a toggle, with no unread count, because their work is done. A
-// filter field shows above the list once it holds more than ten bridges.
-// The foot holds the readout of the fleet.
+// behind a toggle, with no unread count, because their work is done, the
+// one with the newest entry first. A filter field shows above the list once
+// it holds more than ten bridges. A filter shows the closed bridges that
+// match under a heading, and a filter that matches none says so, with the
+// key Clear. The foot holds the readout of the fleet.
 
 import { memo } from 'preact/compat';
 import { useEffect, useState } from 'preact/hooks';
@@ -116,7 +118,13 @@ export function BridgeList({ current }: { current: string }) {
   // The list reads the ids of the open and the closed bridges as strings,
   // so a new message redraws one row and not the list.
   const openIds = useSelect((s) => s.bridges.order.filter((id) => s.bridges.byId[id].state === 'open').join('\n'));
-  const closedIds = useSelect((s) => s.bridges.order.filter((id) => s.bridges.byId[id].state === 'closed').join('\n'));
+  // A closed bridge shows the time of its newest entry, so the list orders them by it, newest first.
+  const closedIds = useSelect((s) =>
+    s.bridges.order
+      .filter((id) => s.bridges.byId[id].state === 'closed')
+      .sort((a, b) => (s.bridges.byId[b].lastAt || '').localeCompare(s.bridges.byId[a].lastAt || ''))
+      .join('\n'),
+  );
   const loaded = useSelect((s) => s.bridges.loaded);
   // A seat that failed shows on the row of its bridge, so the list reads the record of each open bridge once, as Activity does.
   useEffect(() => {
@@ -131,6 +139,7 @@ export function BridgeList({ current }: { current: string }) {
   const many = allOpen.length + allClosed.length > FILTER_FROM;
   const titles = useSelect((s) => (many && filter.trim() ? s.bridges.byId : null));
   const keep = (id: string) => !titles || (!!titles[id] && matches(titles[id].title, filter));
+  const filtering = many && !!filter.trim();
   const open = allOpen.filter(keep);
   const closed = allClosed.filter(keep);
   return (
@@ -152,6 +161,14 @@ export function BridgeList({ current }: { current: string }) {
         </div>
       )}
       <div class="scroll" ref={list}>
+        {filtering && open.length === 0 && closed.length === 0 && (
+          <div class="empty" role="status">
+            <p>No bridge matches {filter.trim()}.</p>
+            <Button size="s" onClick={() => setFilter('')}>
+              Clear
+            </Button>
+          </div>
+        )}
         <div role="list" aria-labelledby="bridges-title" class="rows">
           {open.map((id) => (
             <div role="listitem">
@@ -170,12 +187,20 @@ export function BridgeList({ current }: { current: string }) {
         {!loaded && <p class="empty">Loading the bridges.</p>}
         {closed.length > 0 && (
           <>
-            <button type="button" class="group-toggle" aria-expanded={showClosed || (many && !!filter.trim())} onClick={() => setShowClosed(!showClosed)}>
-              <Glyph name="back" size={14} class={showClosed ? 'turn-down' : 'turn-right'} />
-              <span>Closed</span>
-              <Chip>{closed.length}</Chip>
-            </button>
-            {(showClosed || (many && !!filter.trim())) && (
+            {/* A filter shows every closed bridge that matches, so the group is a heading then, not a toggle that does nothing. */}
+            {filtering ? (
+              <h2 class="group-toggle group-head" id="closed-head">
+                <span>Closed</span>
+                <Chip>{closed.length}</Chip>
+              </h2>
+            ) : (
+              <button type="button" class="group-toggle" aria-expanded={showClosed} onClick={() => setShowClosed(!showClosed)}>
+                <Glyph name="back" size={14} class={showClosed ? 'turn-down' : 'turn-right'} />
+                <span>Closed</span>
+                <Chip>{closed.length}</Chip>
+              </button>
+            )}
+            {(showClosed || filtering) && (
               <div role="list" class="rows">
                 {closed.map((id) => (
                   <div role="listitem">

@@ -62,7 +62,7 @@ describe('a seat at its limit', () => {
     await settle();
     expect(f.seen.filter((s) => s.method === 'PATCH').pop()).toEqual({ method: 'PATCH', path: '/v1/bridges/b-limit/members/reviewer', body: { continue: true } });
     act(() => (li.querySelector('button[aria-label="More for reviewer"]') as HTMLButtonElement).click());
-    const items = [...li.querySelectorAll('[role="menuitem"]')].map((x) => x.textContent);
+    const items = [...li.querySelectorAll('[role="menuitem"]')].map((x) => x.querySelector('.t')!.textContent);
     expect(items).toEqual(['Open conversation', 'Mute', 'Continue', 'Seat again', 'Change task', 'Fire']);
     expect(row(el, 'migrator-1').querySelector('.member-keys')).toBeNull();
   });

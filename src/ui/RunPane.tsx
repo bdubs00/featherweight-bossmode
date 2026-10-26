@@ -8,10 +8,16 @@
 // of a run goes to its worker and wakes a worker that sleeps, so these
 // views read only when the person opens them, and say so in place when the
 // read wakes the worker.
+//
+// The server hands a message of a bridge to a seat with a header that
+// names the bridge and the sender, such as [bridge "Notes" 01m5...]
+// @reviewer from operator:. The conversation of a run shows the words of
+// the sender without that header, under the name of the sender.
 
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { api } from '../api/routes';
 import type { FileView, Item, Member, ReactionKind, Result, Run } from '../api/types';
+import type { TranscriptState } from './Conversation';
 import { store, useSelect } from '../state/store';
 import { runStatus } from '../lib/presence';
 import { awakeFor, seatPresence, statusOf } from '../lib/status';
@@ -65,6 +71,55 @@ export function useResult(runId: string, load = true): Result | null {
     };
   }, [runId, key, load]);
   return res;
+}
+
+/** The header of a message that the server hands to a seat: the bridge, its id, who it goes to, and the sender. */
+const ENVELOPE = /^\[bridge "(?:[^"\\]|\\.)*" [0-9a-z]+\] (?:to everyone|@\S+(?: @\S+)*) from (\S+): /i;
+
+/** The words that the server puts before an answer of a person to a question of the seat. */
+const ANSWERED = /^Answer to your question in entry \d+: /;
+
+/** The name of the person in the header of the server. */
+const OPERATOR = 'operator';
+
+/**
+ * bridgeWords reads a message that the server handed to a seat: the words
+ * of the sender without the header, and the sender, "" for the person. It
+ * returns null for a message without the header.
+ */
+export function bridgeWords(text: string): { text: string; from: string } | null {
+  const m = ENVELOPE.exec(text);
+  if (!m) return null;
+  const from = m[1].toLowerCase() === OPERATOR ? '' : m[1];
+  return { text: text.slice(m[0].length).replace(ANSWERED, ''), from };
+}
+
+/** plainItems shows each message of a bridge in a transcript as its sender wrote it, under the name of the sender. */
+export function plainItems(items: Item[]): Item[] {
+  let changed = false;
+  const out = items.map((it) => {
+    if (it.kind !== 'user' || !it.text) return it;
+    const w = bridgeWords(it.text);
+    if (!w) return it;
+    changed = true;
+    return w.from ? { ...it, text: w.text, who: w.from } : { ...it, text: w.text };
+  });
+  return changed ? out : items;
+}
+
+/** RunTimes says when a run started, and when it ended, for a run that ended. */
+function RunTimes({ run }: { run: Run }) {
+  const ended = run.state === 'completed' || run.state === 'failed' || run.state === 'canceled';
+  return (
+    <span class="run-times">
+      started <When at={run.createdAt} />
+      {ended && run.updatedAt && (
+        <>
+          , ended <When at={run.updatedAt} />
+        </>
+      )}
+    </span>
+  );
 }
 
 /** WakeNote says in place that a read of a run wakes its worker. */
@@ -333,7 +388,7 @@ export function RunView({ runId, result, bridge, member, who, items, endSeq, gon
       {archived && !gone && <p class="run-note">{RUN_ARCHIVED}</p>}
       <p class="run-status">
         {run && <Light light={runStatus(run)} />}
-        {run && <When at={run.createdAt} />}
+        {run && <RunTimes run={run} />}
         {phrase && <span class="clip">{phrase}</span>}
       </p>
       {fail && (fail.line || again) && <FailureView id={runId} f={fail} again={again} />}
@@ -390,6 +445,9 @@ export function RunPane({ bridge, runId, handle }: { bridge: string; runId: stri
   const light = seatLight || (run ? runStatus(run) : null);
   const who = handle || (member ? member.handle : run ? run.agent : 'the agent');
   const end = [...t.items].reverse().find((x) => x.kind === 'end');
+  // The messages of the bridge read as their senders wrote them.
+  const items = useMemo(() => plainItems(t.items), [t.items]);
+  const plain: TranscriptState = useMemo(() => ({ ...t, items }), [t, items]);
   return (
     <section class="screen runpane" aria-labelledby="run-title">
       <PaneHeader
@@ -402,7 +460,7 @@ export function RunPane({ bridge, runId, handle }: { bridge: string; runId: stri
       <div class="scroll">
         <RunView runId={runId} result={res} bridge={bridge} member={member} who={who} items={t.items} endSeq={end ? end.seq : undefined} gone={t.gone} archived={archived} wakes={wakes} />
         {filesCount(res, t.items) > 0 && <FilesView runId={runId} result={res} items={t.items} gone={t.gone} archived={archived} />}
-        <Conversation run={run} result={res} t={t} agentLabel={who} />
+        <Conversation run={run} result={res} t={plain} agentLabel={who} />
       </div>
     </section>
   );

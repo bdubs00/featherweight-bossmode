@@ -8,6 +8,7 @@
 // at its limit, Seat again, Change task, and Fire. Add opens the
 // picker, and each pick puts a new seat row at the top. The foot sums the
 // usage of the bridge. A member dragged out of the pane asks to fire it.
+// A closed bridge takes no change: its menu holds Open conversation alone.
 
 import { memo } from 'preact/compat';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
@@ -43,7 +44,16 @@ export function Phrase({ text }: { text: string }) {
   );
 }
 
-const MemberRow = memo(function MemberRow({ bridge, handle, onAsk, current }: { bridge: string; handle: string; onAsk: (a: Ask) => void; current: boolean }) {
+/** muteItem is the menu item of Mute or Unmute, with what it does. */
+export function muteItem(bridge: string, m: Member): { label: string; hint: string; onSelect: () => void } {
+  return {
+    label: m.muted ? 'Unmute' : 'Mute',
+    hint: m.muted ? 'It gets every message again.' : 'It gets only the messages that name it.',
+    onSelect: () => attempt(() => patchMember(bridge, m.handle, { muted: !m.muted })),
+  };
+}
+
+const MemberRow = memo(function MemberRow({ bridge, handle, onAsk, current, closed }: { bridge: string; handle: string; onAsk: (a: Ask) => void; current: boolean; closed: boolean }) {
   const m = useSelect((s) => (s.rosters[bridge] ? s.rosters[bridge].byHandle[handle] : undefined));
   const run = m ? m.runs[m.runs.length - 1] : '';
   const runState = useSelect((s) => (run && s.runs[run] ? s.runs[run].state : ''));
@@ -64,13 +74,14 @@ const MemberRow = memo(function MemberRow({ bridge, handle, onAsk, current }: { 
   // A seat whose newest run failed, stopped at a limit, or was canceled gets
   // no message. Seat again starts a new run with its task, and Continue
   // goes on with a run that stopped at a limit.
-  const stopped = presence === 'error' || presence === 'limit' || runState === 'failed' || runState === 'canceled';
+  // A closed bridge seats no one again.
+  const stopped = !closed && (presence === 'error' || presence === 'limit' || runState === 'failed' || runState === 'canceled');
   const href = hrefOf({ place: 'member', bridge, handle: m.handle, tab: 'chat' });
   const phrase = m.activity && m.activity.phrase && (presence === 'working' || presence === 'needs-you') && light.word !== 'waiting for a worker' ? m.activity.phrase : '';
   return (
     <li
       class={'member' + (m.fired ? ' fired' : '') + (current ? ' sel' : '') + (presence === 'needs-you' ? ' needs' : '') + (stopped && !m.fired ? ' has-keys' : '')}
-      draggable={!m.fired}
+      draggable={!m.fired && !closed}
       onDragStart={(e) => {
         if (!e.dataTransfer) return;
         e.dataTransfer.setData(DRAG_TYPE, m.handle);
@@ -104,14 +115,18 @@ const MemberRow = memo(function MemberRow({ bridge, handle, onAsk, current }: { 
       {!m.fired && (
         <Menu
           label={'More for ' + m.handle}
-          items={[
-            { label: 'Open conversation', onSelect: () => go(href) },
-            { label: m.muted ? 'Unmute' : 'Mute', onSelect: () => attempt(() => patchMember(bridge, m.handle, { muted: !m.muted })) },
-            ...(presence === 'limit' ? [{ label: 'Continue', onSelect: () => continueSeat(bridge, m) }] : []),
-            ...(stopped ? [{ label: 'Seat again', onSelect: () => seatAgain(bridge, m) }] : []),
-            { label: 'Change task', onSelect: () => onAsk({ kind: 'task', m }) },
-            { label: 'Fire', danger: true, onSelect: () => onAsk({ kind: 'fire', m }) },
-          ]}
+          items={
+            closed
+              ? [{ label: 'Open conversation', onSelect: () => go(href) }]
+              : [
+                  { label: 'Open conversation', onSelect: () => go(href) },
+                  muteItem(bridge, m),
+                  ...(presence === 'limit' ? [{ label: 'Continue', onSelect: () => continueSeat(bridge, m) }] : []),
+                  ...(stopped ? [{ label: 'Seat again', onSelect: () => seatAgain(bridge, m) }] : []),
+                  { label: 'Change task', onSelect: () => onAsk({ kind: 'task', m }) },
+                  { label: 'Fire', danger: true, onSelect: () => onAsk({ kind: 'fire', m }) },
+                ]
+          }
         />
       )}
       {stopped && !m.fired && (
@@ -177,10 +192,14 @@ function SeatRow({ bridge, d, taken, onChange, onDone }: { bridge: string; d: Dr
   );
 }
 
-/** NewTask asks for the new task of Change task. A new run starts with it. */
+/** NewTask asks for the new task of Change task. A new run starts with it. The field takes the focus, so the person types at once. */
 function NewTask({ bridge, m, onClose }: { bridge: string; m: Member; onClose: () => void }) {
   const [task, setTask] = useState(m.task);
   const [busy, setBusy] = useState(false);
+  const field = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (field.current) field.current.focus();
+  }, []);
   return (
     <Confirm
       title={'Change the task of ' + m.handle}
@@ -195,7 +214,7 @@ function NewTask({ bridge, m, onClose }: { bridge: string; m: Member; onClose: (
       }}
     >
       <Field label="Task">
-        <TextArea value={task} onInput={(e) => setTask((e.target as HTMLTextAreaElement).value)} />
+        <TextArea ref={field} value={task} onInput={(e) => setTask((e.target as HTMLTextAreaElement).value)} />
       </Field>
     </Confirm>
   );
@@ -245,6 +264,7 @@ export function Roster({ bridge, current }: { bridge: string; current?: string }
   // A bridge that the list does not hold is not here, so its members never load.
   const missing = useSelect((s) => s.bridges.loaded && !s.bridges.byId[bridge] && !s.rosters[bridge]);
   const isOpen = useSelect((s) => !!s.bridges.byId[bridge] && s.bridges.byId[bridge].state === 'open');
+  const closed = useSelect((s) => !!s.bridges.byId[bridge] && s.bridges.byId[bridge].state === 'closed');
   const goal = useSelect((s) => (s.bridges.byId[bridge] ? s.bridges.byId[bridge].goal : ''));
   const title = useSelect((s) => (s.bridges.byId[bridge] ? s.bridges.byId[bridge].title : ''));
   const [ask, setAsk] = useState<Ask>(null);
@@ -320,7 +340,7 @@ export function Roster({ bridge, current }: { bridge: string; current?: string }
         title="Members"
         count={order ? order.length : undefined}
         countLabel={order ? (order.length === 1 ? '1 member' : order.length + ' members') : undefined}
-        back={{ href: hrefOf({ place: 'bridge', id: bridge, pane: 'none' }), label: 'Channel', to: 'main' }}
+        back={{ href: hrefOf({ place: 'bridge', id: bridge, pane: 'none' }), label: title || 'the bridge', to: 'main' }}
         actions={isOpen && addButton}
       />
       {picker && <Picker bridge={bridge} drafts={drafts.map((d) => d.agent)} draftHandles={drafts.map((d) => d.handle)} onPick={pick} onClose={closePicker} anchor={addKey} below={below} />}
@@ -342,7 +362,7 @@ export function Roster({ bridge, current }: { bridge: string; current?: string }
         {order && order.length > 0 && (
           <ul class="members" ref={list}>
             {order.map((h) => (
-              <MemberRow key={h} bridge={bridge} handle={h} onAsk={setAsk} current={h === current} />
+              <MemberRow key={h} bridge={bridge} handle={h} onAsk={setAsk} current={h === current} closed={closed} />
             ))}
           </ul>
         )}

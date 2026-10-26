@@ -109,7 +109,10 @@ function HeartNote({ onSave, onCancel }: { onSave: (note: string) => void; onCan
 /**
  * Reactions draws the chips of an entry and the keys that add a reaction.
  * On a card that waits, a thumb up allows and a thumb down denies, as the
- * keys of the card do.
+ * keys of the card do. A second press of the person's own reaction takes
+ * it back, because the server removes a reaction that the same person
+ * sends again, and a thumb up and a thumb down of one person exclude each
+ * other.
  */
 export function Reactions({ bridge, e, onReply }: { bridge: string; e: Entry; onReply?: (seq: number) => void }) {
   const me = useSelect((s) => (s.me && s.me.principal ? s.me.principal.subject : ''));
@@ -132,10 +135,10 @@ export function Reactions({ bridge, e, onReply }: { bridge: string; e: Entry; on
     if (deciding && k === 'down') return 'Thumb down: Deny';
     return NAMES[k];
   };
-  // A chip adds the same reaction. A chip of a thumb on a card that waits only counts.
+  // A chip adds the same reaction, and a chip of the person's own reaction takes it back. A chip of a thumb on a card that waits only counts.
   const chipPress = (k: ReactionKind) => {
-    if (mineOf(k) || busy) return undefined;
-    if (k === 'heart') return () => setHeart(true);
+    if (busy) return undefined;
+    if (k === 'heart') return mineOf(k) ? () => press(k) : () => setHeart(true);
     if (deciding) return undefined;
     return () => press(k);
   };
@@ -149,7 +152,7 @@ export function Reactions({ bridge, e, onReply }: { bridge: string; e: Entry; on
               <IconButton icon="thumb-down" label={label('down')} aria-pressed={deciding ? undefined : mineOf('down')} disabled={busy} onClick={() => press('down')} />
             </>
           )}
-          <IconButton icon="heart" label="Heart" title="Heart: keep this in the wiki" aria-pressed={mineOf('heart')} aria-expanded={heart} disabled={busy} onClick={() => setHeart(!heart)} />
+          <IconButton icon="heart" label="Heart" title="Heart: keep this in the wiki" aria-pressed={mineOf('heart')} aria-expanded={heart} disabled={busy} onClick={() => (mineOf('heart') ? press('heart') : setHeart(!heart))} />
           {onReply && e.from.kind !== 'system' && <IconButton icon="reply" label={'Reply to ' + senderName(e.from)} title="Reply" onClick={() => onReply(e.seq)} />}
         </div>
         {shown.map((k) => (
@@ -248,7 +251,8 @@ export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, fresh, li
   // The whole text of a long entry, once the person asked for it with Show all.
   const whole = useWhole(bridge, e && e.cut ? seq : 0);
   // A question of a seat that waits for you, as the front names it.
-  const asking = useSelect((s) => (e && e.ask ? questionWaits(s.rosters[bridge], e) : false));
+  // A closed bridge takes no answer, so its question shows as the message that it is.
+  const asking = useSelect((s) => (e && e.ask && !(s.bridges.byId[bridge] && s.bridges.byId[bridge].state === 'closed') ? questionWaits(s.rosters[bridge], e) : false));
   if (!e) return null;
   const day = listed ? '' : !prev || dayWords(prev.at) !== dayWords(e.at) ? dayWords(e.at) : '';
   const id = 'entry-' + bridge + '-' + seq;
@@ -366,7 +370,7 @@ export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, fresh, li
             <header>
               <b>{author}</b>
               <When at={e.at} />
-              {to.length > 0 && <span class="to">to {list(to)}</span>}
+              {to.length > 0 && <span class="to">to {list(to.map((h) => (h === 'operator' ? 'you' : h)))}</span>}
               {e.pinned && <Chip>pinned</Chip>}
             </header>
           )}
