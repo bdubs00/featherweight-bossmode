@@ -1028,6 +1028,19 @@ stands for a value.
 | the dialog `Delete <title>?` | change | adds `1 duty opens a bridge from it.` or `<n> duties open a bridge from it.` before `A duty that opens a bridge from it stops until you pick another playbook.` | done |
 | `Saved the playbook <name>.` | change | the same, with the key `See the playbook`, which opens its page | done |
 
+### The walk of the held changes, 2026-10-26: names, calls, and playbooks
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `Daily report` for daily-report, the name of a duty in words where it has no title, in the list, on its page, in its dialogs, on a profile, and in Activity | change | the title of the duty where the person gave one, such as `Walk Duty 7`, else its name as it is, such as `daily-report`. The page never dresses a name up. A row and the chip of Activity read the title once the page read the duties. | done |
+| `Weekly patching` for weekly-patching, a playbook in words | change | the name as it is, such as `weekly-patching`, in the tab, the choice of a playbook, the dialogs, and the notices. Save as playbook starts the field from the short name of the title of the bridge, and says `It saves as <name>.` only when the name changes on the way. | done |
+| `The duty Walk duty 7` with the initials `DD` (the sender of the first message of the run of a duty) | change | `The duty <title>`, else `The duty <name>`, with the clock of the place Duties as its face | done |
+| `You denied bash.`, `The manager allowed shell.exec: …` (a line of the history) | change | the call in words: `a shell command`, `a write to the wiki`, `a web request`, `a change of files`, `a new bridge`, `a post in a bridge`, `a hand-off to another agent`, `a call to <phrase>` from the catalog, else `the tool <name>`, with the name of the tool in the tooltip | done |
+| the first sentence of the task of a seat of a playbook | change | the whole task. A task of more than 160 characters or of several lines shows its first line and the fold `The whole task`. | done |
+| Rename of a playbook opens with the focus on Cancel | change | the focus goes to Name, with the name selected | done |
+| `A duty that opens a bridge from it stops until you pick another playbook.` in Delete of a playbook that no duty opens | change | `The bridges that it opened stay.`, and with a duty `1 duty opens a bridge from it. It stops until you pick another playbook for it.` or `<n> duties open a bridge from it. They stop until you pick another playbook for them.` | done |
+| Cancel and Back of New duty from Make a duty of a playbook go to Duties | change | they go back to the playbook, with `Back to the playbook` | done |
+
 ## 10. Packages
 
 The section uses the words package, Python package, and Program. These

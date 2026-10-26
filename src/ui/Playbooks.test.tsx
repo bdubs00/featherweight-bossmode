@@ -75,9 +75,9 @@ describe('a playbook from a bridge', () => {
     more(el, 'Save as playbook');
     await settle();
     expect(dialog().querySelector('h2')!.textContent).toBe('Save as playbook');
-    // The name reads as words, and the page shows the short name that it saves as.
-    expect(fieldOf(dialog(), 'Name')!.value).toBe('Migrate puppet');
-    expect(dialog().querySelector('#playbook-slug')!.textContent).toBe('It saves as migrate-puppet.');
+    // The name starts as the short name of the title of the bridge, and the page shows a playbook by its name as it is.
+    expect(fieldOf(dialog(), 'Name')!.value).toBe('migrate-puppet');
+    expect(dialog().querySelector('#playbook-slug')).toBeNull();
     expect(dialog().textContent).toContain('It keeps the goal, 2 seats, the placement, the caps, and what the manager can do.');
     typeIn(fieldOf(dialog(), 'Name'), '???');
     click(keyNamed(dialog(), 'Save playbook'));
@@ -94,7 +94,7 @@ describe('a playbook from a bridge', () => {
     expect(dialog()).toBeNull();
     expect(document.activeElement!.getAttribute('aria-label')).toBe('More');
     // A short notice says that it worked.
-    expect(currentSaid()).toBe('Saved the playbook Puppet to ansible.');
+    expect(currentSaid()).toBe('Saved the playbook puppet-to-ansible.');
     // The notice links to the page of the playbook, on the tab Playbooks of Duties.
     expect(currentSaidLink()).toEqual({ label: 'See the playbook', href: '#playbooks/puppet-to-ansible' });
   });
@@ -159,7 +159,7 @@ describe('New bridge', () => {
     const el = mount(<NewBridge />);
     await settle();
     const pick = fieldOf(el, 'Start from a playbook') as unknown as HTMLSelectElement;
-    expect([...pick.options].map((o) => o.text)).toEqual(['No playbook', 'Weekly patching: Patch the lab hosts and report.']);
+    expect([...pick.options].map((o) => o.text)).toEqual(['No playbook', 'weekly-patching: Patch the lab hosts and report.']);
     act(() => {
       pick.value = 'weekly-patching';
       pick.dispatchEvent(new Event('change', { bubbles: true }));

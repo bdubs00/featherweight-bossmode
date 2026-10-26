@@ -40,14 +40,29 @@ const ITEMS = {
 const rows = (el: HTMLElement) => [...el.querySelectorAll('.inbox-row')] as HTMLElement[];
 
 describe('Activity and the duties', () => {
+  it('names a duty by its title once the page reads the duties', async () => {
+    api = fakeApi({
+      'GET /v1/inbox': { items: [{ kind: 'failure', run: 'run-x', duty: 'walk-duty-7', agent: '', text: 'The run failed.', since: at(1) }] },
+      'GET /v1/duties': { duties: [{ name: 'walk-duty-7', title: 'Walk Duty 7', agent: 'scribe', when: {}, do: {}, limits: {} }], paused: false },
+    });
+    const el = mount(<ActivityList />);
+    await settle();
+    const row = rows(el).find((r) => r.querySelector('a.duty-chip[href="#duties/walk-duty-7"]'))!;
+    expect(row.querySelector('a.duty-chip')!.textContent).toBe('Walk Duty 7');
+    expect(row.querySelector('a.duty-chip')!.getAttribute('title')).toBe('Open the duty Walk Duty 7');
+    // A row with no agent names the duty by its title too.
+    expect(row.querySelector('b')!.textContent).toBe('Walk Duty 7');
+  });
+
   it('names the duty of a run with a chip that opens the duty', async () => {
     api = fakeApi({ 'GET /v1/inbox': { items: [] } });
     const el = mount(<ActivityList />);
     await settle();
     const chip = rows(el)[0].querySelector('a.duty-chip')!;
-    expect(chip.textContent).toBe('Nightly check');
+    // A duty goes by its name as it is until the page reads its title.
+    expect(chip.textContent).toBe('nightly-check');
     expect(chip.getAttribute('href')).toBe('#duties/nightly-check');
-    expect(rows(el)[0].querySelector('.inbox-where')!.textContent).toBe('Homelab operationsNightly check');
+    expect(rows(el)[0].querySelector('.inbox-where')!.textContent).toBe('Homelab operationsnightly-check');
   });
 
   it('shows the failed runs and the paused duties of the inbox, and a question of a bridge only once', async () => {
@@ -161,7 +176,7 @@ describe('Activity and the duties', () => {
     // The main pane shows the card, which needs no bridge.
     const main = el.querySelector('.inbox-main-pane')!;
     expect(main.querySelector('.card')).toBeTruthy();
-    expect(main.querySelector('.pane-head a.duty-chip')!.textContent).toBe('Restore test');
+    expect(main.querySelector('.pane-head a.duty-chip')!.textContent).toBe('restore-test');
     act(() => row.focus());
     act(() => {
       row.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));

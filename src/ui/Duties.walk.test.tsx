@@ -232,10 +232,10 @@ describe('the page of a duty', () => {
     click(el.querySelector('button[aria-label="More"]'));
     click([...el.querySelectorAll('[role="menuitem"]')].find((b) => b.textContent === 'Delete'));
     const dialog = document.querySelector('dialog.confirm')!;
-    expect(text(dialog.querySelector('h2'))).toBe('Delete Walk duty?');
+    expect(text(dialog.querySelector('h2'))).toBe('Delete walk-duty?');
     click(keyNamed(dialog, 'Delete'));
     await settle();
-    expect(currentSaid()).toBe('Deleted the duty Walk duty.');
+    expect(currentSaid()).toBe('Deleted the duty walk-duty.');
     expect(document.activeElement).toBe(list.querySelector('#duties-title'));
   });
 

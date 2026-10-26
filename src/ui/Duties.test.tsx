@@ -118,7 +118,7 @@ describe('the list of duties', () => {
     expect(rows.map((r) => r.getAttribute('href'))).toEqual(['#duties/watch-p1', '#duties/daily-report', '#duties/monthly-summary']);
     expect(rows.every((r) => r.querySelector('.mark'))).toBe(true);
     // The title is the name of the duty in words, and an agent without a face shows its name with a capital.
-    expect(text(rows[1])).toBe(`Daily report finished Every weekday at 9:00 AM, New York time. Scribe Next ${nextShort(NEXT[0])} $0.12 today`);
+    expect(text(rows[1])).toBe(`daily-report finished Every weekday at 9:00 AM, New York time. Scribe Next ${nextShort(NEXT[0])} $0.12 today`);
     expect(rows[1].getAttribute('aria-current')).toBe('page');
     expect(text(rows[0])).toContain('failed');
     expect(text(rows[2])).toContain('paused');
@@ -127,18 +127,19 @@ describe('the list of duties', () => {
     expect(keyNamed(el, 'Pause all duties')).toBeUndefined();
   });
 
-  it('names each duty by the name that the person gave, finds it by what it does, and tells apart two names that read the same', async () => {
-    const MORNING = base({ name: 'morning-report', readback: 'Every day at 9:00 AM, UTC.', next: NEXT });
-    const EVENING = base({ name: 'evening-report', readback: 'Every day at 6:00 PM, UTC.', next: NEXT });
-    const TWIN = base({ name: 'morning_report', readback: 'Every day at 7:00 AM, UTC.', next: NEXT });
+  it('names each duty by its title, else by its name as it is, finds it by what it does, and tells apart two titles that read the same', async () => {
+    const MORNING = base({ name: 'morning-report', title: 'Report', readback: 'Every day at 9:00 AM, UTC.', next: NEXT });
+    const EVENING = base({ name: 'evening-report', title: 'Evening report', readback: 'Every day at 6:00 PM, UTC.', next: NEXT });
+    const TWIN = base({ name: 'morning_report', title: 'Report', readback: 'Every day at 7:00 AM, UTC.', next: NEXT });
     api = fakeApi(listOf([MORNING, EVENING, WATCH, TWIN]));
     const el = mount(<DutyList />);
     await settle();
     const rows = () => [...el.querySelectorAll('.duty-row')];
     const row = (name: string) => rows().find((r) => r.getAttribute('href') === '#duties/' + name)!;
     expect(text(row('evening-report').querySelector('.duty-row-title'))).toBe('Evening report');
-    expect(text(row('watch-p1').querySelector('.duty-row-title'))).toBe('Watch p1');
-    // Two names that read the same show their short names.
+    // A duty without a title keeps its name as it is, never dressed up.
+    expect(text(row('watch-p1').querySelector('.duty-row-title'))).toBe('watch-p1');
+    // Two titles that read the same show their names.
     expect(text(row('morning-report').querySelector('.duty-row-meta'))).toContain('morning-report');
     expect(text(row('morning_report').querySelector('.duty-row-meta'))).toContain('morning_report');
     expect(text(row('evening-report').querySelector('.duty-row-meta'))).not.toContain('evening-report');
@@ -247,7 +248,7 @@ describe('the page of a duty', () => {
     const el = mount(<DutyMain name="watch-p1" />);
     await settle();
     expect(api.calls.find((c) => c.path === '/v1/duties/watch-p1')!.headers['X-Time-Zone']).toBe(ZONE);
-    expect(text(el.querySelector('h1'))).toBe('Watch p1');
+    expect(text(el.querySelector('h1'))).toBe('watch-p1');
     expect(text(el.querySelector('.pane-head'))).toContain('failed');
     expect(text(el.querySelector('.duty-readback'))).toBe(WATCH.readback);
     expect([...el.querySelectorAll('.duty-next li')].map(text)).toEqual(NEXT.slice(0, 5).map(nextWords));
@@ -324,9 +325,10 @@ describe('the page of a duty', () => {
     const list = el.querySelector('.duty-run ul.duty-decided')!;
     expect(list.getAttribute('aria-label')).toBe('Decided while you were away');
     expect([...list.querySelectorAll('li')].map((li) => text(li.querySelector('span:last-child')))).toEqual([
-      'The manager allowed shell.exec: it only reads the disk',
-      'Nobody answered in time, so git.push was denied.',
-      'You stopped the run at bash: wrong host',
+      // Each call reads as what it does, and the tool stays in the tooltip.
+      'The manager allowed a shell command: it only reads the disk',
+      'Nobody answered in time, so the tool git.push was denied.',
+      'You stopped the run at a shell command: wrong host',
     ]);
     expect(list.querySelectorAll('time').length).toBe(3);
   });
@@ -361,7 +363,7 @@ describe('the page of a duty', () => {
     api = fakeApi(one(open));
     el = mount(<DutyMain name="patching" />);
     await settle();
-    expect(what()).toBe("What it does Scribe opens a bridge from the playbook Weekly patching Patch on Today's date.");
+    expect(what()).toBe("What it does Scribe opens a bridge from the playbook weekly-patching Patch on Today's date.");
     expect(text(el.querySelector('.duty-readback'))).toBe('When a bridge of Triage closes');
     // The budget of an open is the turns of the bridge. An event has starts, not times, and misses none.
     expect(limits()).toBe('Limits The bridge gets at most 40 turns. A start that comes while the last run works is skipped.');
@@ -435,14 +437,14 @@ describe('the page of a duty', () => {
     click(el.querySelector('button[aria-label="More"]'));
     click([...el.querySelectorAll('[role="menuitem"]')].find((b) => b.textContent === 'Delete'));
     const dialog = document.querySelector('dialog.confirm')!;
-    expect(text(dialog.querySelector('h2'))).toBe('Delete Daily report?');
+    expect(text(dialog.querySelector('h2'))).toBe('Delete daily-report?');
     expect(api.calls.some((c) => c.method === 'DELETE')).toBe(false);
     click(keyNamed(dialog, 'Delete'));
     await settle();
     expect(api.calls.find((c) => c.method === 'DELETE')!.path).toBe('/v1/duties/daily-report');
     expect(location.hash).toBe('#duties');
     // A short notice says that it worked.
-    expect(currentSaid()).toBe('Deleted the duty Daily report.');
+    expect(currentSaid()).toBe('Deleted the duty daily-report.');
   });
 
   it('offers only Run now to a person who cannot change the duty', async () => {
@@ -482,7 +484,7 @@ describe('the page of a duty', () => {
       const el = mount(<DutyMain name="renew-certificates" />);
       await settle();
       expect(text(el.querySelector('.duty-template'))).toBe('The message comes from the setup of the server. Write a message to replace it.');
-      expect(text(el.querySelector('h1'))).toBe('Renew certificates');
+      expect(text(el.querySelector('h1'))).toBe('renew-certificates');
       expect(keyNamed(el, 'Edit')).toBeTruthy();
       unmountAll();
       api.restore();
@@ -547,8 +549,8 @@ describe('the profile of an agent', () => {
     expect(sec.querySelector('h3')!.textContent).toBe('Duties');
     expect(sec.querySelector('.chip .sr')!.textContent).toBe('2 duties');
     expect([...sec.querySelectorAll('a')].map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
-      ['Daily report', '#duties/daily-report'],
-      ['Monthly summary', '#duties/monthly-summary'],
+      ['daily-report', '#duties/daily-report'],
+      ['monthly-summary', '#duties/monthly-summary'],
     ]);
   });
 

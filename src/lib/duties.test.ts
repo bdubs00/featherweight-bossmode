@@ -313,11 +313,11 @@ describe('a duty in words', () => {
 
   it('says what a duty does, its limits, who decides, and what you hear of', () => {
     const d = duty();
-    // The title is the name that the person gave, in words. What the duty does is its first line.
-    expect(dutyTitle(d)).toBe('Daily homelab report');
-    expect(dutyTitle({ name: 'weekly-patching' })).toBe('Weekly patching');
+    // A duty without a title goes by its name as it is. What the duty does is its first line.
+    expect(dutyTitle(d)).toBe('daily-homelab-report');
+    expect(dutyTitle({ name: 'weekly-patching' })).toBe('weekly-patching');
     expect(dutyWhat(d)).toBe("Write the report of [Today's date].");
-    expect(dutyWhat({ do: { open: { playbook: 'weekly-patching' } } })).toBe('Open a bridge from the playbook Weekly patching');
+    expect(dutyWhat({ do: { open: { playbook: 'weekly-patching' } } })).toBe('Open a bridge from the playbook weekly-patching');
     expect(dutyWhat({ do: {} })).toBe('');
     expect(dutyLight(duty({ paused: true, state: { pausedReason: 'Three runs in a row failed.' } }))).toMatchObject({ word: 'paused', label: 'Three runs in a row failed.' });
     expect(dutyLight(d, true).word).toBe('paused');
@@ -340,16 +340,19 @@ describe('a duty in words', () => {
   });
 
   it('says who decided a question while the person was away', () => {
-    expect(decidedWords({ at: '', by: 'manager', verdict: 'allow', tool: 'shell.exec', reason: 'it only reads the disk' })).toBe('The manager allowed shell.exec: it only reads the disk');
-    expect(decidedWords({ at: '', by: 'manager', verdict: 'deny', tool: 'shell.exec' })).toBe('The manager denied shell.exec.');
-    expect(decidedWords({ at: '', by: 'timeout', verdict: 'deny', tool: 'git.push' })).toBe('Nobody answered in time, so git.push was denied.');
-    expect(decidedWords({ at: '', by: 'timeout', verdict: 'cancel', tool: 'git.push' })).toBe('Nobody answered in time, so the run stopped at git.push.');
-    expect(decidedWords({ at: '', by: 'bob@example.com', verdict: 'cancel', tool: 'bash', reason: 'wrong host' })).toBe('Bob stopped the run at bash: wrong host');
+    // A call reads as what it does, such as a shell command, and a tool that the page does not know keeps its name.
+    expect(decidedWords({ at: '', by: 'manager', verdict: 'allow', tool: 'shell.exec', reason: 'it only reads the disk' })).toBe('The manager allowed a shell command: it only reads the disk');
+    expect(decidedWords({ at: '', by: 'manager', verdict: 'deny', tool: 'shell.exec' })).toBe('The manager denied a shell command.');
+    expect(decidedWords({ at: '', by: 'timeout', verdict: 'deny', tool: 'git.push' })).toBe('Nobody answered in time, so the tool git.push was denied.');
+    expect(decidedWords({ at: '', by: 'timeout', verdict: 'cancel', tool: 'git.push' })).toBe('Nobody answered in time, so the run stopped at the tool git.push.');
+    expect(decidedWords({ at: '', by: 'bob@example.com', verdict: 'cancel', tool: 'bash', reason: 'wrong host' })).toBe('Bob stopped the run at a shell command: wrong host');
+    expect(decidedWords({ at: '', by: 'manager', verdict: 'allow', tool: 'front.pages_write' })).toBe('The manager allowed a write to the wiki.');
+    expect(decidedWords({ at: '', by: 'manager', verdict: 'deny', tool: 'servicenow.query_incidents' }, '', () => 'Find incidents')).toBe('The manager denied a call to find incidents.');
     // A question is answered or declined.
     expect(decidedWords({ at: '', by: 'token', verdict: 'allow', tool: 'ask_user', question: true }, 'token')).toBe('You answered the question.');
     expect(decidedWords({ at: '', by: 'bob@example.com', verdict: 'deny', tool: 'ask_user', question: true })).toBe('Bob declined the question.');
     expect(decidedWords({ at: '', by: 'timeout', verdict: 'deny', tool: 'ask_user', question: true })).toBe('Nobody answered the question in time, so it was declined.');
-    expect(decidedWords({ at: '', by: 'alice@example.com', verdict: 'allow', tool: 'bash' }, 'alice@example.com')).toBe('You allowed bash.');
+    expect(decidedWords({ at: '', by: 'alice@example.com', verdict: 'deny', tool: 'bash' }, 'alice@example.com')).toBe('You denied a shell command.');
   });
 });
 
@@ -567,7 +570,7 @@ describe('the walk of 2026-10-26', () => {
 describe('the title of a duty', () => {
   it('shows the words of the person, keeps them in the record, and makes the short name from them', () => {
     expect(dutyTitle({ name: 'walk-duty-1', title: 'Walk Duty 1' })).toBe('Walk Duty 1');
-    expect(dutyTitle({ name: 'walk-duty-1', title: '  ' })).toBe('Walk duty 1');
+    expect(dutyTitle({ name: 'walk-duty-1', title: '  ' })).toBe('walk-duty-1');
     // A name from what the duty does keeps the capitals of the message, and its short name is that of nameOf.
     expect(titleWordsOf('Check the VPN logs of [Today\'s date] in the office.')).toBe('Check the VPN logs');
     expect(slugOf(titleWordsOf('Check the VPN logs of [Today\'s date] in the office.'))).toBe(nameOf('Check the VPN logs of [Today\'s date] in the office.'));

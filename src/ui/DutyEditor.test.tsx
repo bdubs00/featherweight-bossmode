@@ -378,7 +378,7 @@ describe('the chips of a message', () => {
     expect(text(el.querySelector('h1'))).toBe('Edit duty');
     // A duty without a title shows its short name in words as the placeholder, and its short name stays.
     expect(fieldOf(el, 'Name')!.value).toBe('');
-    expect(fieldOf(el, 'Name')!.placeholder).toBe('Watch queue');
+    expect(fieldOf(el, 'Name')!.placeholder).toBe('watch-queue');
     expect(text(el.querySelector('#duty-slug'))).toBe('Its short name stays watch-queue.');
     const box = fieldOf(el, 'Ask Migrator') as unknown as HTMLTextAreaElement;
     expect(box.value).toBe("Handle [What the check found]. The last report was [The last run's title] on [Today's date].");

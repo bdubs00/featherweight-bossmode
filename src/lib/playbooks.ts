@@ -5,7 +5,7 @@
 
 import type { PlaybookBody } from '../api/routes';
 import type { Bridge, Caps, Member, Playbook } from '../api/types';
-import { firstLine, nameOf, titleOfName } from './duties';
+import { firstLine, nameOf } from './duties';
 
 const NAME = /^[a-z0-9_-]{1,63}$/;
 
@@ -38,8 +38,8 @@ export function keepsWords(seats: number): string {
   return 'It keeps the goal, ' + (seats === 1 ? '1 seat' : seats + ' seats') + ', the placement, the caps, and what the manager can do.';
 }
 
-/** playbookLabel names a playbook in a choice: its name in words, and the first line of its goal. */
+/** playbookLabel names a playbook in a choice: its name as it is, and the first line of its goal. */
 export function playbookLabel(p: Pick<Playbook, 'name' | 'goal'>): string {
   const goal = firstLine(p.goal || '');
-  return titleOfName(p.name) + (goal ? ': ' + goal : '');
+  return p.name + (goal ? ': ' + goal : '');
 }
