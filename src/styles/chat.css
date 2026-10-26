@@ -13,6 +13,11 @@
 .chat-row time {
   flex: none;
 }
+/* A closed conversation reads, and takes no message: its title is muted. */
+.chat-row.closed .brow-title {
+  font-weight: 400;
+  color: var(--muted);
+}
 
 /* ---------- the past conversations ---------- */
 /* The dialog of the Manager screen and of a conversation with an agent. Its list scrolls, and the rows are keys. */

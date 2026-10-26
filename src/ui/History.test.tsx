@@ -54,6 +54,9 @@ describe('the past conversations', () => {
       conv('other-person', { principal: 'bob@example.com' }),
       conv('bridge', { metadata: { 'fw.batch': 'bridge:01abc' } }),
       conv('internal', { metadata: { 'workbench.internal': 'duty-verdict:x' } }),
+      conv('verdict', { metadata: { 'workbench.dutyVerdict': 'run-1/ap-1' } }),
+      // A decision of a duty whose run lost its metadata, as a run of the archive can.
+      conv('bare-verdict', { title: 'Decide for the duty away', input: 'You decide one approval for the duty away while its owner token is away.', archived: true }),
       conv('quick', { metadata: { 'fw.view': 'quickchat' } }),
       conv('duty', { createdAt: day(19), metadata: { 'fw.batch': 'duty:daily' } }),
     ];

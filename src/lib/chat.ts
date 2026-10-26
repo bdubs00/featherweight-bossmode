@@ -7,6 +7,7 @@
 import type { Attachment, InlineProfile, Item, NewRun, Run, RunUsage, Tool } from '../api/types';
 import { dayWords, excerpt } from './words';
 import { costParts } from './cost';
+import { runStatus, type Light } from './presence';
 
 /** The metadata that marks a run that the quick chat started. */
 export const CHAT_VIEW = { key: 'fw.view', value: 'quickchat' } as const;
@@ -17,7 +18,23 @@ export function works(run: (Pick<Run, 'state'> & Partial<Pick<Run, 'archived'>>)
 }
 
 /** The line of an archived conversation, which every view of a conversation shows. */
-export const ARCHIVED_LINE = 'This conversation is from a worker that was replaced. You can read it, and your next message starts a new conversation.';
+export const ARCHIVED_LINE = 'This conversation closed when its agent restarted. You can read it, and your next message starts a new conversation.';
+
+/**
+ * chatStatus is the status of a conversation in a list of conversations.
+ * A conversation that answered waits for nothing, so it says answered, not
+ * ready, which reads as a call for the person. A conversation whose worker
+ * was replaced says closed, because it takes no further message. The other
+ * states keep the words of runStatus.
+ */
+export function chatStatus(r: Pick<Run, 'state' | 'output'> & Partial<Pick<Run, 'input' | 'title' | 'archived'>>): Light {
+  if (r.archived && r.state !== 'failed') return { word: 'closed', tone: 'grey', label: 'Closed when its agent restarted. You can read it.' };
+  if (r.state === 'completed') {
+    if (r.output) return { word: 'answered', tone: 'grey', label: 'Answered. Your next message follows up.' };
+    return { word: 'ended', tone: 'grey', label: 'Ended with no answer.' };
+  }
+  return runStatus(r);
+}
 
 /** answerSeqs are the seqs of the answers of a transcript: its assistant items. */
 export function answerSeqs(items: Item[]): number[] {
@@ -197,17 +214,19 @@ export interface UsagePart {
   word: string;
 }
 
-/** usageParts are the figures of the usage of a run and their words: turns, tokens, and cost, with so far while it works. A cost below one cent reads under $0.01. */
+/**
+ * usageParts are the figures of the usage of a run and their words, with
+ * so far while it works. A person reads the cost, so a known cost stands
+ * alone. A cost below one cent reads under $0.01. Without a cost, the
+ * tokens stand in, the only measure that the run gives.
+ */
 export function usageParts(u: RunUsage | undefined, working: boolean): UsagePart[] {
   if (!u) return [];
-  const out: UsagePart[] = [];
-  if (u.turns !== undefined) out.push({ n: u.turns.toLocaleString('en-US'), word: u.turns === 1 ? 'turn' : 'turns' });
-  const tokens = tokensOf(u);
-  if (tokens > 0) out.push({ n: tokens.toLocaleString('en-US'), word: tokens === 1 ? 'token' : 'tokens' });
   if (u.costUSD !== undefined) {
     const c = costParts(u.costUSD);
-    out.push({ ...(c.lead ? { lead: c.lead } : {}), n: c.n, word: working ? 'so far' : '' });
+    return [{ ...(c.lead ? { lead: c.lead } : {}), n: c.n, word: working ? 'so far' : '' }];
   }
-  else if (working && out.length) out[out.length - 1] = { ...out[out.length - 1], word: out[out.length - 1].word + ' so far' };
-  return out;
+  const tokens = tokensOf(u);
+  if (tokens > 0) return [{ n: tokens.toLocaleString('en-US'), word: (tokens === 1 ? 'token' : 'tokens') + (working ? ' so far' : '') }];
+  return [];
 }

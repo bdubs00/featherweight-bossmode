@@ -100,7 +100,7 @@ describe('the Chat place', () => {
     expect(calls.find((c) => c.path.startsWith('/v1/fleet/runs'))!.path).toBe('/v1/fleet/runs?agent=chat&principal=alice%40example.com');
     const row = el.querySelector('.chat-row')!;
     expect(row.querySelector('.brow-title')!.textContent).toBe('Summarize the notes');
-    expect(row.querySelector('.status-word')!.textContent).toBe('ready');
+    expect(row.querySelector('.status-word')!.textContent).toBe('answered');
     expect(row.getAttribute('aria-current')).toBe('page');
     expect(row.getAttribute('href')).toBe('#chat/run-chat-1');
     expect(el.querySelector('.people-head')!.textContent).not.toBe('');
@@ -283,7 +283,7 @@ describe('the Chat place', () => {
     expect([...el.querySelectorAll('.abilities li')].map((c) => c.getAttribute('title'))).toEqual(['files', 'web_fetch']);
     expect(el.querySelector('.chat-skills')!.textContent).toBe('1 skill: notes');
     expect(el.querySelector('.chat-model')!.textContent).toBe('model-large');
-    expect(el.querySelector('.today')!.textContent).toBe('1 turn1,200 tokens$0.02');
+    expect(el.querySelector('.today')!.textContent).toBe('$0.02');
     expect([...el.querySelectorAll('button')].map((b) => b.textContent)).not.toContain('Rename');
   });
 
@@ -323,7 +323,7 @@ describe('the Chat place', () => {
     configure(CHAT);
     act(() => store.dispatch({ type: 'run', run: { ...OLD, seq: 11, usage: { inputTokens: 25000, outputTokens: 2076, turns: 4, costUSD: 0.0031 } } }));
     const el = mount(<ChatDetails run="run-chat-1" />);
-    expect(el.querySelector('.today')!.textContent).toBe('4 turns27,076 tokensunder $0.01');
+    expect(el.querySelector('.today')!.textContent).toBe('under $0.01');
     expect(el.textContent).not.toContain('$0.00');
   });
 });
