@@ -54,6 +54,8 @@ import {
   nextTime,
   scheduleWordsIn,
   slugOf,
+  titleWordsOf,
+  dutySlot,
 } from './duties';
 
 const duty = (over: Partial<Duty> = {}): Duty => ({
@@ -559,5 +561,25 @@ describe('the walk of 2026-10-26', () => {
     expect(moneyIn('Spend at most $2 a run.')).toBe('2');
     expect(moneyIn('No money here.')).toBe('');
     expect(moneyIn('$0 is free.')).toBe('');
+  });
+});
+
+describe('the title of a duty', () => {
+  it('shows the words of the person, keeps them in the record, and makes the short name from them', () => {
+    expect(dutyTitle({ name: 'walk-duty-1', title: 'Walk Duty 1' })).toBe('Walk Duty 1');
+    expect(dutyTitle({ name: 'walk-duty-1', title: '  ' })).toBe('Walk duty 1');
+    // A name from what the duty does keeps the capitals of the message, and its short name is that of nameOf.
+    expect(titleWordsOf('Check the VPN logs of [Today\'s date] in the office.')).toBe('Check the VPN logs');
+    expect(slugOf(titleWordsOf('Check the VPN logs of [Today\'s date] in the office.'))).toBe(nameOf('Check the VPN logs of [Today\'s date] in the office.'));
+    expect(titleWordsOf('list the new helpdesk tickets in one line each.')).toBe('List the new helpdesk tickets');
+    const f = { ...emptyForm('UTC'), agent: 'x', message: 'Hi.', cost: '1' };
+    expect(recordOf({ ...f, name: '  Walk   Duty 1 ' }, null, 'walk-duty-1').title).toBe('Walk Duty 1');
+    expect('title' in recordOf({ ...f, name: '' }, null, 'walk-duty-1')).toBe(false);
+    // An edit reads the title into the name field, and a duty without one leaves it empty.
+    expect(formOf({ ...duty(), title: 'Morning report' }, 'UTC').name).toBe('Morning report');
+    expect(formOf(duty(), 'UTC').name).toBe('');
+    // A problem of the title shows beside the name.
+    expect(dutySlot('title')).toBe('name');
+    expect(nameWordsReason('x'.repeat(101), [])).toBe('A name holds 100 characters at most.');
   });
 });

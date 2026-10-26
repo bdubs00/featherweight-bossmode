@@ -22,8 +22,11 @@
 // Tell me about also offers the shared channels of the operator, from GET
 // /v1/notifications, and keeps a shared channel that the duty names.
 //
-// The person writes the name of a duty in words, such as Walk duty 1, and
-// the page makes its short name, walk-duty-1, and shows it. A change of the
+// The person writes the name of a duty in words, such as Walk Duty 1. The
+// duty keeps it as its title, and the page makes its short name,
+// walk-duty-1, and shows it. An edit changes the title and keeps the short
+// name. The technical part of a readback, such as the address of another
+// app, sits in the closed fold For developers. A change of the
 // form stays as a draft in the tab until Save or Cancel, so a move to
 // another screen loses nothing. Make this a duty reads the schedule and the
 // cost that its message names, and Cancel goes back to the conversation.
@@ -67,9 +70,9 @@ import {
   formOf,
   hasCheck,
   limitWords,
+  MAX_TITLE,
   moneyIn,
   monthDayOf,
-  nameOf,
   nameWordsReason,
   nextTime,
   nextWords,
@@ -84,6 +87,7 @@ import {
   splitProblem,
   startWords,
   titleOfName,
+  titleWordsOf,
   whenError,
   whenFormOf,
   withChoice,
@@ -112,7 +116,7 @@ import { usePlaybooks } from '../state/playbooks';
 import { showError } from './notice';
 import { Confirm } from './common';
 import { Picker } from './Picker';
-import { CheckFirst } from './DutyCheck';
+import { CheckFirst, ForDevelopers } from './DutyCheck';
 import { PlaybookPick, PlaybookShelf } from './Playbooks';
 import { Button, Choices, Field, Help, IconButton, Input, Mark, PaneHeader, TextArea, buttonClass } from './primitives';
 
@@ -492,6 +496,7 @@ function Readback({ p, zone, fallback, said, hidden }: { p: Preview; zone: strin
       ) : (
         <>
           {words && <p class="duty-readback">{words}</p>}
+          <ForDevelopers text={a ? a.forDevelopers : ''} />
           {next.length > 0 && (
             <>
               <p class="t-meta">Next, in your time ({zoneWords(zone)})</p>
@@ -648,12 +653,14 @@ function EditorForm({ name, seed, base: read, heading, back: home }: FormProps) 
   // The message of a duty from the setup of the server never shows. An empty field keeps it, and a message replaces it.
   const templated = templatedOf(base);
   // The name in words, as the person wrote it or as the page makes it from what the duty does, and its short name.
-  const shownName = f.nameOwn ? f.name : titleOfName(nameOf(f.act === 'open' ? f.goal || f.playbook : f.message));
-  const slug = slugOf(shownName);
+  const shownName = f.nameOwn ? f.name : titleWordsOf(f.act === 'open' ? f.goal || f.playbook : f.message);
+  // A new duty takes its short name from its name. An edit keeps the short name of the duty.
+  const slug = name || slugOf(shownName);
   // The reason of a name that cannot name a duty, shown as the person types, before a save.
   const nameWhy = fresh && shownName.trim() ? nameWordsReason(shownName, []) : '';
   const pathName = name || (slug && !nameWhy ? slug : DRAFT);
-  const record = () => recordOf(f, base, pathName);
+  // The record keeps the name in words as its title.
+  const record = () => recordOf(f.nameOwn ? f : { ...f, name: shownName }, base, pathName);
   const nameOfAgent = (a: string) => (faces[a] && faces[a].displayName) || titleOfName(a);
 
   // The choices that the front serves, and the choice that the duty holds, so an edit keeps it.
@@ -956,7 +963,10 @@ function EditorForm({ name, seed, base: read, heading, back: home }: FormProps) 
               When
             </h2>
             {keepsWhen ? (
-              <p class="duty-readback">{startWords(base!)}. You cannot change this start here.</p>
+              <>
+                <p class="duty-readback">{(base!.readback || startWords(base!) + '.') + ' You cannot change this start here.'}</p>
+                <ForDevelopers text={base!.forDevelopers} />
+              </>
             ) : (
               <>
                 {kinds.length > 0 && (
@@ -1246,23 +1256,21 @@ function EditorForm({ name, seed, base: read, heading, back: home }: FormProps) 
             <Said list={pr.tell} />
           </section>
 
-          {fresh && (
-            <Field label="Name" error={joinError(err.name || nameWhy, pr.name)} class="duty-narrow">
-              <Input
-                value={shownName}
-                maxLength={80}
-                invalid={!!(err.name || nameWhy || pr.name)}
-                placeholder="Daily report"
-                aria-describedby={slug && !(err.name || nameWhy || pr.name) ? 'duty-slug' : undefined}
-                onInput={(e) => patch({ name: (e.target as HTMLInputElement).value, nameOwn: true })}
-              />
-              {slug && !(err.name || nameWhy || pr.name) && (
-                <span class="t-meta duty-slug" id="duty-slug">
-                  It saves as {slug}.
-                </span>
-              )}
-            </Field>
-          )}
+          <Field label="Name" error={joinError(err.name || nameWhy, pr.name)} class="duty-narrow">
+            <Input
+              value={shownName}
+              maxLength={MAX_TITLE}
+              invalid={!!(err.name || nameWhy || pr.name)}
+              placeholder={fresh ? 'Daily report' : titleOfName(name || '')}
+              aria-describedby={slug && !(err.name || nameWhy || pr.name) ? 'duty-slug' : undefined}
+              onInput={(e) => patch({ name: (e.target as HTMLInputElement).value, nameOwn: true })}
+            />
+            {slug && !(err.name || nameWhy || pr.name) && (
+              <span class="t-meta duty-slug" id="duty-slug">
+                {fresh ? 'It saves as ' + slug + '.' : 'Its short name stays ' + slug + '.'}
+              </span>
+            )}
+          </Field>
 
           <div class="form-end">
             <Button href={back.href} onClick={() => writeDraft(key, null)}>
@@ -1277,6 +1285,7 @@ function EditorForm({ name, seed, base: read, heading, back: home }: FormProps) 
       {review && (
         <Confirm title="Save this duty?" confirm="Save duty" busy={busy} onCancel={() => setReview(null)} onConfirm={save}>
           <p class="duty-readback">{review.readback || startWords(record(), nameOfAgent) || (base ? startWords(base, nameOfAgent) : '')}</p>
+          <ForDevelopers text={review.forDevelopers} />
           {(review.next || []).length > 0 && (
             <>
               <p class="t-meta">Next, in your time</p>

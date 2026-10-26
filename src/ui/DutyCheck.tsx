@@ -8,7 +8,11 @@
 // a value. Nobody types a secret, a regex, or code. GET /v1/duties/options
 // names what the front serves, and the section offers nothing else. A tool
 // shows by what it does, and its name stays out of sight unless two tools
-// say the same.
+// say the same. The technical part of a readback, such as where the check
+// finds its items, sits in the closed fold For developers. Write the check
+// for me sends the budget of a run of the duty, which the server uses for
+// an agent without a budget of its own, and a check that failed its test
+// fills the fields, so the person can fix it.
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
@@ -51,10 +55,32 @@ function reasonOf(e: unknown): string {
   return /[.!?]$/.test(s) ? s : s + '.';
 }
 
-/** What the agent tried, from a 422 of Write the check: the record that it wrote and its readback, which the page shows and does not take. */
+/**
+ * What the agent tried, from a 422 of Write the check: the record that it
+ * wrote, which fills the fields, else only its readback, and the technical
+ * part for developers.
+ */
 interface TriedRecord {
   checkFirst: CheckRecord | null;
   readback: string;
+  dev: string;
+}
+
+/** ForDevelopers is the technical part of a readback, such as the address of a webhook or where a check finds its items, in a closed fold under the readback. */
+export function ForDevelopers({ text }: { text?: string }) {
+  const t = (text || '').trim();
+  if (!t) return null;
+  return (
+    <details class="advanced duty-dev">
+      <summary>
+        <Glyph name="back" size={16} />
+        For developers
+      </summary>
+      <div class="advanced-body">
+        <p class="duty-dev-text">{t}</p>
+      </div>
+    </details>
+  );
 }
 
 /** The words of the looks that the front can serve. */
@@ -278,6 +304,8 @@ export function CheckFirst(p: CheckProps) {
   const [writing, setWriting] = useState(false);
   const [waited, setWaited] = useState(0);
   const [wrote, setWrote] = useState('');
+  // The technical part of the readback that the server wrote, for the fold For developers.
+  const [wroteDev, setWroteDev] = useState('');
   const [writeError, setWriteError] = useState('');
   const [stopped, setStopped] = useState(false);
   const [attempted, setAttempted] = useState<TriedRecord | null>(null);
@@ -308,10 +336,14 @@ export function CheckFirst(p: CheckProps) {
     setStopped(false);
     setAttempted(null);
     if (p.onAgentProblems) p.onAgentProblems([]);
+    // The run that writes the check is one more run of the duty, so it takes the budget of a run that the form holds. A post or an open has none of its own.
+    const r = record();
+    const budget = (r.do.ask || r.do.manager) && r.limits.budget && Object.keys(r.limits.budget).length ? r.limits.budget : undefined;
     try {
-      const w = await api.writeCheck(writeName, words.trim(), agent, ctl.signal);
+      const w = await api.writeCheck(writeName, words.trim(), agent, ctl.signal, budget);
       onChange(checkFormOf(w.checkFirst));
       setWrote(w.readback || '');
+      setWroteDev(w.forDevelopers || '');
       setTried(w.check ? { found: w.check } : null);
       setManual(true);
     } catch (e) {
@@ -322,12 +354,20 @@ export function CheckFirst(p: CheckProps) {
         setManual(true);
       } else if (e instanceof ApiError && e.status === 504) setWriteError(agentName + ' did not answer within two minutes. Try again, or set the check up by hand.');
       else if (e instanceof ApiError && e.status === 422) {
-        // The agent could not write a check that works. A record that it wrote shows as it is, so the person sees what it tried.
+        // The agent could not write a check that works. A record that it wrote fills the fields, so the person can fix it and try it.
         setWriteError(reasonOf(e));
         const pr = e.problem || {};
-        const record = pr.checkFirst && typeof pr.checkFirst === 'object' ? (pr.checkFirst as CheckRecord) : null;
+        const proposed = pr.checkFirst && typeof pr.checkFirst === 'object' && (pr.checkFirst as CheckRecord).look ? (pr.checkFirst as CheckRecord) : null;
         const readback = typeof pr.readback === 'string' ? pr.readback : '';
-        if (record || readback) setAttempted({ checkFirst: record, readback });
+        const dev = typeof pr.forDevelopers === 'string' ? pr.forDevelopers : '';
+        if (proposed) {
+          onChange(checkFormOf(proposed));
+          setWrote(readback);
+          setWroteDev(dev);
+          setTried(null);
+          setManual(true);
+        }
+        if (proposed || readback) setAttempted({ checkFirst: proposed, readback, dev });
       } else if (e instanceof ApiError && e.status === 400 && e.problem && Array.isArray(e.problem.problems) && e.problem.problems.length) {
         // A problem of the words shows under the words, and one of the agent under the agent picker.
         const by = problemsBy(e.problem.problems as unknown[], (path) => (path === 'agent' || path.startsWith('agent.') ? 'agent' : 'words'));
@@ -356,6 +396,7 @@ export function CheckFirst(p: CheckProps) {
   // A change by hand makes the readback of the agent and the last try stale.
   const change = (c: CheckForm) => {
     setWrote('');
+    setWroteDev('');
     setTried(null);
     onChange(c);
   };
@@ -407,14 +448,22 @@ export function CheckFirst(p: CheckProps) {
             )}
             {attempted && !writing && (
               <div class="duty-tried">
-                <p class="t-meta">What {agentName} tried</p>
-                <p class="duty-readback">{attempted.readback || (attempted.checkFirst && attempted.checkFirst.look ? checkWords(attempted.checkFirst, agentName, toolWords) : '')}</p>
+                {attempted.checkFirst ? (
+                  <p class="t-meta">The fields below hold what {agentName} tried. Change them, then use Try the check.</p>
+                ) : (
+                  <>
+                    <p class="t-meta">What {agentName} tried</p>
+                    <p class="duty-readback">{attempted.readback}</p>
+                    <ForDevelopers text={attempted.dev} />
+                  </>
+                )}
               </div>
             )}
           </div>
         )}
         {(manual || !writer) && <CheckFields check={check} onChange={change} agent={agent} options={options} error={p.error} whereError={p.whereError} />}
         {on && written && <p class="duty-readback">{wrote || checkWords(written, agentName, toolWords)}</p>}
+        {on && written && wrote && <ForDevelopers text={wroteDev} />}
         {problems.length > 0 && (
           <ul class="duty-problems" role="alert">
             {problems.map((x) => (

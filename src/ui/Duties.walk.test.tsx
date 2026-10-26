@@ -233,6 +233,28 @@ describe('the page of a duty', () => {
     expect([text(status('fresh-one')), text(status('resting')), text(status('done-one'))]).toEqual(['not run yet', 'paused', 'finished']);
   });
 
+  it('shows the title that the person wrote as the name, and the technical part of the readback in a closed fold', async () => {
+    const hook = duty({
+      title: 'Walk Duty 1',
+      when: { webhook: { auth: { mode: 'hmac', secret: 'GITEA', header: 'X-Gitea-Signature' } } } as Duty['when'],
+      readback: 'When Gitea sends an event, signed.',
+      forDevelopers: 'Another app calls POST /v1/duties/walk-duty/call with the HMAC-SHA256 signature of the body in the header X-Gitea-Signature.',
+    });
+    api = fakeApi({ 'GET /v1/duties': { duties: [hook], paused: false }, 'GET /v1/duties/walk-duty': { ...hook, history: [] } });
+    const list = mount(<DutyList current="walk-duty" />);
+    const el = mount(<DutyMain name="walk-duty" />);
+    await settle();
+    expect(text(list.querySelector('.duty-row-title'))).toBe('Walk Duty 1');
+    expect(text(el.querySelector('h1'))).toBe('Walk Duty 1');
+    const when = el.querySelector('section[aria-labelledby="duty-when"]')!;
+    expect(text(when.querySelector('.duty-readback'))).toBe('When Gitea sends an event, signed.');
+    const dev = when.querySelector('details.duty-dev') as HTMLDetailsElement;
+    expect(dev.open).toBe(false);
+    expect(text(dev)).toBe('For developers Another app calls POST /v1/duties/walk-duty/call with the HMAC-SHA256 signature of the body in the header X-Gitea-Signature.');
+    // The row of the list keeps the technical part out.
+    expect(text(list)).not.toContain('POST');
+  });
+
   it('says that a run of a duty without a cost limit has none', async () => {
     api = fakeApi({ 'GET /v1/duties': { duties: [], paused: false }, 'GET /v1/duties/walk-duty': { ...duty({ limits: { budget: {}, overlap: 'skip', catchUp: '1h' } }), history: [] } });
     const el = mount(<DutyMain name="walk-duty" />);
@@ -391,6 +413,43 @@ describe('the editor of a duty', () => {
     await settle();
     expect(lastPut().path).toBe('/v1/duties/walk-duty-1?dryRun=true');
     expect((lastPut().body as DutyRecord).name).toBe('walk-duty-1');
+    // The words of the person stay as the title.
+    expect((lastPut().body as DutyRecord).title).toBe('Walk Duty 1');
+  });
+
+  it('keeps a change of the name of a duty as its title, under the same short name', async () => {
+    const d = duty({ title: 'Walk Duty 1' });
+    api = fakeApi({
+      'GET /v1/duties': { duties: [d], paused: false },
+      'GET /v1/duties/walk-duty': { ...d, history: [] },
+      'PUT /v1/duties/walk-duty?dryRun=true': dry({ forDevelopers: 'It runs on the queue of migrator.' }),
+      'PUT /v1/duties/walk-duty': (c: Call) => ({ body: { ...d, ...(c.body as object) } }),
+    });
+    const el = mount(<DutyEditor name="walk-duty" />);
+    await settle();
+    expect(fieldOf(el, 'Name')!.value).toBe('Walk Duty 1');
+    expect(text(el.querySelector('#duty-slug'))).toBe('Its short name stays walk-duty.');
+    // The readback of a dry run keeps its technical part in a closed fold.
+    expect(text(el.querySelector('.duty-readback-box details.duty-dev'))).toBe('For developers It runs on the queue of migrator.');
+    typeIn(fieldOf(el, 'Name'), '  The   walk  report ');
+    click(keyNamed(el, 'Save duty'));
+    await settle();
+    expect(text(document.querySelector('dialog.confirm details.duty-dev'))).toBe('For developers It runs on the queue of migrator.');
+    click(keyNamed(document.querySelector('dialog.confirm')!, 'Save duty'));
+    await settle();
+    const saved = puts().find((c) => c.path === '/v1/duties/walk-duty')!;
+    expect((saved.body as DutyRecord).name).toBe('walk-duty');
+    expect((saved.body as DutyRecord).title).toBe('The walk report');
+  });
+
+  it('shows the readback of a start that the page cannot change, with its technical part in a fold', async () => {
+    const hook = duty({ when: { webhook: { auth: { mode: 'bearer', secret: 'HOOK' } } } as Duty['when'], readback: 'When the lab sends an event.', forDevelopers: 'Another app calls POST /v1/duties/walk-duty/call with its bearer token.' });
+    api = fakeApi({ 'GET /v1/duties': { duties: [hook], paused: false }, 'GET /v1/duties/walk-duty': { ...hook, history: [] }, 'PUT /v1/duties/walk-duty?dryRun=true': dry() });
+    const el = mount(<DutyEditor name="walk-duty" />);
+    await settle();
+    const when = el.querySelector('section[aria-labelledby="duty-when-head"]')!;
+    expect(text(when.querySelector('.duty-readback'))).toBe('When the lab sends an event. You cannot change this start here.');
+    expect(text(when.querySelector('details.duty-dev'))).toBe('For developers Another app calls POST /v1/duties/walk-duty/call with its bearer token.');
   });
 
   it('offers the agents that workers run for an event, and names each in words', async () => {
