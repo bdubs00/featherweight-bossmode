@@ -13,7 +13,7 @@ import { ApiError } from '../api/client';
 import { api } from '../api/routes';
 import type { Fleet, Item, Result, Run } from '../api/types';
 import { store, useSelect } from '../state/store';
-import { placedSteps, type Step } from '../state/thread';
+import { stepOf, type Step } from '../state/thread';
 import { decisionOf } from '../lib/decision';
 import { whoName } from '../lib/lines';
 import { showError } from './notice';
@@ -171,7 +171,7 @@ export function useTranscript(runId: string, load = true): TranscriptState {
     if (!prev) return;
     try {
       const t = await api.transcript(runId, { before: prev, limit: 200 });
-      setItems((old) => [...t.items.filter((x) => !old.some((o) => o.seq === x.seq)), ...old]);
+      setItems((old) => [...t.items.filter((x) => !old.some((o) => sameItem(o, x))), ...old]);
       setPrev(t.prev);
     } catch (e) {
       showError(e);
@@ -235,13 +235,46 @@ export function usePoll(runId: string, also = false): void {
 type Block = { kind: 'item'; it: Item } | { kind: 'steps'; steps: Step[] };
 
 /**
+ * stepsAt words each tool call of a transcript and names the item where
+ * its line goes. A call goes at its own item. A call that asked for a
+ * decision goes at its result, after the decision, and makes no line while
+ * it waits. The map takes the item itself as its key, not its seq: two
+ * calls of one turn share a seq, and each keeps its own line.
+ */
+export function stepsAt(items: Item[]): Map<Item, Step> {
+  const results = new Map<string, Item>();
+  const files = new Map<string, Item>();
+  const asked = new Set<string>();
+  for (const x of items) {
+    if (!x.callId) continue;
+    if (x.kind === 'result') results.set(x.callId, x);
+    else if (x.kind === 'file') files.set(x.callId, x);
+    else if (x.kind === 'ask') asked.add(x.callId);
+  }
+  const out = new Map<Item, Step>();
+  for (const c of items) {
+    if (c.kind !== 'tool') continue;
+    const r = c.callId ? results.get(c.callId) : undefined;
+    const f = c.callId ? files.get(c.callId) : undefined;
+    let at: Item = c;
+    if (c.callId && asked.has(c.callId)) {
+      const after = [r, f].filter((x): x is Item => !!x).sort((a, b) => a.seq - b.seq)[0];
+      if (!after) continue;
+      at = after;
+    }
+    out.set(at, { ...stepOf(c, f, r), key: 'step-' + (c.callId || c.seq), at: at.time });
+  }
+  return out;
+}
+
+/**
  * blocksOf folds the step lines between two messages into one block of
- * steps. A step goes where placedSteps puts it: a call that asked for a
+ * steps. A step goes where stepsAt puts it: a call that asked for a
  * decision shows after the decision, at its result, and not at all while
  * it waits.
  */
 export function blocksOf(items: Item[]): Block[] {
-  const placed = placedSteps(items);
+  const placed = stepsAt(items);
   const out: Block[] = [];
   let steps: Step[] = [];
   const flush = () => {
@@ -251,7 +284,7 @@ export function blocksOf(items: Item[]): Block[] {
   for (const it of items) {
     if (it.kind === 'tools') continue;
     if (it.kind === 'tool' || it.kind === 'result' || it.kind === 'file') {
-      const s = placed.get(it.seq);
+      const s = placed.get(it);
       if (s) steps.push(s);
       continue;
     }
@@ -261,6 +294,9 @@ export function blocksOf(items: Item[]): Block[] {
   flush();
   return out;
 }
+
+/** sameItem reports whether two items of a transcript are one: a seq holds several items, such as the calls of one turn. */
+const sameItem = (a: Item, b: Item) => a.seq === b.seq && a.kind === b.kind && (a.callId || '') === (b.callId || '') && (a.id || '') === (b.id || '');
 
 /** within5 reports whether two items of one sender are close enough to share a header. */
 const within5 = (a: Item, b: Item) => {

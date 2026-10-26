@@ -231,6 +231,20 @@ describe('the thread', () => {
     expect(blocks[1].kind === 'steps' && blocks[1].steps.map((x) => x.cmd || x.text)).toEqual(['ls', 'Reading the fleet']);
   });
 
+  it('gives each call of one turn its own line, though the calls share a seq', () => {
+    const items: Item[] = [
+      ASK,
+      { seq: 5, time: T, kind: 'tool', tool: 'memory', callId: 'm', input: { command: 'view', path: '/memories' } },
+      { seq: 5, time: T, kind: 'tool', tool: 'front.agents_list', callId: 'a', input: {} },
+      { seq: 6, time: T, kind: 'result', callId: 'm', text: 'notes.md' },
+      { seq: 6, time: T, kind: 'result', callId: 'a', text: '3 agents' },
+      { seq: 7, time: T, kind: 'assistant', text: 'Three.' },
+    ];
+    const blocks = blocksOf(items);
+    expect(blocks[1].kind === 'steps' && blocks[1].steps.map((x) => x.text)).toEqual(['Checked its notes', 'Looked at the agents']);
+    expect(blocks[1].kind === 'steps' && blocks[1].steps.map((x) => x.key)).toEqual(['step-m', 'step-a']);
+  });
+
   it('puts the step of a call that asked for a decision after the decision, and none while it waits', () => {
     const call: Item[] = [
       ASK,

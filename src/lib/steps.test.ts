@@ -26,6 +26,26 @@ describe('stepWords', () => {
     expect(stepWords('spawn_task', { agent: 'tester' })).toBe('Handed off a task to tester');
     expect(stepWords(undefined)).toBe('Used a tool');
   });
+
+  it('words the tools that the manager uses and the quiet tools of the kernel, never by their code names', () => {
+    expect(stepWords('front.agents_list', {})).toBe('Looked at the agents');
+    expect(stepWords('front.duties_list', {})).toBe('Read the duties');
+    expect(stepWords('front.runs_list', { agent: 'migrator' })).toBe('Looked at the recent work');
+    expect(stepWords('front.duty_preview', { name: 'nightly' })).toBe('Checked a duty');
+    expect(stepWords('front.agent_get', { name: 'reviewer' })).toBe('Read the profile of reviewer');
+    expect(stepWords('front.agent_get', {})).toBe('Read the profile of an agent');
+    expect(stepWords('front.duty_put', '{"name":"nightly"}')).toBe('Saved the duty nightly');
+    expect(stepWords('front.duty_pause', { name: 'nightly', paused: true })).toBe('Paused the duty nightly');
+    expect(stepWords('front.duty_pause', { name: 'nightly', paused: false })).toBe('Resumed the duty nightly');
+    expect(stepWords('front.faces_put', { agent: 'tester', svg: '<svg/>' })).toBe('Drew a picture of tester');
+    expect(stepWords('front.run', { agent: 'tester', input: 'Go.' })).toBe('Gave work to tester');
+    expect(stepWords('memory', { command: 'view', path: '/memories' })).toBe('Checked its notes');
+    expect(stepWords('memory', { command: 'str_replace', path: '/memories/a.md' })).toBe('Wrote in its notes');
+    expect(stepWords('memory', { command: 'delete', path: '/memories/a.md' })).toBe('Tidied its notes');
+    expect(stepWords('recall', { query: 'x' })).toBe('Searched its memory');
+    expect(stepWords('http', { url: 'https://example.com/a' })).toBe('Fetched https://example.com/a');
+    expect(stepWords('skill', { name: 'plan' })).toBe('Read the skill plan');
+  });
 });
 
 describe('pagesWritten', () => {

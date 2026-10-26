@@ -123,7 +123,7 @@ describe('the direct thread', () => {
       ['Wrote', 'k3s/runbook.md', '#pages/k3s/runbook.md'],
       ['Handing off a task to tester', '', ''],
       ['Read the fleet', '', ''],
-      ['Used recall', '', ''],
+      ['Searched its memory', '', ''],
     ]);
   });
 
