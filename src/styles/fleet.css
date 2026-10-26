@@ -853,6 +853,13 @@ a.file {
   line-height: var(--t-code-lh);
   overflow-wrap: anywhere;
 }
+/* The installed version follows the name, in the muted word of a meta. */
+.pkgs-version {
+  margin-left: var(--s-2);
+  font-family: var(--font);
+  font-size: var(--t-meta);
+  color: var(--muted);
+}
 .pkgs-state {
   display: flex;
   align-items: center;

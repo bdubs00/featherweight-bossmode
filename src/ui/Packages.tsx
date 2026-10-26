@@ -6,8 +6,9 @@
 // Off, the section says that the agent uses the programs of its image, and
 // an owner can turn packages on. On, an owner adds a package with one field
 // and a choice of two, removes one from its list, and lets the agent ask
-// for a package. A state line says how far the change reached the workers,
-// and a fold shows the output of a failed install as it is.
+// for a package. Each package shows the version that a ready worker
+// installed. A state line says how far the change reached the workers, and
+// a fold shows the output of a failed install as it is.
 //
 // The section reads GET /v1/pools/{name}/packages when it opens. While a
 // change reaches the workers, or a worker is not ready, it reads the route
@@ -18,14 +19,14 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
 import { ApiError, SigninNeeded } from '../api/client';
 import type { Packages, PackagesBody } from '../api/types';
-import { KIND_WORDS, POLL_MS, bodyOf, lineOf, nameProblem, normalize, shouldPoll, type PackageKind } from '../lib/packages';
+import { KIND_WORDS, POLL_MS, bodyOf, keyOf, lineOf, nameProblem, normalize, shouldPoll, versionsOf, type PackageKind } from '../lib/packages';
 import { Button, Command, IconButton, Input, LineLed } from './primitives';
 import { Switch } from './ChannelDialog';
 import { Glyph } from './icons';
 
 export const OFF_TEXT = 'This agent uses only the programs of its image.';
 export const ASK_TEXT = 'The agent can ask for a package. You approve each one.';
-export const NOTE_TEXT = 'When a worker is idle, it gets the change. Work in progress does not stop.';
+export const NOTE_TEXT = 'Workers take a change in about a minute. Work in progress does not stop.';
 
 const KINDS: PackageKind[] = ['python', 'tools'];
 
@@ -153,7 +154,7 @@ export function PackagesSection({ agent, pool, owner }: { agent: string; pool: s
         <div class="pkgs-off">
           <p>{OFF_TEXT}</p>
           {owner && (
-            <Button ref={turnOnKey} size="s" onClick={() => save({ on: true }, 'field')}>
+            <Button ref={turnOnKey} size="s" onClick={() => save({ on: true, ask: true }, 'field')}>
               Turn on packages
             </Button>
           )}
@@ -189,23 +190,31 @@ export function PackagesSection({ agent, pool, owner }: { agent: string; pool: s
               </div>
             </form>
           )}
-          {KINDS.map((k) =>
-            p[k].length > 0 ? (
+          {KINDS.map((k) => {
+            if (p[k].length === 0) return null;
+            const versions = versionsOf(p, k);
+            return (
               <div class="pkgs-list">
                 <h4 class="pkgs-list-head" id={id + '-' + k}>
                   {KIND_WORDS[k].many}
                 </h4>
                 <ul aria-labelledby={id + '-' + k}>
-                  {p[k].map((x) => (
-                    <li>
-                      <span class="pkgs-name">{x.name}</span>
-                      {owner && <IconButton icon="close" label={'Remove ' + x.name} onClick={() => remove(k, x.name)} />}
-                    </li>
-                  ))}
+                  {p[k].map((x) => {
+                    const version = versions.get(keyOf(x.name));
+                    return (
+                      <li>
+                        <span class="pkgs-name">
+                          {x.name}
+                          {version && <span class="pkgs-version">{version}</span>}
+                        </span>
+                        {owner && <IconButton icon="close" label={'Remove ' + x.name} onClick={() => remove(k, x.name)} />}
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
-            ) : null,
-          )}
+            );
+          })}
           {line && (
             <p class="pkgs-state" role="status">
               <LineLed tone={line.tone} />

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Fleet, Packages } from '../api/types';
-import { bodyOf, lineOf, nameProblem, normalize, poolOfAgent, shouldPoll } from './packages';
+import { bodyOf, keyOf, lineOf, nameProblem, normalize, poolOfAgent, shouldPoll, versionsOf } from './packages';
 
 const base: Packages = { pool: 'crew', available: true, on: true, ask: true, python: [{ name: 'ansible-lint' }], tools: [], applying: false, workers: [] };
 const w = (task: string, state: string) => ({ task, state }) as Packages['workers'] extends (infer T)[] | undefined ? T : never;
@@ -21,11 +21,12 @@ describe('lineOf', () => {
     expect(lineOf({ ...base, python: [], workers: [w('a', 'ready')] })).toBeNull();
   });
 
-  it('names a failed worker first, then the workers that install, then a change that waits, then the ready count', () => {
+  it('names a failed worker first, then the workers that take a change, then the ready count', () => {
     expect(lineOf({ ...base, applying: true, workers: [w('a', 'materializing'), { task: 'b', state: 'failed', failure: { output: 'x' } }] })).toEqual({ tone: 'red', text: 'The install failed on b.', failure: { output: 'x' } });
-    expect(lineOf({ ...base, workers: [w('a', 'pending'), w('b', 'ready')] })!.text).toBe('Installing on 1 of 2 workers.');
-    expect(lineOf({ ...base, workers: [w('a', 'materializing')] })!.text).toBe('Installing on 1 of 1 worker.');
-    expect(lineOf({ ...base, applying: true, workers: [w('a', 'ready'), w('b', 'ready')] })).toEqual({ tone: 'amber', text: 'Waiting for an idle worker.' });
+    expect(lineOf({ ...base, workers: [w('a', 'pending'), w('b', 'ready')] })).toEqual({ tone: 'amber', text: 'Updating on 1 of 2 workers.' });
+    expect(lineOf({ ...base, workers: [w('a', 'materializing')] })!.text).toBe('Updating on 1 of 1 worker.');
+    // A running worker takes a change in place, so a change never waits for an idle worker: the line says what the workers report.
+    expect(lineOf({ ...base, applying: true, workers: [w('a', 'ready'), w('b', 'ready')] })).toEqual({ tone: 'green', text: 'Ready on 2 of 2 workers.' });
     expect(lineOf({ ...base, workers: [w('a', 'ready'), w('b', 'ready')] })).toEqual({ tone: 'green', text: 'Ready on 2 of 2 workers.' });
     expect(lineOf({ ...base, workers: [w('a', 'ready'), w('b', 'unknown')] })).toEqual({ tone: 'grey', text: 'Ready on 1 of 2 workers.' });
   });
@@ -68,5 +69,25 @@ describe('bodyOf and poolOfAgent', () => {
     expect(poolOfAgent(undefined, undefined, fleet, 'migrator')).toBe('crew');
     expect(poolOfAgent(undefined, null, fleet, 'reviewer')).toBe('');
     expect(poolOfAgent({ name: 'default', role: 'owner', front: true }, null, { ...fleet, pools: [{ name: 'd', agent: 'default' }] } as unknown as Fleet, 'default')).toBe('');
+  });
+});
+
+describe('versionsOf', () => {
+  it('names the version of each package from the workers that are ready, by the key of its name', () => {
+    const p: Packages = {
+      ...base,
+      workers: [
+        { task: 'a', state: 'materializing', installed: { python: [{ name: 'ansible-lint', version: '1.0' }] } },
+        { task: 'b', state: 'ready', installed: { python: [{ name: 'Ansible_Lint', version: '24.9.2' }, { name: 'PyYAML', version: '6.0.2' }], tools: [{ name: 'iproute2', version: '6.11' }] } },
+        { task: 'c', state: 'ready', installed: { python: [{ name: 'ansible-lint', version: '24.9.1' }, { name: 'six' }] } },
+      ],
+    };
+    const py = versionsOf(p, 'python');
+    expect(py.get(keyOf('ansible-lint'))).toBe('24.9.2');
+    expect(py.get(keyOf('pyyaml>=6'))).toBe('6.0.2');
+    expect(py.has(keyOf('six'))).toBe(false);
+    expect(versionsOf(p, 'tools').get(keyOf('iproute2'))).toBe('6.11');
+    expect(versionsOf({ ...base, workers: undefined }, 'python').size).toBe(0);
+    expect(keyOf(' Zope.Interface[docs] ~= 5 ')).toBe('zope-interface');
   });
 });

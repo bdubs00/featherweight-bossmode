@@ -78,9 +78,10 @@ const workers = (n: number) => (n === 1 ? 'worker' : 'workers');
 /**
  * lineOf is the state line of the packages of an agent, or null when there
  * is nothing to say: packages are off, no worker runs, or the lists are
- * empty and nothing changes. A failed worker comes first, then a worker
- * that installs, then a change that waits for an idle worker, then the
- * count of the workers that are ready.
+ * empty and nothing changes. A failed worker comes first, then the workers
+ * that take a change, then the count of the workers that are ready. A
+ * running worker takes a change in place, so no change waits for an idle
+ * worker.
  */
 export function lineOf(p: Packages): PackageLine | null {
   if (!p.on) return null;
@@ -88,9 +89,8 @@ export function lineOf(p: Packages): PackageLine | null {
   const failed = ws.find((w) => w.state === 'failed');
   if (failed) return { tone: 'red', text: `The install failed on ${failed.task}.`, failure: failed.failure || undefined };
   const total = ws.length;
-  const installing = ws.filter((w) => w.state === 'pending' || w.state === 'materializing').length;
-  if (installing > 0) return { tone: 'amber', text: `Installing on ${installing} of ${total} ${workers(total)}.` };
-  if (p.applying) return { tone: 'amber', text: 'Waiting for an idle worker.' };
+  const updating = ws.filter((w) => w.state === 'pending' || w.state === 'materializing').length;
+  if (updating > 0) return { tone: 'amber', text: `Updating on ${updating} of ${total} ${workers(total)}.` };
   if (total === 0 || (p.python.length === 0 && p.tools.length === 0)) return null;
   const ready = ws.filter((w) => w.state === 'ready').length;
   return { tone: ready === total ? 'green' : 'grey', text: `Ready on ${ready} of ${total} ${workers(total)}.` };
@@ -136,4 +136,33 @@ export function poolOfAgent(listed: Agent | undefined, read: Agent | null | unde
   if ((listed && listed.front) || (read && read.front)) return '';
   const p = fleet && fleet.pools ? fleet.pools.find((x) => x.agent === agent) : undefined;
   return p ? p.name : '';
+}
+
+/**
+ * keyOf is the key of a package name for a match: the name without its
+ * version, in lower case, with each run of dashes, underscores, and dots
+ * as one dash, as the Python index compares names. pyyaml>=6 and PyYAML
+ * give pyyaml.
+ */
+export function keyOf(req: string): string {
+  const name = String(req).trim().split(/[\s<>=!~;[@]/)[0];
+  return name.toLowerCase().replace(/[-_.]+/g, '-');
+}
+
+/**
+ * versionsOf names the installed version of each package of a kind, by the
+ * key of its name, from the workers that are ready. The first ready worker
+ * that names a package gives its version.
+ */
+export function versionsOf(p: Packages, kind: PackageKind): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const w of p.workers || []) {
+    if (w.state !== 'ready' || !w.installed) continue;
+    for (const x of w.installed[kind] || []) {
+      if (!x || typeof x.name !== 'string' || typeof x.version !== 'string' || !x.version) continue;
+      const k = keyOf(x.name);
+      if (!out.has(k)) out.set(k, x.version);
+    }
+  }
+  return out;
 }

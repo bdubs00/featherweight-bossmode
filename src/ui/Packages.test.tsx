@@ -146,7 +146,9 @@ describe('the states of the section', () => {
     expect(button(el, 'Turn off')).toBeUndefined();
     act(() => button(el, 'Turn on packages')!.click());
     await vi.waitFor(() => expect(el.querySelector('form.pkgs-add')).not.toBeNull());
-    expect(puts()[0]).toEqual({ method: 'PUT', path: '/v1/pools/crew/packages', body: { on: true, ask: false, python: [], tools: [] } });
+    // Turn on lets the agent ask for a package, whatever the setting held while off.
+    expect(puts()[0]).toEqual({ method: 'PUT', path: '/v1/pools/crew/packages', body: { on: true, ask: true, python: [], tools: [] } });
+    expect((el.querySelector('input[role="switch"]') as HTMLInputElement).checked).toBe(true);
     // The focus goes to the field of the add row, which took the place of the key.
     expect(document.activeElement).toBe(el.querySelector('form.pkgs-add input[aria-label="Package name"]'));
   });
@@ -174,7 +176,9 @@ describe('the states of the section', () => {
     const el = await section();
     const lists = [...el.querySelectorAll('.pkgs-list')];
     expect(lists.map((l) => l.querySelector('h4')!.textContent)).toEqual(['Python packages', 'Programs']);
-    expect(lists.map((l) => [...l.querySelectorAll('.pkgs-name')].map((x) => x.textContent))).toEqual([['ansible-lint'], ['iproute2']]);
+    // A ready worker names the version that it installed, after the name. iproute2 has no version on a ready worker.
+    expect(lists.map((l) => [...l.querySelectorAll('.pkgs-name')].map((x) => x.textContent))).toEqual([['ansible-lint24.9.2'], ['iproute2']]);
+    expect(el.querySelector('.pkgs-name .pkgs-version')!.textContent).toBe('24.9.2');
     expect([...el.querySelectorAll('.pkgs-list button')].map((b) => b.getAttribute('aria-label'))).toEqual(['Remove ansible-lint', 'Remove iproute2']);
     expect(el.querySelector('.pkgs-state')!.textContent).toBe('Ready on 2 of 2 workers.');
     expect(el.querySelector('.pkgs-state')!.getAttribute('role')).toBe('status');
@@ -183,10 +187,11 @@ describe('the states of the section', () => {
     expect(el.querySelector('details.pkgs-fold')).toBeNull();
   });
 
-  it('says how many workers install a change', async () => {
-    answer = { ...ON, applying: true, workers: [ready('crew-0'), { task: 'crew-1', state: 'materializing' }] };
+  it('says how many workers take a change, and names no version of a worker that is not ready', async () => {
+    answer = { ...ON, applying: true, workers: [{ task: 'crew-0', state: 'pending', installed: { python: [{ name: 'ansible-lint', version: '1.0' }] } }, { task: 'crew-1', state: 'materializing' }] };
     const el = await section();
-    expect(el.querySelector('.pkgs-state')!.textContent).toBe('Installing on 1 of 2 workers.');
+    expect(el.querySelector('.pkgs-state')!.textContent).toBe('Updating on 2 of 2 workers.');
+    expect(el.querySelector('.pkgs-version')).toBeNull();
     expect(el.querySelector('.pkgs-state .led-amber')).not.toBeNull();
   });
 
@@ -303,7 +308,19 @@ describe('a change of the packages', () => {
     expect(el.querySelector('.pkgs-error')!.textContent).toBe('The package nope starts with a dash.');
     expect(el.querySelector('.pkgs-error')!.getAttribute('role')).toBe('alert');
     expect((el.querySelector('form.pkgs-add input') as HTMLInputElement).value).toBe('nope');
-    expect([...el.querySelectorAll('.pkgs-name')].map((x) => x.textContent)).toEqual(['ansible-lint', 'iproute2']);
+    expect([...el.querySelectorAll('.pkgs-name')].map((x) => x.firstChild!.textContent)).toEqual(['ansible-lint', 'iproute2']);
+  });
+});
+
+describe('a Python package that the index does not know', () => {
+  it('shows the sentence of the front as it is, and keeps the name in the field', async () => {
+    putAnswer = () => new Response(JSON.stringify({ status: 400, detail: 'There is no Python package named does-not-exist-2.' }), { status: 400, headers: { 'Content-Type': 'application/problem+json' } });
+    const el = await section();
+    typeIn(el.querySelector('form.pkgs-add input') as HTMLInputElement, 'does-not-exist-2');
+    submit(el);
+    await vi.waitFor(() => expect(el.querySelector('.pkgs-error')).not.toBeNull());
+    expect(el.querySelector('.pkgs-error')!.textContent).toBe('There is no Python package named does-not-exist-2.');
+    expect((el.querySelector('form.pkgs-add input') as HTMLInputElement).value).toBe('does-not-exist-2');
   });
 });
 
@@ -386,7 +403,7 @@ describe('the refresh of the section', () => {
       expect(reads()).toBe(1);
       act(() => (el.querySelector('button[aria-label="Remove iproute2"]') as HTMLButtonElement).click());
       await tick(10);
-      expect(el.querySelector('.pkgs-state')!.textContent).toBe('Waiting for an idle worker.');
+      expect(el.querySelector('.pkgs-note')!.textContent).toBe(NOTE_TEXT);
       await tick(5000);
       expect(reads()).toBe(2);
     } finally {
