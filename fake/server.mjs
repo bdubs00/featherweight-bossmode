@@ -32,6 +32,7 @@ import { AGENTS, FLEET, WHOLE, hash, seed, wiki } from './data.mjs';
 import { checkSvg, identicon } from './faces.mjs';
 import { TEMPLATES } from './routes-c.mjs';
 import { TOOLS_OF, allowlistOf, givesTool } from './skills.mjs';
+import { ARCHIVED_REFUSAL } from './archive.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const DIST = path.resolve(here, '..', 'dist');
@@ -1233,6 +1234,8 @@ on('POST', '/v1/runs/([^/]+)/messages', async (c, id) => {
   const files = uploadedFiles(body);
   const content = String(body.content || '').trim();
   if (!content && !files.length) refuse(400, 'a message needs content');
+  // A run of the archive is read-only: its worker was replaced.
+  if (run.archived) refuse(409, ARCHIVED_REFUSAL);
   if (run.state === 'failed' || run.state === 'canceled') refuse(409, `the run ${id} ${run.state === 'failed' ? 'failed' : 'was canceled'}, so it takes no message`);
   const items = S.transcripts.get(id);
   const seq = items[items.length - 1].seq + 1;
@@ -1566,8 +1569,9 @@ function tick() {
 // skills.mjs serves the Skills place.
 // routes-d.mjs serves the Routines place, and writes the runbook of a
 // routine on a sign-off with writePage. routes-e.mjs serves the Duties place.
-// packages.mjs serves the packages of the pools.
-for (const name of ['skills.mjs', 'routes-a.mjs', 'routes-b.mjs', 'routes-c.mjs', 'routes-chat.mjs', 'routes-d.mjs', 'routes-e.mjs', 'packages.mjs']) {
+// packages.mjs serves the packages of the pools, and archive.mjs adds the
+// conversations whose worker was replaced.
+for (const name of ['skills.mjs', 'routes-a.mjs', 'routes-b.mjs', 'routes-c.mjs', 'routes-chat.mjs', 'routes-d.mjs', 'routes-e.mjs', 'packages.mjs', 'archive.mjs']) {
   const mod = await import('./' + name);
   mod.register({ on, refuse, readJson, readBody, publish, S, now, AGENTS, FLEET, admin: () => ADMIN, writePage });
 }

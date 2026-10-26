@@ -144,7 +144,7 @@ Variables of the fake server:
 | `FAKE_LIVE_MS` | The time between two pieces of a live answer in milliseconds, 120 by default |
 | `FAKE_LIVE_HOLD=1` | A live answer stops near its middle and waits there, for a screenshot of an answer that streams in |
 | `FAKE_ASK=<tool>` | The manager waits for a decision on one call: `bridge_open`, `pages_write`, `spawn_task`, `create_issue`, or `env`. An allowed `bridge_open` opens the bridge, and the manager names it by its id. An allowed `env` adds `ansible-lint` to the packages of the manager. |
-| `FAKE_PACKAGES=0` | The settings say that the deployment has no package mirror, so no profile shows Packages. Without it, the workers of migrator have two packages, and every other agent starts with packages off. A change installs on each worker for a few seconds, one worker after the other. A package named `does-not-exist` fails with a short output. |
+| `FAKE_PACKAGES=0` | The settings say that the deployment has no package mirror, so no profile shows Packages. Without it, the workers of migrator have two packages, and every other agent starts with packages off. A change installs on each worker for a few seconds, one worker after the other. A program named `does-not-exist` fails with a short output. A new Python package whose name starts with `does-not-exist` gets a 400, as the front answers a name that the index does not know. alice also has four conversations whose worker was replaced: two with the manager, one with migrator, and one quick chat. They carry `archived`, and a message to one answers 409. |
 
 A sign-in at `/ui/signin?as=bob` signs you in as bob@example.com.
 

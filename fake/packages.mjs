@@ -12,7 +12,9 @@
 // FAKE_ASK=env, the manager asks for a Python package, and its pool starts
 // on. A change makes each worker install for a few seconds, one after the
 // other, and then it is ready. A package named does-not-exist fails, with a
-// short output. An allowed call of env adds its package to the list.
+// short output. A new Python package whose name starts with does-not-exist
+// gets the 400 of the front, which asks the index of the mirror first. An
+// allowed call of env adds its package to the list.
 
 /** The most characters of one package, and the most packages of one list, as the kernel takes them. */
 const MAX_NAME = 200;
@@ -174,6 +176,11 @@ export function register({ on, refuse, readJson, S, now, AGENTS, FLEET }) {
     const body = await readJson(c.req);
     check(body);
     const st = stateOf(pool);
+    // The front asks the index of the mirror for each new Python package, and refuses a name that the index does not know.
+    for (const r of body.python || []) {
+      const name = nameOf(r);
+      if (name.startsWith(BAD) && !st.python.some((x) => nameOf(x.name) === name)) refuse(400, `There is no Python package named ${String(r).trim().split(/[\s<>=!~;[]/)[0]}.`);
+    }
     const next = {
       on: body.on === undefined ? st.on : body.on,
       ask: body.ask === undefined ? st.ask : body.ask,
