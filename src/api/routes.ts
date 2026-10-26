@@ -173,6 +173,8 @@ export const api = {
   bridgePages: (id: string) => call<BridgePages>(bridge(id) + '/pages').then((r) => (r && r.pages) || []),
   react: (id: string, seq: number, reaction: ReactionKind, note?: string) =>
     call<Entry>(bridge(id) + '/messages/' + enc(seq) + '/reactions', { method: 'POST', body: note ? { reaction, note } : { reaction } }),
+  /** settleQuestion ends the open question of a seat, entry seq of its channel, without an answer. The seat does not wake. The answer is 204. */
+  settleQuestion: (id: string, seq: number) => call<null>(bridge(id) + '/questions/' + enc(seq) + '/settle', { method: 'POST' }),
   addMember: (id: string, m: NewMember) => call<Member>(bridge(id) + '/members', { method: 'POST', body: m }),
   fire: (id: string, handle: string) => call<Member>(bridge(id) + '/members/' + enc(handle), { method: 'DELETE' }),
   patchMember: (id: string, handle: string, patch: { muted?: boolean; task?: string; continue?: boolean }) =>

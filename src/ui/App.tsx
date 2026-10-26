@@ -15,7 +15,8 @@
 
 import type { ComponentChildren } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { clearToken, getToken, scheduleRenewal, setToken, setUnauthorizedHandler, stopRenewal, type SigninNeeded } from '../api/client';
+import { clearToken, getToken, scheduleRenewal, setReachHandler, setToken, setUnauthorizedHandler, stopRenewal, type SigninNeeded } from '../api/client';
+import { noteAnswer, watchReach } from '../state/reach';
 import { afterUnauthorized, clearSigninMarks, markSignedOut, sessionStore } from '../api/auth';
 import { api } from '../api/routes';
 import { store, useSelect } from '../state/store';
@@ -25,7 +26,7 @@ import { dismissBuild, useNewBuild } from '../lib/build';
 import { applyTheme, themeOf } from '../lib/theme';
 import { canonicalPath, columnOf, go, parentOf, parseRoute, placeOf, type Place, type Route } from '../lib/route';
 import { isTyping } from './keys';
-import { clearNotice, clearSaid, currentSaidLink, showError, useNotice, useSaid } from './notice';
+import { clearNotice, clearSaid, currentSaidLink, showError, undoSaid, useNotice, useSaid, useUndo } from './notice';
 import { EmptyPane, Shell, shownOf } from './Shell';
 import { BridgeList } from './BridgeList';
 import { Channel } from './Channel';
@@ -229,13 +230,18 @@ function Notice({ text }: { text: string }) {
   );
 }
 
-/** Said is the notice of an action that worked: its sentence, with Dismiss. It goes by itself after a few seconds. */
-function Said({ text }: { text: string }) {
+/** Said is the notice of an action that worked: its sentence, with Undo for an action that waits to go out or a link to what the action made, and Dismiss. It goes by itself after a few seconds. */
+function Said({ text, undo }: { text: string; undo: boolean }) {
   const link = currentSaidLink();
   return (
     <div class="notice" role="status">
       <p>{text}</p>
-      {link && (
+      {undo && (
+        <Button kind="secondary" size="s" onClick={undoSaid}>
+          Undo
+        </Button>
+      )}
+      {!undo && link && (
         <Button kind="secondary" size="s" href={link.href} onClick={clearSaid}>
           {link.label}
         </Button>
@@ -272,6 +278,7 @@ export function App() {
   const [auth, setAuth] = useState<Auth>({ kind: 'loading' });
   const notice = useNotice();
   const said = useSaid();
+  const undo = useUndo();
   const fresh = useNewBuild();
   const open = route.place === 'bridge' ? route.id : '';
   const config = useSelect((s) => s.config);
@@ -359,6 +366,8 @@ export function App() {
     const path = canonicalPath(location.pathname);
     if (path !== location.pathname) history.replaceState(null, '', path + location.search + location.hash);
     setUnauthorizedHandler(unauthorized);
+    // Each call says whether it reached the server, for the bar Offline.
+    setReachHandler(noteAnswer);
     boot();
     // A page that comes back from the cache of the browser, as after Back
     // from a sign-in that did not finish, starts again. Without this, the
@@ -388,6 +397,13 @@ export function App() {
       stopStream();
     };
   }, []);
+
+  // While the person is signed in, the page follows whether it reaches the server, and tries again with a read of whoami while it does not.
+  const signedIn = auth.kind === 'ready';
+  useEffect(() => {
+    if (!signedIn) return;
+    return watchReach(() => api.whoami());
+  }, [signedIn]);
 
   // The keys of the whole page: / and Escape.
   useEffect(() => {
@@ -483,5 +499,5 @@ export function App() {
 
   const panes = panesOf(route);
   const place = placeIn(route);
-  return <Shell route={route} place={place} list={panes.list} main={panes.main} details={panes.details} notice={notice ? <Notice text={notice} /> : said ? <Said text={said} /> : fresh ? <NewBuild /> : null} onSignOut={signOut} />;
+  return <Shell route={route} place={place} list={panes.list} main={panes.main} details={panes.details} notice={notice ? <Notice text={notice} /> : said ? <Said text={said} undo={undo} /> : fresh ? <NewBuild /> : null} onSignOut={signOut} />;
 }

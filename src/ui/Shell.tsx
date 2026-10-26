@@ -9,7 +9,10 @@
 // title of the tab names the place, the count of what needs you, and the
 // deployment. After a move that leaves the focus on the page, the focus
 // goes to the row that the list marks, or to the heading of the pane that
-// shows.
+// shows. While the page reaches no server, a bar at the top says Offline.
+// Trying again., and the figures of the page show as stale: the readout of
+// the fleet says Offline and the counts fade, because they show what the
+// page read last.
 
 import type { ComponentChildren, JSX } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
@@ -17,6 +20,7 @@ import { api } from '../api/routes';
 import type { BossConfig } from '../api/types';
 import { useSelect } from '../state/store';
 import { loadInbox } from '../state/duties';
+import { useOffline } from '../state/reach';
 import { columnOf, placeOf, type Column, type Place, type Route } from '../lib/route';
 import { themeOf, setChoice, useChoice, type ThemeChoice } from '../lib/theme';
 import { personName } from '../lib/words';
@@ -253,6 +257,7 @@ export function AppBar({ route, place: placeProp, onSignOut, onReach }: { route:
   const config = useSelect((s) => s.config);
   // The count on Activity counts the rows of Activity that need you: the same rows as its list, less the new messages.
   const attention = useAttention();
+  const offline = useOffline();
   const theme = themeOf(config);
   const logo = useLogo(theme.logo);
   // A run that starts to wait for the person, such as a decision in a chat
@@ -284,7 +289,7 @@ export function AppBar({ route, place: placeProp, onSignOut, onReach }: { route:
               <Glyph name={it.glyph} size={22} />
               <span class="place-label">{it.label}</span>
               {count > 0 && (
-                <Chip tone="ink" class="place-count" label={count === 1 ? '1 item needs you' : count + ' items need you'}>
+                <Chip tone="ink" class={'place-count' + (offline ? ' stale' : '')} label={(count === 1 ? '1 item needs you' : count + ' items need you') + (offline ? ', as the page read it last' : '')}>
                   {countText(count)}
                 </Chip>
               )}
@@ -381,7 +386,10 @@ export function FleetFoot() {
   const facts = useSelect(selectFacts);
   const r = useMemo(() => readoutOf(facts), [facts]);
   const known = !!facts.fleet;
-  const down = useDownWord(status);
+  const offline = useOffline();
+  const word = useDownWord(status);
+  // A page that reaches no server says so here too, whatever the stream says.
+  const down = offline ? 'Offline' : word;
   if (!known && !down) return null;
   const caption = known ? captionOf(r.lamps.length) : 'Workers';
   const figures = known ? figuresOf(r) : [];
@@ -395,7 +403,11 @@ export function FleetFoot() {
         </span>
         <span class="readout-figures" aria-hidden="true">
           {down ? (
-            <Led tone={status === 'closed' ? 'red' : 'grey'} word={down} label={status === 'closed' ? 'The page gets no updates.' : 'The page connects to the server again.'} />
+            <Led
+              tone={offline || status === 'closed' ? 'red' : 'grey'}
+              word={down}
+              label={offline ? 'The page reaches no server. The figures show what it read last.' : status === 'closed' ? 'The page gets no updates.' : 'The page connects to the server again.'}
+            />
           ) : (
             figures.map((f) => (
               <span class={'figure figure-' + f.kind}>
@@ -465,6 +477,7 @@ export function Shell({ route, place: placeProp, list, main, details, notice, on
   // the dialog and its draft stay in sight when the width of the window
   // crosses 800 pixels.
   const [reach, setReach] = useState(false);
+  const offline = useOffline();
   // Each place remembers its last address for the app bar.
   useEffect(() => {
     lastOf[place] = location.hash || '#';
@@ -486,10 +499,19 @@ export function Shell({ route, place: placeProp, list, main, details, notice, on
     focusHome(document.getElementById('main'));
   };
   return (
-    <div class="shell" data-show={shown} data-place={place} data-list={list ? '1' : '0'} data-details={details ? '1' : '0'}>
+    <div class="shell" data-show={shown} data-place={place} data-list={list ? '1' : '0'} data-details={details ? '1' : '0'} data-offline={offline ? '1' : undefined}>
       <a class="skip" href="#main" onClick={skip}>
         Skip to the content
       </a>
+      {offline && (
+        <div class="offline-bar" aria-hidden="true">
+          <Led tone="red" word="Offline." />
+          <span>Trying again.</span>
+        </div>
+      )}
+      <span class="sr" role="status">
+        {offline ? 'Offline. Trying again.' : ''}
+      </span>
       <AppBar route={route} place={place} onSignOut={onSignOut} onReach={() => setReach(true)} />
       {list && (
         <section class="pane pane-list" aria-label="List">

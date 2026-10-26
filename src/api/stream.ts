@@ -1,6 +1,9 @@
 // The live updates of GET /v1/bossmode/stream. EventSource cannot send a
 // bearer token, so the page reads the server-sent events over fetch and
-// parses them here. A lost stream connects again with Last-Event-ID.
+// parses them here. A lost stream connects again with Last-Event-ID. The
+// server writes a keep-alive line each 15 seconds, so a stream that stays
+// silent for SILENT_MS lost its connection, as when the network went away
+// under it, and the page connects again.
 
 import { authHeaders, renewToken, SigninNeeded, ApiError, type FetchLike, type Problem } from './client';
 import type { StreamEvent } from './types';
@@ -118,6 +121,8 @@ export interface StreamOptions {
   sleep?: (ms: number) => Promise<void>;
   /** The clock, in milliseconds. A test sets it. */
   now?: () => number;
+  /** How long a stream may stay silent before the page drops it and connects again, in milliseconds. A test sets it short. */
+  silentMs?: number;
 }
 
 export interface StreamHandle {
@@ -137,6 +142,9 @@ const BACKOFF = [1000, 2000, 4000, 8000, 15000];
  */
 export const QUIET_MS = 5000;
 
+/** SILENT_MS is the longest silence of a stream that still counts as a connection: three keep-alive lines of the server. */
+export const SILENT_MS = 45_000;
+
 /**
  * openStream reads the stream until close. After an error or an end, it
  * waits and connects again with Last-Event-ID. A 401 that a renewal of the
@@ -149,15 +157,34 @@ export function openStream(opts: StreamOptions): StreamHandle {
   const backoff = opts.backoff || BACKOFF;
   const sleep = opts.sleep || ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const now = opts.now || (() => Date.now());
+  const silentMs = opts.silentMs || SILENT_MS;
   const ctl = new AbortController();
   let lastId = opts.lastId || '';
   let closed = false;
   const status = (s: StreamStatus) => opts.onStatus && opts.onStatus(s);
 
   async function once(mayRenew = true): Promise<boolean> {
+    // Each attempt has a signal of its own, so a silent stream ends alone, and close ends every attempt.
+    const attempt = new AbortController();
+    const stop = () => attempt.abort();
+    ctl.signal.addEventListener('abort', stop);
+    let silent: ReturnType<typeof setTimeout> | null = null;
+    const listen = () => {
+      if (silent) clearTimeout(silent);
+      silent = setTimeout(stop, silentMs);
+    };
+    try {
+      return await read(attempt.signal, listen, mayRenew);
+    } finally {
+      if (silent) clearTimeout(silent);
+      ctl.signal.removeEventListener('abort', stop);
+    }
+  }
+
+  async function read(signal: AbortSignal, listen: () => void, mayRenew: boolean): Promise<boolean> {
     const headers: Record<string, string> = { Accept: 'text/event-stream', ...authHeaders() };
     if (lastId) headers['Last-Event-ID'] = lastId;
-    const res = await doFetch(url, { headers, signal: ctl.signal, cache: 'no-store', credentials: 'same-origin' });
+    const res = await doFetch(url, { headers, signal, cache: 'no-store', credentials: 'same-origin' });
     if (res.status === 401) {
       // A token that expired renews, and the stream connects again with it.
       if (mayRenew && (await renew())) return once(false);
@@ -185,9 +212,11 @@ export function openStream(opts: StreamOptions): StreamHandle {
     const parser = new SseParser();
     parser.lastId = lastId;
     const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+    listen();
     for (;;) {
       const { value, done } = await reader.read();
       if (done) break;
+      listen();
       for (const m of parser.feed(value)) {
         const e = toEvent(m);
         if (m.id) lastId = m.id;

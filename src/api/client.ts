@@ -128,6 +128,13 @@ export function setFetch(f: FetchLike): FetchLike {
 /** The handler of a 401, which the app sets. */
 let onUnauthorized: (e: SigninNeeded) => void = () => {};
 
+let onReach: (status: number) => void = () => {};
+
+/** setReachHandler sets what the page notes at the end of each call: the status of its answer, or 0 for a call that got none. */
+export function setReachHandler(f: (status: number) => void): void {
+  onReach = f;
+}
+
 /** setUnauthorizedHandler sets what the page does on a 401. */
 export function setUnauthorizedHandler(f: (e: SigninNeeded) => void): void {
   onUnauthorized = f;
@@ -284,8 +291,10 @@ export async function send(path: string, opts: CallOptions = {}): Promise<Respon
     res = await fetchImpl(path, { method: opts.method || 'GET', headers, body, signal: opts.signal, credentials: 'same-origin' });
   } catch (e) {
     if (e instanceof DOMException && e.name === 'AbortError') throw e;
+    onReach(0);
     throw new ApiError(0, null);
   }
+  onReach(res.status);
   if (res.status === 401) {
     if (!opts.renewed && (await renewToken())) return send(path, { ...opts, renewed: true });
     const err = new SigninNeeded(await readProblem(res), path);

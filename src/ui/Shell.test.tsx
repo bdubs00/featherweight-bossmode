@@ -4,6 +4,7 @@ import { act } from 'preact/test-utils';
 import type { Fleet } from '../api/types';
 import { store } from '../state/store';
 import { fakeFetch } from './testkit-b';
+import { forgetReach, noteAnswer } from '../state/reach';
 import { FleetFoot, GRACE_MS, RACK_LAMPS, Shell, captionOf, isToken, placesOf, shownOf, tabTitle } from './Shell';
 
 let box: HTMLElement | null = null;
@@ -130,6 +131,30 @@ describe('the count of Activity', () => {
     } finally {
       f.restore();
     }
+  });
+});
+
+describe('the bar Offline', () => {
+  it('shows while the page reaches no server, pushes the shell down, and marks the figures as stale', () => {
+    forgetReach();
+    act(() => {
+      store.dispatch({ type: 'stream-status', status: 'live' });
+      store.dispatch({ type: 'fleet', fleet: { name: 'front-0', members: [], pools: [{ name: 'crew', atespace: 'default', agent: 'migrator', intake: 'q', wanted: 1, actual: 1, ready: 1, hash: 'h', checkedAt: '', tasks: [{ name: 'crew-0', phase: 'Running', current: true }] }] } });
+    });
+    const el = mount(<Shell route={{ place: 'home' }} list={<FleetFoot />} main={<p>main</p>} details={null} onSignOut={() => {}} />);
+    expect(el.querySelector('.offline-bar')).toBeNull();
+    expect(el.querySelector('.shell')!.hasAttribute('data-offline')).toBe(false);
+    act(() => noteAnswer(0));
+    expect(el.querySelector('.offline-bar')!.textContent).toBe('Offline.Trying again.');
+    expect(el.querySelector('.shell > .sr[role="status"]')!.textContent).toBe('Offline. Trying again.');
+    expect(el.querySelector('.shell')!.getAttribute('data-offline')).toBe('1');
+    // The readout of the fleet shows what the page read last, and says so.
+    expect(el.querySelector('.readout.stale')).not.toBeNull();
+    expect(el.querySelector('.readout')!.getAttribute('aria-label')).toContain('Offline');
+    act(() => noteAnswer(200));
+    expect(el.querySelector('.offline-bar')).toBeNull();
+    expect(el.querySelector('.readout.stale')).toBeNull();
+    forgetReach();
   });
 });
 

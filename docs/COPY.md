@@ -107,6 +107,7 @@ Capacity shows where seating happens:
 | `A new version of bossmode is out.` | change | `A new version of this page is ready.`, with `Reload` and `Dismiss` | done |
 | `The workbench refused one request. You are still signed in. Try again.` | change | `The server refused one request. You are still signed in. Try again.` | done |
 | `The workbench did not answer. Check the connection, then try again.` | change | `The server did not answer. Check the connection, then try again.` | done |
+| new | add | `Undo` on the notice of an action that waits to go out, such as `Denied.`, beside `Dismiss` | done |
 
 ### src/ui/Shell.tsx
 
@@ -132,6 +133,7 @@ Capacity shows where seating happens:
 | `Graphite` (the theme in the account menu) | change | `Dark`, also in Appearance | done |
 | `token, account`, `TO`, and `token` over `token` in the menu head, for the access token of the fleet | change | `Your account`, a figure for the key, and `You` over `Signed in with an access token` | done |
 | `The page connects to the workbench again.` | change | `The page connects to the server again.` | done |
+| new | add | the bar `Offline. Trying again.` at the top of the window while the page reaches no server. The readout of the fleet says `Offline` with the tooltip `The page reaches no server. The figures show what it read last.`, and the count of Activity adds `, as the page read it last` for a screen reader. | done |
 
 ### src/ui/Signin.tsx
 
@@ -371,6 +373,7 @@ Capacity shows where seating happens:
 | the plan of a large call, such as a playbook with check false and a files map, as the top-level fields cut to one line, or no input at all | change | the short fields first (`hosts`, `check`, `become`, `module`), a text of several lines as a short block of code with its name and the quiet key `Show all`, then `Show less`, and a map of files as a list of file names, each a key that opens its text. No JSON outside Details | done |
 | `Deny`, `Allow` on the card of the channel, `Deny`, `Always allow`, `Allow` on the card of Activity for the same decision | change | the same keys on every surface: Always allow only by the rule of the front, never for a rule with a pattern such as `check=false` | done |
 | new | add | the card of a question of a seat: `Needs your answer` with the amber light, the words of the seat, one key per choice, `Your answer`, and `Answer`. `Question from <who>` names the card for a screen reader, and `Answers for <who>` the group of the keys. Once a person answers, or the seat posts again, the entry reads as a message | done |
+| new | add | `No answer needed`, a quiet key beside `Answer` on the card of a question of a seat, in the channel and in Activity. It ends the question, and the seat does not wake. A server without the route: `This server cannot end a question without an answer yet. Answer it instead.` | done |
 
 ### src/ui/Composer.tsx
 
@@ -463,6 +466,7 @@ Capacity shows where seating happens:
 | the empty main pane after a decision | change | the next item that needs you opens. When none is left, the decided card stays, settled: quiet, with `You allowed this` or the answer, and no key | B |
 | `Done` | add | a small secondary key on the row of a message, under its text, and in the head of the main pane, and the key e. It clears the message for you: the read mark of its bridge moves to the message. `Done with <name>` for a screen reader on a row. A decision and a message that asks you have no Done | B |
 | `at its limit` (a seat whose newest run stopped at a limit) | add | its row, after the errors: the plain line of the limit, such as `Stopped at its turn limit`, and the key `Continue`, also in the main pane, and the key c. `Continue <handle>` for a screen reader on a row | B |
+| a and d decide at once | change | a and d hold the decision five seconds with the notice `Allowed.` or `Denied.` and `Undo`. The row says `allowed` or `denied` with the tooltip `It goes out in a few seconds. Undo takes it back.`, and u on the row takes it back. Undo says `Undone. Nothing went out.` | done |
 
 ### src/ui/Fleet.tsx
 

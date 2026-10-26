@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { act } from 'preact/test-utils';
 import { store } from '../state/store';
 import { forgetDuties } from '../state/duties';
-import { ActivityList, ActivityMain, pick } from './Activity';
+import { ActivityList, ActivityMain, holdFor, pick } from './Activity';
 import { Shell } from './Shell';
 import { at, bridge, run, seat } from './testkit-b';
 import { fakeApi, keyNamed, mount, settle, unmountAll } from './testkit-c';
@@ -12,6 +12,8 @@ let api: ReturnType<typeof fakeApi>;
 
 beforeEach(() => {
   forgetDuties();
+  // A decision of a key waits a moment before it goes out. The tests wait little.
+  holdFor(0);
   pick('');
   location.hash = '#activity';
   window.matchMedia = ((q: string) => ({ matches: /min-width/.test(q), media: q, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
@@ -164,7 +166,7 @@ describe('Activity and the duties', () => {
     act(() => {
       row.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
     });
-    await settle();
+    await settle(8);
     expect(api.calls.some((c) => c.method === 'POST' && c.path === '/v1/runs/run-ask/approvals/ap-1')).toBe(true);
   });
 
