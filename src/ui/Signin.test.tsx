@@ -13,6 +13,10 @@ describe('the sign-in screen', () => {
     expect(root.querySelector('a[href^="/ui/signin"]')?.textContent?.trim()).toBe('Sign in');
     expect(root.querySelector('.lede')?.textContent).toBe('Sign in to run your fleet.');
     expect((root.querySelector('details.token-way') as HTMLDetailsElement).open).toBe(false);
+    // The page names itself before the settings of the deployment load, and the token way shows the arrow of a disclosure.
+    expect(root.querySelector('h1')!.textContent).toBe('Sign in to Bossmode');
+    expect(document.title).toBe('Sign in - Bossmode');
+    expect(root.querySelector('details.token-way summary .glyph')).not.toBeNull();
   });
 
   it('opens the token way after a sign-in that did not finish', () => {

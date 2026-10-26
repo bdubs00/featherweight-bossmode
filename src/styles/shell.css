@@ -351,21 +351,45 @@ dialog.confirm .notify-said.field-error {
   margin: auto;
 }
 
-/* The notice of a failed action, over the top of the main pane. */
+/* The notice of an action, at the top of the main pane. It takes its own
+   room and pushes the screen down, so it never covers a key of the screen. */
 .notice {
-  position: absolute;
+  flex: none;
+  position: relative;
   z-index: var(--z-notice);
-  top: calc(var(--h-header) + var(--groove) + var(--s-2));
-  left: var(--s-4);
-  right: var(--s-4);
   display: flex;
   align-items: center;
   gap: var(--s-3);
+  margin: var(--s-2) var(--s-4);
   padding: var(--s-2) var(--s-2) var(--s-2) var(--s-4);
   border: 1px solid var(--edge);
   border-radius: var(--r);
   background: var(--card);
   box-shadow: var(--e-overlay);
+}
+
+/* The link that skips the places. It shows only while it holds the focus. */
+.skip {
+  position: absolute;
+  z-index: calc(var(--z-notice) + 1);
+  top: var(--s-2);
+  left: var(--s-2);
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--edge);
+  border-radius: var(--r);
+  background: var(--card);
+  color: var(--ink);
+  font-weight: 600;
+  transform: translateY(-200%);
+}
+.skip:focus {
+  transform: none;
+}
+
+/* The account of a person with the access token of the fleet: a figure, not letters. */
+.avatar-you .ic {
+  width: 18px;
+  height: 18px;
 }
 .notice p {
   flex: 1;
@@ -381,8 +405,10 @@ dialog.confirm .notify-said.field-error {
 }
 .signin {
   max-width: 420px;
-  margin: 12vh auto 0;
-  padding: 0 var(--s-4);
+  margin: 0 auto;
+  /* Padding, not a margin, keeps the space above the card: a margin of the
+     first child passes through the body, and the page then scrolls. */
+  padding: 12vh var(--s-4) 0;
 }
 .signin .card-body {
   gap: var(--s-3);
@@ -403,7 +429,19 @@ dialog.confirm .notify-said.field-error {
   min-height: var(--h-row);
   display: inline-flex;
   align-items: center;
+  gap: var(--s-1);
   font-weight: 600;
+  list-style: none;
+}
+.token-way summary::-webkit-details-marker {
+  display: none;
+}
+/* The arrow of the disclosure turns down when it opens, as Advanced does. */
+.token-way summary .glyph {
+  transform: rotate(180deg);
+}
+.token-way[open] summary .glyph {
+  transform: rotate(-90deg);
 }
 .token-way .field {
   margin: var(--s-2) 0 var(--s-3);

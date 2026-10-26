@@ -74,7 +74,7 @@ describe('a new build of the page', () => {
     el = mount(<App />);
     await vi.waitFor(() => expect(offer(el)).not.toBeNull());
     const line = offer(el)!;
-    expect(line.querySelector('p')!.textContent).toBe('A new version of bossmode is out.');
+    expect(line.querySelector('p')!.textContent).toBe('A new version of this page is ready.');
     expect([...line.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Reload', 'Dismiss']);
     expect(document.querySelector('dialog[open]')).toBeNull();
     await visit('#fleet');

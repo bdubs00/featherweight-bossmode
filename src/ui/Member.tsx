@@ -13,6 +13,10 @@
 // the status, the plain line of the failure, and the key Seat again, which
 // starts the seat anew with its task in one click.
 //
+// The screen belongs to the place that opened it. From a bridge or from
+// Activity, Back goes to the members of the bridge. From the Fleet place,
+// Back goes to the Fleet list, as before.
+//
 // A read of a run goes to its worker and wakes a worker that sleeps. Chat
 // shows what the page has from the channel and the stream, and reads the
 // steps and the files of the run only while its worker is awake. Run and
@@ -39,12 +43,33 @@ import { Composer } from './Composer';
 import { useTranscript } from './Conversation';
 import { FilesView, RunView, failureOf, filesCount, useResult } from './RunPane';
 import { SeatAgainKey, continueSeat, seatAgain } from './SeatAgain';
+import { muteItem } from './Roster';
 import { FollowBox, ThreadView } from './Thread';
 import { LiveLines, useLiveAnswer } from './Live';
 import { works } from '../lib/chat';
 import { Profile } from './Profile';
 import { ProfileLink, rememberOpen } from './Fleet';
 import { Button, Field, Led, PaneHeader, Tabs, TextArea } from './primitives';
+
+/* ---------- the place that opened the seat ---------- */
+
+let from: 'bridges' | 'fleet' = 'bridges';
+
+/** setMemberFrom notes the place that opened the conversation of a seat. The shell calls it when the route moves to a seat. */
+export function setMemberFrom(place: 'bridges' | 'fleet'): void {
+  from = place;
+}
+
+/** memberFrom is the place that opened the conversation of a seat: bridges, unless the Fleet place opened it. */
+export function memberFrom(): 'bridges' | 'fleet' {
+  return from;
+}
+
+/** backTo is the way back from the conversation of a seat: the members of its bridge, or the Fleet list. */
+function backTo(bridge: string, title: string): { href: string; label: string; to: 'list' } {
+  if (from === 'fleet') return { href: '#fleet', label: 'Fleet', to: 'list' };
+  return { href: hrefOf({ place: 'bridge', id: bridge, pane: 'roster' }), label: 'the members of ' + (title || 'the bridge'), to: 'list' };
+}
 
 /* ---------- the seat ---------- */
 
@@ -82,6 +107,11 @@ function useStopped(m: MemberT | undefined): '' | 'failed' | 'stopped' | 'limit'
 export function TaskDialog({ bridge, m, onClose }: { bridge: string; m: MemberT; onClose: () => void }) {
   const [task, setTask] = useState(m.task);
   const [busy, setBusy] = useState(false);
+  // The field takes the focus, so the person types the new task at once.
+  const field = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (field.current) field.current.focus();
+  }, []);
   return (
     <Confirm
       title={'Change the task of ' + m.handle}
@@ -96,7 +126,7 @@ export function TaskDialog({ bridge, m, onClose }: { bridge: string; m: MemberT;
       }}
     >
       <Field label="Task">
-        <TextArea rows={3} value={task} onInput={(e) => setTask((e.target as HTMLTextAreaElement).value)} />
+        <TextArea ref={field} rows={3} value={task} onInput={(e) => setTask((e.target as HTMLTextAreaElement).value)} />
       </Field>
     </Confirm>
   );
@@ -107,17 +137,21 @@ export function TaskDialog({ bridge, m, onClose }: { bridge: string; m: MemberT;
  * reaches only here, Mute, Seat again, Change task, and Fire. Seat again
  * acts at once, as its key does.
  */
-function SeatMenu({ bridge, m, stopped }: { bridge: string; m: MemberT; stopped: '' | 'failed' | 'stopped' | 'limit' | 'not-started' }) {
+function SeatMenu({ bridge, m, stopped, closed }: { bridge: string; m: MemberT; stopped: '' | 'failed' | 'stopped' | 'limit' | 'not-started'; closed: boolean }) {
   const [dialog, setDialog] = useState<'' | 'task' | 'fire'>('');
   if (m.fired) return null;
-  const items: MenuItem[] = [
-    { label: 'Profile', onSelect: () => go({ place: 'member', bridge, handle: m.handle, tab: 'chat', profile: true }) },
-    { label: m.muted ? 'Unmute' : 'Mute', onSelect: () => attempt(() => patchMember(bridge, m.handle, { muted: !m.muted })) },
-    ...(stopped === 'limit' ? [{ label: 'Continue', onSelect: () => continueSeat(bridge, m) }] : []),
-    ...(stopped ? [{ label: 'Seat again', onSelect: () => seatAgain(bridge, m) }] : []),
-    { label: 'Change task', onSelect: () => setDialog('task') },
-    { label: 'Fire', danger: true, onSelect: () => setDialog('fire') },
-  ];
+  const profile: MenuItem = { label: 'Profile', onSelect: () => go({ place: 'member', bridge, handle: m.handle, tab: 'chat', profile: true }) };
+  // A closed bridge takes no change, so its seat offers the profile alone.
+  const items: MenuItem[] = closed
+    ? [profile]
+    : [
+        profile,
+        muteItem(bridge, m),
+        ...(stopped === 'limit' ? [{ label: 'Continue', onSelect: () => continueSeat(bridge, m) }] : []),
+        ...(stopped ? [{ label: 'Seat again', onSelect: () => seatAgain(bridge, m) }] : []),
+        { label: 'Change task', onSelect: () => setDialog('task') },
+        { label: 'Fire', danger: true, onSelect: () => setDialog('fire') },
+      ];
   return (
     <>
       <Menu label={'More for ' + m.handle} kind="secondary" items={items} />
@@ -247,13 +281,18 @@ function Chat({ bridge, m, items, closed, stopped, reason, said }: { bridge: str
 }
 
 export function MemberMain({ bridge, handle, tab }: { bridge: string; handle: string; tab: MemberTab }) {
-  useEffect(() => rememberOpen(hrefOf({ place: 'member', bridge, handle, tab: 'chat' })), [bridge, handle]);
+  // The Fleet place opens this seat again only when the Fleet place opened it.
+  useEffect(() => {
+    if (from === 'fleet') rememberOpen(hrefOf({ place: 'member', bridge, handle, tab: 'chat' }));
+  }, [bridge, handle]);
   const { m, loaded } = useSeat(bridge, handle);
   const b = useSelect((s) => s.bridges.byId[bridge]);
   const runId = m ? newestRun(m) : '';
   const light = useSelect((s) => (m ? statusOf(selectFacts(s), { seat: m }) : null));
   const runObj = useSelect((s) => (runId ? s.runs[runId] : undefined));
-  const stopped = useStopped(m);
+  // A closed bridge seats no one again, so a stop there offers no key.
+  const halted = useStopped(m);
+  const stopped = b && b.state === 'closed' ? '' : halted;
   // A worker that the page knows awake can take a read. Run and Files read when the person opens them, and say so when the read wakes the worker.
   const awake = useSelect((s) => (runId ? awakeFor(selectFacts(s), s.runs[runId]) : null));
   const opened = tab === 'run' || tab === 'files';
@@ -278,7 +317,7 @@ export function MemberMain({ bridge, handle, tab }: { bridge: string; handle: st
   if (!m) {
     return (
       <section class="screen member-main">
-        <PaneHeader title={handle} size="title" level={1} back={{ href: '#fleet', label: 'Fleet', to: 'list' }} />
+        <PaneHeader title={handle} size="title" level={1} back={backTo(bridge, b ? b.title : '')} />
         <div class="empty">
           <p>{loaded ? handle + ' has no seat on this bridge, or no run yet.' : 'Loading the member.'}</p>
         </div>
@@ -299,7 +338,7 @@ export function MemberMain({ bridge, handle, tab }: { bridge: string; handle: st
         level={1}
         headingRef={heading}
         focusable
-        back={{ href: '#fleet', label: 'Fleet', to: 'list' }}
+        back={backTo(bridge, b ? b.title : '')}
         lead={<ProfileLink href={hrefOf({ ...base, tab: 'chat', profile: true })} agent={m.agent} label={handle} light={light} />}
         actions={
           <>
@@ -312,7 +351,7 @@ export function MemberMain({ bridge, handle, tab }: { bridge: string; handle: st
                 { id: 'files', label: 'Files', href: hrefOf({ ...base, tab: 'files' }), count: files, countLabel: files === 1 ? '1 file' : files + ' files' },
               ]}
             />
-            <SeatMenu bridge={bridge} m={m} stopped={stopped} />
+            <SeatMenu bridge={bridge} m={m} stopped={stopped} closed={!!b && b.state === 'closed'} />
           </>
         }
       >

@@ -109,7 +109,7 @@ export function problemSentence(problem: Problem | null, status: number, statusT
   if (detail) return detail;
   const title = problem && typeof problem.title === 'string' ? oneSentence(problem.title) : '';
   if (title) return title;
-  if (status === 0) return 'The workbench did not answer. Check the connection and try again.';
+  if (status === 0) return 'The server did not answer. Check the connection and try again.';
   return oneSentence(`The workbench answered ${status}${statusText ? ' ' + statusText : ''}`);
 }
 

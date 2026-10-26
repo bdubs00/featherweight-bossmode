@@ -8,7 +8,7 @@ import { Choices, PaneHeader } from './primitives';
 export const CHOICES: [ThemeChoice, string][] = [
   ['system', 'Match the system'],
   ['light', 'Light'],
-  ['dark', 'Graphite'],
+  ['dark', 'Dark'],
 ];
 
 export function Appearance() {

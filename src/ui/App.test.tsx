@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { act } from 'preact/test-utils';
 import { setToken } from '../api/client';
 import type { Entry } from '../api/types';
-import { App } from './App';
+import { App, backOf, isForm } from './App';
 import { showError } from './notice';
 import { at, bridge, fakeFetch, FLEET, mount, seat, unmountAll } from './testkit-b';
 
@@ -128,5 +128,78 @@ describe('the notice of a failed action', () => {
     expect(el.querySelector('[role=alert]')!.textContent).toContain('The save failed.');
     await visit('#fleet');
     expect(el.querySelector('[role=alert]')).toBeNull();
+  });
+});
+
+describe('a form and the keys of the page', () => {
+  const key = (k: string) =>
+    act(() => {
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
+    });
+
+  it('keeps Open a bridge on Escape and on /, and gives the half-filled job back after a move away', async () => {
+    sessionStorage.clear();
+    const el = mount(<App />);
+    await vi.waitFor(() => expect(el.querySelector('.appbar, nav')).not.toBeNull());
+    await visit('#new');
+    const goal = () => el.querySelector('.newbridge textarea') as HTMLTextAreaElement;
+    act(() => {
+      goal().value = 'Migrate logrotate.';
+      goal().dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    // The focus leaves the field, as a second Escape or a click on a key does. Neither key leaves the form.
+    act(() => goal().blur());
+    key('Escape');
+    await settle();
+    expect(location.hash).toBe('#new');
+    key('/');
+    await settle();
+    expect(location.hash).toBe('#new');
+    await visit('#bridge/b1');
+    await visit('#new');
+    expect(goal().value).toBe('Migrate logrotate.');
+  });
+});
+
+describe('the conversation of a seat', () => {
+  const lit = (el: HTMLElement) => el.querySelector('.place[aria-current="page"] .place-label')!.textContent;
+
+  it('stays in Bridges when a bridge opens it, with the bridges in the list and Back to the members of its bridge', async () => {
+    const el = mount(<App />);
+    await vi.waitFor(() => expect(el.querySelector('.appbar, nav')).not.toBeNull());
+    await visit('#bridge/b1/roster');
+    await visit('#member/b1/migrator-1');
+    expect(lit(el)).toBe('Bridges');
+    expect(el.querySelector('.pane-list #bridges-title')).not.toBeNull();
+    const back = el.querySelector('.member-main .pane-head a.back') as HTMLAnchorElement;
+    expect(back.getAttribute('href')).toBe('#bridge/b1/roster');
+    expect(back.getAttribute('aria-label')).toBe('Back to the members of Migrate Puppet');
+    expect(backOf({ place: 'member', bridge: 'b1', handle: 'migrator-1', tab: 'chat' })).toEqual({ place: 'bridge', id: 'b1', pane: 'roster' });
+    // A move between the tabs of the seat keeps the place.
+    await visit('#member/b1/migrator-1/run');
+    expect(lit(el)).toBe('Bridges');
+  });
+
+  it('stays in Fleet when the Fleet place opens it', async () => {
+    const el = mount(<App />);
+    await vi.waitFor(() => expect(el.querySelector('.appbar, nav')).not.toBeNull());
+    await visit('#fleet');
+    await visit('#member/b1/migrator-1');
+    expect(lit(el)).toBe('Fleet');
+    expect((el.querySelector('.member-main .pane-head a.back') as HTMLAnchorElement).getAttribute('href')).toBe('#fleet');
+    expect(backOf({ place: 'member', bridge: 'b1', handle: 'migrator-1', tab: 'chat' })).toEqual({ place: 'fleet' });
+  });
+});
+
+describe('the forms of the page', () => {
+  it('names the routes where / never leaves the screen', () => {
+    expect(isForm({ place: 'new' })).toBe(true);
+    expect(isForm({ place: 'new-agent' })).toBe(true);
+    expect(isForm({ place: 'duties', fresh: true })).toBe(true);
+    expect(isForm({ place: 'duties', name: 'x', edit: true })).toBe(true);
+    expect(isForm({ place: 'duties', name: 'x' })).toBe(false);
+    expect(isForm({ place: 'pages', path: 'a.md', mode: 'edit' })).toBe(true);
+    expect(isForm({ place: 'skills', add: true })).toBe(true);
+    expect(isForm({ place: 'bridge', id: 'b1', pane: 'none' })).toBe(false);
   });
 });

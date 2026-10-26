@@ -4,21 +4,29 @@
 // pane when the route puts the focus on the details. In a narrow window one
 // pane shows at a time, and the app bar becomes a bar of places at the
 // bottom of a list. docs/DESIGN.md, section 5, draws the layouts.
+//
+// A link at the start of the page skips the places to the main pane. The
+// title of the tab names the place, the count of what needs you, and the
+// deployment. After a move that leaves the focus on the page, the focus
+// goes to the row that the list marks, or to the heading of the pane that
+// shows.
 
 import type { ComponentChildren, JSX } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
 import type { BossConfig } from '../api/types';
 import { useSelect } from '../state/store';
+import { loadInbox } from '../state/duties';
 import { columnOf, placeOf, type Column, type Place, type Route } from '../lib/route';
 import { themeOf, setChoice, useChoice, type ThemeChoice } from '../lib/theme';
 import { personName } from '../lib/words';
 import { LAMP_ORDER, readoutOf, type Lamp, type LampKind, type Readout } from '../lib/status';
 import { selectFacts } from '../state/reducer';
 import { useAttention } from '../state/activity';
-import { Glyph, type GlyphName } from './icons';
+import { Glyph, Icon, type GlyphName } from './icons';
 import { Avatar, Chip, LogoWell, Led, countText } from './primitives';
 import { Notifications } from './Notifications';
+import { focusHome, focusLost } from './keys';
 
 /* ---------- the logo of the deployment ---------- */
 
@@ -82,8 +90,36 @@ const PLACES: PlaceItem[] = [
 const THEMES: [ThemeChoice, string][] = [
   ['system', 'Match the system'],
   ['light', 'Light'],
-  ['dark', 'Graphite'],
+  ['dark', 'Dark'],
 ];
+
+/** The names of the places in the title of the tab. */
+const PLACE_NAMES: Record<Place, string> = {
+  activity: 'Activity',
+  chat: 'Chat',
+  bridges: 'Bridges',
+  fleet: 'Fleet',
+  duties: 'Duties',
+  skills: 'Skills',
+  routines: 'Routines',
+  wiki: 'Wiki',
+  manager: 'Manager',
+  account: 'Appearance',
+};
+
+/** tabTitle is the title of the tab: the count of what needs you, the place, and the name of the deployment, such as (2) Activity - Homelab. */
+export function tabTitle(place: Place, count: number, name: string): string {
+  return (count > 0 ? '(' + count + ') ' : '') + PLACE_NAMES[place] + ' - ' + (name || 'Bossmode');
+}
+
+/**
+ * isToken reports whether the person signed in with the access token of the
+ * fleet, a principal with no name of a person. The page then says You, and
+ * never the word token.
+ */
+export function isToken(p: { subject: string; name?: string; kind?: string } | null | undefined): boolean {
+  return !!p && !p.name && (p.kind === 'token' || p.subject === 'token');
+}
 
 /**
  * AccountMenu is the account key at the foot of the app bar: the name of
@@ -98,8 +134,11 @@ function AccountMenu({ onSignOut, onReach }: { onSignOut: () => void; onReach: (
   const [open, setOpen] = useState(false);
   const btn = useRef<HTMLButtonElement>(null);
   const list = useRef<HTMLDivElement>(null);
+  const token = isToken(me && me.principal);
   const subject = (me && me.principal && me.principal.subject) || '';
-  const name = (me && me.principal && (me.principal.name || personName(subject))) || 'You';
+  const name = token ? 'You' : (me && me.principal && (me.principal.name || personName(subject))) || 'You';
+  // The line under the name: the subject of a person, or how a person with the token of the fleet signed in.
+  const how = token ? 'Signed in with an access token' : subject;
   useEffect(() => {
     if (!open) return;
     const first = list.current && (list.current.querySelector('[role^="menuitem"]') as HTMLElement | null);
@@ -134,14 +173,20 @@ function AccountMenu({ onSignOut, onReach }: { onSignOut: () => void; onReach: (
   };
   return (
     <div class="account pop">
-      <button ref={btn} type="button" class="account-key" aria-label={name + ', account'} title={subject || name} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
-        <Avatar subject={subject} display={me && me.principal ? me.principal.name : undefined} size={32} />
+      <button ref={btn} type="button" class="account-key" aria-label={token ? 'Your account' : name + ', account'} title={token ? name : subject || name} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
+        {token ? (
+          <span class="avatar s32 avatar-you" aria-hidden="true">
+            <Icon name="person" />
+          </span>
+        ) : (
+          <Avatar subject={subject} display={me && me.principal ? me.principal.name : undefined} size={32} />
+        )}
       </button>
       {open && (
         <div ref={list} class="menu menu-account" role="menu" aria-label="Account" onKeyDown={onKey}>
           <div class="menu-head" role="presentation">
             <div class="t-sub clip">{name}</div>
-            <div class="t-meta clip">{subject}</div>
+            <div class="t-meta clip">{how}</div>
           </div>
           <div class="menu-sep" role="separator" />
           {THEMES.map(([c, label]) => (
@@ -198,14 +243,35 @@ export function placesOf(config: BossConfig | null): PlaceItem[] {
   return config && config.routines !== false ? PLACES : PLACES.filter((it) => it.id !== 'routines');
 }
 
-/** AppBar is the column of places: the logo well, the places, and the account. onReach opens Where to reach me. */
-export function AppBar({ route, onSignOut, onReach }: { route: Route; onSignOut: () => void; onReach: () => void }) {
-  const place = placeOf(route);
+/**
+ * AppBar is the column of places: the logo well, the places, and the
+ * account. onReach opens Where to reach me. place is the place to light,
+ * when the route alone does not say it.
+ */
+export function AppBar({ route, place: placeProp, onSignOut, onReach }: { route: Route; place?: Place; onSignOut: () => void; onReach: () => void }) {
+  const place = placeProp || placeOf(route);
   const config = useSelect((s) => s.config);
   // The count on Activity counts the rows of Activity that need you: the same rows as its list, less the new messages.
   const attention = useAttention();
   const theme = themeOf(config);
   const logo = useLogo(theme.logo);
+  // A run that starts to wait for the person, such as a decision in a chat
+  // with an agent, reaches the page on the stream at once. Its row of
+  // Activity comes from the inbox, so the count reads the inbox then, and
+  // does not wait for the next read of the minute.
+  const waiting = useSelect((s) =>
+    Object.keys(s.runs)
+      .filter((id) => s.runs[id].state === 'input-required')
+      .map((id) => id + '/' + (s.runs[id].pending ? s.runs[id].pending!.id : ''))
+      .sort()
+      .join(','),
+  );
+  useEffect(() => {
+    if (waiting) loadInbox().catch(() => {});
+  }, [waiting]);
+  useEffect(() => {
+    document.title = tabTitle(place, attention, theme.name);
+  }, [place, attention, theme.name]);
   return (
     <nav class="appbar" aria-label="Places">
       <LogoWell src={logo} name={theme.name} href="#" />
@@ -329,7 +395,7 @@ export function FleetFoot() {
         </span>
         <span class="readout-figures" aria-hidden="true">
           {down ? (
-            <Led tone={status === 'closed' ? 'red' : 'grey'} word={down} label={status === 'closed' ? 'The page gets no updates.' : 'The page connects to the workbench again.'} />
+            <Led tone={status === 'closed' ? 'red' : 'grey'} word={down} label={status === 'closed' ? 'The page gets no updates.' : 'The page connects to the server again.'} />
           ) : (
             figures.map((f) => (
               <span class={'figure figure-' + f.kind}>
@@ -373,6 +439,8 @@ export function EmptyPane({ children, back }: { children: ComponentChildren; bac
 
 export interface ShellProps {
   route: Route;
+  /** The place to light, when the route alone does not say it, such as Bridges for a seat that a bridge opened. */
+  place?: Place;
   list: ComponentChildren | null;
   main: ComponentChildren;
   details: ComponentChildren | null;
@@ -387,8 +455,8 @@ export function shownOf(focus: Column, hasList: boolean, hasDetails: boolean): C
   return focus;
 }
 
-export function Shell({ route, list, main, details, notice, onSignOut }: ShellProps) {
-  const place = placeOf(route);
+export function Shell({ route, place: placeProp, list, main, details, notice, onSignOut }: ShellProps) {
+  const place = placeProp || placeOf(route);
   const shown = shownOf(columnOf(route), !!list, !!details);
   // The shell holds Where to reach me, and the app bar only opens it. A
   // narrow window hides the app bar while it shows the main pane or the
@@ -401,9 +469,28 @@ export function Shell({ route, list, main, details, notice, onSignOut }: ShellPr
   useEffect(() => {
     lastOf[place] = location.hash || '#';
   });
+  // A move to another screen that leaves the focus on the page, such as
+  // Escape or Back in a narrow window, gives it to the pane that shows: the
+  // row that its list marks, or its heading. A screen that puts the focus
+  // in a field of its own keeps it.
+  const at = location.hash;
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (!focusLost() || document.querySelector('dialog[open]')) return;
+      if (!focusHome(document.querySelector('.shell .pane-' + shown))) focusHome(document.querySelector('.shell .pane-main'));
+    }, 0);
+    return () => clearTimeout(t);
+  }, [at, shown]);
+  const skip = (e: Event) => {
+    e.preventDefault();
+    focusHome(document.getElementById('main'));
+  };
   return (
     <div class="shell" data-show={shown} data-place={place} data-list={list ? '1' : '0'} data-details={details ? '1' : '0'}>
-      <AppBar route={route} onSignOut={onSignOut} onReach={() => setReach(true)} />
+      <a class="skip" href="#main" onClick={skip}>
+        Skip to the content
+      </a>
+      <AppBar route={route} place={place} onSignOut={onSignOut} onReach={() => setReach(true)} />
       {list && (
         <section class="pane pane-list" aria-label="List">
           {list}

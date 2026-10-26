@@ -1,7 +1,13 @@
 // The page: the sign-in, then the shell with the app bar and three panes.
 // The route picks the place, the screen of each pane, and the one pane that
 // a narrow window shows. The keyboard reaches every action: / puts the
-// focus in the composer, and Escape closes or goes back.
+// focus in the composer, and Escape closes or goes back. A form, such as
+// Open a bridge, keeps the person on it: / does not leave it, and Escape
+// leaves it only where one pane shows, with the draft of the form kept.
+//
+// The conversation of a seat belongs to the place that opened it: from a
+// bridge, it keeps Bridges lit and the list of the bridges, and Back goes to
+// the members of its bridge. From the Fleet place, it stays in Fleet.
 //
 // panesOf maps each route to its screens. The screens live in files that the
 // screens of the next stage own (docs/DESIGN.md, section 11), so a screen
@@ -17,7 +23,7 @@ import { loadAgents, loadBridges, loadFaces, loadFleet, loadOpenRuns, loadSkills
 import { forgetFaces } from '../lib/faces';
 import { dismissBuild, useNewBuild } from '../lib/build';
 import { applyTheme, themeOf } from '../lib/theme';
-import { canonicalPath, columnOf, go, parentOf, parseRoute, type Route } from '../lib/route';
+import { canonicalPath, columnOf, go, parentOf, parseRoute, placeOf, type Place, type Route } from '../lib/route';
 import { isTyping } from './keys';
 import { clearNotice, clearSaid, showError, useNotice, useSaid } from './notice';
 import { EmptyPane, Shell, shownOf } from './Shell';
@@ -28,7 +34,7 @@ import { RunPane } from './RunPane';
 import { Manager, ManagerList } from './Manager';
 import { ChatDetails, ChatList, ChatMain, NoChat } from './Chat';
 import { Fleet, AgentPane, FleetList } from './Fleet';
-import { MemberMain, MemberProfile } from './Member';
+import { MemberMain, MemberProfile, memberFrom, setMemberFrom } from './Member';
 import { Board } from './Board';
 import { ActivityList, ActivityMain } from './Activity';
 import { PageEditor, PageHistory, PageTree, PageView } from './Pages';
@@ -53,6 +59,50 @@ let confirming = false;
 let streamAgainAt = 0;
 /** The bridge that the person read last, so Bridges opens it again. */
 let lastBridge = '';
+/** The route that the page showed before this one, so a seat knows the place that opened it. */
+let lastRoute: Route | null = null;
+
+/**
+ * followMember notes the place that opens the conversation of a seat: the
+ * Fleet place keeps it, and every other place, such as a bridge or
+ * Activity, gives it to Bridges. A move between the tabs of a seat keeps
+ * what the first move noted.
+ */
+function followMember(r: Route): void {
+  if (r.place === 'member' && (!lastRoute || lastRoute.place !== 'member')) setMemberFrom(lastRoute && placeOf(lastRoute) === 'fleet' ? 'fleet' : 'bridges');
+  lastRoute = r;
+}
+
+/** backOf is the route that Escape and Back go to: the parent of the route, and for a seat that a bridge opened, the members of that bridge. */
+export function backOf(r: Route): Route {
+  if (r.place === 'member' && !r.profile && memberFrom() === 'bridges') return { place: 'bridge', id: r.bridge, pane: 'roster' };
+  return parentOf(r);
+}
+
+/** placeIn is the place of the app bar for a route, with the place that opened the conversation of a seat. */
+export function placeIn(r: Route): Place {
+  return r.place === 'member' && memberFrom() === 'bridges' ? 'bridges' : placeOf(r);
+}
+
+/**
+ * isForm reports whether a route shows a form that the person fills: Open a
+ * bridge, New agent, the editor of a duty, the editor of a page, and Add
+ * skill. The / key never leaves such a form.
+ */
+export function isForm(r: Route): boolean {
+  switch (r.place) {
+    case 'new':
+    case 'new-agent':
+      return true;
+    case 'duties':
+      return !!(r.edit || r.fresh);
+    case 'pages':
+      return r.mode === 'edit' || r.mode === 'create';
+    case 'skills':
+      return !!r.add;
+  }
+  return false;
+}
 
 /** The width from which two panes show side by side. */
 const TWO_PANES = '(min-width: 800px)';
@@ -129,7 +179,7 @@ function panesOf(r: Route): Panes {
     case 'fleet':
       return { list: <FleetList current={r.agent} />, main: r.board ? <Board /> : <Fleet agent={r.agent} />, details: r.agent ? <AgentPane agent={r.agent} /> : null };
     case 'member':
-      return { list: <FleetList member={r.bridge + '/' + r.handle} />, main: <MemberMain bridge={r.bridge} handle={r.handle} tab={r.tab} />, details: <MemberProfile bridge={r.bridge} handle={r.handle} /> };
+      return { list: memberFrom() === 'bridges' ? <BridgeList current={r.bridge} /> : <FleetList member={r.bridge + '/' + r.handle} />, main: <MemberMain bridge={r.bridge} handle={r.handle} tab={r.tab} />, details: <MemberProfile bridge={r.bridge} handle={r.handle} /> };
     case 'new-agent':
       return { list: <FleetList />, main: <NewAgent />, details: null };
     case 'skills':
@@ -198,7 +248,7 @@ function Said({ text }: { text: string }) {
 function NewBuild() {
   return (
     <div class="notice" role="status">
-      <p>A new version of bossmode is out.</p>
+      <p>A new version of this page is ready.</p>
       <Button kind="secondary" size="s" onClick={() => location.reload()}>
         Reload
       </Button>
@@ -211,6 +261,7 @@ function NewBuild() {
 
 export function App() {
   const route = useRoute();
+  followMember(route);
   const [auth, setAuth] = useState<Auth>({ kind: 'loading' });
   const notice = useNotice();
   const said = useSaid();
@@ -249,7 +300,7 @@ export function App() {
           if (e.path === '/v1/bossmode/stream' && Date.now() - streamAgainAt > 30_000) {
             streamAgainAt = Date.now();
             startStream(unauthorized);
-          } else showError(new Error('The workbench refused one request. You are still signed in. Try again.'));
+          } else showError(new Error('The server refused one request. You are still signed in. Try again.'));
         })
         .catch(() => {})
         .finally(() => {
@@ -292,7 +343,7 @@ export function App() {
     } catch (e) {
       const err = e as { name?: string; message?: string };
       if (err && err.name === 'SigninNeeded') return;
-      setAuth({ kind: 'failed', error: (err && err.message) || 'The workbench did not answer. Check the connection, then try again.' });
+      setAuth({ kind: 'failed', error: (err && err.message) || 'The server did not answer. Check the connection, then try again.' });
     }
   };
 
@@ -337,6 +388,8 @@ export function App() {
       if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) return;
       if (document.querySelector('dialog[open]')) return;
       if (e.key === '/' && !isTyping(e)) {
+        // A form keeps the person: / would leave it for a composer elsewhere.
+        if (isForm(parseRoute(location.hash))) return;
         const box = document.getElementById('composer') as HTMLTextAreaElement | null;
         e.preventDefault();
         if (box && !box.disabled) box.focus();
@@ -362,9 +415,10 @@ export function App() {
         // Where three panes show, the list and the main pane stay, so Escape
         // goes back only from what the details pane or the main pane opened.
         const wide = window.matchMedia(THREE_PANES).matches;
-        if (wide && shown !== 'details' && (r.place === 'bridge' || r.place === 'home' || r.place === 'manager' || r.place === 'chat' || r.place === 'activity' || r.place === 'member' || r.place === 'routines' || r.place === 'duties' || (r.place === 'fleet' && !r.board) || (r.place === 'skills' && !r.item))) return;
+        // A form stays too, as the editor of a duty does: a stray Escape never throws its work away.
+        if (wide && shown !== 'details' && (r.place === 'bridge' || r.place === 'home' || r.place === 'manager' || r.place === 'chat' || r.place === 'activity' || r.place === 'member' || r.place === 'routines' || r.place === 'duties' || r.place === 'new' || r.place === 'new-agent' || (r.place === 'fleet' && !r.board) || (r.place === 'skills' && !r.item))) return;
         e.preventDefault();
-        go(parentOf(r));
+        go(backOf(r));
       }
     };
     document.addEventListener('keydown', onKey);
@@ -384,7 +438,7 @@ export function App() {
   if (auth.kind === 'loading') {
     return (
       <div class="boot" role="status">
-        Loading bossmode.
+        Loading the page.
       </div>
     );
   }
@@ -408,7 +462,7 @@ export function App() {
   if (auth.kind === 'failed') {
     return (
       <main class="signin">
-        <Card title="Bossmode" tone="red" label="The workbench did not answer">
+        <Card title="Bossmode" tone="red" label="The server did not answer">
           <p class="alert" role="alert">
             {auth.error}
           </p>
@@ -421,5 +475,6 @@ export function App() {
   }
 
   const panes = panesOf(route);
-  return <Shell route={route} list={panes.list} main={panes.main} details={panes.details} notice={notice ? <Notice text={notice} /> : said ? <Said text={said} /> : fresh ? <NewBuild /> : null} onSignOut={signOut} />;
+  const place = placeIn(route);
+  return <Shell route={route} place={place} list={panes.list} main={panes.main} details={panes.details} notice={notice ? <Notice text={notice} /> : said ? <Said text={said} /> : fresh ? <NewBuild /> : null} onSignOut={signOut} />;
 }

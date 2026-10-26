@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from 'preact/hooks';
 import { ApiError, SigninNeeded } from '../api/client';
+import { holdFocus } from './keys';
 
 let text = '';
 let said = '';
@@ -79,8 +80,13 @@ export function useSaid(): string {
   return said;
 }
 
-/** attempt runs an action and shows its error. It returns true when the action worked. */
+/**
+ * attempt runs an action and shows its error. It returns true when the
+ * action worked. An action that removes the key that held the focus gives
+ * the focus a home nearby, so it never falls to the page (holdFocus).
+ */
 export async function attempt(f: () => Promise<unknown>): Promise<boolean> {
+  const after = holdFocus();
   try {
     await f();
     clearNotice();
@@ -88,5 +94,7 @@ export async function attempt(f: () => Promise<unknown>): Promise<boolean> {
   } catch (e) {
     showError(e);
     return false;
+  } finally {
+    after();
   }
 }

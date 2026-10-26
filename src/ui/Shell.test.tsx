@@ -3,7 +3,8 @@ import { render, type ComponentChildren } from 'preact';
 import { act } from 'preact/test-utils';
 import type { Fleet } from '../api/types';
 import { store } from '../state/store';
-import { FleetFoot, GRACE_MS, RACK_LAMPS, Shell, captionOf, placesOf, shownOf } from './Shell';
+import { fakeFetch } from './testkit-b';
+import { FleetFoot, GRACE_MS, RACK_LAMPS, Shell, captionOf, isToken, placesOf, shownOf, tabTitle } from './Shell';
 
 let box: HTMLElement | null = null;
 
@@ -78,8 +79,57 @@ describe('Shell', () => {
     const key = el.querySelector('.account-key') as HTMLButtonElement;
     act(() => key.click());
     const items = [...el.querySelectorAll('[role^="menuitem"]')].map((x) => x.textContent);
-    expect(items).toEqual(['Match the system', 'Light', 'Graphite', 'Where to reach me', 'Connections', 'Sign out']);
+    expect(items).toEqual(['Match the system', 'Light', 'Dark', 'Where to reach me', 'Connections', 'Sign out']);
     expect(el.querySelector('[role="menuitemradio"][aria-checked="true"]')!.textContent).toBe('Match the system');
+  });
+});
+
+describe('the account and the tab', () => {
+  it('says You for the token of the fleet, never the word token', () => {
+    expect(isToken({ subject: 'token', kind: 'token' })).toBe(true);
+    expect(isToken({ subject: 'token' })).toBe(true);
+    expect(isToken({ subject: 'alice@example.com', name: 'Alice' })).toBe(false);
+    act(() => store.dispatch({ type: 'me', me: { principal: { subject: 'token', kind: 'token' }, roles: {}, admin: true, canCreate: true } }));
+    const el = mount(<Shell route={{ place: 'home' }} list={null} main={<p>main</p>} details={null} onSignOut={() => {}} />);
+    const key = el.querySelector('.account-key') as HTMLButtonElement;
+    expect(key.getAttribute('aria-label')).toBe('Your account');
+    expect(key.textContent).toBe('');
+    act(() => key.click());
+    expect(el.querySelector('.menu-head')!.textContent).toBe('YouSigned in with an access token');
+    act(() => store.dispatch({ type: 'me', me: null }));
+  });
+
+  it('names the place, the count of what needs you, and the deployment in the title of the tab', () => {
+    expect(tabTitle('activity', 2, 'Homelab')).toBe('(2) Activity - Homelab');
+    expect(tabTitle('bridges', 0, '')).toBe('Bridges - Bossmode');
+    mount(<Shell route={{ place: 'manager' }} list={null} main={<p>main</p>} details={null} onSignOut={() => {}} />);
+    // The bridge of the first test still needs you twice.
+    expect(document.title).toMatch(/^(\(\d+\) )?Manager - Bossmode$/);
+  });
+
+  it('lights the place that the page names, and starts with a link that skips the places', () => {
+    const el = mount(<Shell route={{ place: 'member', bridge: 'b1', handle: 'migrator-1', tab: 'chat' }} place="bridges" list={null} main={<h1 class="t-title">main</h1>} details={null} onSignOut={() => {}} />);
+    expect(el.querySelector('.place[aria-current="page"]')!.textContent).toContain('Bridges');
+    const skip = el.querySelector('.shell > a.skip') as HTMLAnchorElement;
+    expect(skip.textContent).toBe('Skip to the content');
+    expect(skip.getAttribute('href')).toBe('#main');
+  });
+});
+
+describe('the count of Activity', () => {
+  it('reads the inbox again as soon as a run starts to wait for you, so the count does not lag a minute', async () => {
+    const f = fakeFetch([['GET', /^\/v1\/inbox/, () => ({ items: [] })]]);
+    try {
+      mount(<Shell route={{ place: 'home' }} list={null} main={<p>main</p>} details={null} onSignOut={() => {}} />);
+      await act(async () => new Promise((r) => setTimeout(r, 0)));
+      const reads = () => f.calls.filter((c) => c.path.startsWith('/v1/inbox')).length;
+      const before = reads();
+      act(() => store.dispatch({ type: 'run', run: { id: 'run-ask', agent: 'proxmox-admin', state: 'input-required', seq: 2, createdAt: '', updatedAt: '', pending: { id: 'ap-1', tool: 'packages', requestedAt: '' } as never } }));
+      await act(async () => new Promise((r) => setTimeout(r, 0)));
+      expect(reads()).toBe(before + 1);
+    } finally {
+      f.restore();
+    }
   });
 });
 

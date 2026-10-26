@@ -1,6 +1,11 @@
 // Keyboard reach for lists. One item of a list is in the tab order at a
 // time. ArrowDown and ArrowUp, or j and k, move between the items, Home and
 // End go to the ends, and Enter opens an item that is not a button.
+//
+// The focus also never falls to the page. A move to another screen, or an
+// action that removes the key that held the focus, gives the focus a home:
+// the row that the list marks, else the heading of the pane, else the next
+// key that still stands where the old key stood.
 
 import { useEffect, useRef, type MutableRef } from 'preact/hooks';
 
@@ -112,4 +117,64 @@ export function useRoving<T extends HTMLElement>(opts: RovingOptions = {}): Muta
 /** smooth is the scroll behavior that respects prefers-reduced-motion. */
 export function smooth(): ScrollBehavior {
   return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+}
+
+/** focusLost reports whether the focus fell to the page: the body holds it, or an element that left the page or that no longer shows. */
+export function focusLost(): boolean {
+  const a = document.activeElement as HTMLElement | null;
+  if (!a || a === document.body || !a.isConnected) return true;
+  return typeof a.checkVisibility === 'function' && !a.checkVisibility();
+}
+
+/** The keys that take the focus, for the next key that still stands. */
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/**
+ * focusHome gives the focus to the home of a pane: the row of its list that
+ * the page marks as open, else the heading of the pane. It reports whether
+ * it found one.
+ */
+export function focusHome(pane: Element | null): boolean {
+  if (!pane) return false;
+  const row = pane.querySelector<HTMLElement>('[data-item][aria-current="page"], [data-item].sel, .sel > [data-item]');
+  if (row) {
+    row.focus();
+    return true;
+  }
+  const head = pane.querySelector<HTMLElement>('.pane-head h1, .pane-head h2');
+  if (!head) return false;
+  if (!head.hasAttribute('tabindex')) head.setAttribute('tabindex', '-1');
+  head.focus();
+  return true;
+}
+
+/**
+ * holdFocus notes the element that holds the focus before an action, and
+ * returns the step that runs after it. When the action removed that
+ * element, such as a card that a decision settles, the step gives the
+ * focus to the first key of the nearest part of the page that still
+ * stands, else to the home of its pane. An open dialog keeps its own focus.
+ */
+export function holdFocus(): () => void {
+  const before = document.activeElement as HTMLElement | null;
+  if (!before || before === document.body) return () => {};
+  const chain: Element[] = [];
+  for (let el: Element | null = before.parentElement; el && el !== document.body; el = el.parentElement) chain.push(el);
+  return () => {
+    setTimeout(() => {
+      if (before.isConnected || !focusLost() || document.querySelector('dialog[open]')) return;
+      for (const el of chain) {
+        if (!el.isConnected) continue;
+        if (el.classList.contains('pane')) {
+          focusHome(el);
+          return;
+        }
+        const key = el.querySelector<HTMLElement>(FOCUSABLE);
+        if (key) {
+          key.focus();
+          return;
+        }
+      }
+    }, 0);
+  };
 }
