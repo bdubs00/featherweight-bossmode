@@ -3,11 +3,44 @@
    column that a narrow window shows. */
 
 .shell {
+  --h-offline: 28px;
   display: flex;
   height: 100vh;
   height: 100dvh;
   background: var(--chrome);
   overflow: hidden;
+}
+/* While the page reaches no server, the bar Offline takes the top of the
+   window and pushes the shell down, so it covers nothing. The counts fade,
+   because they show what the page read last. */
+.shell[data-offline] {
+  margin-top: var(--h-offline);
+  height: calc(100vh - var(--h-offline));
+  height: calc(100dvh - var(--h-offline));
+}
+.offline-bar {
+  position: fixed;
+  z-index: calc(var(--z-notice) + 2);
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  height: var(--h-offline);
+  border-bottom: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  font-size: var(--t-meta);
+  font-weight: 600;
+}
+.shell[data-offline] .place-count,
+.shell[data-offline] .readout-figures,
+.shell[data-offline] .brow-meta,
+.shell[data-offline] .brow-unread,
+.shell[data-offline] .pane-head .chip {
+  opacity: 0.55;
 }
 
 /* ---------- the app bar ---------- */

@@ -15,7 +15,8 @@
 
 import type { ComponentChildren } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { clearToken, getToken, scheduleRenewal, setToken, setUnauthorizedHandler, stopRenewal, type SigninNeeded } from '../api/client';
+import { clearToken, getToken, scheduleRenewal, setReachHandler, setToken, setUnauthorizedHandler, stopRenewal, type SigninNeeded } from '../api/client';
+import { noteAnswer, watchReach } from '../state/reach';
 import { afterUnauthorized, clearSigninMarks, markSignedOut, sessionStore } from '../api/auth';
 import { api } from '../api/routes';
 import { store, useSelect } from '../state/store';
@@ -352,6 +353,8 @@ export function App() {
     const path = canonicalPath(location.pathname);
     if (path !== location.pathname) history.replaceState(null, '', path + location.search + location.hash);
     setUnauthorizedHandler(unauthorized);
+    // Each call says whether it reached the server, for the bar Offline.
+    setReachHandler(noteAnswer);
     boot();
     // A page that comes back from the cache of the browser, as after Back
     // from a sign-in that did not finish, starts again. Without this, the
@@ -381,6 +384,13 @@ export function App() {
       stopStream();
     };
   }, []);
+
+  // While the person is signed in, the page follows whether it reaches the server, and tries again with a read of whoami while it does not.
+  const signedIn = auth.kind === 'ready';
+  useEffect(() => {
+    if (!signedIn) return;
+    return watchReach(() => api.whoami());
+  }, [signedIn]);
 
   // The keys of the whole page: / and Escape.
   useEffect(() => {

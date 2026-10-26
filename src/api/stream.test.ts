@@ -235,4 +235,36 @@ describe('openStream', () => {
     expect(calls).toBe(3);
     expect(statuses).toContain('lost');
   });
+
+  it('drops a stream that stays silent past the keep-alive lines of the server, and connects again', async () => {
+    let n = 0;
+    const statuses: string[] = [];
+    let finish!: () => void;
+    const done = new Promise<void>((r) => (finish = r));
+    const h = openStream({
+      onEvent: () => {},
+      onStatus: (s) => statuses.push(s),
+      sleep: () => Promise.resolve(),
+      silentMs: 20,
+      fetch: async (_url, init) => {
+        n++;
+        if (n > 1) {
+          finish();
+          return new Promise<Response>(() => {});
+        }
+        // A stream that sends one keep-alive line, then nothing, as when the network went away under it.
+        const body = new ReadableStream<Uint8Array>({
+          start(c) {
+            c.enqueue(new TextEncoder().encode(': keep-alive\n\n'));
+            init!.signal!.addEventListener('abort', () => c.error(new DOMException('The stream was silent.', 'AbortError')));
+          },
+        });
+        return new Response(body, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+      },
+    });
+    await done;
+    h.close();
+    expect(n).toBe(2);
+    expect(statuses.slice(0, 3)).toEqual(['connecting', 'live', 'lost']);
+  });
 });
