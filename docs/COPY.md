@@ -515,7 +515,7 @@ Capacity shows where seating happens:
 | the tools of a profile as chips of raw names, such as `front.pages_read` | change | `What it can do`, a section of the profile with one plain line per ability: the phrase of the tool in the catalog of `GET /v1/tools`, such as `Run shell commands`. The tools of the wiki make one line, `Read and write the wiki`, `Read the wiki`, or `Write the wiki`, and the tools of the bridges make one line, `Read and post in bridges`, `Read bridges`, or `Post in bridges`. A whole server is `Use the tools of <server>`, and `*` is `Every tool`. The raw names sit in the tooltip. `N skills` moves to the end of the heading line of the section. | done |
 | `Edit` (the key of an owner on the profile) | add | | done |
 | `Keep is a whole number, 0 or more.` | add | the error of the Keep field | done |
-| `Remove workers`, with the dialog `Remove the workers of <agent>?`, `Every worker of <agent> stops. A seat of <agent> waits for a worker.`, and the key `Remove workers` | change | an owner only, as the danger item of the menu `More for workers` beside Keep, so no destructive key sits in plain sight | done |
+| `Remove workers`, with the dialog `Remove the workers of <agent>?`, `Every worker of <agent> stops. A seat of <agent> waits for a worker.`, and the key `Remove workers` | change | `Delete agent` (D1), the danger item of the menu `More for <agent>` on the head of the profile, for an owner of an agent that the page made. The dialog `Delete <agent>?` says `<agent>, its workers, and the files on its workers go. A seat of it on a bridge gets no worker again.` and `Your past conversations with it stay readable.`, with the key `Delete agent`, then the notice `Deleted <agent>. Its workers stop once they are idle.` An agent of the setup file has no such key. | done |
 | `N runs`, `$N`, `N decisions` (Today) | add | `1 run` and `1 decision` for one. If a run reports no cost, `$N so far`. A cost below one cent reads `under $0.01`, never `$0.00`, from `src/lib/cost.ts`. | done |
 
 ### src/ui/RunPane.tsx and src/ui/Conversation.tsx
@@ -590,8 +590,11 @@ Capacity shows where seating happens:
 | `The wiki has no page.` | change | `The wiki is empty.` with the key `New page` | C |
 | `Loading the pages.`, `Loading the page.`, `Loading the history.` | keep | | C |
 | `No page <path> is here.`, `Create <path>` | keep | | C |
+| new | add | `This page was removed. Its history keeps its versions, and Restore brings one back.` with the key `History`, for a path whose newest version is a removal (D5) | done |
+| new | add | `Remove page` in the menu `More for <page>` of a page, with the dialog `Remove <page>?`, `The page leaves the wiki. Its history keeps every version, and Restore of a version brings the page back.`, the key `Remove page`, and the notice `Removed <page>. Its history keeps it.` (D5) | done |
+| new | add | `Restore this version` on an old version, which saves it as the newest version with the summary `Restored version N`, and the notice `Restored version N as the newest version.` A page that changed since says `Someone saved a newer version of this page. Open the history again.` (D5) | done |
 | `History`, `Edit` | keep | | done |
-| `This is version N, by <by>, <time>. Read the current page.` | change | `Version N, by <by>, 14 min.` and the link `Current page` | C |
+| `This is version N, by <by>, <time>. Read the current page.` | change | `Version N, by <by>, 14 min.` and the link `Current page`. N counts the versions of the page from 1, the oldest first; the store numbers the versions of the whole wiki, so a page never reads Version 183. Without the history, `An old version, by <by>, 14 min.` (D5) | done |
 | `<by> saved a newer version. The page shows it.` | change | `<by> saved a newer version.` | C |
 | `Version N by <by>, 3 hours ago: <summary>` | change | `Version N`, `<by>`, `3 h`, and the summary, as parts with gaps | C |
 | `History` (heading) | change | `History of <page>` | done |
@@ -920,6 +923,9 @@ stands for a value.
 | Now | Verdict | New text | Who |
 |---|---|---|---|
 | new | add | `More` with `Make this a duty` on the header of a quick chat, of the manager, and of a conversation with an agent, once the conversation exists | done |
+| new | add | the menu `More for <title>` on each row of the Manager list, the Chat list, and Past conversations, with `Rename` and `Delete` (D4). Rename: the dialog `Rename the conversation` with the field `Name`, `An empty name gives it back the first words of the conversation.`, and the key `Rename`. Delete: `Delete <title>?` with `It leaves your lists. The agent keeps no copy of it, and the archive of the server keeps it.` and the key `Delete`. A server without the route says `This server cannot rename or delete a conversation yet.` | done |
+| new | add | a message in an archived conversation starts a new one with `continues`, and the line of the archived conversation says `... Your next message starts a new conversation, and the agent gets a summary of this one.` (D3) | done |
+| new | add | the unread dot of the place Manager, `The manager answered.` or `The manager answered in N conversations.` for a screen reader, and on the row a dot, a bold title, and `new answer` in its name for a screen reader (D10) | done |
 
 ### src/ui/Activity.tsx
 

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Bridge, PageMeta } from '../api/types';
-import { PageEditor, PageHistory, PageTree, PageView, foldersOf, newPath, withoutTitle } from './Pages';
-import { currentNotice } from './notice';
+import { PageEditor, PageHistory, PageTree, PageView, foldersOf, newPath, pageNumbers, withoutTitle } from './Pages';
+import { clearSaid, currentNotice, currentSaid } from './notice';
 import { act } from 'preact/test-utils';
 import { store } from '../state/store';
 import { parseRoute } from '../lib/route';
@@ -216,7 +216,71 @@ describe('the editor', () => {
     expect(el.querySelector('.article')!.textContent!.trim()).toBe('Run the playbook.');
     const old = mount(<PageView path="runbooks/deploy.md" version={2} />);
     await settle();
-    expect(old.textContent!.match(/Version 2/g)!.length).toBe(1);
+    expect(old.textContent!.match(/An old version, by/g)!.length).toBe(1);
+  });
+
+  it('numbers the versions of a page from 1, the oldest first, and a removal has no number', async () => {
+    const v = (version: number, extra = {}) => ({ version, hash: 'h' + version, by: 'alice@example.com', at: '2026-10-22T00:00:00Z', size: 1, ...extra });
+    expect([...pageNumbers([v(183), v(120), v(90, { deleted: true }), v(42)]).entries()]).toEqual([
+      [42, 1],
+      [120, 2],
+      [183, 3],
+    ]);
+    api = fakeApi({ 'GET /v1/pages/runbooks/deploy.md/history': { versions: [v(183), v(120), v(90, { deleted: true, hash: '' }), v(42)] } });
+    const el = mount(<PageHistory path="runbooks/deploy.md" />);
+    await settle();
+    expect([...el.querySelectorAll('.vrow .head')].map((x) => x.textContent)).toEqual(['Version 3current', 'Version 2', 'Removed', 'Version 1']);
+  });
+
+  it('restores an old version as the newest one, over the newest version', async () => {
+    const v = (version: number) => ({ version, hash: 'h' + version, by: 'alice@example.com', at: '2026-10-22T00:00:00Z', size: 1 });
+    api = fakeApi({
+      'GET /v1/pages/runbooks/deploy.md?version=120': { ...page('Old text.', 'h120'), version: 120 },
+      'GET /v1/pages/runbooks/deploy.md/history': { versions: [v(183), v(120), v(42)] },
+      'PUT /v1/pages/runbooks/deploy.md': { ...page('Old text.', 'h184'), version: 184 },
+      'GET /v1/pages': { pages: [] },
+    });
+    const el = mount(<PageView path="runbooks/deploy.md" version={120} />);
+    await settle();
+    expect(el.querySelector('.note-line')!.textContent).toContain('Version 2, by');
+    click(keyNamed(el, 'Restore this version'));
+    await settle();
+    const put = api.calls.find((c) => c.method === 'PUT')!;
+    expect(put.body).toEqual({ text: 'Old text.', summary: 'Restored version 2' });
+    expect(put.headers['If-Match']).toBe('"h183"');
+    expect(currentSaid()).toBe('Restored version 2 as the newest version.');
+    expect(location.hash).toBe('#pages/runbooks/deploy.md');
+    clearSaid();
+  });
+
+  it('removes a page after a confirmation that says the history keeps it, and says a removed page can come back', async () => {
+    api = fakeApi({
+      'GET /v1/pages/runbooks/deploy.md': { ...page('# Deploy\n\nRun it.', 'h7'), version: 7 },
+      'GET /v1/pages/runbooks/deploy.md/history': { versions: [{ version: 7, hash: 'h7', by: 'alice@example.com', at: '', size: 1 }] },
+      'DELETE /v1/pages/runbooks/deploy.md': () => ({ status: 204 }),
+      'GET /v1/pages': { pages: [] },
+    });
+    const el = mount(<PageView path="runbooks/deploy.md" />);
+    await settle();
+    expect(el.querySelector('.parts')!.textContent).toContain('Version 1');
+    click(el.querySelector('button[aria-label="More for Deploy"]'));
+    click([...el.querySelectorAll('[role="menu"] button')].find((b) => b.textContent === 'Remove page'));
+    const dialog = document.querySelector('dialog.confirm')!;
+    expect(dialog.querySelector('h2')!.textContent).toBe('Remove Deploy?');
+    expect(dialog.textContent).toContain('The page leaves the wiki. Its history keeps every version, and Restore of a version brings the page back.');
+    click([...dialog.querySelectorAll('button')].find((b) => b.textContent === 'Remove page'));
+    await settle();
+    const del = api.calls.find((c) => c.method === 'DELETE')!;
+    expect(del.headers['If-Match']).toBe('"h7"');
+    expect(currentSaid()).toBe('Removed Deploy. Its history keeps it.');
+    expect(location.hash).toBe('#pages');
+    clearSaid();
+    api.restore();
+    api = fakeApi({ 'GET /v1/pages/runbooks/deploy.md/history': { versions: [{ version: 8, hash: '', by: '', at: '', size: 0, deleted: true }, { version: 7, hash: 'h7', by: 'alice@example.com', at: '', size: 1 }] } });
+    const gone = mount(<PageView path="runbooks/deploy.md" />);
+    await settle();
+    expect(gone.textContent).toContain('This page was removed. Its history keeps its versions, and Restore brings one back.');
+    expect(keyNamed(gone, 'History')!.getAttribute('href')).toBe('#history/runbooks/deploy.md');
   });
 
   it('names the key that saves beside the keys, and names none on a touch screen', () => {
