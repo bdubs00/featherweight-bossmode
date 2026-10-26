@@ -171,8 +171,8 @@ export function PackagesSection({ agent, pool, owner }: { agent: string; pool: s
                   autoComplete="off"
                   spellcheck={false}
                   value={name}
-                  invalid={!!problem}
-                  aria-describedby={problem ? id + '-error' : undefined}
+                  invalid={!!(problem || error)}
+                  aria-describedby={problem || error ? id + '-error' : undefined}
                   onInput={(e) => {
                     setName((e.target as HTMLInputElement).value);
                     setProblem('');
@@ -180,6 +180,12 @@ export function PackagesSection({ agent, pool, owner }: { agent: string; pool: s
                 />
                 <Button type="submit">Add</Button>
               </div>
+              {/* A refusal of a name sits under the field that holds it. */}
+              {(problem || error) && (
+                <p class="field-error pkgs-error" id={id + '-error'} role="alert">
+                  {problem || error}
+                </p>
+              )}
               <div class="pkgs-kind" role="radiogroup" aria-label="Kind of package">
                 {KINDS.map((k) => (
                   <label class="check">
@@ -234,7 +240,7 @@ export function PackagesSection({ agent, pool, owner }: { agent: string; pool: s
           <Switch label={ASK_TEXT} on={p.ask} disabled={!owner} onChange={(ask) => save({ ask })} />
         </>
       )}
-      {(problem || error) && (
+      {(problem || error) && !(p.on && owner) && (
         <p class="field-error pkgs-error" id={id + '-error'} role="alert">
           {problem || error}
         </p>

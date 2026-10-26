@@ -307,6 +307,9 @@ describe('a change of the packages', () => {
     await vi.waitFor(() => expect(el.querySelector('.pkgs-error')).not.toBeNull());
     expect(el.querySelector('.pkgs-error')!.textContent).toBe('The package nope starts with a dash.');
     expect(el.querySelector('.pkgs-error')!.getAttribute('role')).toBe('alert');
+    // The sentence sits under the field, and the field names it.
+    expect(el.querySelector('form.pkgs-add .pkgs-error')).not.toBeNull();
+    expect((el.querySelector('form.pkgs-add input') as HTMLInputElement).getAttribute('aria-describedby')).toBe(el.querySelector('.pkgs-error')!.id);
     expect((el.querySelector('form.pkgs-add input') as HTMLInputElement).value).toBe('nope');
     expect([...el.querySelectorAll('.pkgs-name')].map((x) => x.firstChild!.textContent)).toEqual(['ansible-lint', 'iproute2']);
   });
