@@ -231,9 +231,10 @@ export function Notifications({ onClose }: { onClose: () => void }) {
   const gone = removing !== null ? f.channels[removing] : undefined;
   return (
     <>
-      <Confirm title="Where to reach me" confirm="Save" busy={busy || !ready} class="notify-dialog" onCancel={onClose} onConfirm={save}>
+      {/* Save turns on once something changed. Cancel closes a dialog with no change. */}
+      <Confirm title="Where to reach me" confirm="Save" busy={busy || !ready || !dirty} class="notify-dialog" onCancel={onClose} onConfirm={save}>
         {load === 'loading' && <p>Loading your settings.</p>}
-        {load === 'none' && <p>This workbench sends no notifications.</p>}
+        {load === 'none' && <p>The server sends no notifications.</p>}
         {load === 'failed' && <p role="alert">{failed}</p>}
         {ready && (
           <div class="notify-form">

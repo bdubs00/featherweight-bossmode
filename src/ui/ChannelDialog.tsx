@@ -176,6 +176,11 @@ export function ChannelDialog({
       if (said && typeof said.scrollIntoView === 'function') said.scrollIntoView({ block: 'nearest' });
     }
   }, [shown]);
+  // The dialog opens on its first question: the kind of a new place, or the name of a place that the person edits.
+  useEffect(() => {
+    const first = box.current && (box.current.querySelector('input[type="radio"]:checked, input[type="radio"], input:not([type="checkbox"]), select') as HTMLElement | null);
+    if (first) first.focus();
+  }, []);
   const kinds = useMemo(() => offeredKinds(read), [read]);
   const agents = useSelect(selectAgents);
   const faces = useSelect((s) => s.faces);
@@ -234,7 +239,7 @@ export function ChannelDialog({
             onChange={(k) => set({ kind: k })}
           />
         ) : (
-          <p>This workbench offers no place yet. Ask an admin.</p>
+          <p>The server offers no place yet. Ask an admin.</p>
         )}
         {kind && (
           <>

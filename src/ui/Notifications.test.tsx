@@ -202,12 +202,13 @@ describe('Where to reach me', () => {
     expect(closed).toBe(true);
   });
 
-  it('closes on Save with no change and writes nothing', async () => {
+  it('keeps Save off until something changes, and Cancel closes it with nothing written', async () => {
     let closed = false;
     api = fakeApi({ 'GET /v1/notifications': READ, 'PUT /v1/notifications': echo });
     mount(<Notifications onClose={() => (closed = true)} />);
     await settle();
-    click(keyNamed(outer(), 'Save'));
+    expect((keyNamed(outer(), 'Save') as HTMLButtonElement).disabled).toBe(true);
+    click(keyNamed(outer(), 'Cancel'));
     await settle();
     expect(puts()).toEqual([]);
     expect(closed).toBe(true);
@@ -238,7 +239,7 @@ describe('Where to reach me', () => {
     api = fakeApi({});
     mount(<Notifications onClose={() => {}} />);
     await settle();
-    expect(outer().textContent).toContain('This workbench sends no notifications.');
+    expect(outer().textContent).toContain('The server sends no notifications.');
     expect((keyNamed(outer(), 'Save') as HTMLButtonElement).disabled).toBe(true);
   });
 });
@@ -250,6 +251,8 @@ describe('Add a place', () => {
     await settle();
     expect(place().querySelector('h2')!.textContent).toBe('Add a place');
     expect(place().querySelector('legend')!.textContent).toBe('What kind of place');
+    // The dialog opens on its first question, not on Cancel.
+    expect(document.activeElement).toBe(place().querySelector('input[type="radio"]'));
     expect([...place().querySelectorAll('.choice')].map((c) => [c.querySelector('.t-sub')!.textContent, c.querySelector('.t-meta')!.textContent])).toEqual([
       ['Slack', 'A channel of your Slack workspace, through an incoming webhook.'],
       ['Webhook', 'Any app that takes a JSON post, such as Home Assistant, n8n, or Zapier.'],
