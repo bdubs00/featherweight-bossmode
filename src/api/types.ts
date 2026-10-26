@@ -604,6 +604,14 @@ export interface Agent {
   /** For a profile that names no tools: the tools and the rules that its workers give it, as the dry run of PUT /v1/agents/{name} names them. */
   workerTools?: string[];
   workerPolicy?: Rules | null;
+  /** The switch of the packages of its workers, on a server with a package mirror. */
+  workerPackages?: PackageSwitch | null;
+}
+
+/** The switch of the packages of the workers of an agent: on, and whether the agent can ask for a package. */
+export interface PackageSwitch {
+  on: boolean;
+  ask: boolean;
 }
 
 /** The display of an agent: GET /v1/faces and PATCH /v1/faces/{agent}. */
@@ -925,6 +933,8 @@ export interface AgentSaved {
   workerTools?: string[];
   /** On a dry run for workers: their rules, which the rules of the profile can only tighten. */
   workerPolicy?: Rules | null;
+  /** On a dry run for workers: the switch of their packages, on a server with a package mirror. */
+  workerPackages?: PackageSwitch | null;
 }
 
 /* ---------- duties ---------- */

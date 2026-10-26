@@ -5,7 +5,8 @@
 // accept an answer with missing fields, because an older or a newer front
 // can leave a field out.
 
-import type { Agent, Fleet, PackageFailure, PackageItem, PackageWorker, Packages, PackagesBody } from '../api/types';
+import type { Agent, Fleet, PackageFailure, PackageItem, PackageSwitch, PackageWorker, Packages, PackagesBody } from '../api/types';
+import type { Ability } from './tools';
 import type { Tone } from './presence';
 
 /** The time between two reads while a change reaches the workers. */
@@ -290,4 +291,40 @@ export function versionsOf(p: Packages, kind: PackageKind): Map<string, string> 
     }
   }
   return out;
+}
+
+/* ---------- the switch and what an agent can do ---------- */
+
+/** The base name of the tool that adds and removes packages, and of the rules that ask before it does. */
+const ENV = 'env';
+
+const baseName = (name: string): string => name.slice(Math.max(name.lastIndexOf('.'), name.lastIndexOf('/')) + 1);
+
+/**
+ * addsPackages reports whether the workers of an agent can add a package
+ * on their own: the tool env adds one only while packages are on and the
+ * agent may ask. Without a switch, the page cannot tell, so it trusts the
+ * tools.
+ */
+export function addsPackages(sw: PackageSwitch | null | undefined): boolean {
+  return !sw || (sw.on && sw.ask);
+}
+
+/** withPackages leaves out the ability of the tool env and its rules when the switch says that the agent cannot add a package. */
+export function withPackages<T extends Pick<Ability, 'names'>>(abilities: T[], sw: PackageSwitch | null | undefined): T[] {
+  if (addsPackages(sw)) return abilities;
+  return abilities.filter((a) => !a.names.length || !a.names.every((n) => baseName(n) === ENV));
+}
+
+/** rulesWithPackages leaves out the rules of the tool env, such as env: command=add, when the agent cannot add a package. */
+export function rulesWithPackages(rules: string[], sw: PackageSwitch | null | undefined): string[] {
+  if (addsPackages(sw)) return rules;
+  return rules.filter((r) => baseName((/^([^\s:]+)/.exec(r.trim()) || ['', ''])[1]) !== ENV);
+}
+
+/** switchWords says the switch of the packages of the workers of a new agent in one sentence. */
+export function switchWords(sw: PackageSwitch): string {
+  if (!sw.on) return 'Packages are off, so it has only the programs that it came with. Its profile can turn them on.';
+  if (sw.ask) return 'Packages are on. It can ask for a package, and you approve each one.';
+  return 'Packages are on. You add each package on its profile.';
 }

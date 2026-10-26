@@ -18,7 +18,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
 import { ApiError, SigninNeeded } from '../api/client';
-import type { Packages, PackagesBody } from '../api/types';
+import type { PackageSwitch, Packages, PackagesBody } from '../api/types';
 import { KIND_WORDS, POLL_MS, bodyOf, keyOf, lineOf, nameProblem, normalize, shouldPoll, versionsOf, type PackageKind } from '../lib/packages';
 import { Button, Command, IconButton, Input, LineLed } from './primitives';
 import { Switch } from './ChannelDialog';
@@ -62,7 +62,7 @@ type FocusTo = '' | 'field' | 'turn-on';
  * PackagesSection is the section Packages of the profile of agent, whose
  * workers the pool runs. An owner changes it. Any other person reads it.
  */
-export function PackagesSection({ agent, pool, owner }: { agent: string; pool: string; owner: boolean }) {
+export function PackagesSection({ agent, pool, owner, onSwitch }: { agent: string; pool: string; owner: boolean; onSwitch?: (sw: PackageSwitch) => void }) {
   // undefined while the first read runs, null when the section does not exist.
   const [p, setP] = useState<Packages | null | undefined>(undefined);
   // The reason of a refused change, and the reason why the name in the field does not work. The section shows one sentence.
@@ -109,6 +109,13 @@ export function PackagesSection({ agent, pool, owner }: { agent: string; pool: s
       },
     );
   }, [pool, tick]);
+
+  // The profile words what the agent can do from the switch, so it hears each switch that the section reads or sets.
+  const on = !!p && p.available !== false && p.on;
+  const ask = !!p && p.ask;
+  useEffect(() => {
+    if (p && p.available !== false && onSwitch) onSwitch({ on, ask });
+  }, [!!p, on, ask]);
 
   // The refresh: a read every POLL_MS while the change reaches the workers. A change in progress holds it.
   const poll = !busy && shouldPoll(p);

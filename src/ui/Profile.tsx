@@ -13,7 +13,7 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
 import { ApiError } from '../api/client';
-import type { Pool, Today } from '../api/types';
+import type { PackageSwitch, Pool, Today } from '../api/types';
 import { store, useSelect } from '../state/store';
 import { loadAgentSkills, loadAgents, loadFaces, loadFleet } from '../state/actions';
 import { forgetProfiles, useFleetAgent, useProfile } from '../state/profiles';
@@ -35,7 +35,7 @@ import { costParts } from '../lib/cost';
 import { useToolCatalog } from '../state/tools';
 import { forgetReads, readCache, useEventRead } from '../state/eventread';
 import { PackagesSection } from './Packages';
-import { poolOfAgent } from '../lib/packages';
+import { poolOfAgent, rulesWithPackages, withPackages } from '../lib/packages';
 
 const WORKER_HELP = 'A worker runs the work of one agent, one seat at a time. Keep is how many it keeps ready.';
 /** The tooltip of a worker of an older setup of its agent. */
@@ -527,7 +527,9 @@ export function Profile({ agent, back }: { agent: string; back?: { href: string;
     const seat = seatsOfAgent({ bridges, rosters }, agent).find((x) => !!newestRun(x.member));
     return seat ? newestRun(seat.member) : '';
   }, [bridges, rosters, agent]);
-  const started = namedProfileOf(useQueued(read !== undefined && !(read && read.tools) ? seatRun : ''));
+  // The front names the tools of the workers beside a profile that names none, so only a profile that it does not answer reads the start of a run of a seat.
+  const answered = !!read && ((!!read.tools && read.tools.length > 0) || !!read.workerTools);
+  const started = namedProfileOf(useQueued(read !== undefined && !answered ? seatRun : ''));
   const loadable = useSelect((s) => s.agentSkills[agent]);
   const runs = useSelect((s) => s.runs);
   const channels = useSelect((s) => s.channels);
@@ -553,13 +555,21 @@ export function Profile({ agent, back }: { agent: string; back?: { href: string;
   // The names of the tools as the profile writes them, a glob as written.
   // A profile that names no tools takes the tools of its workers, which the front names beside it.
   const toolNames = (info && info.tools && info.tools.length ? info.tools : null) || (info && info.workerTools) || (started && started.tools) || [];
-  const policy = (info && info.policy) || (info && info.workerPolicy) || (started && started.policy) || null;
+  const policy = (info && info.policy) || null;
+  // The rules of the workers hold beside the rules of the profile, which can only tighten them.
+  const workerPolicy = (info && info.workerPolicy) || (started && started.policy) || null;
+  // The switch of the packages: the section of the packages tells it once it reads it, else the profile.
+  const [sectionSwitch, setSectionSwitch] = useState<PackageSwitch | null>(null);
+  const sw = sectionSwitch || (info && info.workerPackages) || null;
   const skillCount = loadable ? loadable.length : 0;
   const catalog = useToolCatalog();
   // What the agent can do, in plain words: the tools of the profile, a glob as one ability.
-  const abilities = useMemo(() => abilitiesOf(toolNames, catalog), [toolNames.join('\n'), catalog]);
-  // The rules of the profile, and the rules that its decisions named, as a person reads them.
-  const rules = useMemo(() => rulesWords([...new Set([...policyRules(policy), ...rulesOf(agent, runs, channels)])].sort(), catalog), [policy, agent, runs, channels, catalog]);
+  const abilities = useMemo(() => withPackages(abilitiesOf(toolNames, catalog), sw), [toolNames.join('\n'), catalog, sw && sw.on, sw && sw.ask]);
+  // The rules of the profile and of its workers, and the rules that its decisions named, as a person reads them.
+  const rules = useMemo(
+    () => rulesWords(rulesWithPackages([...new Set([...policyRules(policy), ...policyRules(workerPolicy), ...rulesOf(agent, runs, channels)])].sort(), sw), catalog),
+    [policy, workerPolicy, agent, runs, channels, catalog, sw && sw.on, sw && sw.ask],
+  );
   const upload = async () => {
     const f = file.current && file.current.files && file.current.files[0];
     if (!f) return;
@@ -661,7 +671,7 @@ export function Profile({ agent, back }: { agent: string; back?: { href: string;
         <AgentDuties agent={agent} />
         <Liked agent={agent} />
         <Workers agent={agent} owner={owner} pool={pool} setPool={setPool} />
-        {packagePool && <PackagesSection key={packagePool} agent={agent} pool={packagePool} owner={owner} />}
+        {packagePool && <PackagesSection key={packagePool} agent={agent} pool={packagePool} owner={owner} onSwitch={setSectionSwitch} />}
         <TodaySec agent={agent} today={today} />
       </div>
     </section>

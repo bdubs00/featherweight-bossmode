@@ -366,4 +366,21 @@ describe('the profile', () => {
     expect(el.querySelector('.empty a[href="#fleet"]')).toBeNull();
     expect(el.querySelector('a[href="#fleet"]')).not.toBeNull();
   });
+
+  it('names the tools of the workers of a profile that names none, and leaves out adding packages while they are off', async () => {
+    const g = fakeFetch([
+      ['GET', /^\/v1\/agents\/migrator$/, () => ({ name: 'migrator', role: 'owner', pool: 'crew', workerTools: ['bash', 'env'], workerPolicy: { ask: ['env: command=add'] }, workerPackages: { on: false, ask: false } })],
+      ['GET', /^\/v1\/pools\/crew$/, () => POOL],
+      ['GET', /^\/v1\/bossmode\/agents\/migrator\/today$/, () => ({ runs: 0, decisions: 0 })],
+    ]);
+    try {
+      const el = mount(<Profile agent="migrator" />);
+      await vi.waitFor(() => expect(el.querySelectorAll('.abilities li').length).toBe(1));
+      expect([...el.querySelectorAll('.abilities li')].map((c) => c.textContent)).toEqual(['Run shell commands']);
+      // The profile answers with the tools of the workers, so it reads no start of a run of a seat.
+      expect(g.calls.some((c) => c.path.includes('/events'))).toBe(false);
+    } finally {
+      g.restore();
+    }
+  });
 });

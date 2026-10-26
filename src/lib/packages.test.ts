@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Fleet, Packages } from '../api/types';
-import { bodyOf, keyOf, lineOf, nameProblem, normalize, poolOfAgent, requirementClause, shouldPoll, versionsOf } from './packages';
+import { addsPackages, bodyOf, keyOf, lineOf, nameProblem, normalize, poolOfAgent, requirementClause, rulesWithPackages, shouldPoll, switchWords, versionsOf, withPackages } from './packages';
 
 const base: Packages = { pool: 'crew', available: true, on: true, ask: true, python: [{ name: 'ansible-lint' }], tools: [], applying: false, workers: [] };
 const w = (task: string, state: string) => ({ task, state }) as Packages['workers'] extends (infer T)[] | undefined ? T : never;
@@ -156,5 +156,20 @@ describe('versionsOf', () => {
     expect(versionsOf(p, 'tools').get(keyOf('iproute2'))).toBe('6.11');
     expect(versionsOf({ ...base, workers: undefined }, 'python').size).toBe(0);
     expect(keyOf(' Zope.Interface[docs] ~= 5 ')).toBe('zope-interface');
+  });
+});
+
+describe('the switch of the packages', () => {
+  it('leaves out adding packages and its rules unless packages are on and the agent may ask, and trusts the tools without a switch', () => {
+    const abilities = [{ names: ['bash'] }, { names: ['env'] }, { names: ['builtin.env'] }];
+    const rules = ['bash: git push*', 'env: command=add', 'env: command=remove'];
+    expect(addsPackages(undefined)).toBe(true);
+    expect(withPackages(abilities, null)).toEqual(abilities);
+    expect(withPackages(abilities, { on: true, ask: true })).toEqual(abilities);
+    expect(withPackages(abilities, { on: false, ask: true })).toEqual([{ names: ['bash'] }]);
+    expect(withPackages(abilities, { on: true, ask: false })).toEqual([{ names: ['bash'] }]);
+    expect(rulesWithPackages(rules, { on: false, ask: false })).toEqual(['bash: git push*']);
+    expect(rulesWithPackages(rules, { on: true, ask: true })).toEqual(rules);
+    expect(switchWords({ on: true, ask: false })).toBe('Packages are on. You add each package on its profile.');
   });
 });
