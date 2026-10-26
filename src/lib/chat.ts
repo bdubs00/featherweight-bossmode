@@ -18,7 +18,10 @@ export function works(run: (Pick<Run, 'state'> & Partial<Pick<Run, 'archived'>>)
 }
 
 /** The line of an archived conversation, which every view of a conversation shows. */
-export const ARCHIVED_LINE = 'This conversation closed when its agent restarted. You can read it, and your next message starts a new conversation.';
+export const ARCHIVED_LINE = 'This conversation closed when its agent restarted. You can read it. Your next message starts a new conversation, and the agent gets a summary of this one.';
+
+/** The metadata key of a run that takes up an earlier conversation, as the server sets it from continues. */
+export const CONTINUES_KEY = 'workbench.continues';
 
 /**
  * chatStatus is the status of a conversation in a list of conversations.
@@ -54,8 +57,10 @@ export function isQuickChat(run: Run, agent: string, principal: string): boolean
   return run.agent === agent && (!principal || run.principal === principal) && !!run.metadata && run.metadata[CHAT_VIEW.key] === CHAT_VIEW.value;
 }
 
-/** chatTitle is the title of a chat in the history: the title of the run, else the start of its input. */
-export function chatTitle(run: Pick<Run, 'title' | 'input'>): string {
+/** chatTitle is the title of a chat in the history: the title that the person gave it, else the title of the run, else the start of its input. */
+export function chatTitle(run: Pick<Run, 'title' | 'input'> & Partial<Pick<Run, 'myTitle'>>): string {
+  const mine = (run.myTitle || '').trim();
+  if (mine) return mine;
   const t = (run.title || '').trim();
   if (t) return t;
   const i = excerpt((run.input || '').split('\n')[0] || '', 64);

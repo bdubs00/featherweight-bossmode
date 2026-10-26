@@ -16,8 +16,8 @@ import { INDEX_PATH, byPagePath, pageName, pageReason, withSuffix } from '../lib
 import { personName, since } from '../lib/words';
 import { go, hrefOf } from '../lib/route';
 import { useRoving } from './keys';
-import { attempt, showError } from './notice';
-import { Markdown } from './common';
+import { attempt, showError, showSaid } from './notice';
+import { Confirm, Markdown, Menu } from './common';
 import { keyWords, useCoarse } from './Composer';
 import { Glyph } from './icons';
 import { Button, Card, Chip, Command, Field, Find, Input, PaneHeader, TextArea } from './primitives';
@@ -243,12 +243,42 @@ export function PageTree({ current }: { current?: string }) {
   );
 }
 
-/** Parts is the meta of a page: its version, its writer, its time, its summary, and its tags. brief leaves out the first three, which the line of an old version says. */
-function Parts({ page, tags, brief }: { page: Page; tags: string[]; brief?: boolean }) {
+/**
+ * pageNumbers counts the versions of one page from 1, the oldest first, so
+ * a page with three versions has versions 1, 2, and 3. The store numbers
+ * the versions of the whole wiki, so its number of a version, such as 183,
+ * is the key of the map. A removal has no number.
+ */
+export function pageNumbers(versions: PageVersion[]): Map<number, number> {
+  const out = new Map<number, number>();
+  const kept = versions.filter((v) => !v.deleted).sort((a, b) => a.version - b.version);
+  kept.forEach((v, i) => out.set(v.version, i + 1));
+  return out;
+}
+
+/** usePageHistory reads the history of a page, again when the page changes, or holds null while it reads or when the read fails. */
+function usePageHistory(path: string, hash: string): PageVersion[] | null {
+  const [versions, setVersions] = useState<PageVersion[] | null>(null);
+  useEffect(() => {
+    let live = true;
+    setVersions(null);
+    api
+      .history(path)
+      .then((v) => live && setVersions(v))
+      .catch(() => live && setVersions(null));
+    return () => {
+      live = false;
+    };
+  }, [path, hash]);
+  return versions;
+}
+
+/** Parts is the meta of a page: its version, its writer, its time, its summary, and its tags. brief leaves out the first three, which the line of an old version says. n is the number of the version in the page, when the page knows its history. */
+function Parts({ page, tags, brief, n }: { page: Page; tags: string[]; brief?: boolean; n?: number }) {
   if (brief && !page.summary && tags.length === 0) return null;
   return (
     <p class="parts">
-      {!brief && <span>Version {page.version}</span>}
+      {!brief && n !== undefined && <span>Version {n}</span>}
       {!brief && <span class="by">{byName(page.by)}</span>}
       {!brief && <Since at={page.at} />}
       {page.summary && <span>{page.summary}</span>}
@@ -301,20 +331,76 @@ export function PageView({ path, version }: { path: string; version?: number }) 
   useEffect(() => {
     if (page && heading.current) heading.current.focus();
   }, [page && page.path]);
+  // The history numbers the versions of the page from 1, and names the newest one, which Restore replaces.
+  // A hash names the text, and a restored version has the text of an older one, so the version of the page reads the history again too.
+  const versions = usePageHistory(path, [hash || (page ? page.hash : ''), page ? page.version : '', missing ? 'missing' : ''].join(':'));
+  const numbers = useMemo(() => pageNumbers(versions || []), [versions]);
+  const [asking, setAsking] = useState(false);
+  const [busy, setBusy] = useState(false);
   const back = { href: '#pages', label: 'Wiki', to: 'list' as const };
+  const removedNow = !!versions && versions.length > 0 && !!versions[0].deleted;
   if (missing) {
     return (
       <section class="screen pageview" aria-labelledby="page-title">
         <PaneHeader id="page-title" title={pageName(path)} size="title" level={1} back={back} />
         <div class="empty">
-          <p>No page {path} is here.</p>
-          <Button href={hrefOf({ place: 'pages', path, mode: 'create' })}>Create {path}</Button>
+          {removedNow ? (
+            <>
+              <p>This page was removed. Its history keeps its versions, and Restore brings one back.</p>
+              <Button href={hrefOf({ place: 'pages', path, mode: 'history' })}>History</Button>
+            </>
+          ) : (
+            <>
+              <p>No page {path} is here.</p>
+              <Button href={hrefOf({ place: 'pages', path, mode: 'create' })}>Create {path}</Button>
+            </>
+          )}
         </div>
       </section>
     );
   }
   const fm = page ? stripFrontMatter(page.text) : null;
   const title = (page && (page.title || fm!.title)) || pageName(path);
+  const n = page ? numbers.get(page.version) : undefined;
+  const remove = async () => {
+    if (!page) return;
+    setBusy(true);
+    const ok = await attempt(async () => {
+      try {
+        await api.removePage(path, page.hash);
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 412) throw new Error('Someone saved a newer version of this page. Read it, then remove it again.');
+        throw e;
+      }
+      await loadPages();
+    });
+    setBusy(false);
+    setAsking(false);
+    if (ok) {
+      showSaid('Removed ' + title + '. Its history keeps it.');
+      go('#pages');
+    }
+  };
+  // Restore saves an old version as the newest one: over the newest version, or as the page again when it was removed.
+  const restore = async () => {
+    if (!page || !versions) return;
+    const newest = versions[0];
+    setBusy(true);
+    const ok = await attempt(async () => {
+      try {
+        await api.putPage(path, page.text, newest && !newest.deleted ? newest.hash : '*', 'Restored version ' + (n || page.version));
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 412) throw new Error('Someone saved a newer version of this page. Open the history again.');
+        throw e;
+      }
+      await loadPages();
+    });
+    setBusy(false);
+    if (ok) {
+      showSaid('Restored version ' + (n || page.version) + ' as the newest version.');
+      go({ place: 'pages', path, mode: 'read' });
+    }
+  };
   return (
     <section class="screen pageview" aria-labelledby="page-title">
       <PaneHeader
@@ -335,16 +421,28 @@ export function PageView({ path, version }: { path: string; version?: number }) 
                 Edit
               </Button>
             )}
+            {!version && page && path !== INDEX_PATH && <Menu label={'More for ' + title} kind="secondary" items={[{ label: 'Remove page', danger: true, onSelect: () => setAsking(true) }]} />}
           </>
         }
       />
+      {asking && (
+        <Confirm title={'Remove ' + title + '?'} confirm="Remove page" danger busy={busy} onCancel={() => setAsking(false)} onConfirm={remove}>
+          <p>The page leaves the wiki. Its history keeps every version, and Restore of a version brings the page back.</p>
+        </Confirm>
+      )}
       <div class="scroll pad">
         {version && page && (
           <p class="note-line">
             <span>
-              Version {page.version}, by {byName(page.by)}, <Since at={page.at} />.
+              {n !== undefined ? 'Version ' + n + ', by ' : 'An old version, by '}
+              {byName(page.by)}, <Since at={page.at} />.
             </span>
-            <a href={hrefOf({ place: 'pages', path, mode: 'read' })}>Current page</a>
+            <a href={hrefOf({ place: 'pages', path, mode: 'read' })}>{removedNow ? 'History' : 'Current page'}</a>
+            {versions && path !== INDEX_PATH && (
+              <Button size="s" disabled={busy} onClick={restore}>
+                Restore this version
+              </Button>
+            )}
           </p>
         )}
         {changed && !version && page && (
@@ -356,7 +454,7 @@ export function PageView({ path, version }: { path: string; version?: number }) 
           <p class="t-meta">Loading the page.</p>
         ) : (
           <>
-            <Parts page={page} tags={fm!.tags} brief={!!version} />
+            <Parts page={page} tags={fm!.tags} brief={!!version} n={n} />
             <Markdown text={withoutTitle(fm!.body, title)} base={path} class="article" />
           </>
         )}
@@ -375,6 +473,7 @@ export function PageHistory({ path }: { path: string }) {
     setVersions(null);
     api.history(path).then(setVersions).catch(showError);
   }, [path, meta && meta.hash]);
+  const numbers = useMemo(() => pageNumbers(versions || []), [versions]);
   return (
     <section class="screen pagehistory" aria-labelledby="history-title">
       <PaneHeader id="history-title" title={'History of ' + name} size="title" level={1} back={{ href: hrefOf({ place: 'pages', path, mode: 'read' }), label: name, to: 'here' }} />
@@ -396,7 +495,7 @@ export function PageHistory({ path }: { path: string }) {
                 <li>
                   <a class="vrow" data-item href={i === 0 ? hrefOf({ place: 'pages', path, mode: 'read' }) : hrefOf({ place: 'pages', path, mode: 'read', version: v.version })}>
                     <span class="head">
-                      <span class="t-sub">Version {v.version}</span>
+                      <span class="t-sub">Version {numbers.get(v.version) || v.version}</span>
                       {i === 0 && <Chip>current</Chip>}
                     </span>
                     <span class="meta">

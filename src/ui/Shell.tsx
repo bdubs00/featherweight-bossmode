@@ -29,6 +29,7 @@ import { selectFacts } from '../state/reducer';
 import { useAttention } from '../state/activity';
 import { Glyph, Icon, type GlyphName } from './icons';
 import { Avatar, Chip, LogoWell, Led, countText } from './primitives';
+import { ManagerDot } from './Manager';
 import { Notifications } from './Notifications';
 import { focusHome, focusLost } from './keys';
 
@@ -293,6 +294,7 @@ export function AppBar({ route, place: placeProp, onSignOut, onReach }: { route:
                   {countText(count)}
                 </Chip>
               )}
+              {it.id === 'manager' && <ManagerDot />}
             </a>
           );
         })}

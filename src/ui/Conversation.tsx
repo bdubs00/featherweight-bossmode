@@ -11,7 +11,7 @@ import type { ComponentChildren } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { ApiError } from '../api/client';
 import { api } from '../api/routes';
-import type { Fleet, Item, Result, Run } from '../api/types';
+import type { Fleet, Item, NewRun, Result, Run } from '../api/types';
 import { store, useSelect } from '../state/store';
 import { stepOf, type Step } from '../state/thread';
 import { decisionOf } from '../lib/decision';
@@ -178,6 +178,29 @@ export function useTranscript(runId: string, load = true): TranscriptState {
     }
   };
   return { items, prev, loading, gone, problem, earlier };
+}
+
+/**
+ * startRun starts a run on a member. continues names an archived
+ * conversation that the new run takes up: the server puts a summary of it
+ * in front of the message. A server that does not know continues refuses
+ * the field, and the run then starts without it, so no message is lost.
+ */
+export async function startRun(member: string, body: NewRun, continues = ''): Promise<Run> {
+  if (!continues) return api.start(member, body);
+  try {
+    return await api.start(member, { ...body, continues });
+  } catch (e) {
+    const detail = e instanceof ApiError && e.problem && typeof e.problem.detail === 'string' ? e.problem.detail : '';
+    if (e instanceof ApiError && e.status === 400 && /\bcontinues\b/.test(detail) && /unknown field/i.test(detail)) return api.start(member, body);
+    throw e;
+  }
+}
+
+/** takeUpOf names the conversation that a new run takes up: the run of the view when the server keeps it in its archive, else "". */
+export function takeUpOf(runId: string): string {
+  const r = runId ? store.get().runs[runId] : undefined;
+  return r && r.archived ? runId : '';
 }
 
 /** focusComposer puts the focus in the message box once the screen draws it, as after New conversation. */

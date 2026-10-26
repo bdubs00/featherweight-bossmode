@@ -35,12 +35,13 @@ import { attempt, showError } from './notice';
 import { AttachedFiles } from './AttachedFiles';
 import { NO_FILES_WITH_COMMAND, describeFiles, refusalOf } from '../lib/attachments';
 import { Composer } from './Composer';
-import { Conversation, usePoll, useTranscript } from './Conversation';
+import { Conversation, startRun, takeUpOf, usePoll, useTranscript } from './Conversation';
 import { useResult } from './RunPane';
 import { FollowBox, Msg, Quiet } from './Thread';
 import { useLiveAnswer } from './Live';
 import { Avatar, Button, Chip, Find, Help, Led, Mark, PaneHeader } from './primitives';
 import { Menu } from './common';
+import { ConversationMenu } from './History';
 import { askOfRun } from '../lib/duties';
 
 /** The number of items of a list of picks above which it gets a field to find one. */
@@ -81,7 +82,7 @@ function useHistory(chat: QuickChat | null): { runs: Run[]; loaded: boolean } {
   const list = useMemo(() => {
     if (!chat) return [];
     const ids = new Set(chats.ids);
-    return newestFirst(Object.values(runs).filter((r) => ids.has(r.id) || isQuickChat(r, chat.agent, me)));
+    return newestFirst(Object.values(runs).filter((r) => !r.hidden && (ids.has(r.id) || isQuickChat(r, chat.agent, me))));
   }, [runs, chats, chat, me]);
   return { runs: list, loaded: chats.loaded };
 }
@@ -108,14 +109,21 @@ export function NoChat() {
 /* ---------- the history ---------- */
 
 /** HistoryRow is one conversation of a history list: its title, its status, and when it started. */
-function HistoryRow({ r, on, href }: { r: Run; on: boolean; href: string }) {
+function HistoryRow({ r, on, href, unread }: { r: Run; on: boolean; href: string; unread?: boolean }) {
   const light = chatStatus(r);
   const title = chatTitle(r);
   const d = new Date(r.createdAt);
   return (
-    <a class={'brow chat-row' + (on ? ' sel strong' : '') + (r.archived ? ' closed' : '')} href={href} data-item aria-current={on ? 'page' : undefined} aria-label={title + ', ' + light.word + ', ' + ago(r.createdAt)}>
+    <a
+      class={'brow chat-row' + (on ? ' sel strong' : '') + (r.archived ? ' closed' : '') + (unread ? ' unread' : '')}
+      href={href}
+      data-item
+      aria-current={on ? 'page' : undefined}
+      aria-label={title + ', ' + (unread ? 'new answer, ' : '') + light.word + ', ' + ago(r.createdAt)}
+    >
       <span class="brow-top">
         <span class="brow-title clip">{title}</span>
+        {unread && <span class="unread-dot" aria-hidden="true" />}
       </span>
       <span class="brow-meta">
         <Led tone={light.tone} word={light.word} label={light.label} />
@@ -146,7 +154,26 @@ export interface HistoryWords {
  * and Manager: the conversations of the person, newest first, grouped by
  * day, with a field to find one and the key New.
  */
-export function HistoryList({ id, words, runs, loaded, current, hrefFor, newHref }: { id: string; words: HistoryWords; runs: Run[]; loaded: boolean; current?: string; hrefFor: (r: Run) => string; newHref: string }) {
+export function HistoryList({
+  id,
+  words,
+  runs,
+  loaded,
+  current,
+  hrefFor,
+  newHref,
+  unread,
+}: {
+  id: string;
+  words: HistoryWords;
+  runs: Run[];
+  loaded: boolean;
+  current?: string;
+  hrefFor: (r: Run) => string;
+  newHref: string;
+  /** The conversations whose newest answer the person has not opened. */
+  unread?: Set<string>;
+}) {
   const [q, setQ] = useState('');
   const shown = useMemo(() => findChats(runs, q), [runs, q]);
   const groups = useMemo(() => historyGroups(shown), [shown]);
@@ -175,8 +202,9 @@ export function HistoryList({ id, words, runs, loaded, current, hrefFor, newHref
             </div>
             <div role="list" class="rows">
               {g.runs.map((r) => (
-                <div role="listitem">
-                  <HistoryRow r={r} on={r.id === current} href={hrefFor(r)} />
+                <div role="listitem" class="chat-item">
+                  <HistoryRow r={r} on={r.id === current} href={hrefFor(r)} unread={!!unread && unread.has(r.id)} />
+                  <ConversationMenu r={r} onHidden={(x) => x.id === current && go(newHref)} />
                 </div>
               ))}
             </div>
@@ -464,7 +492,8 @@ function ChatRun({ chat, runId }: { chat: QuickChat; runId: string }) {
     const startNew = async () => {
       // A list that the page does not know stays out, so the list of the agent holds.
       const p: InlineProfile = { tools: picks.tools || undefined, skills: picks.skills || undefined };
-      const r = await api.start(chat.member, startBody(chat.agent, text, p, files)).catch((e) => {
+      // A message in an archived chat takes it up in a new one, which starts with a summary of it.
+      const r = await startRun(chat.member, startBody(chat.agent, text, p, files), takeUpOf(runId)).catch((e) => {
         throw refusalOf(e, files.length);
       });
       picksOf.set(r.id, p);

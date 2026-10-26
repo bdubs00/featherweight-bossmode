@@ -18,7 +18,7 @@
 
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { api } from '../api/routes';
-import type { AttachedFile, Attachment, Result } from '../api/types';
+import type { AttachedFile, Attachment, ManagerConfig, Result, Run } from '../api/types';
 import { store, useSelect } from '../state/store';
 import { askManager, closed, loadAgentSkills, loadManagerChats, setManagerRun } from '../state/actions';
 import { managerRunOf } from '../state/reducer';
@@ -36,12 +36,173 @@ import { HistoryList, type HistoryWords } from './Chat';
 import { chatTitle } from '../lib/chat';
 import { hrefOf } from '../lib/route';
 import { Composer } from './Composer';
-import { Conversation, POLL_MS, focusComposer, usePoll, useTranscript } from './Conversation';
+import { Conversation, POLL_MS, focusComposer, startRun, usePoll, useTranscript } from './Conversation';
 import { FollowBox, Msg, Quiet } from './Thread';
 import { useLiveAnswer } from './Live';
 import { ARCHIVED_LINE, answerSeqs, lastSeq, works } from '../lib/chat';
 
 export { POLL_MS };
+
+/* ---------- the answers that the person has not opened ---------- */
+
+/** SEEN_KEY is the key under which this browser keeps the seq of each conversation with the manager that the person saw last. */
+export const SEEN_KEY = 'fw.bossmode.manager.seen';
+
+let seen: Record<string, number> | null = null;
+const seenListeners = new Set<() => void>();
+
+function seenMap(): Record<string, number> {
+  if (seen) return seen;
+  try {
+    const v = JSON.parse(localStorage.getItem(SEEN_KEY) || '{}');
+    seen = v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, number>) : {};
+  } catch {
+    seen = {};
+  }
+  return seen;
+}
+
+function keepSeen(next: Record<string, number>): void {
+  seen = next;
+  try {
+    // The map keeps the newest 200 conversations, so it never grows without end.
+    const ids = Object.keys(next);
+    const kept = ids.length > 200 ? Object.fromEntries(ids.slice(-200).map((k) => [k, next[k]])) : next;
+    localStorage.setItem(SEEN_KEY, JSON.stringify(kept));
+  } catch {
+    // No storage: the marks live while the page lives.
+  }
+  for (const f of [...seenListeners]) f();
+}
+
+/** forgetSeen drops the marks of what the person saw, for the tests. */
+export function forgetSeen(): void {
+  seen = null;
+  try {
+    localStorage.removeItem(SEEN_KEY);
+  } catch {
+    // No storage.
+  }
+  for (const f of [...seenListeners]) f();
+}
+
+/** markSeen notes that the person sees a conversation as far as its seq. */
+export function markSeen(r: Pick<Run, 'id' | 'seq'>): void {
+  const m = seenMap();
+  if (m[r.id] !== undefined && m[r.id] >= r.seq) return;
+  keepSeen({ ...m, [r.id]: r.seq });
+}
+
+/** useSeen redraws a view when the marks change, and answers them. */
+function useSeen(): Record<string, number> {
+  const [, setN] = useState(0);
+  useEffect(() => {
+    const f = () => setN((n) => n + 1);
+    seenListeners.add(f);
+    return () => {
+      seenListeners.delete(f);
+    };
+  }, []);
+  return seenMap();
+}
+
+/** The states in which the manager waits for the person: an answer, or a question. */
+const ANSWERED = new Set(['completed', 'input-required']);
+
+/**
+ * unreadOf names the conversations of the person with the manager whose
+ * newest answer the person has not opened: the run moved past the seq
+ * that the person saw last, and the manager waits for the person. A
+ * conversation that the page meets for the first time counts as seen as
+ * it is, so an old conversation never lights the place; firstSeen
+ * receives such runs to note them.
+ */
+export function unreadOf(runs: Run[], agent: string, me: string, marks: Record<string, number>, firstSeen?: (r: Run) => void): Set<string> {
+  const out = new Set<string>();
+  for (const r of conversationsOf(runs, agent, me)) {
+    const at = marks[r.id];
+    if (at === undefined) {
+      if (firstSeen) firstSeen(r);
+      continue;
+    }
+    if (r.seq > at && ANSWERED.has(r.state) && !r.archived) out.add(r.id);
+  }
+  return out;
+}
+
+/** useManagerUnread names the conversations with an answer of the manager that the person has not opened. */
+export function useManagerUnread(): Set<string> {
+  const agent = useSelect((s) => (s.config && s.config.manager ? s.config.manager.agent : ''));
+  const me = useSelect((s) => (s.me && s.me.principal ? s.me.principal.subject : ''));
+  const runs = useSelect((s) => s.runs);
+  const marks = useSeen();
+  const found = useMemo(() => {
+    const fresh: Run[] = [];
+    const unread = agent ? unreadOf(Object.values(runs), agent, me, marks, (r) => fresh.push(r)) : new Set<string>();
+    return { unread, fresh };
+  }, [runs, agent, me, marks]);
+  // The conversations that the page meets for the first time count as seen as they are.
+  useEffect(() => {
+    if (!found.fresh.length) return;
+    const m = { ...seenMap() };
+    for (const r of found.fresh) if (m[r.id] === undefined) m[r.id] = r.seq;
+    keepSeen(m);
+  }, [found]);
+  return found.unread;
+}
+
+/** mainShown reports whether the person sees the main pane: two panes show side by side, or a narrow window shows the main pane, and the tab shows. */
+function mainShown(): boolean {
+  if (typeof document === 'undefined' || document.hidden) return false;
+  const shell = document.querySelector('.shell');
+  if (!shell || shell.getAttribute('data-show') === 'main') return true;
+  return typeof window.matchMedia === 'function' && window.matchMedia('(min-width: 800px)').matches;
+}
+
+/** useMarkSeen marks the conversation that the main pane shows as seen, as far as its newest change, whenever the person can see it. */
+function useMarkSeen(run: Run | undefined): void {
+  const id = run ? run.id : '';
+  const seq = run ? run.seq : 0;
+  useEffect(() => {
+    if (!id) return;
+    const mark = () => {
+      const r = store.get().runs[id];
+      if (r && mainShown()) markSeen(r);
+    };
+    mark();
+    // A tab that comes back, or a narrow window that moves to the main pane, shows the conversation again.
+    // The shell draws the new column after the event, so the mark waits a frame.
+    const later = () => requestAnimationFrame(mark);
+    document.addEventListener('visibilitychange', later);
+    window.addEventListener('hashchange', later);
+    return () => {
+      document.removeEventListener('visibilitychange', later);
+      window.removeEventListener('hashchange', later);
+    };
+  }, [id, seq, run && run.state]);
+}
+
+/**
+ * ManagerDot is the unread dot on the place Manager of the app bar, while
+ * an answer of the manager waits that the person has not opened.
+ */
+export function ManagerDot() {
+  const unread = useManagerUnread();
+  if (unread.size === 0) return null;
+  return (
+    <span class="place-dot" role="status">
+      <span class="sr">{unread.size === 1 ? 'The manager answered.' : 'The manager answered in ' + unread.size + ' conversations.'}</span>
+    </span>
+  );
+}
+
+/** continueManager starts a new conversation with the manager that takes up an archived one, and opens it. */
+async function continueManager(m: ManagerConfig, runId: string, text: string, files: Attachment[]): Promise<string> {
+  const r = await startRun(m.member, files.length ? { agent: m.agent, input: text, files } : { agent: m.agent, input: text }, runId);
+  store.dispatch({ type: 'run', run: r });
+  setManagerRun(r.id);
+  return r.id;
+}
 
 function NoManager() {
   return (
@@ -80,9 +241,21 @@ export function ManagerList({ run, fresh }: { run?: string; fresh?: boolean }) {
     if (agent) attempt(loadManagerChats);
   }, [agent, me]);
   const list = useMemo(() => (agent ? conversationsOf(Object.values(runs), agent, me) : []), [runs, agent, me]);
+  const unread = useManagerUnread();
   if (!agent) return null;
   const current = run || (fresh ? '' : picked);
-  return <HistoryList id="manager-list-title" words={MANAGER_WORDS} runs={list} loaded={loaded} current={current} hrefFor={(r) => hrefOf({ place: 'manager', run: r.id })} newHref={hrefOf({ place: 'manager', fresh: true })} />;
+  return (
+    <HistoryList
+      id="manager-list-title"
+      words={MANAGER_WORDS}
+      runs={list}
+      loaded={loaded}
+      current={current}
+      unread={unread}
+      hrefFor={(r) => hrefOf({ place: 'manager', run: r.id })}
+      newHref={hrefOf({ place: 'manager', fresh: true })}
+    />
+  );
 }
 
 export function Manager({ run: routeRun, fresh }: { run?: string; fresh?: boolean } = {}) {
@@ -129,6 +302,9 @@ export function Manager({ run: routeRun, fresh }: { run?: string; fresh?: boolea
     if (sent && (sent.run === runId ? userCount > sent.users : userCount > 0)) setSent(null);
   }, [userCount, runId]);
 
+  // The conversation that the screen shows is seen, as far as its newest change, while the person can see it.
+  useMarkSeen(run);
+
   // The decision of the manager reads its label from the result.
   const pendingId = run && run.pending ? run.pending.id : '';
   useEffect(() => {
@@ -163,7 +339,8 @@ export function Manager({ run: routeRun, fresh }: { run?: string; fresh?: boolea
         const r = await api.runSkill(runId, slash);
         if (r && r.id) store.dispatch({ type: 'run', run: r });
       } else {
-        const id = await askManager(text, files).catch((e) => {
+        // A message in an archived conversation takes it up in a new one, which starts with a summary of it.
+        const id = await (archived && manager ? continueManager(manager, runId, text, files) : askManager(text, files)).catch((e) => {
           throw refusalOf(e, files.length);
         });
         // A new run gets its own address, so the list marks it and a reload opens it.

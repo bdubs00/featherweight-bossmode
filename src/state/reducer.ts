@@ -491,6 +491,9 @@ export function applyStream(state: State, ev: StreamEvent): State {
   return next;
 }
 
+/** listedRun is a run of a list of the person, with its name and its hiding said, so an empty name clears the name that the store kept. */
+const listedRun = (r: Run): Run => ({ ...r, myTitle: r.myTitle || '', hidden: !!r.hidden });
+
 /** reduce is the reducer of the page. */
 export function reduce(state: State, a: Action): State {
   switch (a.type) {
@@ -549,14 +552,16 @@ export function reduce(state: State, a: Action): State {
     case 'run': {
       const old = state.runs[a.run.id];
       if (old && old.seq > a.run.seq) return state;
-      if (old && JSON.stringify(old) === JSON.stringify(a.run)) return state;
+      // Only the lists of the person name the title and the hiding of a conversation, so a read of the run alone keeps them.
+      const run = old && a.run.myTitle === undefined && a.run.hidden === undefined && (old.myTitle !== undefined || old.hidden !== undefined) ? { ...a.run, myTitle: old.myTitle, hidden: old.hidden } : a.run;
+      if (old && JSON.stringify(old) === JSON.stringify(run)) return state;
       // A run that changes is a run that the fleet holds again.
       let lost = state.lost;
       if (lost[a.run.id]) {
         lost = { ...lost };
         delete lost[a.run.id];
       }
-      return { ...state, runs: { ...state.runs, [a.run.id]: a.run }, lost };
+      return { ...state, runs: { ...state.runs, [a.run.id]: run }, lost };
     }
     case 'pages': {
       const byPath: Record<string, PageMeta> = {};
@@ -592,14 +597,15 @@ export function reduce(state: State, a: Action): State {
       return Object.keys(state.agentSkills).length ? { ...state, agentSkills: {} } : state;
     case 'manager-pick':
       return { ...state, managerPick: a.pick };
+    // A list of the person says the name and the hiding of each conversation, also when it has none, so the list replaces what the store kept.
     case 'manager-chats': {
       let next: State = { ...state, managerChats: { ids: a.runs.map((r) => r.id), loaded: true } };
-      for (const r of a.runs) next = reduce(next, { type: 'run', run: r });
+      for (const r of a.runs) next = reduce(next, { type: 'run', run: listedRun(r) });
       return next;
     }
     case 'chats': {
       let next: State = { ...state, chats: { ids: a.runs.map((r) => r.id), loaded: true } };
-      for (const r of a.runs) next = reduce(next, { type: 'run', run: r });
+      for (const r of a.runs) next = reduce(next, { type: 'run', run: listedRun(r) });
       return next;
     }
     case 'faces': {
