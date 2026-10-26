@@ -157,7 +157,7 @@ export function abilitiesOf(names: string[], catalog: Tool[] | null | undefined)
     }
     const server = serverName(catalog, name);
     if (server) {
-      put('server:' + server, name, () => ({ text: 'Use the tools of ' + server, noun: server }));
+      put('server:' + server, name, () => (server === 'front' ? { text: 'Use the bridges, the wiki, and the fleet', noun: 'the bridges and the wiki' } : { text: 'Use the tools of ' + server, noun: server }));
       continue;
     }
     const src = serverOf(name);

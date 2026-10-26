@@ -138,8 +138,8 @@ describe('the presence words', () => {
   });
 
   it('gives an agent its free workers, and no words without a worker', () => {
-    expect(capacityWords(workersOf(factsOf(fleet), 'migrator'))).toBe('1 free');
-    expect(capacityWords(workersOf(factsOf(fleet), 'scribe'))).toBe('1 free');
+    expect(capacityWords(workersOf(factsOf(fleet), 'migrator'))).toBe('1 worker free');
+    expect(capacityWords(workersOf(factsOf(fleet), 'scribe'))).toBe('1 worker free');
     // An agent with no worker gets no words: no row says Keep 0.
     expect(capacityWords(workersOf(factsOf(fleet), 'idler'))).toBe('');
     const busy = workersOf(factsOf({ ...fleet, members: fleet.members.map((x) => ({ ...x, active: 1 })) }), 'manager');
@@ -161,7 +161,7 @@ describe('Not on a bridge, from the agents of the fleet', () => {
     const last = peopleOf(base()).pop()!;
     expect(last.title).toBe(NOT_ON_A_BRIDGE);
     expect(last.rows.map((r) => r.handle)).toEqual(['manager', 'scribe', 'writer']);
-    expect(last.rows.map((r) => r.task)).toEqual(['1 free', '1 free', '']);
+    expect(last.rows.map((r) => r.task)).toEqual(['1 worker free', '1 worker free', '']);
     expect(peopleOf(base()).flatMap((g) => g.rows).some((r) => /Keep/.test(r.task))).toBe(false);
   });
 

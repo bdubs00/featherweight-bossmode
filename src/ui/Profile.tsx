@@ -15,16 +15,15 @@ import { api } from '../api/routes';
 import { ApiError } from '../api/client';
 import type { Pool, Today } from '../api/types';
 import { store, useSelect } from '../state/store';
-import { loadAgentSkills, loadFaces } from '../state/actions';
-import { useFleetAgent, useProfile } from '../state/profiles';
+import { loadAgentSkills, loadAgents, loadFaces, loadFleet } from '../state/actions';
+import { forgetProfiles, useFleetAgent, useProfile } from '../state/profiles';
 import { namedProfileOf, useQueued } from '../state/queued';
 import { ensureRuns } from '../state/fetchers';
-import { likedOf, newestRun, parseKeep, policyRules, rulesOf, seatOnWorker, seatsOfAgent, type LikedEntry } from '../state/people';
+import { agentGone, likedOf, newestRun, parseKeep, policyRules, rulesOf, seatOnWorker, seatsOfAgent, type LikedEntry } from '../state/people';
 import { poolNameOf, workersOf } from '../lib/workers';
 import { statusOf } from '../lib/status';
 import { selectFacts } from '../state/reducer';
 import { hrefOf } from '../lib/route';
-import { since } from '../lib/words';
 import { attempt, showError } from './notice';
 import { Confirm, InlineMarkdown, Menu } from './common';
 import { Glyph, Icon } from './icons';
@@ -39,6 +38,10 @@ import { PackagesSection } from './Packages';
 import { poolOfAgent } from '../lib/packages';
 
 const WORKER_HELP = 'A worker runs the work of one agent, one seat at a time. Keep is how many it keeps ready.';
+/** The tooltip of a worker of an older setup of its agent. */
+export const OLD_SETUP = 'It takes the new setup of the agent when it starts again.';
+/** The line over the gaps of the workers of an agent: a change that the server cannot make yet. */
+export const GAPS_LINE = 'Some changes have not reached the workers of this agent yet. An admin can read why.';
 /** The answers of the pools and of today, kept for the next view of a profile. */
 const pools = readCache<Pool>();
 const todays = readCache<Today>();
@@ -191,17 +194,12 @@ function Workers({ agent, owner, pool, setPool }: { agent: string; owner: boolea
   const runs = useSelect((s) => s.runs);
   const facts = useSelect(selectFacts);
   const workers = useMemo(() => workersOf(facts, agent).workers, [facts, agent]);
-  const fleetMembers = useSelect((s) => (s.fleet ? s.fleet.members : []));
   // The open runs of the fleet name the seat that each worker serves. Until the page reads them, it reads the newest run of each seat.
   const openRuns = useSelect((s) => s.openRuns);
   const runIds = openRuns ? '' : seats.map((x) => newestRun(x.member)).join(',');
   useEffect(() => {
     if (runIds) ensureRuns(runIds.split(','));
   }, [runIds]);
-  const sleptAt = (name: string) => {
-    const fm = fleetMembers.find((x) => x.name === name || x.name.endsWith('/' + name));
-    return fm ? since(fm.lastSeen) : '';
-  };
   return (
     <section class="prof-sec" aria-labelledby={'workers-' + agent}>
       <div class="prof-sec-head">
@@ -219,12 +217,17 @@ function Workers({ agent, owner, pool, setPool }: { agent: string; owner: boolea
           {workers.map((w) => {
             const light = statusOf(facts, { worker: w.member });
             const seat = seatOnWorker(w.name, seats, runs);
-            const who = seat || (light && light.word === 'asleep' ? sleptAt(w.name) : '');
+            // The page knows no moment when a worker fell asleep, so a sleeping worker shows its word alone.
+            const who = seat;
             return (
               <li>
                 <span class="worker-name">{w.name}</span>
                 {light && <Led tone={light.tone} word={light.word} label={light.label} />}
-                {!w.current && <Chip>old setup</Chip>}
+                {!w.current && (
+                  <span class="worker-old" title={OLD_SETUP}>
+                    <Chip label={'old setup. ' + OLD_SETUP}>old setup</Chip>
+                  </span>
+                )}
                 {who && <span class="worker-who clip">{who}</span>}
               </li>
             );
@@ -232,11 +235,21 @@ function Workers({ agent, owner, pool, setPool }: { agent: string; owner: boolea
         </ul>
       )}
       {pool && pool.gaps && pool.gaps.length > 0 && (
-        <ul class="worker-gaps">
-          {pool.gaps.map((g) => (
-            <li>{g}</li>
-          ))}
-        </ul>
+        // The gaps are the words of the server for an admin, so they sit in a fold under one plain line.
+        <div class="worker-gaps">
+          <p>{GAPS_LINE}</p>
+          <details class="advanced worker-gaps-fold">
+            <summary>
+              <Glyph name="back" size={16} />
+              Details
+            </summary>
+            <ul>
+              {pool.gaps.map((g) => (
+                <li>{g}</li>
+              ))}
+            </ul>
+          </details>
+        </div>
       )}
     </section>
   );
@@ -265,7 +278,12 @@ function RemoveWorkers({ agent, onDone }: { agent: string; onDone: () => void })
             const ok = await attempt(() => api.removeWorkers(poolNameOf(store.get().fleet, agent)));
             setBusy(false);
             setAsk(false);
-            if (ok) onDone();
+            if (ok) {
+              onDone();
+              // The server can remove the profile with its workers, so the page reads the agents and the fleet again.
+              forgetProfiles();
+              await Promise.allSettled([loadAgents(), loadFleet()]);
+            }
           }}
         >
           <p>Every worker of {agent} stops. A seat of {agent} waits for a worker.</p>
@@ -282,11 +300,73 @@ export function runHref(t: Pick<LikedEntry, 'run' | 'bridge' | 'handle'>): strin
   return '/ui#run/' + encodeURIComponent(t.run);
 }
 
+/** The length of an answer above which a heart folds it to a few lines, with Show more. */
+export const LIKED_FOLD = 240;
+
+/**
+ * plainAnswer cleans the answer of a heart for a short view. The front
+ * keeps the answer on one line, so a table loses its rows: the line of
+ * dashes under its head goes, and each bar between two cells becomes a
+ * dot.
+ */
+export function plainAnswer(text: string): string {
+  return String(text || '')
+    .replace(/\|?(\s*:?-{3,}:?\s*\|)+\s*:?-{3,}:?\s*\|?/g, ' ')
+    .replace(/(^|\s)\|\s*/g, '$1')
+    .replace(/\s*\|(\s|$)/g, ' \u00b7$1')
+    .replace(/(\s\u00b7)+/g, ' \u00b7')
+    .replace(/\s+\u00b7\s*$/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** LikedItem is one heart: the note of the person first, what was asked, and the answer, folded when it is long. */
+function LikedItem({ t }: { t: LikedEntry }) {
+  const [more, setMore] = useState(false);
+  const did = plainAnswer(t.did);
+  const long = did.length > LIKED_FOLD;
+  return (
+    <li>
+      <Glyph name="heart" size={14} class="heart" />
+      <div class="liked-body">
+        {t.note && (
+          <p class="liked-note">
+            <span class="liked-label">Liked because: </span>
+            <InlineMarkdown text={t.note} />
+          </p>
+        )}
+        {t.asked && (
+          <p class="liked-asked clip" title={t.asked}>
+            <span class="liked-label">Asked: </span>
+            {t.asked}
+          </p>
+        )}
+        {did && (
+          <p class={'liked-did' + (long && !more ? ' folded' : '')}>
+            <span class="liked-label">Answer: </span>
+            <InlineMarkdown text={did} />
+          </p>
+        )}
+        {long && (
+          <button type="button" class="prof-link liked-more" aria-expanded={more} onClick={() => setMore(!more)}>
+            {more ? 'Show less' : 'Show more'}
+          </button>
+        )}
+        {t.run && (
+          <a class="prof-link" href={runHref(t)}>
+            Open the run
+          </a>
+        )}
+      </div>
+    </li>
+  );
+}
+
 /**
  * Liked is What people liked: the hearts of people from the page of the
- * agent, newest first. Each shows what the agent did, what was asked, the
- * note, and its run. An agent with no heart has no section: a heading over
- * nothing says nothing.
+ * agent, newest first. Each leads with the note of the person, then what
+ * was asked, then the answer, and its run. An agent with no heart has no
+ * section: a heading over nothing says nothing.
  */
 function Liked({ agent }: { agent: string }) {
   const { path, items } = useLiked(agent);
@@ -304,37 +384,11 @@ function Liked({ agent }: { agent: string }) {
           Open page
         </a>
       </div>
-      {n > 0 && (
-        <ul class="liked">
-          {items!.slice(0, 3).map((t) => (
-            <li>
-              <Glyph name="heart" size={14} class="heart" />
-              <div class="liked-body">
-                {t.did && (
-                  <p class="liked-did">
-                    <InlineMarkdown text={t.did} />
-                  </p>
-                )}
-                {t.asked && (
-                  <p class="liked-asked">
-                    <InlineMarkdown text={t.asked} />
-                  </p>
-                )}
-                {t.note && (
-                  <p class="liked-note">
-                    <InlineMarkdown text={t.note} />
-                  </p>
-                )}
-                {t.run && (
-                  <a class="prof-link" href={runHref(t)}>
-                    Open the run
-                  </a>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+      <ul class="liked">
+        {items!.slice(0, 3).map((t) => (
+          <LikedItem t={t} />
+        ))}
+      </ul>
     </section>
   );
 }
@@ -367,31 +421,55 @@ function TodaySec({ agent, today }: { agent: string; today: Today | null | undef
   );
 }
 
-/** EditFace is the form of an owner: the name and the tagline, Save, and Use the mark for a custom face. */
-function EditFace({ agent, onDone }: { agent: string; onDone: (said: string) => void }) {
+/**
+ * EditFace is the form of an owner: the name and the tagline, Save, and
+ * Use the default picture for a custom face. The fields open with what
+ * the profile shows: the name of the face, else the name of the agent,
+ * and the tagline, else the description. A field that keeps the name or
+ * the description of the agent saves as empty, so the face follows a
+ * later change of the profile. The focus opens in Name, Escape cancels,
+ * and onDone gives the focus back to Edit.
+ */
+function EditFace({ agent, description, onDone }: { agent: string; description: string; onDone: (said: string) => void }) {
   const face = useSelect((s) => s.faces[agent]);
-  const [name, setName] = useState(face ? face.displayName : '');
-  const [tagline, setTagline] = useState(face ? face.tagline : '');
+  const [name, setName] = useState((face && face.displayName) || agent);
+  const [tagline, setTagline] = useState((face && face.tagline) || description);
   const [busy, setBusy] = useState(false);
+  const first = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (first.current) first.current.focus();
+  }, []);
   const save = async (e: Event) => {
     e.preventDefault();
     setBusy(true);
-    const ok = await attempt(() => api.patchFace(agent, { displayName: name, tagline }).then(() => loadFaces()));
+    const displayName = name.trim() === agent ? '' : name.trim();
+    const line = tagline.trim() === description.trim() ? '' : tagline.trim();
+    const ok = await attempt(() => api.patchFace(agent, { displayName, tagline: line }).then(() => loadFaces()));
     setBusy(false);
     if (ok) onDone('Saved.');
   };
   return (
-    <form class="prof-edit" onSubmit={save}>
+    <form
+      class="prof-edit"
+      onSubmit={save}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape' && !busy) {
+          e.preventDefault();
+          e.stopPropagation();
+          onDone('');
+        }
+      }}
+    >
       <Field label="Name">
-        <Input value={name} maxLength={64} onInput={(e) => setName((e.target as HTMLInputElement).value)} />
+        <Input ref={first} value={name} maxLength={64} placeholder={agent} onInput={(e) => setName((e.target as HTMLInputElement).value)} />
       </Field>
       <Field label="Tagline">
-        <Input value={tagline} maxLength={140} onInput={(e) => setTagline((e.target as HTMLInputElement).value)} />
+        <Input value={tagline} maxLength={140} placeholder={description || undefined} onInput={(e) => setTagline((e.target as HTMLInputElement).value)} />
       </Field>
       <div class="prof-edit-do">
         {face && face.custom && (
           <Button size="s" kind="quiet" disabled={busy} onClick={() => attempt(() => api.deleteFace(agent).then(() => loadFaces()))}>
-            Use the mark
+            Use the default picture
           </Button>
         )}
         <span class="grow" />
@@ -403,6 +481,32 @@ function EditFace({ agent, onDone }: { agent: string; onDone: (said: string) => 
         </Button>
       </div>
     </form>
+  );
+}
+
+/**
+ * AgentGone is the page of an agent that no longer exists, with the way
+ * back to the fleet. The details pane passes quiet: where it shows beside
+ * the main pane, the main pane holds the key, and alone it has its back
+ * link.
+ */
+export function AgentGone({ agent, quiet }: { agent: string; quiet?: boolean }) {
+  return (
+    <section class="screen agent-gone" aria-labelledby={quiet ? 'agent-gone-details' : 'agent-gone-title'}>
+      {quiet ? (
+        <PaneHeader id="agent-gone-details" title={agent} back={{ href: '#fleet', label: 'Fleet', to: 'main' }} />
+      ) : (
+        <PaneHeader id="agent-gone-title" title={agent} size="title" level={1} back={{ href: '#fleet', label: 'Fleet', to: 'list' }} />
+      )}
+      <div class="empty center">
+        <p>This agent no longer exists.</p>
+        {!quiet && (
+          <Button href="#fleet" kind="primary">
+            Back to Fleet
+          </Button>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -436,6 +540,8 @@ export function Profile({ agent, back }: { agent: string; back?: { href: string;
   const [said, setSaid] = useState('');
   const [busy, setBusy] = useState(false);
   const file = useRef<HTMLInputElement>(null);
+  const editKey = useRef<HTMLButtonElement>(null);
+  const gone = useSelect((s) => agentGone(s, agent));
   useEffect(() => {
     setEdit(false);
     setSaid('');
@@ -445,8 +551,9 @@ export function Profile({ agent, back }: { agent: string; back?: { href: string;
   }, [agent]);
   const owner = !!info && info.role === 'owner';
   // The names of the tools as the profile writes them, a glob as written.
-  const toolNames = (info && info.tools) || (started && started.tools) || [];
-  const policy = (info && info.policy) || (started && started.policy) || null;
+  // A profile that names no tools takes the tools of its workers, which the front names beside it.
+  const toolNames = (info && info.tools && info.tools.length ? info.tools : null) || (info && info.workerTools) || (started && started.tools) || [];
+  const policy = (info && info.policy) || (info && info.workerPolicy) || (started && started.policy) || null;
   const skillCount = loadable ? loadable.length : 0;
   const catalog = useToolCatalog();
   // What the agent can do, in plain words: the tools of the profile, a glob as one ability.
@@ -471,6 +578,8 @@ export function Profile({ agent, back }: { agent: string; back?: { href: string;
     if (ok) setSaid('The new face is up.');
   };
   const title = (face && face.displayName) || agent;
+  if (gone) return <AgentGone agent={agent} quiet />;
+  const description = (info && info.description) || '';
   return (
     <section class="screen profile" aria-labelledby="profile-title">
       <PaneHeader
@@ -479,7 +588,7 @@ export function Profile({ agent, back }: { agent: string; back?: { href: string;
         back={{ href: back ? back.href : '#fleet', label: back ? back.label : 'Fleet', to: 'main' }}
         actions={
           owner && !edit ? (
-            <Button size="s" onClick={() => setEdit(true)}>
+            <Button ref={editKey} size="s" onClick={() => setEdit(true)}>
               Edit
             </Button>
           ) : undefined
@@ -488,7 +597,7 @@ export function Profile({ agent, back }: { agent: string; back?: { href: string;
         <Chip>agent</Chip>
       </PaneHeader>
       <div class="scroll">
-        <section class="prof-ident" aria-label={title}>
+        <section class={'prof-ident' + (edit ? ' editing' : '')} aria-label={title}>
           {owner ? (
             // The picture is the key that changes it. The pen says so, also on a touch screen with no hover.
             <button type="button" class="prof-mark-key" disabled={busy} aria-label={'Change the picture of ' + title} title="Change the picture: pick an SVG file" onClick={() => file.current && file.current.click()}>
@@ -505,9 +614,12 @@ export function Profile({ agent, back }: { agent: string; back?: { href: string;
             {edit ? (
               <EditFace
                 agent={agent}
+                description={description}
                 onDone={(s) => {
                   setEdit(false);
                   setSaid(s);
+                  // The form goes, so the focus goes back to the key that opened it.
+                  requestAnimationFrame(() => editKey.current && editKey.current.focus());
                 }}
               />
             ) : (
@@ -529,13 +641,21 @@ export function Profile({ agent, back }: { agent: string; back?: { href: string;
                 What it can do
               </h3>
               <span class="grow" />
-              {loadable && (
-                <a class="prof-link prof-skills" href="#skills">
-                  {skillCount === 1 ? '1 skill' : skillCount + ' skills'}
-                </a>
-              )}
+              {loadable && <span class="prof-skills t-meta">{skillCount === 1 ? '1 skill' : skillCount + ' skills'}</span>}
             </div>
             <Abilities abilities={abilities} rules={rules} label="Tools and rules" />
+            {loadable && loadable.length > 0 && (
+              // Each skill links its own page, so the person sees which skills the agent has.
+              <p class="prof-skill-list">
+                <span class="liked-label">Skills: </span>
+                {loadable.map((k, i) => (
+                  <>
+                    {i > 0 && ', '}
+                    <a href={hrefOf({ place: 'skills', item: { kind: 'skill', id: k } })}>{k}</a>
+                  </>
+                ))}
+              </p>
+            )}
           </section>
         )}
         <AgentDuties agent={agent} />

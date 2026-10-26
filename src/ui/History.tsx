@@ -12,9 +12,8 @@ import { useEffect, useId, useMemo, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
 import type { Run } from '../api/types';
 import { useSelect } from '../state/store';
-import { runStatus } from '../lib/presence';
-import { since } from '../lib/words';
-import { CHAT_VIEW, chatTitle, findChats, historyGroups, newestFirst } from '../lib/chat';
+import { ago, since } from '../lib/words';
+import { CHAT_VIEW, chatStatus, chatTitle, findChats, historyGroups, newestFirst } from '../lib/chat';
 import { useRoving } from './keys';
 import { Find, GrooveBand, Led, buttonClass } from './primitives';
 
@@ -23,6 +22,22 @@ export const BRIDGE_BATCH = 'bridge:';
 
 /** The metadata key of a run that the front starts for itself, as fleet.MetaInternal of the workbench. */
 export const INTERNAL_KEY = 'workbench.internal';
+
+/** The metadata key of a run in which the manager decides for a duty, as away.MetaVerdict of the workbench. */
+export const VERDICT_KEY = 'workbench.dutyVerdict';
+
+/**
+ * internalRun reports whether the front started a run for itself, such as
+ * the run in which the manager decides an approval for a duty. Such a run
+ * is no conversation of a person. The front marks it in its metadata. A
+ * run that lost its metadata, as a run of the archive can, still shows the
+ * title and the first words that the front gives a decision of a duty.
+ */
+export function internalRun(r: Pick<Run, 'metadata' | 'title' | 'input'>): boolean {
+  const m = r.metadata || {};
+  if (m[INTERNAL_KEY] || m[VERDICT_KEY]) return true;
+  return (r.title || '').startsWith('Decide for the duty ') && (r.input || '').startsWith('You decide one approval for the duty ');
+}
 
 /** The number of conversations above which the dialog gets a field to find one. */
 export const FIND_PAST_FROM = 12;
@@ -40,22 +55,22 @@ export function conversationsOf(runs: Run[], agent: string, me: string): Run[] {
     runs.filter((r) => {
       if (r.agent !== agent || r.parent || (me && r.principal !== me)) return false;
       const m = r.metadata || {};
-      return !(m['fw.batch'] || '').startsWith(BRIDGE_BATCH) && !m[INTERNAL_KEY] && m[CHAT_VIEW.key] !== CHAT_VIEW.value;
+      return !(m['fw.batch'] || '').startsWith(BRIDGE_BATCH) && !internalRun(r) && m[CHAT_VIEW.key] !== CHAT_VIEW.value;
     }),
   );
 }
 
 function PastRow({ r, on, onPick }: { r: Run; on: boolean; onPick: (r: Run) => void }) {
-  const light = runStatus(r);
+  const light = chatStatus(r);
   const title = chatTitle(r);
   const d = new Date(r.createdAt);
   return (
     <button
       type="button"
-      class={'brow chat-row past-row' + (on ? ' sel strong' : '')}
+      class={'brow chat-row past-row' + (on ? ' sel strong' : '') + (r.archived ? ' closed' : '')}
       data-item
       aria-current={on ? 'true' : undefined}
-      aria-label={title + ', ' + light.word + ', ' + since(r.createdAt) + (on ? ', open now' : '')}
+      aria-label={title + ', ' + light.word + ', ' + ago(r.createdAt) + (on ? ', open now' : '')}
       onClick={() => onPick(r)}
     >
       <span class="brow-top">

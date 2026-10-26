@@ -187,6 +187,16 @@ describe('the states of the section', () => {
     expect(el.querySelector('details.pkgs-fold')).toBeNull();
   });
 
+  it('says that a change waits for a worker that sleeps, and promises no time', async () => {
+    // crew-0 sleeps on the stream, so the change reaches it only when it wakes.
+    act(() => store.dispatch({ type: 'stream', event: { id: '7', kind: 'task', data: { member: 'default/crew-0', phase: 'Suspended' } } as never }));
+    answer = { ...ON, applying: true, workers: [{ task: 'crew-0', state: 'pending' }] };
+    const el = await section();
+    await vi.waitFor(() => expect(el.querySelector('.pkgs-state')!.textContent).toBe('The change waits for its worker to wake up.'));
+    expect(el.querySelector('.pkgs-state .led-amber')).toBeNull();
+    expect(el.querySelector('.pkgs-note')).toBeNull();
+  });
+
   it('says how many workers take a change, and names no version of a worker that is not ready', async () => {
     answer = { ...ON, applying: true, workers: [{ task: 'crew-0', state: 'pending', installed: { python: [{ name: 'ansible-lint', version: '1.0' }] } }, { task: 'crew-1', state: 'materializing' }] };
     const el = await section();
@@ -293,6 +303,12 @@ describe('a change of the packages', () => {
     expect(puts()[0].body).toEqual({ on: true, ask: false, python: ['ansible-lint'], tools: ['iproute2'] });
     await vi.waitFor(() => expect((el.querySelector('input[role="switch"]') as HTMLInputElement).checked).toBe(false));
     act(() => button(el, 'Turn off')!.click());
+    // The workers would lose the packages of the list, so the key asks first and names them.
+    const dialog = el.querySelector('dialog') as HTMLDialogElement;
+    expect(dialog.textContent).toContain('Turn off packages?');
+    expect(dialog.textContent).toContain('The workers of migrator lose ansible-lint and iproute2.');
+    expect(puts().length).toBe(1);
+    act(() => ([...dialog.querySelectorAll('button')].find((b) => b.textContent === 'Turn off') as HTMLButtonElement).click());
     await vi.waitFor(() => expect(puts().length).toBe(2));
     expect(puts()[1].body).toEqual({ on: false, ask: false, python: ['ansible-lint'], tools: ['iproute2'] });
     await vi.waitFor(() => expect(el.querySelector('.pkgs-off')).not.toBeNull());

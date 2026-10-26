@@ -44,6 +44,9 @@ export interface Folder {
   pages: PageMeta[];
 }
 
+/** The headings over the work folders of the bridges and of the agents in the tree. */
+const KIND_HEADS: Record<string, string> = { bridge: 'Bridges', agent: 'Agents' };
+
 /** The order of the kinds of folders: the pages that people keep first, the work folders of bridges and agents last. */
 const KIND_ORDER: Folder['kind'][] = ['root', 'people', 'bridge', 'agent'];
 
@@ -76,6 +79,31 @@ export function foldersOf(pages: PageMeta[], bridgeTitles: Record<string, string
   return [...by.keys()]
     .map((path) => ({ ...folderOf(path, bridgeTitles), pages: by.get(path)!.sort(byPagePath) }))
     .sort((a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind) || (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : a.path < b.path ? -1 : 1));
+}
+
+/**
+ * newPath makes the path of a new page from what a person typed: each
+ * space between words becomes a hyphen, so walk/walk page 1 gives
+ * walk/walk-page-1.md, and .md comes last when the person leaves it out.
+ */
+export function newPath(typed: string): string {
+  const p = typed
+    .trim()
+    .split('/')
+    .map((part) => part.trim().replace(/\s+/g, '-'))
+    .join('/');
+  return withSuffix(p);
+}
+
+/**
+ * withoutTitle drops the first heading of the text of a page when it says
+ * the title that the head of the page shows, so the title shows once and
+ * the screen has one h1.
+ */
+export function withoutTitle(body: string, title: string): string {
+  const m = /^\s*#[ \t]+(.+?)[ \t]*#*[ \t]*(\r?\n|$)/.exec(body);
+  if (!m || m[1].trim().toLowerCase() !== title.trim().toLowerCase()) return body;
+  return body.slice(m[0].length).replace(/^\s*\n/, '');
 }
 
 /** Since is a short meta of a moment, with the full time in a tooltip. */
@@ -181,26 +209,31 @@ export function PageTree({ current }: { current?: string }) {
                 <Button href="#create">New page</Button>
               </div>
             )}
-            {folders.map((f) => {
+            {folders.map((f, i) => {
               const open = !shut[f.path];
               const id = 'folder-' + (f.path || 'root');
+              // The work folders of the bridges and of the agents each start under a heading of their own.
+              const kindHead = (f.kind === 'bridge' || f.kind === 'agent') && (i === 0 || folders[i - 1].kind !== f.kind) ? KIND_HEADS[f.kind] : '';
               return (
-                <div class="group" role="group" aria-labelledby={f.path ? id : undefined} aria-label={f.path ? undefined : 'Pages'}>
-                  {f.path && (
-                    <button type="button" class="group-head" id={id} aria-expanded={open} title={f.title !== f.path ? f.path : undefined} onClick={() => setShut({ ...shut, [f.path]: open })}>
-                      <Glyph name="back" size={14} />
-                      <span class="clip">{f.title}</span>
-                      <Chip>{f.pages.length}</Chip>
-                    </button>
-                  )}
-                  {open && (
-                    <div class="c-rows" role="list">
-                      {f.pages.map((p) => (
-                        <PageRow p={p} current={current} />
-                      ))}
-                    </div>
-                  )}
-                </div>
+                <>
+                  {kindHead && <h2 class="group-title t-heading">{kindHead}</h2>}
+                  <div class="group" role="group" aria-labelledby={f.path ? id : undefined} aria-label={f.path ? undefined : 'Pages'}>
+                    {f.path && (
+                      <button type="button" class="group-head" id={id} aria-expanded={open} title={f.title !== f.path ? f.path : undefined} onClick={() => setShut({ ...shut, [f.path]: open })}>
+                        <Glyph name="back" size={14} />
+                        <span class="clip">{f.title}</span>
+                        <Chip>{f.pages.length}</Chip>
+                      </button>
+                    )}
+                    {open && (
+                      <div class="c-rows" role="list">
+                        {f.pages.map((p) => (
+                          <PageRow p={p} current={current} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
               );
             })}
           </>
@@ -210,13 +243,14 @@ export function PageTree({ current }: { current?: string }) {
   );
 }
 
-/** Parts is the meta of a page: its version, its writer, its time, its summary, and its tags. */
-function Parts({ page, tags }: { page: Page; tags: string[] }) {
+/** Parts is the meta of a page: its version, its writer, its time, its summary, and its tags. brief leaves out the first three, which the line of an old version says. */
+function Parts({ page, tags, brief }: { page: Page; tags: string[]; brief?: boolean }) {
+  if (brief && !page.summary && tags.length === 0) return null;
   return (
     <p class="parts">
-      <span>Version {page.version}</span>
-      <span class="by">{byName(page.by)}</span>
-      <Since at={page.at} />
+      {!brief && <span>Version {page.version}</span>}
+      {!brief && <span class="by">{byName(page.by)}</span>}
+      {!brief && <Since at={page.at} />}
       {page.summary && <span>{page.summary}</span>}
       {tags.length > 0 && (
         <span class="tags">
@@ -280,11 +314,12 @@ export function PageView({ path, version }: { path: string; version?: number }) 
     );
   }
   const fm = page ? stripFrontMatter(page.text) : null;
+  const title = (page && (page.title || fm!.title)) || pageName(path);
   return (
     <section class="screen pageview" aria-labelledby="page-title">
       <PaneHeader
         id="page-title"
-        title={(page && (page.title || fm!.title)) || pageName(path)}
+        title={title}
         size="title"
         level={1}
         headingRef={heading}
@@ -321,8 +356,8 @@ export function PageView({ path, version }: { path: string; version?: number }) 
           <p class="t-meta">Loading the page.</p>
         ) : (
           <>
-            <Parts page={page} tags={fm!.tags} />
-            <Markdown text={fm!.body} base={path} class="article" />
+            <Parts page={page} tags={fm!.tags} brief={!!version} />
+            <Markdown text={withoutTitle(fm!.body, title)} base={path} class="article" />
           </>
         )}
       </div>
@@ -379,6 +414,9 @@ export function PageHistory({ path }: { path: string }) {
   );
 }
 
+/** The refusal of a new page whose path a page holds already. */
+export const TAKEN = 'A page with this name exists already. Pick another name, or edit that page.';
+
 const draftKey = (p: string) => 'fw.bossmode.page.' + p;
 
 interface Draft {
@@ -414,7 +452,13 @@ export function PageEditor({ path: initial, create }: { path?: string; create?: 
   const [ready, setReady] = useState(!!create);
   const [busy, setBusy] = useState(false);
   const [conflict, setConflict] = useState<Page | null>(null);
+  // The refusal of a new path, under the field that holds it.
+  const [taken, setTaken] = useState('');
   const box = useRef<HTMLTextAreaElement>(null);
+  const pathField = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (create && pathField.current) pathField.current.focus();
+  }, [create]);
   // A touch screen has no Ctrl or Cmd key, so the editor names the key that saves only where one exists, as the composer does.
   const coarse = useCoarse();
   // The heading names the page by its title, as the tree and the page do, and by its name only without one.
@@ -458,10 +502,13 @@ export function PageEditor({ path: initial, create }: { path?: string; create?: 
   const save = async (over?: string) => {
     // A new path gets .md when the person leaves it out, and the page checks
     // the rule of the store before it sends anything.
-    const target = create ? withSuffix(path) : initial || '';
+    const target = create ? newPath(path) : initial || '';
     const why = pageReason(target);
     if (why) {
-      showError(new Error(why));
+      if (create) {
+        setTaken(why);
+        if (pathField.current) pathField.current.focus();
+      } else showError(new Error(why));
       return;
     }
     if (create && target !== path) setPath(target);
@@ -475,7 +522,9 @@ export function PageEditor({ path: initial, create }: { path?: string; create?: 
     } catch (e) {
       if (e instanceof ApiError && e.status === 412) {
         if (create) {
-          showError(new Error('A page with this path exists already. Pick another path, or edit that page.'));
+          // The refusal sits under the field that it asks to change, and the page that holds the name is a link.
+          setTaken(TAKEN);
+          if (pathField.current) pathField.current.focus();
         } else {
           try {
             setConflict(await api.page(target));
@@ -488,8 +537,8 @@ export function PageEditor({ path: initial, create }: { path?: string; create?: 
     setBusy(false);
   };
 
-  const target = create ? withSuffix(path) : initial || '';
-  const why = create && path.trim() ? pageReason(target) : '';
+  const target = create ? newPath(path) : initial || '';
+  const why = create && path.trim() ? pageReason(target) || taken : '';
   const cancelHref = create ? '#pages' : hrefOf({ place: 'pages', path: initial || '', mode: 'read' });
   return (
     <section class="screen pageedit" aria-labelledby="edit-title">
@@ -545,10 +594,26 @@ export function PageEditor({ path: initial, create }: { path?: string; create?: 
           </Card>
         )}
         {create && (
-          <Field label="Path" error={why}>
-            <Input value={path} required invalid={!!why} placeholder="runbooks/deploy.md" spellcheck={false} onInput={(e) => setPath((e.target as HTMLInputElement).value)} />
+          <Field label="Name" error={why}>
+            <Input
+              ref={pathField}
+              value={path}
+              required
+              invalid={!!why}
+              placeholder="runbooks/deploy"
+              spellcheck={false}
+              onInput={(e) => {
+                setPath((e.target as HTMLInputElement).value);
+                setTaken('');
+              }}
+            />
             {!why && target && <span class="t-meta">The page will be {target}.</span>}
           </Field>
+        )}
+        {create && taken === TAKEN && (
+          <p class="t-meta taken-link">
+            <a href={hrefOf({ place: 'pages', path: target, mode: 'edit' })}>Edit {target}</a>
+          </p>
         )}
         <Field label="Text" class="text-grow">
           <TextArea

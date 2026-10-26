@@ -1,8 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'preact/test-utils';
 import { store } from '../state/store';
 import type { BossConfig, SkillsList } from '../api/types';
 import { DEFAULT_COMPACTION, NewAgent, emptyForm, formErrors, requestOf } from './NewAgent';
+import { clearSaid, currentSaid } from './notice';
 import { click, fakeApi, fieldOf, keyNamed, mount, settle, typeIn, unmountAll } from './testkit-c';
 
 const BASE: BossConfig = { manager: null, placement: 'queue', maxMembers: 16 };
@@ -30,6 +31,11 @@ beforeEach(() => {
 afterEach(() => {
   unmountAll();
   if (api) api.restore();
+  clearSaid();
+  history.replaceState(null, '', location.pathname);
+  // An agent that a test made leaves the fleet, so its name is free for the next test.
+  const fleet = store.get().fleet;
+  if (fleet) act(() => store.dispatch({ type: 'fleet', fleet: { ...fleet, pools: [] } }));
 });
 
 const saved = (name: string) => ({
@@ -83,6 +89,10 @@ describe('NewAgent', () => {
     expect(adv.querySelector('summary')!.textContent).toBe('Advanced');
     expect(fieldOf(adv, 'Compact at, in tokens')!.value).toBe(String(DEFAULT_COMPACTION));
     expect(['Model', 'Effort', 'Turns', 'Tokens', 'Cost in dollars', 'Compaction model', 'Ask before', 'Never run', 'Time zone'].every((l) => fieldOf(adv, l))).toBe(true);
+    // The efforts read as words, and the value stays the word of the kernel.
+    const effort = adv.querySelector('select') as HTMLSelectElement;
+    expect([...effort.options].map((o) => o.textContent)).toEqual(['The default', 'Low', 'Medium', 'High', 'Extra high', 'Highest']);
+    expect([...effort.options].map((o) => o.value)).toEqual(['', 'low', 'medium', 'high', 'xhigh', 'max']);
   });
 
   it('sends the profile and the workers to PUT /v1/agents/{name}, and shows the workers', async () => {
@@ -112,6 +122,19 @@ describe('NewAgent', () => {
     expect(el.querySelector('#workers-out')!.textContent).toContain('Workers');
     expect(el.textContent).not.toMatch(/pool/i);
     expect([...el.querySelectorAll('.worker-rows li')].map((li) => li.textContent)).toEqual(['linter-0starting', 'linter-1starting']);
+    // The new agent opens, and the fleet holds its workers before the next read of the fleet names them.
+    expect(location.hash).toBe('#fleet/linter');
+    expect(currentSaid()).toBe('Made the agent linter. Its workers start now.');
+    expect(store.get().fleet!.pools!.find((p) => p.agent === 'linter')!.wanted).toBe(2);
+  });
+
+  it('brings the first field with an error into view and gives it the focus', async () => {
+    config();
+    const el = mount(<NewAgent />);
+    (el.querySelector('details.advanced') as HTMLDetailsElement).open = true;
+    (document.activeElement as HTMLElement | null)?.blur();
+    click(keyNamed(el, 'Preview'));
+    await vi.waitFor(() => expect(document.activeElement).toBe(fieldOf(el, 'Name')));
   });
 
   it('previews with dryRun and saves nothing', async () => {

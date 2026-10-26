@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Bridge, PageMeta } from '../api/types';
-import { PageEditor, PageHistory, PageTree, PageView, foldersOf } from './Pages';
+import { PageEditor, PageHistory, PageTree, PageView, foldersOf, newPath, withoutTitle } from './Pages';
+import { currentNotice } from './notice';
 import { act } from 'preact/test-utils';
 import { store } from '../state/store';
 import { parseRoute } from '../lib/route';
@@ -54,6 +55,8 @@ describe('the tree of the wiki', () => {
     const heads = [...el.querySelectorAll('button.group-head')];
     expect(heads.map((h) => h.querySelector('.clip')!.textContent)).toEqual(['Harden the lab hosts', 'docs-scribe']);
     expect(heads.map((h) => h.getAttribute('title'))).toEqual(['bridges/01m5h96ejx8yh5fqkg', 'agents/docs-scribe']);
+    // The work folders of the bridges and of the agents each start under a heading.
+    expect([...el.querySelectorAll('h2.group-title')].map((h) => h.textContent)).toEqual(['Bridges', 'Agents']);
   });
 });
 
@@ -169,7 +172,9 @@ describe('the editor', () => {
     location.hash = '#create';
     api = fakeApi({ 'PUT /v1/pages/runbooks/rollback.md': () => ({ status: 201, body: { ...page('x', 'h9'), path: 'runbooks/rollback.md' } }), 'GET /v1/pages': { pages: [] } });
     const el = mount(<PageEditor create />);
-    typeIn(fieldOf(el, 'Path'), 'runbooks/rollback');
+    // The name takes the focus when the form opens.
+    expect(document.activeElement).toBe(fieldOf(el, 'Name'));
+    typeIn(fieldOf(el, 'Name'), 'runbooks/rollback');
     expect(el.textContent).toContain('The page will be runbooks/rollback.md.');
     typeIn(fieldOf(el, 'Text'), '# Rollback');
     click(keyNamed(el, 'Create page'));
@@ -177,6 +182,41 @@ describe('the editor', () => {
     const put = api.calls.find((c) => c.method === 'PUT')!;
     expect(put.path).toBe('/v1/pages/runbooks/rollback.md');
     expect(put.headers['If-None-Match']).toBe('*');
+  });
+
+  it('makes the path of a new page from words, and says under the name when a page holds it, with a link to that page', async () => {
+    location.hash = '#create';
+    api = fakeApi({ 'PUT /v1/pages/walk/walk-page-1.md': () => ({ ...problem(412, 'exists'), body: { detail: 'exists' } }), 'GET /v1/pages': { pages: [] } });
+    const el = mount(<PageEditor create />);
+    typeIn(fieldOf(el, 'Name'), 'walk/walk page 1');
+    expect(el.textContent).toContain('The page will be walk/walk-page-1.md.');
+    typeIn(fieldOf(el, 'Text'), '# Walk');
+    click(keyNamed(el, 'Create page'));
+    await settle();
+    expect(api.calls.find((c) => c.method === 'PUT')!.path).toBe('/v1/pages/walk/walk-page-1.md');
+    expect(el.querySelector('.field-error')!.textContent).toBe('A page with this name exists already. Pick another name, or edit that page.');
+    expect(el.querySelector('.taken-link a')!.getAttribute('href')).toBe('#edit/walk/walk-page-1.md');
+    expect(currentNotice()).toBe('');
+    expect(document.activeElement).toBe(fieldOf(el, 'Name'));
+  });
+
+  it('shows the title of a page once: the first heading of the text goes when it says the title', () => {
+    expect(withoutTitle('# Homelab inventory\n\nThe hosts.', 'Homelab inventory')).toBe('The hosts.');
+    expect(withoutTitle('\n# Homelab inventory ##\nThe hosts.', 'homelab inventory')).toBe('The hosts.');
+    expect(withoutTitle('# Another title\n\nThe hosts.', 'Homelab inventory')).toBe('# Another title\n\nThe hosts.');
+    expect(withoutTitle('Text first.\n# Homelab inventory', 'Homelab inventory')).toBe('Text first.\n# Homelab inventory');
+    expect(newPath(' runbooks / deploy the  site ')).toBe('runbooks/deploy-the-site.md');
+  });
+
+  it('shows one h1 on a page whose text starts with its title, and the meta of an old version once', async () => {
+    api = fakeApi({ 'GET /v1/pages/runbooks/deploy.md': page('# Deploy\n\nRun the playbook.', 'h1'), 'GET /v1/pages/runbooks/deploy.md?version=2': { ...page('# Deploy\n\nOld.', 'h0'), version: 2 } });
+    const el = mount(<PageView path="runbooks/deploy.md" />);
+    await settle();
+    expect([...el.querySelectorAll('h1')].map((h) => h.textContent)).toEqual(['Deploy']);
+    expect(el.querySelector('.article')!.textContent!.trim()).toBe('Run the playbook.');
+    const old = mount(<PageView path="runbooks/deploy.md" version={2} />);
+    await settle();
+    expect(old.textContent!.match(/Version 2/g)!.length).toBe(1);
   });
 
   it('names the key that saves beside the keys, and names none on a touch screen', () => {

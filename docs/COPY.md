@@ -474,7 +474,7 @@ Capacity shows where seating happens:
 | `Runs <agent> from the queue <intake>` | change | `Keep <n>` | done |
 | `N of M ready` | change | `N ready` | done |
 | `The fleet has no pool that you can see.` | change | `No agent has a worker that you can see.` | done |
-| `older configuration` (tag) | change | `old setup` | B |
+| `older configuration` (tag) | change | `old setup`, with the tooltip `It takes the new setup of the agent when it starts again.` | done |
 | `Checked 2 minutes ago` | remove | | B |
 | `Read again` | remove | the stream keeps the fleet current | B |
 | `Agents`, `Tasks` (sections) | remove | the people list grouped by bridge, then `Not on a bridge` | B |
@@ -486,7 +486,7 @@ Capacity shows where seating happens:
 | `Tagline, at most 140 characters` | change | `Tagline` | B |
 | `A new face: an SVG file of at most 32 KB. The workbench refuses a face with a script, a link, or an image inside.` | change | the picture of the agent as the key, with a pen in its corner and the name `Change the picture of <agent>` for a screen reader, and the limit in the error | B |
 | `A face holds at most 32 KB.` | change | `This face is over 32 KB. Pick a smaller SVG.` | B |
-| `Use the pattern again` | change | `Use the mark` | B |
+| `Use the pattern again` | change | `Use the mark`, then `Use the default picture`, because the walk read Use the mark as unclear | done |
 | `Only an owner of <agent> can change its face.` | remove | the Edit key does not show | B |
 | `Saved.`, `The new face is up.` | keep | | B |
 | new | add | the profile: `Workers` with its chip, `Keep`, and the question mark `What is a worker` with `A worker runs the work of one agent, one seat at a time. Keep is how many it keeps ready.` | B |
@@ -498,7 +498,15 @@ Capacity shows where seating happens:
 | `Find a member` | add | the field above the people list | done |
 | `Not on a bridge` | add | the last group of the people list | done |
 | `N awake` (a chip with a green light), with `N workers awake` for a screen reader | add | the chip shows only while a worker is awake. A green light never stands for zero, so `0 awake` never shows. | done |
-| `N free`, `Keep N` (a person who is not an owner reads Keep as a number) | add | | done |
+| `N free`, `Keep N` (a person who is not an owner reads Keep as a number) | change | `1 worker free`, `N workers free` on the row of an agent in the people list. The picker of Add keeps `1 free`. | done |
+| `Keep 0` (the placeholder of the composer of an agent with no member) | change | the reason in words: `The worker of <agent> is starting.`, `Every worker of <agent> failed. Its profile says more.`, `<agent> has no worker. Set Keep on its profile.`, or `Loading the workers.` | done |
+| new | add | `This agent no longer exists.` with the key `Back to Fleet`, for the address of an agent that neither the fleet nor the profiles name | done |
+| new | add | `Start a conversation with <name>.` and the tagline or the description, in an empty conversation with an agent | done |
+| new | add | `No member matches “<words>”.` with the key `Clear the search`, and `N members match` for a screen reader | done |
+| new | add | the gaps of the workers: `Some changes have not reached the workers of this agent yet. An admin can read why.`, with the words of the server in the fold `Details` | done |
+| `<n> min` beside a sleeping worker | remove | it was the age of the read of the fleet, not the time asleep | done |
+| new | add | a heart: `Liked because: <note>`, `Asked: <task>`, `Answer: <answer>`, and `Show more` and `Show less` for an answer over 240 characters | done |
+| new | add | `Skills: <name>, <name>`, each a link to its page, under What it can do | done |
 | `Keep 0` (the row of an agent with no worker in Not on a bridge) | remove | the row shows no words for an agent with no worker. The list holds the agents of the fleet, so a profile of the front with no pool and no run shows nowhere. | done |
 | `asks before <pattern>`, `asks first` (an amber word for a rule of the profile) | change | the rule as a person reads it, in an amber line under What it can do: `Asks before git push` for `bash: git push*`, `Asks before a real Ansible run` for `ansible.playbook: check=false`, `Asks before a tool that changes things`, `Asks first when <field> is <value>`, `Asks first: <ability>`, and `Asks first`. Two patterns with one meaning make one line. The patterns sit in the tooltip. | done |
 | `Tools and rules` (the list of chips) | add | an accessible name, now of the list of What it can do | done |
@@ -591,12 +599,12 @@ Capacity shows where seating happens:
 | `<by> saved this page while you edited it, <time>. Your text is still here, and nothing is lost.` | change | `<by> saved this page while you edited it. Your text is still here.` | C |
 | `See their version` | keep | | C |
 | `Drop my text and take theirs`, `Save mine over theirs` | change | `Take theirs`, `Keep mine` | C |
-| `Path, such as runbooks/deploy.md. The page adds .md when you leave it out.` | change | `Path` with the placeholder `runbooks/deploy.md` | C |
+| `Path, such as runbooks/deploy.md. The page adds .md when you leave it out.` | change | `Name` with the placeholder `runbooks/deploy`. A space between words becomes a hyphen, and the hint `The page will be <path>.` names the path | done |
 | `The page will be <path>.` | keep | | C |
 | `Markdown`, `What changed, in a few words` | change | `Text`, `What changed` | C |
 | `Cancel`, `Create the page`, `Save` | change | `Cancel`, `Create page`, `Save` | C |
 | `Cmd or Ctrl+Enter saves. A save that meets a newer version stops and asks you.` | change | `Ctrl+Enter` beside the key, `⌘+Enter` on a Mac, and no key on a touch screen, from `keyWords` and `useCoarse` of the composer | done |
-| `A page with this path exists already. Pick another path, or edit that page.` | keep | | C |
+| `A page with this path exists already. Pick another path, or edit that page.` | change | `A page with this name exists already. Pick another name, or edit that page.`, under the field Name, with the link `Edit <path>` | done |
 | `the fleet token`, `run <id>` (writers) | keep | | C |
 
 ### src/ui/Manager.tsx
@@ -659,7 +667,7 @@ Capacity shows where seating happens:
 | `Appearance`, `Theme`, `Match the system`, `Light`, `Graphite` | keep | | C |
 | `<name> sets the accent <hex>.`, `The accent is <hex>.` | remove | Appearance holds the theme of the person only, and the accent belongs to the deployment | done |
 | `Skills` with the count chip, `Imported`, `Local`, `<server>`, `Tools`, `Built in` | keep | | done |
-| `Agents that can load it` with the count chip | keep | | done |
+| `Agents that can load it` with the count chip | keep | for a skill. A tool says `Agents that can use it`, and names the agents whose tool list gives it. A tool leads with its plain phrase in the list and as its title, with its name as code. | done |
 | `Pick a skill or a tool in the list.` | keep | where two panes show, the place opens the first skill of the list, else its first tool, so this line shows only while the catalog loads. With nothing in the list, the main pane stays empty, because the list says `No skill yet.` | done |
 | the front matter of a skill as chips, such as `user-invocable true`, `argument-hint [task]`, and `arguments task` | change | how a person calls the skill, as one line of code under its description, such as `/proxmox-ops [task]`, and nothing else of the front matter. A skill that only a model loads shows no such line. | done |
 | the details pane of Skills with nothing picked, the list of the imported skills | change | the details pane holds `Add skill` alone. It lists the imported skills only beside the chooser of Add skill, where an install can replace one. With a skill open, it holds its keys alone: `Copy /<name>` and `Remove`. | done |
@@ -672,7 +680,7 @@ Capacity shows where seating happens:
 | `Find a skill` (with the name `Find a skill or a tool`), `No skill holds those words.`, `Loading the skill.`, `Loading the skills.` | add | | done |
 | `Address`, `Preview`, `Pick files`, `Pick a folder`, `SKILL.md`, `Files`, `Close` | add | the keys and fields of the chooser | done |
 | `Loading the marketplaces.`, `No marketplace is set up.`, `Loading the preview.` | add | | done |
-| `An installed skill is instructions for every agent of a profile that allows it.` | add | behind the question mark `What an install does` beside the name of the preview, because the chrome never explains | done |
+| `An installed skill is a set of instructions that an agent loads when its work needs them. Every agent can load it, unless the list of skills of the agent leaves it out.` | add | behind the question mark `What an install does` beside the name of the preview, because the chrome never explains. It said profile before. | done |
 | `replaces <name>` (a grey light), `blocks` (red), `note` (grey) | add | the status words of a preview and its problems | done |
 | `Replace <name>` | add | the key after a 409 for the name of an imported skill. A 409 for a source that changed shows its reason, and a new preview. | done |
 | `imported`, `local`, `built in`, and the name of a server | add | the origin of a skill or a tool | done |
@@ -688,7 +696,7 @@ Capacity shows where seating happens:
 | new | add | `New`, the key of a new chat on the header of the list, the word of the other lists | done |
 | new | add | `Find a chat`, the field above the history | done |
 | new | add | `Today`, `Yesterday`, and the date, such as `Monday, October 19`, the quiet heading of each day of the history | done |
-| new | add | a row of the history: the title of the run, the status of the run, and `since()`, such as `25 min`. The status is a light with its word: `working`, `waiting for a worker`, `needs you`, `ready`, `ended`, `failed`, or `stopped`. A run without a title shows the start of its first message, else `Chat`. | done |
+| new | add | a row of the history: the title of the run, the status of the run, and `since()`, such as `25 min`. The status is a light with its word: `working`, `waiting for a worker`, `needs you`, `answered`, `closed` (for a conversation of a replaced worker, with a muted title), `ended`, `failed`, or `stopped`. `ready` read as a call for the person, so a list of conversations never says it. The name for a screen reader says the time in words, such as `3 days ago`. A run without a title shows the start of its first message, else `Chat`. | done |
 | new | add | `Loading the chats.`, `No chat holds those words.` | done |
 | new | add | `No chat yet.` with the key `New chat` | done |
 | the key `New chat` under `No chat yet.` | remove | the key `New` of the header starts a chat, and the main pane already holds a new chat, so the empty list holds no second key | done |
@@ -972,15 +980,16 @@ install as it is, which can hold any word.
 | Now | Verdict | New text | Who |
 |---|---|---|---|
 | new | add | the heading `Packages`, and for an owner the small key `Turn off` while packages are on | done |
-| new | add | off: `This agent uses only the programs of its image.`, and for an owner the key `Turn on packages` | done |
+| new | add | off: `This agent has only the programs that it came with.` (image was a word of a developer), and for an owner the key `Turn on packages` | done |
+| new | add | `Turn off packages?` with `The workers of <agent> lose <names>.` and the key `Turn off`, when a list holds a package | done |
 | new | add | the add row: the field `Package name` with the placeholder `such as ansible-lint`, the choice `Kind of package` of `Python package` and `Program`, and the key `Add` | done |
 | new | add | the lists `Python packages` and `Programs`, each package with the key `Remove <name>` | done |
-| new | add | the state line: `Ready on <n> of <m> workers.`, `Updating on <n> of <m> workers.`, or `The install failed on <worker>.` with the fold `Show the output` | done |
+| new | add | the state line: `Ready on <n> of <m> workers.`, `Updating on <n> of <m> workers.`, `The change waits for its worker to wake up.` or `The change waits for <n> workers to wake up.` when every worker that takes it sleeps, which hides the note, or `The install failed on <worker>.` with the fold `Show the output` | done |
 | new | add | the note `Workers take a change in about a minute. Work in progress does not stop.` | done |
 | new | add | the version that a ready worker installed, in muted words after the name of each package | done |
 | new | add | the refusal of the front `There is no Python package named <name>.` | done |
 | new | add | the switch `The agent can ask for a package. You approve each one.` | done |
-| new | add | the errors `Write the name of a package.`, `A package name cannot start with a dash.`, `A package name cannot hold a control character.`, `A package name holds 200 characters at most.`, `<name> is in the list already.`, and `A list holds 100 packages at most.` | done |
+| new | add | the errors `Write the name of a package.`, `A package name cannot start with a dash.`, `A package name cannot hold a control character.`, `A package name holds 200 characters at most.`, `<name> is in the list already.`, `A list holds 100 packages at most.`, `That is not the name of a Python package. Write a name such as pyyaml, with a version such as >=6 when you need one.`, and `That is not the name of a program. Write a name such as jq, with a version such as =1.7 when you need one.` | done |
 
 ### src/ui/Decision.tsx and src/lib/words.ts: the card of a package
 
@@ -995,7 +1004,7 @@ install as it is, which can hold any word.
 
 | Now | Verdict | New text | Who |
 |---|---|---|---|
-| new | add | the line `This conversation is from a worker that was replaced. You can read it, and your next message starts a new conversation.` under an archived conversation | done |
+| new | add | the line `This conversation closed when its agent restarted. You can read it, and your next message starts a new conversation.` under an archived conversation. It said worker that was replaced before. | done |
 | `working` (an archived run that had not finished) | change | `ended`, with the tooltip `Its worker was replaced. You can read it.` | done |
 
 ## 11. No front in the words of the page

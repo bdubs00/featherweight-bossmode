@@ -29,6 +29,11 @@ describe('lineOf', () => {
     expect(lineOf({ ...base, applying: true, workers: [w('a', 'ready'), w('b', 'ready')] })).toEqual({ tone: 'green', text: 'Ready on 2 of 2 workers.' });
     expect(lineOf({ ...base, workers: [w('a', 'ready'), w('b', 'ready')] })).toEqual({ tone: 'green', text: 'Ready on 2 of 2 workers.' });
     expect(lineOf({ ...base, workers: [w('a', 'ready'), w('b', 'unknown')] })).toEqual({ tone: 'grey', text: 'Ready on 1 of 2 workers.' });
+    // A worker that sleeps takes the change when it wakes, so the line waits and names no time.
+    const asleep = (t: string) => t !== 'c';
+    expect(lineOf({ ...base, workers: [w('a', 'pending')] }, asleep)).toEqual({ tone: 'grey', text: 'The change waits for its worker to wake up.', asleep: true });
+    expect(lineOf({ ...base, workers: [w('a', 'pending'), w('b', 'pending')] }, asleep)!.text).toBe('The change waits for 2 workers to wake up.');
+    expect(lineOf({ ...base, workers: [w('a', 'pending'), w('c', 'pending')] }, asleep)).toEqual({ tone: 'amber', text: 'Updating on 1 of 2 workers.' });
   });
 });
 
@@ -54,6 +59,12 @@ describe('nameProblem', () => {
     expect(nameProblem(base, 'tools', 'ansible-lint')).toBe('');
     expect(nameProblem({ ...base, tools: Array.from({ length: 100 }, (_, i) => ({ name: 'p' + i })) }, 'tools', 'jq')).toBe('A list holds 100 packages at most.');
     expect(nameProblem(base, 'python', 'pyyaml>=6')).toBe('');
+    expect(nameProblem(base, 'python', 'requests[socks]>=2.31,<3')).toBe('');
+    // A space, a marker after ;, or an address is no name of a package.
+    expect(nameProblem(base, 'python', 'bad name;rm')).toBe('That is not the name of a Python package. Write a name such as pyyaml, with a version such as >=6 when you need one.');
+    expect(nameProblem(base, 'python', 'https://example.com/x.whl')).toMatch(/^That is not the name of a Python package/);
+    expect(nameProblem(base, 'tools', 'conda-forge::ripgrep=14.1')).toBe('');
+    expect(nameProblem(base, 'tools', 'rm -rf')).toBe('That is not the name of a program. Write a name such as jq, with a version such as =1.7 when you need one.');
   });
 });
 

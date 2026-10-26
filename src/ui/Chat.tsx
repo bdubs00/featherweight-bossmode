@@ -23,8 +23,8 @@ import { slashCommands } from '../state/people';
 import { runStatus } from '../lib/presence';
 import { go, hrefOf } from '../lib/route';
 import { parseSlash } from '../lib/mention';
-import { since } from '../lib/words';
-import { ARCHIVED_LINE, answerSeqs, chatTitle, findChats, historyGroups, isQuickChat, lastSeq, newestFirst, startBody, toolPicks, usageParts, works } from '../lib/chat';
+import { ago, since } from '../lib/words';
+import { ARCHIVED_LINE, answerSeqs, chatStatus, chatTitle, findChats, historyGroups, isQuickChat, lastSeq, newestFirst, startBody, toolPicks, usageParts, works } from '../lib/chat';
 import { abilitiesOf, joined, summaryOf, type Ability } from '../lib/tools';
 import { forgetToolCatalog, useToolCatalog } from '../state/tools';
 import { Abilities } from './Abilities';
@@ -109,11 +109,11 @@ export function NoChat() {
 
 /** HistoryRow is one conversation of a history list: its title, its status, and when it started. */
 function HistoryRow({ r, on, href }: { r: Run; on: boolean; href: string }) {
-  const light = runStatus(r);
+  const light = chatStatus(r);
   const title = chatTitle(r);
   const d = new Date(r.createdAt);
   return (
-    <a class={'brow chat-row' + (on ? ' sel strong' : '')} href={href} data-item aria-current={on ? 'page' : undefined} aria-label={title + ', ' + light.word + ', ' + since(r.createdAt)}>
+    <a class={'brow chat-row' + (on ? ' sel strong' : '') + (r.archived ? ' closed' : '')} href={href} data-item aria-current={on ? 'page' : undefined} aria-label={title + ', ' + light.word + ', ' + ago(r.createdAt)}>
       <span class="brow-top">
         <span class="brow-title clip">{title}</span>
       </span>
@@ -531,7 +531,14 @@ function ChatRun({ chat, runId }: { chat: QuickChat; runId: string }) {
         actions={
           run ? (
             // A chat that did a job once becomes a duty that does it again, with the agent and the first message.
-            <Menu label="More" items={[{ label: 'Make this a duty', onSelect: () => go({ place: 'duties', fresh: true, seed: { agent: chat.agent, act: 'ask', message: askOfRun(run, t.items) } }) }]} />
+            // About this chat opens the details, which a narrow window keeps out of sight.
+            <Menu
+              label="More"
+              items={[
+                { label: 'About this chat', onSelect: () => go({ place: 'chat', run: runId, details: true }) },
+                { label: 'Make this a duty', onSelect: () => go({ place: 'duties', fresh: true, seed: { agent: chat.agent, act: 'ask', message: askOfRun(run, t.items) } }) },
+              ]}
+            />
           ) : undefined
         }
       />

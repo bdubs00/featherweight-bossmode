@@ -89,23 +89,14 @@ describe('the picks of a new chat', () => {
 });
 
 describe('the usage and the live answer', () => {
-  it('words the turns, the tokens, and the cost, with so far while the run works', () => {
+  it('words the cost alone, and the tokens without a cost, with so far while the run works', () => {
     const u = { inputTokens: 4200, outputTokens: 380, cacheReadTokens: 1000, turns: 2, costUSD: 0.031 };
-    expect(usageParts(u, false)).toEqual([
-      { n: '2', word: 'turns' },
-      { n: '5,580', word: 'tokens' },
-      { n: '$0.03', word: '' },
-    ]);
-    expect(usageParts({ turns: 1, costUSD: 0 }, true)).toEqual([
-      { n: '1', word: 'turn' },
-      { n: '$0.00', word: 'so far' },
-    ]);
-    expect(usageParts({ turns: 3 }, true)).toEqual([{ n: '3', word: 'turns so far' }]);
+    expect(usageParts(u, false)).toEqual([{ n: '$0.03', word: '' }]);
+    expect(usageParts({ turns: 1, costUSD: 0 }, true)).toEqual([{ n: '$0.00', word: 'so far' }]);
+    expect(usageParts({ turns: 3, inputTokens: 900, outputTokens: 100 }, true)).toEqual([{ n: '1,000', word: 'tokens so far' }]);
+    expect(usageParts({ turns: 3 }, true)).toEqual([]);
     // A cost below one cent never reads $0.00.
-    expect(usageParts({ turns: 4, costUSD: 0.0031 }, false)).toEqual([
-      { n: '4', word: 'turns' },
-      { lead: 'under', n: '$0.01', word: '' },
-    ]);
+    expect(usageParts({ turns: 4, costUSD: 0.0031 }, false)).toEqual([{ lead: 'under', n: '$0.01', word: '' }]);
     expect(usageParts(undefined, true)).toEqual([]);
   });
 

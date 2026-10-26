@@ -22,13 +22,24 @@ import type { Packages, PackagesBody } from '../api/types';
 import { KIND_WORDS, POLL_MS, bodyOf, keyOf, lineOf, nameProblem, normalize, shouldPoll, versionsOf, type PackageKind } from '../lib/packages';
 import { Button, Command, IconButton, Input, LineLed } from './primitives';
 import { Switch } from './ChannelDialog';
+import { Confirm } from './common';
+import { useSelect } from '../state/store';
+import { selectFacts } from '../state/reducer';
+import { workersOf } from '../lib/workers';
 import { Glyph } from './icons';
 
-export const OFF_TEXT = 'This agent uses only the programs of its image.';
+export const OFF_TEXT = 'This agent has only the programs that it came with.';
 export const ASK_TEXT = 'The agent can ask for a package. You approve each one.';
 export const NOTE_TEXT = 'Workers take a change in about a minute. Work in progress does not stop.';
 
 const KINDS: PackageKind[] = ['python', 'tools'];
+
+/** offWords names what the workers lose when packages turn off: a few names, else a count. */
+export function offWords(p: Packages): string {
+  const names = [...p.python, ...p.tools].map((x) => x.name);
+  if (names.length <= 3) return names.length === 1 ? names[0] : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+  return names.slice(0, 2).join(', ') + ', and ' + (names.length - 2) + ' more packages';
+}
 
 /** Where the focus goes after a change redraws the section. */
 type FocusTo = '' | 'field' | 'turn-on';
@@ -55,6 +66,14 @@ export function PackagesSection({ agent, pool, owner }: { agent: string; pool: s
   const field = useRef<HTMLInputElement>(null);
   const turnOnKey = useRef<HTMLButtonElement>(null);
   const focusTo = useRef<FocusTo>('');
+  const [askOff, setAskOff] = useState(false);
+  // The workers that sleep, by name: a change reaches them only when they wake.
+  const facts = useSelect(selectFacts);
+  const sleeping = new Set(
+    workersOf(facts, agent)
+      .workers.filter((w) => w.phase === 'Suspended')
+      .map((w) => w.name),
+  );
 
   useEffect(() => {
     live.current = true;
@@ -133,7 +152,7 @@ export function PackagesSection({ agent, pool, owner }: { agent: string; pool: s
 
   const remove = (k: PackageKind, item: string) => save({ [k]: p[k].filter((x) => x.name !== item).map((x) => x.name) }, 'field');
 
-  const line = lineOf(p);
+  const line = lineOf(p, (task) => sleeping.has(task) || sleeping.has(task.slice(task.lastIndexOf('/') + 1)));
   const output = line && line.failure ? line.failure.output || line.failure.error || '' : '';
   const id = 'packages-' + agent;
   const any = p.python.length > 0 || p.tools.length > 0;
@@ -145,7 +164,8 @@ export function PackagesSection({ agent, pool, owner }: { agent: string; pool: s
         </h3>
         <span class="grow" />
         {owner && p.on && (
-          <Button size="s" kind="quiet" class="pkgs-off-key" onClick={() => save({ on: false }, 'turn-on')}>
+          // Off drops every package from the workers, so a list that holds some asks first.
+          <Button size="s" kind="quiet" class="pkgs-off-key" onClick={() => (any ? setAskOff(true) : save({ on: false }, 'turn-on'))}>
             Turn off
           </Button>
         )}
@@ -236,9 +256,26 @@ export function PackagesSection({ agent, pool, owner }: { agent: string; pool: s
               <Command class="pkgs-output">{output}</Command>
             </details>
           )}
-          {(any || p.applying) && <p class="pkgs-note">{NOTE_TEXT}</p>}
+          {(any || p.applying) && !(line && line.asleep) && <p class="pkgs-note">{NOTE_TEXT}</p>}
           <Switch label={ASK_TEXT} on={p.ask} disabled={!owner} onChange={(ask) => save({ ask })} />
         </>
+      )}
+      {askOff && (
+        <Confirm
+          title="Turn off packages?"
+          confirm="Turn off"
+          danger
+          busy={busy}
+          onCancel={() => setAskOff(false)}
+          onConfirm={async () => {
+            await save({ on: false }, 'turn-on');
+            setAskOff(false);
+          }}
+        >
+          <p>
+            The workers of {agent} lose {offWords(p)}.
+          </p>
+        </Confirm>
       )}
       {(problem || error) && !(p.on && owner) && (
         <p class="field-error pkgs-error" id={id + '-error'} role="alert">

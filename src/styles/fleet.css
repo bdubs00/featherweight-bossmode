@@ -685,15 +685,30 @@ a.file {
   font-size: var(--t-meta);
   color: var(--muted);
 }
+/* While the owner edits, the fields take the whole width of the pane under
+   the picture, and the keys wrap, so Save is never cut in a narrow pane. */
+.prof-ident.editing {
+  flex-wrap: wrap;
+}
+.prof-ident.editing .prof-ident-main {
+  flex-basis: 100%;
+}
 .prof-edit {
   display: flex;
   flex-direction: column;
   gap: var(--s-3);
   width: 100%;
+  min-width: 0;
+}
+.prof-edit .input {
+  width: 100%;
+  min-width: 0;
 }
 .prof-edit-do {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: var(--s-2);
 }
 .prof-sec {
@@ -740,6 +755,41 @@ a.file {
   overflow-wrap: anywhere;
 }
 .liked-did {
+  color: var(--ink);
+}
+/* A long answer folds to three lines until the person asks for more. */
+.liked-did.folded {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
+.liked-label {
+  font-weight: 600;
+  color: var(--muted);
+}
+.liked-note .liked-label,
+.liked-did .liked-label {
+  color: var(--ink);
+}
+button.liked-more {
+  appearance: none;
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-decoration: underline;
+  cursor: pointer;
+}
+/* The skills of an agent, each a link to its page. */
+.prof-skill-list {
+  margin: var(--s-2) 0 0;
+  font-size: var(--t-control);
+  line-height: var(--t-control-lh);
+  overflow-wrap: anywhere;
+}
+.prof-skill-list a {
   color: var(--ink);
 }
 .liked-asked {
@@ -811,10 +861,20 @@ a.file {
 }
 .worker-gaps {
   margin: var(--s-2) 0 0;
+  font-size: var(--t-meta);
+}
+.worker-gaps > p {
+  color: var(--word-amber);
+}
+.worker-gaps ul {
+  margin: var(--s-1) 0 0;
   padding: 0;
   list-style: none;
-  font-size: var(--t-meta);
-  color: var(--word-amber);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.worker-old {
+  display: inline-flex;
 }
 .today {
   display: flex;
@@ -1107,6 +1167,25 @@ a.file {
 .strip-seg .status {
   font-size: inherit;
 }
+/* The filter of the board in its head: what it shows, and the key that shows every member again. */
+.board-only {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  min-height: 28px;
+  padding: 0 var(--s-2);
+  border: 1px solid var(--ink);
+  border-radius: var(--r);
+  background: none;
+  color: var(--ink);
+  font-size: var(--t-meta);
+  font-weight: 600;
+  cursor: pointer;
+}
+.board-only .status {
+  font-size: inherit;
+}
 .board-lights {
   display: flex;
   flex-wrap: wrap;
@@ -1147,12 +1226,17 @@ a.file {
     width: var(--h-row);
     height: var(--h-row);
   }
-  a.people-title,
   .prof-link,
   .member-where a {
     display: inline-flex;
     align-items: center;
     min-height: var(--h-row);
+  }
+  /* A flex box hides the ellipsis of its text, so the title of a group stays a block and its line height makes the target. */
+  a.people-title {
+    display: block;
+    min-height: var(--h-row);
+    line-height: var(--h-row);
   }
   .board-light {
     width: var(--h-row);
@@ -1205,4 +1289,16 @@ a.file {
   .files-view {
     padding: var(--s-4);
   }
+}
+
+/* A search of the people list that finds nothing says so, with the key that clears it. */
+.people-none {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-2);
+  padding: 0 var(--s-4) var(--s-4);
+}
+.people-none .people-note {
+  padding: 0;
 }

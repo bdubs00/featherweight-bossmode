@@ -102,10 +102,10 @@ describe('a run of the archive', () => {
 });
 
 describe('an archived conversation with the manager', () => {
-  it('shows in the list, reads as ended, and shows the line of a replaced worker', async () => {
+  it('shows in the list, reads as closed, and shows the line of a replaced worker', async () => {
     const list = mount(<ManagerList />);
     await vi.waitFor(() => expect(list.querySelectorAll('.chat-row').length).toBe(1));
-    expect(list.querySelector('.chat-row')!.getAttribute('aria-label')).toContain('Which workers slept?, ended');
+    expect(list.querySelector('.chat-row')!.getAttribute('aria-label')).toMatch(/^Which workers slept\?, closed, (\d+ (minute|hour|day)s? ago|yesterday|just now)$/);
     const el = mount(<Manager />);
     await vi.waitFor(() => expect(el.textContent).toContain(ARCHIVED_LINE));
     // The run worked when its worker went, and nothing works now.
@@ -144,7 +144,7 @@ describe('an archived conversation with an agent', () => {
   it('lists the archived conversation in Past conversations', async () => {
     const el = mount(<PastConversations agent="manager" current="" onPick={() => {}} onClose={() => {}} />);
     await vi.waitFor(() => expect(document.querySelectorAll('.past-row').length).toBe(1));
-    expect(document.querySelector('.past-row')!.getAttribute('aria-label')).toContain('ended');
+    expect(document.querySelector('.past-row')!.getAttribute('aria-label')).toContain('closed');
     expect(el).toBeDefined();
   });
 });

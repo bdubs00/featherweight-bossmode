@@ -141,6 +141,8 @@ describe('the manager', () => {
     await settle();
     expect(el.querySelector('#manager-title')!.textContent).toContain('New conversation');
     expect(el.querySelector('.thread-empty')!.textContent).toBe('Ask about the fleet, or ask for a bridge.');
+    // A new conversation puts the focus in the message box.
+    await vi.waitFor(() => expect(document.activeElement).toBe(el.querySelector('#composer')));
     typeIn(el.querySelector('#composer'), 'Hello');
     click(keyNamed(el, 'Send'));
     await settle();
@@ -229,6 +231,20 @@ describe('the thread', () => {
     const blocks = blocksOf(items);
     expect(blocks.map((b) => b.kind)).toEqual(['item', 'steps', 'item']);
     expect(blocks[1].kind === 'steps' && blocks[1].steps.map((x) => x.cmd || x.text)).toEqual(['ls', 'Reading the fleet']);
+  });
+
+  it('gives each call of one turn its own line, though the calls share a seq', () => {
+    const items: Item[] = [
+      ASK,
+      { seq: 5, time: T, kind: 'tool', tool: 'memory', callId: 'm', input: { command: 'view', path: '/memories' } },
+      { seq: 5, time: T, kind: 'tool', tool: 'front.agents_list', callId: 'a', input: {} },
+      { seq: 6, time: T, kind: 'result', callId: 'm', text: 'notes.md' },
+      { seq: 6, time: T, kind: 'result', callId: 'a', text: '3 agents' },
+      { seq: 7, time: T, kind: 'assistant', text: 'Three.' },
+    ];
+    const blocks = blocksOf(items);
+    expect(blocks[1].kind === 'steps' && blocks[1].steps.map((x) => x.text)).toEqual(['Checked its notes', 'Looked at the agents']);
+    expect(blocks[1].kind === 'steps' && blocks[1].steps.map((x) => x.key)).toEqual(['step-m', 'step-a']);
   });
 
   it('puts the step of a call that asked for a decision after the decision, and none while it waits', () => {
