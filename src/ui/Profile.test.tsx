@@ -4,6 +4,7 @@ import { KeepField, Profile, forgetProfileReads } from './Profile';
 import { FLEET, fakeFetch, mount, seedFleet, unmountAll, type Call } from './testkit-b';
 import { forgetProfiles } from '../state/profiles';
 import { store } from '../state/store';
+import { clearSaid, currentSaid } from './notice';
 import { forgetQueued } from '../state/queued';
 
 let calls: Call[] = [];
@@ -43,7 +44,8 @@ beforeEach(() => {
   const f = fakeFetch([
     ['PATCH', /^\/v1\/pools\/crew$/, (b) => ({ ...POOL, wanted: (b as { replicas: number }).replicas })],
     ['GET', /^\/v1\/pools\/crew$/, () => POOL],
-    ['DELETE', /^\/v1\/pools\/crew$/, () => null],
+    // The front answers a delete of a pool with 202 and the pool, which deletes its workers once they are idle.
+    ['DELETE', /^\/v1\/pools\/crew$/, () => ({ ...POOL, wanted: 0, deleting: true })],
     ['GET', /^\/v1\/bossmode\/agents\/migrator\/today$/, () => ({ runs: 7, costUSD: 1.9, decisions: 2 })],
     ['GET', /^\/v1\/pages\/agents\/migrator\/learned\.md$/, () => ({ path: 'agents/migrator/learned.md', text: LEARNED })],
     ['GET', /^\/v1\/runs\/run-migrator-2$/, () => ({ id: 'run-migrator-2', agent: 'migrator', state: 'completed', seq: 1, createdAt: '', updatedAt: '' })],
@@ -218,29 +220,46 @@ describe('the profile', () => {
     }
   });
 
-  it('keeps Remove workers in the More menu of the workers, for an owner, and removes them after Confirm', async () => {
+  it('keeps Delete agent in the More menu of the head, for an owner, and says what goes before it deletes the agent', async () => {
     const el = mount(<Profile agent="migrator" />);
     await vi.waitFor(() => expect(el.querySelectorAll('.workers li').length).toBe(2));
-    // The menu waits for the read of the workers, which says whether any exist.
-    await vi.waitFor(() => expect(el.querySelector('button[aria-label="More for workers"]')).not.toBeNull());
-    // No destructive key sits in plain sight on the profile.
-    expect([...el.querySelectorAll('button')].some((b) => b.textContent === 'Remove workers')).toBe(false);
-    expect(el.querySelector('.key-danger')).toBeNull();
-    const more = el.querySelector('button[aria-label="More for workers"]') as HTMLButtonElement;
-    expect(more.getAttribute('aria-haspopup')).toBe('menu');
+    // The menu waits for the read of the workers, which says whether the page made them.
+    await vi.waitFor(() => expect(el.querySelector('button[aria-label="More for migrator"]')).not.toBeNull());
+    // No destructive key sits in plain sight on the profile, and no key says Remove workers.
+    expect([...el.querySelectorAll('button')].some((b) => /Delete agent|Remove workers/.test(b.textContent || ''))).toBe(false);
+    const more = el.querySelector('button[aria-label="More for migrator"]') as HTMLButtonElement;
     act(() => more.click());
     const item = el.querySelector('[role="menu"] button.danger') as HTMLButtonElement;
-    expect(item.textContent).toBe('Remove workers');
+    expect(item.textContent).toBe('Delete agent');
     act(() => item.click());
-    expect(document.querySelector('dialog.confirm h2')!.textContent).toBe('Remove the workers of migrator?');
-    act(() => ([...document.querySelectorAll('dialog.confirm button')].find((b) => b.textContent === 'Remove workers') as HTMLButtonElement).click());
+    const dialog = document.querySelector('dialog.confirm')!;
+    expect(dialog.querySelector('h2')!.textContent).toBe('Delete migrator?');
+    expect(dialog.textContent).toContain('migrator, its workers, and the files on its workers go.');
+    expect(dialog.textContent).toContain('Your past conversations with it stay readable.');
+    act(() => ([...dialog.querySelectorAll('button')].find((b) => b.textContent === 'Delete agent') as HTMLButtonElement).click());
     await vi.waitFor(() => expect(calls.some((c) => c.method === 'DELETE' && c.path === '/v1/pools/crew')).toBe(true));
+    await vi.waitFor(() => expect(location.hash).toBe('#fleet'));
+    expect(currentSaid()).toBe('Deleted migrator. Its workers stop once they are idle.');
+    clearSaid();
+    history.replaceState(null, '', location.pathname);
   });
 
-  it('gives the workers no More menu for a person who is not an owner', async () => {
-    const el = mount(<Profile agent="reviewer" />);
+  it('offers no Delete agent for an agent of the setup file, nor to a person who is not an owner', async () => {
+    const g = fakeFetch([
+      ['GET', /^\/v1\/pools\/crew$/, () => ({ ...POOL, source: 'config' })],
+      ['GET', /^\/v1\/bossmode\/agents\/[^/]+\/today$/, () => ({ runs: 0, decisions: 0 })],
+    ]);
+    try {
+      const el = mount(<Profile agent="migrator" />);
+      await vi.waitFor(() => expect(el.querySelectorAll('.workers li').length).toBe(2));
+      await new Promise((r) => setTimeout(r, 20));
+      expect(el.querySelector('button[aria-label="More for migrator"]')).toBeNull();
+    } finally {
+      g.restore();
+    }
+    const other = mount(<Profile agent="reviewer" />);
     await new Promise((r) => setTimeout(r, 20));
-    expect(el.querySelector('button[aria-label="More for workers"]')).toBeNull();
+    expect(other.querySelector('button[aria-label="More for reviewer"]')).toBeNull();
   });
 
   it('says what an agent that a pool runs can do in plain words, with the raw names and the patterns in a tooltip', async () => {

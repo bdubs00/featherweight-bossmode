@@ -23,8 +23,8 @@ import { agentGone, likedOf, newestRun, parseKeep, policyRules, rulesOf, seatOnW
 import { poolNameOf, workersOf } from '../lib/workers';
 import { statusOf } from '../lib/status';
 import { selectFacts } from '../state/reducer';
-import { hrefOf } from '../lib/route';
-import { attempt, showError } from './notice';
+import { go, hrefOf } from '../lib/route';
+import { attempt, showError, showSaid } from './notice';
 import { Confirm, InlineMarkdown, Markdown, Menu } from './common';
 import { Glyph, Icon } from './icons';
 import { Button, Chip, Field, Help, Input, Led, Mark, PaneHeader } from './primitives';
@@ -210,7 +210,6 @@ function Workers({ agent, owner, pool, setPool }: { agent: string; owner: boolea
         <Help label="What is a worker">{WORKER_HELP}</Help>
         <span class="grow" />
         {pool !== undefined && <KeepField agent={agent} value={pool ? pool.wanted : 0} owner={owner} onSaved={setPool} />}
-        {owner && pool && <RemoveWorkers agent={agent} onDone={() => setPool(null)} />}
       </div>
       {workers.length > 0 && (
         <ul class="workers">
@@ -256,20 +255,23 @@ function Workers({ agent, owner, pool, setPool }: { agent: string; owner: boolea
 }
 
 /**
- * RemoveWorkers is the More menu of the section of the workers, for an
- * owner. It holds Remove workers, which removes every worker of the agent
- * after Confirm, so no destructive key sits in plain sight on the profile.
+ * DeleteAgent is the More menu of the head of the profile, for an owner of
+ * an agent that the page made. It holds Delete agent, which deletes the
+ * agent with its workers after Confirm, so no destructive key sits in
+ * plain sight. The server deletes a pool that the page made with the
+ * profile that it runs, and the workers once they are idle. An agent of
+ * the setup file has no such key: only the file removes it.
  */
-function RemoveWorkers({ agent, onDone }: { agent: string; onDone: () => void }) {
+function DeleteAgent({ agent, title }: { agent: string; title: string }) {
   const [ask, setAsk] = useState(false);
   const [busy, setBusy] = useState(false);
   return (
     <>
-      <Menu label="More for workers" items={[{ label: 'Remove workers', danger: true, onSelect: () => setAsk(true) }]} />
+      <Menu label={'More for ' + title} kind="secondary" items={[{ label: 'Delete agent', danger: true, onSelect: () => setAsk(true) }]} />
       {ask && (
         <Confirm
-          title={'Remove the workers of ' + agent + '?'}
-          confirm="Remove workers"
+          title={'Delete ' + title + '?'}
+          confirm="Delete agent"
           danger
           busy={busy}
           onCancel={() => setAsk(false)}
@@ -278,15 +280,15 @@ function RemoveWorkers({ agent, onDone }: { agent: string; onDone: () => void })
             const ok = await attempt(() => api.removeWorkers(poolNameOf(store.get().fleet, agent)));
             setBusy(false);
             setAsk(false);
-            if (ok) {
-              onDone();
-              // The server can remove the profile with its workers, so the page reads the agents and the fleet again.
-              forgetProfiles();
-              await Promise.allSettled([loadAgents(), loadFleet()]);
-            }
+            if (!ok) return;
+            forgetProfiles();
+            await Promise.allSettled([loadAgents(), loadFleet()]);
+            showSaid('Deleted ' + title + '. Its workers stop once they are idle.');
+            go('#fleet');
           }}
         >
-          <p>Every worker of {agent} stops. A seat of {agent} waits for a worker.</p>
+          <p>{title}, its workers, and the files on its workers go. A seat of it on a bridge gets no worker again.</p>
+          <p>Your past conversations with it stay readable.</p>
         </Confirm>
       )}
     </>
@@ -613,9 +615,12 @@ export function Profile({ agent, back }: { agent: string; back?: { href: string;
         back={{ href: back ? back.href : '#fleet', label: back ? back.label : 'Fleet', to: 'main' }}
         actions={
           owner && !edit ? (
-            <Button ref={editKey} size="s" onClick={() => setEdit(true)}>
-              Edit
-            </Button>
+            <>
+              <Button ref={editKey} size="s" onClick={() => setEdit(true)}>
+                Edit
+              </Button>
+              {pool && pool.source !== 'config' && <DeleteAgent agent={agent} title={title} />}
+            </>
           ) : undefined
         }
       >
