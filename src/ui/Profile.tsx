@@ -484,16 +484,27 @@ function EditFace({ agent, description, onDone }: { agent: string; description: 
   );
 }
 
-/** AgentGone is the page of an agent that no longer exists, with the way back to the fleet. */
-export function AgentGone({ agent }: { agent: string }) {
+/**
+ * AgentGone is the page of an agent that no longer exists, with the way
+ * back to the fleet. The details pane passes quiet: where it shows beside
+ * the main pane, the main pane holds the key, and alone it has its back
+ * link.
+ */
+export function AgentGone({ agent, quiet }: { agent: string; quiet?: boolean }) {
   return (
-    <section class="screen agent-gone" aria-labelledby="agent-gone-title">
-      <PaneHeader id="agent-gone-title" title={agent} size="title" level={1} back={{ href: '#fleet', label: 'Fleet', to: 'list' }} />
+    <section class="screen agent-gone" aria-labelledby={quiet ? 'agent-gone-details' : 'agent-gone-title'}>
+      {quiet ? (
+        <PaneHeader id="agent-gone-details" title={agent} back={{ href: '#fleet', label: 'Fleet', to: 'main' }} />
+      ) : (
+        <PaneHeader id="agent-gone-title" title={agent} size="title" level={1} back={{ href: '#fleet', label: 'Fleet', to: 'list' }} />
+      )}
       <div class="empty center">
         <p>This agent no longer exists.</p>
-        <Button href="#fleet" kind="primary">
-          Back to Fleet
-        </Button>
+        {!quiet && (
+          <Button href="#fleet" kind="primary">
+            Back to Fleet
+          </Button>
+        )}
       </div>
     </section>
   );
@@ -567,7 +578,7 @@ export function Profile({ agent, back }: { agent: string; back?: { href: string;
     if (ok) setSaid('The new face is up.');
   };
   const title = (face && face.displayName) || agent;
-  if (gone) return <AgentGone agent={agent} />;
+  if (gone) return <AgentGone agent={agent} quiet />;
   const description = (info && info.description) || '';
   return (
     <section class="screen profile" aria-labelledby="profile-title">

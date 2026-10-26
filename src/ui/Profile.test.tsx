@@ -362,6 +362,8 @@ describe('the profile', () => {
   it('says that an agent that no list names no longer exists, with the way back to the fleet', () => {
     const el = mount(<Profile agent="walk-agent-1" />);
     expect(el.textContent).toContain('This agent no longer exists.');
-    expect(el.querySelector('.empty a[href="#fleet"]')!.textContent).toBe('Back to Fleet');
+    // Beside the main pane, the main pane holds the key, so the details hold the back link alone.
+    expect(el.querySelector('.empty a[href="#fleet"]')).toBeNull();
+    expect(el.querySelector('a[href="#fleet"]')).not.toBeNull();
   });
 });
