@@ -683,8 +683,9 @@ The work:
   Chat: the status, the plain line, and Seat again. The `activity` of `GET /v1/runs/{id}` has
   no phrase, so the phrase comes from the member of the bridge. For the
   reads of each tab, see section 11.8.
-- The profile of the agent, in the details pane. The mark at 72, the
-  tagline, and the key New face. What it can do: one plain line per
+- The profile of the agent, in the details pane. The mark at 72, which
+  an owner clicks to change it (a pen in its corner says so), and the
+  tagline. What it can do: one plain line per
   ability, from the phrases of the catalog of tools, with the tools of the
   wiki as one line and the tools of the bridges as another, and a rule
   that asks first as an amber line, such as Asks before git push. The raw

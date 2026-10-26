@@ -273,11 +273,23 @@ describe('the profile', () => {
     expect([...row.children].map((c) => c.className.split(' ')[0])).toEqual(['worker-name', 'status', 'worker-who']);
   });
 
-  it('offers Edit and New face to an owner only', () => {
+  it('offers Edit to an owner only, and makes the picture the key that changes it', () => {
     const owner = mount(<Profile agent="migrator" />);
-    expect([...owner.querySelectorAll('button')].map((b) => b.textContent)).toEqual(expect.arrayContaining(['Edit', 'New face']));
+    expect([...owner.querySelectorAll('button')].map((b) => b.textContent)).toContain('Edit');
+    expect([...owner.querySelectorAll('button')].map((b) => b.textContent)).not.toContain('New face');
+    const key = owner.querySelector('.prof-ident button.prof-mark-key') as HTMLButtonElement;
+    expect(key.getAttribute('aria-label')).toBe('Change the picture of migrator');
+    expect(key.querySelector('.mark')).not.toBeNull();
+    expect(key.querySelector('.prof-mark-pen')).not.toBeNull();
+    // A click opens the picker of a file.
+    const input = owner.querySelector('.prof-ident input[type="file"]') as HTMLInputElement;
+    let opened = false;
+    input.addEventListener('click', () => (opened = true));
+    key.click();
+    expect(opened).toBe(true);
     const other = mount(<Profile agent="reviewer" />);
     expect([...other.querySelectorAll('button')].map((b) => b.textContent)).not.toContain('Edit');
-    expect([...other.querySelectorAll('button')].map((b) => b.textContent)).not.toContain('New face');
+    expect(other.querySelector('.prof-mark-key')).toBeNull();
+    expect(other.querySelector('.prof-ident .mark')).not.toBeNull();
   });
 });

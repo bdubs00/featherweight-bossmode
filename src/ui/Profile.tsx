@@ -1,6 +1,7 @@
 // The profile of an agent, in the details pane of the Fleet place: the mark
-// at 72, the tagline, the tools and the rules as chips, the count of its
-// skills, its duties, New face, What people liked, the workers with Keep,
+// at 72, which an owner clicks to change it, the tagline, the tools and the
+// rules as chips, the count of its skills, its duties, What people liked,
+// the workers with Keep,
 // and the counts of today. The workers and their phases come from the state of
 // each worker that the stream keeps, as on every screen. GET
 // /v1/pools/{name} gives only Keep and the gaps. The profile reads it when
@@ -26,7 +27,7 @@ import { hrefOf } from '../lib/route';
 import { since } from '../lib/words';
 import { attempt, showError } from './notice';
 import { Confirm, InlineMarkdown, Menu } from './common';
-import { Glyph } from './icons';
+import { Glyph, Icon } from './icons';
 import { Button, Chip, Field, Help, Input, Led, Mark, PaneHeader } from './primitives';
 import { Abilities } from './Abilities';
 import { AgentDuties } from './Duties';
@@ -488,7 +489,18 @@ export function Profile({ agent, back }: { agent: string; back?: { href: string;
       </PaneHeader>
       <div class="scroll">
         <section class="prof-ident" aria-label={title}>
-          <Mark agent={agent} size={72} />
+          {owner ? (
+            // The picture is the key that changes it. The pen says so, also on a touch screen with no hover.
+            <button type="button" class="prof-mark-key" disabled={busy} aria-label={'Change the picture of ' + title} title="Change the picture: pick an SVG file" onClick={() => file.current && file.current.click()}>
+              <Mark agent={agent} size={72} />
+              <span class="prof-mark-pen" aria-hidden="true">
+                <Icon name="edit" />
+              </span>
+            </button>
+          ) : (
+            <Mark agent={agent} size={72} />
+          )}
+          {owner && <input ref={file} type="file" accept="image/svg+xml,.svg" class="sr" tabIndex={-1} aria-hidden="true" onChange={upload} />}
           <div class="prof-ident-main">
             {edit ? (
               <EditFace
@@ -501,14 +513,6 @@ export function Profile({ agent, back }: { agent: string; back?: { href: string;
             ) : (
               <>
                 {((face && face.tagline) || (info && info.description)) && <p class="prof-tagline">{(face && face.tagline) || (info && info.description)}</p>}
-                {owner && (
-                  <div class="prof-face">
-                    <Button size="s" disabled={busy} onClick={() => file.current && file.current.click()}>
-                      New face
-                    </Button>
-                    <input ref={file} type="file" accept="image/svg+xml,.svg" class="sr" tabIndex={-1} aria-hidden="true" onChange={upload} />
-                  </div>
-                )}
               </>
             )}
             {said && (

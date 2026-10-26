@@ -460,7 +460,7 @@ Capacity shows where seating happens:
 | `A person drew this face.`, `A pattern from the name. No model drew it.` | remove | | B |
 | `Display name, at most 64 characters` | change | `Name` | B |
 | `Tagline, at most 140 characters` | change | `Tagline` | B |
-| `A new face: an SVG file of at most 32 KB. The workbench refuses a face with a script, a link, or an image inside.` | change | the key `New face`, and the limit in the error | B |
+| `A new face: an SVG file of at most 32 KB. The workbench refuses a face with a script, a link, or an image inside.` | change | the picture of the agent as the key, with a pen in its corner and the name `Change the picture of <agent>` for a screen reader, and the limit in the error | B |
 | `A face holds at most 32 KB.` | change | `This face is over 32 KB. Pick a smaller SVG.` | B |
 | `Use the pattern again` | change | `Use the mark` | B |
 | `Only an owner of <agent> can change its face.` | remove | the Edit key does not show | B |
