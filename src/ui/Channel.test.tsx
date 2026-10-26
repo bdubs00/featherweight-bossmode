@@ -6,7 +6,7 @@ import { Channel, cardOrder } from './Channel';
 import { bridgeOf, entryOf, fakeFetch, memberOf, mount, settle, unmountAll } from './testkit-a';
 import { typeIn } from './testkit-c';
 import { setFetch } from '../api/client';
-import { clearNotice, currentNotice } from './notice';
+import { clearNotice, clearSaid, currentNotice, currentSaid } from './notice';
 
 const B = 'b-chan';
 const sys = (seq: number, event: string, text: string) => entryOf(seq, { from: { kind: 'system' }, event, text });
@@ -207,6 +207,22 @@ describe('the channel', () => {
     expect(rows().map((a) => a.querySelector('.prow-title')!.textContent)).toEqual(['The plan', 'Rules']);
   });
 
+  it('says that it saved what the manager can do here, once the dialog closes', async () => {
+    const el = mount(<Channel id={B} />);
+    await settle();
+    act(() => (el.querySelector('button[aria-label="More"]') as HTMLButtonElement).click());
+    act(() => ([...el.querySelectorAll('[role="menuitem"]')].find((x) => x.textContent === 'What the manager can do') as HTMLButtonElement).click());
+    const dialog = el.querySelector('dialog.confirm')!;
+    expect(dialog.querySelector('h2')!.textContent).toBe('What the manager can do here');
+    act(() => (dialog.querySelector('input[type="checkbox"]') as HTMLInputElement).click());
+    act(() => ([...dialog.querySelectorAll('button')].find((b) => b.textContent === 'Save') as HTMLButtonElement).click());
+    await settle();
+    expect(f.seen.some((x) => x.method === 'PATCH' && x.path === '/v1/bridges/b-chan' && !!(x.body as { delegation?: object }).delegation)).toBe(true);
+    expect(el.querySelector('dialog.confirm')).toBeNull();
+    expect(currentSaid()).toBe('Saved what the manager can do here.');
+    clearSaid();
+  });
+
   it('asks before it closes the bridge, in the words of its key', async () => {
     const el = mount(<Channel id={B} />);
     await settle();
@@ -267,7 +283,7 @@ describe('a closed bridge', () => {
     await settle();
     const tabs = [...el.querySelectorAll('nav.tabs a.tab')];
     expect(tabs[2].querySelector('.chip-amber')).toBeNull();
-    expect(el.querySelector('.cards-none')!.textContent).toBe('Nothing waits for you. The cards below were decided or answered.');
+    expect(el.querySelector('.cards-none')!.textContent).toBe('Nothing waits for you. The cards below were decided, answered, or ended without an answer.');
     expect(el.querySelector('.card-row.waiting')).toBeNull();
     expect(el.querySelector('#entry-b-shut-3')!.textContent).toContain('Which host?');
   });

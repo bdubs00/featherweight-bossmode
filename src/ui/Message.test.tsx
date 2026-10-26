@@ -231,3 +231,26 @@ describe('a question of a seat', () => {
     expect(el.querySelector('.card')).toBeNull();
   });
 });
+
+describe('a question of a seat that no longer waits', () => {
+  const S = 'b-ask-end';
+  const q = entryOf(3, { from: { kind: 'agent', handle: 'reviewer', run: 'run-reviewer' }, to: ['operator'], text: 'Shall I go on with nginx?', ask: {} });
+  const load = (more: Entry[]) =>
+    act(() => {
+      store.dispatch({ type: 'bridge', bridge: { ...bridgeOf(S), members: [memberOf('reviewer', { question: 0 })] } });
+      store.dispatch({ type: 'channel', bridge: S, page: { bridge: S, messages: [q, ...more], next: 0, prev: 0 }, mode: 'latest' });
+    });
+
+  it('says Ended without an answer, as after No answer needed', () => {
+    load([]);
+    const el = mount(<EntryRow bridge={S} seq={3} prevSeq={0} onReply={() => {}} />);
+    expect(el.querySelector('.card-row')).toBeNull();
+    expect(el.querySelector('.ask-end')!.textContent).toBe('Ended without an answer');
+  });
+
+  it('says the answer of the person when one replied to it', () => {
+    load([entryOf(4, { from: { kind: 'person', name: ALICE, display: 'Alice' }, to: ['reviewer'], replyTo: 3, text: 'Yes, go on.' })]);
+    const el = mount(<EntryRow bridge={S} seq={3} prevSeq={0} onReply={() => {}} />);
+    expect(el.querySelector('.ask-end')!.textContent).toBe('Answered: Yes, go on.');
+  });
+});

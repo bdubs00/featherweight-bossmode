@@ -20,7 +20,7 @@ import { commandOf, decisionTitle, editOf, envCallOf, envEffect, rawInput, toolN
 import { whoName } from '../lib/lines';
 import { useSelect } from '../state/store';
 import { alwaysAllow, answerQuestion, decide, settleQuestion } from '../state/actions';
-import { attempt } from './notice';
+import { attempt, showSaid } from './notice';
 import { Markdown, When } from './common';
 import { Button, Card, Command, Field, Input, LineLed, TextArea } from './primitives';
 import { Glyph } from './icons';
@@ -453,8 +453,9 @@ export function AskCard({ bridge, e, who, body, settle }: { bridge: string; e: E
   const noAnswer = async () => {
     if (busy) return;
     setBusy(true);
-    await attempt(() => settleQuestion(bridge, handle, e.seq));
+    const ok = await attempt(() => settleQuestion(bridge, handle, e.seq));
     setBusy(false);
+    if (ok) showSaid('The question of ' + handle + ' ended without an answer.');
   };
   return (
     <Card class="decide question ask" title="Needs your answer" tone="amber" settle={settle} label={'Question from ' + who}>

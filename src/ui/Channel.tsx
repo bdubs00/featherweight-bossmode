@@ -18,7 +18,7 @@ import { senderName, since } from '../lib/words';
 import { decidedRuns, hiddenLine } from '../lib/lines';
 import { go, hrefOf, type BridgeTab } from '../lib/route';
 import { useRoving, smooth } from './keys';
-import { attempt } from './notice';
+import { attempt, showSaid } from './notice';
 import { refusalOf } from '../lib/attachments';
 import { Confirm, Empty, Menu } from './common';
 import { EntryRow, NapRow, markLoaded } from './Message';
@@ -51,7 +51,9 @@ function Delegations({ id, value, onClose }: { id: string; value: Delegation; on
         setBusy(true);
         const ok = await attempt(() => patchBridge(id, { delegation: d }));
         setBusy(false);
-        if (ok) onClose();
+        if (!ok) return;
+        onClose();
+        showSaid('Saved what the manager can do here.');
       }}
     >
       <div class="checks">
@@ -463,7 +465,7 @@ function DecisionsTab({ id }: { id: string }) {
       {seqs.length === 0 && <Empty>{loading ? 'Loading the channel.' : 'Nothing needs you.'}</Empty>}
       {seqs.length > 0 && waits === 0 && !loading && (
         <p class="cards-none" role="status">
-          Nothing waits for you. The cards below were decided or answered.
+          Nothing waits for you. The cards below were decided, answered, or ended without an answer.
         </p>
       )}
       {seqs.length > 0 && (

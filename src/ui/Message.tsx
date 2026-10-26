@@ -172,6 +172,37 @@ export function Reactions({ bridge, e, onReply }: { bridge: string; e: Entry; on
   );
 }
 
+/* ---------- the end of a question ---------- */
+
+/**
+ * answerOf finds the answer of a person to the question at seq: the first
+ * message of a person in reply to it that the page holds, or undefined.
+ */
+export function answerOf(ch: { seqs: number[]; bySeq: Record<number, Entry> } | undefined, seq: number): Entry | undefined {
+  if (!ch) return undefined;
+  for (const q of ch.seqs) {
+    const x = ch.bySeq[q];
+    if (x && x.seq > seq && x.from.kind === 'person' && x.replyTo === seq) return x;
+  }
+  return undefined;
+}
+
+/**
+ * AskEnd says how a question of a seat that no longer waits ended: the
+ * answer of the person, or Ended without an answer, as after No answer
+ * needed, a close, or a later message of the seat.
+ */
+function AskEnd({ bridge, seq }: { bridge: string; seq: number }) {
+  const known = useSelect((s) => !!s.rosters[bridge]);
+  const answer = useSelect((s) => {
+    const a = answerOf(s.channels[bridge] as { seqs: number[]; bySeq: Record<number, Entry> } | undefined, seq);
+    return a ? excerpt(plainText(a.text), 80) : '';
+  });
+  // Until the seats load, the page cannot tell whether the question still waits.
+  if (!known) return null;
+  return <p class="ask-end">{answer ? 'Answered: ' + answer : 'Ended without an answer'}</p>;
+}
+
 /* ---------- the reply chip ---------- */
 
 /** jumpTo asks the channel to show an entry: it opens the fold that holds it and moves the focus there. */
@@ -376,6 +407,7 @@ export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, fresh, li
           )}
           {e.replyTo ? <ReplyChip bridge={bridge} seq={e.replyTo} /> : null}
           {body}
+          {e.ask && <AskEnd bridge={bridge} seq={e.seq} />}
         </div>
         <Reactions bridge={bridge} e={e} onReply={onReply} />
       </article>

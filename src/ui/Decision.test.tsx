@@ -4,7 +4,7 @@ import type { Decision, Run } from '../api/types';
 import { store } from '../state/store';
 import { AskCard, DecisionCard, canAlways, mayDecide } from './Decision';
 import { bridgeOf, fakeFetch, mount, settle, unmountAll } from './testkit-a';
-import { clearNotice, currentNotice } from './notice';
+import { clearNotice, clearSaid, currentNotice, currentSaid } from './notice';
 import { setFetch } from '../api/client';
 import { NO_SETTLE } from '../state/actions';
 
@@ -389,6 +389,8 @@ describe('No answer needed on the card of a question of a seat', () => {
       expect(f.seen.map((x) => [x.method, x.path])).toEqual([['POST', '/v1/bridges/b-ask/questions/12/settle']]);
       expect(question()).toBe(0);
       expect(currentNotice()).toBe('');
+      expect(currentSaid()).toBe('The question of reviewer ended without an answer.');
+      clearSaid();
     } finally {
       f.restore();
     }

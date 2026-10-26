@@ -744,6 +744,12 @@
   line-height: var(--t-meta-lh);
   color: var(--muted);
 }
+/* While the page reaches no server, the address line says why Send is off. */
+.composer .address.offline-why {
+  color: var(--word-red);
+  font-weight: 600;
+  white-space: normal;
+}
 .composer .keys {
   font-size: var(--t-caption);
   line-height: var(--t-caption-lh);
@@ -1375,4 +1381,12 @@
 .runpane .tmsg-head b {
   flex: none;
   max-width: 100%;
+}
+
+/* How a question of a seat ended, under its words: the answer, or Ended without an answer. */
+.ask-end {
+  margin-top: var(--s-1);
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+  color: var(--muted);
 }
