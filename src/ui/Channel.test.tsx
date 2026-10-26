@@ -174,6 +174,17 @@ describe('the channel', () => {
     expect(el.textContent).not.toMatch(/pool/i);
   });
 
+  it('shows the seats that work at the foot of the channel, with their faces and the three dots', async () => {
+    const el = mount(<Channel id={B} />);
+    await settle();
+    const line = el.querySelector('.msgs .typing')!;
+    expect(line.querySelectorAll('.typing-faces .mark').length).toBe(1);
+    expect(line.querySelectorAll('.typing-dots i').length).toBe(3);
+    expect(line.querySelector('.typing-words')!.textContent).toBe('migrator-1 is working: Read');
+    expect(line.querySelector('.sr')!.textContent).toBe('migrator-1 is working: Read');
+    expect(line.getAttribute('role')).toBe('status');
+  });
+
   it('opens the tab Decisions with the cards, waiting first', async () => {
     const el = mount(<Channel id={B} tab="decisions" />);
     await settle();

@@ -28,6 +28,7 @@ import { ContinuedFrom, Conversation, focusComposer, startRun, takeUpOf, useTran
 import { useResult } from './RunPane';
 import { FollowBox, Quiet } from './Thread';
 import { useLiveAnswer } from './Live';
+import { Typing, typingPhrase } from './Typing';
 import { ARCHIVED_LINE, answerSeqs, lastSeq, works } from '../lib/chat';
 import { AgentGone, Profile } from './Profile';
 import { EmptyPane } from './Shell';
@@ -466,8 +467,10 @@ export function AgentChat({ agent }: { agent: string }) {
   const names = useMemo(() => commands.map((c) => c.name), [commands]);
   const answers = useMemo(() => answerSeqs(t.items), [t.items]);
   const live = useLiveAnswer(runId, { working: works(run), seq: run ? run.seq : 0, mark: lastSeq(t.items, run), answers });
-  // The end of the conversation: its newest item, the live answer, and a card that waits.
-  const end = [t.items.length ? t.items[t.items.length - 1].seq : 0, live.text.length, live.tool, run && run.pending ? run.pending.id : ''].join(':');
+  // The agent types while its run works.
+  const typing = works(run);
+  // The end of the conversation: its newest item, the live answer, a card that waits, and the typing line.
+  const end = [t.items.length ? t.items[t.items.length - 1].seq : 0, live.text.length, live.tool, run && run.pending ? run.pending.id : '', typing ? 1 : 0].join(':');
   // A conversation that failed or stopped, or whose worker was replaced, takes no message: the next one starts a new conversation.
   const stopped = closed(run);
   const archived = !!run && !!run.archived;
@@ -547,7 +550,7 @@ export function AgentChat({ agent }: { agent: string }) {
           />
         }
       />
-      <FollowBox end={end}>
+      <FollowBox end={end} foot={typing ? <Typing who={[{ agent, name }]} phrase={typingPhrase(run, live)} /> : null}>
         {runId ? (
           <Conversation
             run={run}

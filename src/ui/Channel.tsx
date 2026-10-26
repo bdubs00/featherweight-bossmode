@@ -12,7 +12,7 @@ import type { BridgePage, Delegation, Entry } from '../api/types';
 import { store, useSelect } from '../state/store';
 import { loadAllCards, loadBridge, loadChannel, loadOlder, markRead, patchBridge, postMessage } from '../state/actions';
 import { useBridgePages } from '../state/bridgepages';
-import { membersOf, type Channel as ChannelState, type Roster } from '../state/reducer';
+import { membersOf, selectFacts, type Channel as ChannelState, type Roster, type State } from '../state/reducer';
 import { questionWaits } from '../state/inbox';
 import { senderName, since } from '../lib/words';
 import { decidedRuns, hiddenLine } from '../lib/lines';
@@ -26,6 +26,9 @@ import { NewBelow, nearEnd } from './Thread';
 import { Composer } from './Composer';
 import { foldOf, foldShapes, foldWords, shapeKey, shapeOf, shapesOf, type Item, type Part, type Shape } from './fold';
 import { wavesLine } from './seats';
+import { Typing, typingPhrase, type Typist } from './Typing';
+import { seatPresence } from '../lib/status';
+import { newestRun } from '../state/people';
 import { Button, Chip, Led, LineLed, Mark, PaneHeader, Tabs, countText } from './primitives';
 import { byName } from './Pages';
 import { Glyph } from './icons';
@@ -66,6 +69,21 @@ function Delegations({ id, value, onClose }: { id: string; value: Delegation; on
       </div>
     </Confirm>
   );
+}
+
+/** typistsKey lists the seats of a bridge that work now, with the phrase of the step of each, as JSON, or "" when none works. */
+function typistsKey(s: State, bridge: string): string {
+  const roster = s.rosters[bridge];
+  if (!roster) return '';
+  const f = selectFacts(s);
+  const out = membersOf(roster)
+    .filter((m) => !m.fired && seatPresence(f, m) === 'working')
+    .map((m) => {
+      // The run of the store is newer than the activity of the roster, which the bridge reads less often.
+      const run = s.runs[newestRun(m)];
+      return { agent: m.agent, name: m.handle, phrase: typingPhrase(run) || (m.activity ? m.activity.phrase : '') };
+    });
+  return out.length ? JSON.stringify(out) : '';
 }
 
 /**
@@ -173,6 +191,9 @@ function Posts({ id, closed }: { id: string; closed: boolean }) {
   const key = useSelect((s) => channelShape(s.channels[id]));
   const prev = useSelect((s) => (s.channels[id] ? s.channels[id].prev : 0));
   const waves = useSelect((s) => wavesLine(membersOf(s.rosters[id]), s.fleet));
+  // The seats that work now, as one text, so a change elsewhere in the store does not redraw the channel.
+  const typingKey = useSelect((s) => typistsKey(s, id));
+  const typists = useMemo(() => (typingKey ? (JSON.parse(typingKey) as (Typist & { phrase: string })[]) : []), [typingKey]);
   const items = useMemo(() => foldShapes(shapesOf(key || '')), [key]);
   const [open, setOpen] = useState<Set<string>>(() => new Set());
   const [reply, setReply] = useState<number | null>(null);
@@ -264,6 +285,12 @@ function Posts({ id, closed }: { id: string; closed: boolean }) {
     return () => ro.disconnect();
   }, [id, seqs]);
 
+  // The typing line grows the foot of the channel: a channel at its end stays there.
+  useLayoutEffect(() => {
+    const el = scroller.current;
+    if (el && shape.current.atEnd) el.scrollTop = el.scrollHeight;
+  }, [typingKey]);
+
   const onReply = useCallback((seq: number) => setReply(seq), []);
   const replyEntry = useSelect((s) => (reply && s.channels[id] ? s.channels[id].bySeq[reply] : undefined));
 
@@ -314,9 +341,11 @@ function Posts({ id, closed }: { id: string; closed: boolean }) {
             </p>
           </div>
         )}
+        {seqs && <Typing who={typists} phrase={typists.length === 1 ? typists[0].phrase : undefined} named />}
       </div>
       {fresh && (
         <NewBelow
+          lift={typists.length > 0}
           onClick={() => {
             const el = scroller.current;
             if (el) el.scrollTo({ top: el.scrollHeight, behavior: smooth() });

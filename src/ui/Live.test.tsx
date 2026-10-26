@@ -78,9 +78,11 @@ describe('the live answer of the quick chat', () => {
     await vi.waitFor(() => expect(lives().length).toBe(1));
     expect(lives()[0].path).toBe('/v1/runs/' + RUN.id + '/live');
     push('event: tool\ndata: {"turn":1,"name":"front.recall","callId":"c1"}\n\n');
-    await vi.waitFor(() => expect(lines(el)).toContain('Working: recall'));
+    // The typing line names the tool while the model calls it.
+    const words = () => el.querySelector('.typing .typing-words')?.textContent || '';
+    await vi.waitFor(() => expect(words()).toBe('Working: recall'));
     push('event: done\ndata: {"turn":1,"stopReason":"tool_use"}\n\n');
-    await vi.waitFor(() => expect(lines(el)).not.toContain('Working: recall'));
+    await vi.waitFor(() => expect(words()).not.toBe('Working: recall'));
     push('event: delta\ndata: {"turn":2,"text":"Keep 14 "}\n\n');
     push('event: delta\ndata: {"turn":2,"text":"rotations."}\n\n');
     await vi.waitFor(() => expect(el.querySelector('.tmsg.pending')!.textContent).toContain('Keep 14 rotations.'));

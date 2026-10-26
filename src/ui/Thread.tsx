@@ -377,10 +377,10 @@ export function useFollow<T extends HTMLElement>(end: string) {
   return { ref, below, toEnd };
 }
 
-/** NewBelow is the key at the foot of a list that takes the person to what arrived below the fold. */
-export function NewBelow({ onClick }: { onClick: () => void }) {
+/** NewBelow is the key at the foot of a list that takes the person to what arrived below the fold. lift raises it above the typing line of a channel. */
+export function NewBelow({ onClick, lift }: { onClick: () => void; lift?: boolean }) {
   return (
-    <button type="button" class="fresh" onClick={onClick}>
+    <button type="button" class={'fresh' + (lift ? ' lifted' : '')} onClick={onClick}>
       New below
     </button>
   );
@@ -389,14 +389,16 @@ export function NewBelow({ onClick }: { onClick: () => void }) {
 /**
  * FollowBox is the scroll box of a conversation that follows its end
  * (useFollow), with New below at its foot while something new waits under
- * the fold.
+ * the fold. foot follows the thread inside the box, such as the typing
+ * line, which sticks to the foot of the box; New below then sits above it.
  */
-export function FollowBox({ end, children }: { end: string; children: ComponentChildren }) {
+export function FollowBox({ end, foot, children }: { end: string; foot?: ComponentChildren; children: ComponentChildren }) {
   const f = useFollow<HTMLDivElement>(end);
   return (
-    <div class="follow">
+    <div class={'follow' + (foot ? ' footed' : '')}>
       <div class="scroll thread-scroll" ref={f.ref}>
         {children}
+        {foot}
       </div>
       {f.below && <NewBelow onClick={f.toEnd} />}
     </div>

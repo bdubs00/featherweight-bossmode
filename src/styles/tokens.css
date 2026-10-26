@@ -106,10 +106,11 @@
   --e-row: inset 0 1px 0 var(--sheen-row);
   --led-ring: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
 
-  /* Motion. Three things move, and reduced motion stops all three. */
+  /* Motion. Four things move, and reduced motion stops all four. */
   --m-breathe: 2.4s ease-in-out infinite;
   --m-settle: 0.24s ease-out;
   --m-slide: 0.16s ease-out;
+  --m-typing: 1.2s ease-in-out infinite;
 
   /* Layers. */
   --z-menu: 30;

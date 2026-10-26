@@ -224,14 +224,70 @@ a.people-title:hover {
 .tmsg-plain.sending {
   color: var(--muted);
 }
-/* The status of an answer that is on its way: its light and the phrase of the step. */
-.tmsg-status {
+/* The typing line (Typing.tsx): the faces of the agents that work, a
+   bubble of three dots that rise in turn, and the phrase of the step. It
+   keeps the column of the thread and sticks to the foot of the scroll box,
+   on the paper of the pane, so it stays above the composer while the
+   person reads further up. */
+.typing {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: var(--s-2);
-  font-size: var(--t-meta);
+  flex: none;
+  width: 100%;
+  max-width: calc(var(--measure) + 92px);
+  margin-inline: auto;
+  /* The face of 24 pixels sits in the middle of the column of the faces of the messages, which is 32 pixels wide. */
+  padding: var(--s-1) var(--s-5) var(--s-2) calc(var(--s-5) + 4px);
+  background: var(--paper);
+  /* The paper also fills the padding of a scroll box under the line, which a sticky line does not cover. */
+  box-shadow: 0 var(--s-2) 0 var(--paper);
   color: var(--muted);
+}
+/* The text that scrolls under the line fades into it. */
+.typing::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(-1 * var(--s-2));
+  height: var(--s-2);
+  background: linear-gradient(to bottom, transparent, var(--paper));
+  pointer-events: none;
+}
+.typing-faces {
+  display: inline-flex;
+  flex: none;
+}
+/* A second and a third face overlap the one before, with a ring of the paper between them. */
+.typing-faces > .mark + .mark {
+  margin-left: -6px;
+  box-shadow: 0 0 0 2px var(--paper);
+}
+.typing-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  height: 24px;
+  padding: 0 var(--s-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--raised);
+}
+.typing-dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+/* The words take the small size here, not the line, because the width of the column counts in the em of the line. */
+.typing-words {
+  flex: 0 1 auto;
+  font-size: var(--t-meta);
 }
 /* A conversation with no message yet: the invitation, in the middle of the pane. */
 .thread-empty {

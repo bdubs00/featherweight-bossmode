@@ -46,6 +46,7 @@ import { SeatAgainKey, continueSeat, seatAgain } from './SeatAgain';
 import { muteItem } from './Roster';
 import { FollowBox, ThreadView } from './Thread';
 import { LiveLines, useLiveAnswer } from './Live';
+import { Typing, typingPhrase } from './Typing';
 import { works } from '../lib/chat';
 import { Profile } from './Profile';
 import { ProfileLink, rememberOpen } from './Fleet';
@@ -229,10 +230,11 @@ function Chat({ bridge, m, items, closed, stopped, reason, said }: { bridge: str
   const agentOf = (h: string) => (roster && roster.byHandle[h] ? roster.byHandle[h].agent : h === 'manager' ? (store.get().config?.manager?.agent ?? 'manager') : h.replace(/-\d+$/, ''));
   // The end of the conversation: its newest row, which an earlier page never changes, and the live answer.
   const last = rows.length ? rows[rows.length - 1] : null;
-  const end = [last ? last.key : '', last && last.kind === 'entry' && last.entry.decision ? last.entry.decision.state : '', live.text.length, live.tool].join(':');
+  const typing = working && !m.fired;
+  const end = [last ? last.key : '', last && last.kind === 'entry' && last.entry.decision ? last.entry.decision.state : '', live.text.length, live.tool, typing ? 1 : 0].join(':');
   return (
     <>
-      <FollowBox end={end}>
+      <FollowBox end={end} foot={typing ? <Typing who={[{ agent: m.agent, name: m.handle }]} phrase={typingPhrase(runObj, live)} /> : null}>
         <div class="thread" role="log" aria-label={'Messages with ' + m.handle}>
           {ch && ch.prev > 0 && (
             <div class="tearlier">

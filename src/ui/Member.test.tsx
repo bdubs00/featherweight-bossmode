@@ -203,17 +203,18 @@ describe('the member conversation', () => {
     const el = mount(<MemberMain bridge="b1" handle="migrator-1" tab="chat" />);
     await vi.waitFor(() => expect(el.querySelectorAll('.tmsg').length).toBe(2));
     await vi.waitFor(() => expect(calls.filter((c) => c.path === '/v1/runs/run-migrator-1/live').length).toBe(1));
-    const lines = () => [...el.querySelectorAll('.tline')].map((x) => x.textContent);
     push('event: delta\ndata: {"turn":4,"text":"Next: "}\n\n');
     push('event: tool\ndata: {"turn":4,"name":"bash","callId":"c2"}\n\n');
     push('event: delta\ndata: {"turn":4,"text":"the handler."}\n\n');
     await vi.waitFor(() => expect(el.querySelector('.tmsg.pending')!.textContent).toContain('Next: the handler.'));
     expect(el.querySelectorAll('.tmsg').length).toBe(3);
     expect(el.querySelector('.tmsg.pending')!.getAttribute('aria-busy')).toBe('true');
-    expect(lines()).toContain('Working: bash');
-    // The model call ends: the tool line goes, and the answer waits for its entry.
+    const words = () => el.querySelector('.typing .typing-words')?.textContent || '';
+    expect(words()).toBe('Working: bash');
+    expect(el.querySelector('.typing .sr')!.textContent).toBe('migrator-1 is working: bash');
+    // The model call ends: the typing line no longer names the tool, and the answer waits for its entry.
     push('event: done\ndata: {"turn":4,"stopReason":"end_turn"}\n\n');
-    await vi.waitFor(() => expect(lines()).not.toContain('Working: bash'));
+    await vi.waitFor(() => expect(words()).not.toBe('Working: bash'));
     expect(el.querySelector('.tmsg.pending')).not.toBeNull();
     act(() => {
       store.dispatch({ type: 'entry', bridge: 'b1', entry: { seq: 12, at: at(12), from: { kind: 'agent', handle: 'migrator-1', run: 'run-migrator-1' }, to: [], text: 'Next: the handler, as the plan says.' } });

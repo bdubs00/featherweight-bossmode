@@ -30,7 +30,7 @@ import { AttachedFiles } from './AttachedFiles';
 import { Avatar, Menu } from './common';
 import { go } from '../lib/route';
 import { askOfRun } from '../lib/duties';
-import { Help, Led, Mark, PaneHeader } from './primitives';
+import { Help, Mark, PaneHeader } from './primitives';
 import { DeletedLine, conversationsOf } from './History';
 import { HistoryList, type HistoryWords } from './Chat';
 import { chatTitle } from '../lib/chat';
@@ -39,6 +39,7 @@ import { Composer } from './Composer';
 import { ContinuedFrom, Conversation, POLL_MS, focusComposer, startRun, usePoll, useTranscript } from './Conversation';
 import { FollowBox, Msg, Quiet } from './Thread';
 import { useLiveAnswer } from './Live';
+import { Typing, typingPhrase } from './Typing';
 import { ARCHIVED_LINE, answerSeqs, lastSeq, works } from '../lib/chat';
 
 export { POLL_MS };
@@ -332,8 +333,10 @@ export function Manager({ run: routeRun, fresh }: { run?: string; fresh?: boolea
   // A run that completed waits for nothing, also when its last turn gave no answer.
   const waiting = !stopped && (!!sent || (lastUser >= 0 && !answered && !(run && run.state === 'completed'))) && !(run && run.state === 'input-required');
   const live = useLiveAnswer(runId, { working: works(run) || waiting, seq: run ? run.seq : 0, mark: lastSeq(t.items, run), answers });
-  // The end of the conversation: its newest item, the sent text, the live answer, and a card that waits.
-  const end = [t.items.length ? t.items[t.items.length - 1].seq : 0, sent ? 1 : 0, live.text.length, live.tool || '', pendingId].join(':');
+  // The manager types while an answer is on its way, until the run stops or waits for the person.
+  const typing = !stopped && !(run && run.state === 'input-required') && (waiting || works(run));
+  // The end of the conversation: its newest item, the sent text, the live answer, a card that waits, and the typing line.
+  const end = [t.items.length ? t.items[t.items.length - 1].seq : 0, sent ? 1 : 0, live.text.length, live.tool || '', pendingId, typing ? 1 : 0].join(':');
 
   if (!manager) return <NoManager />;
   // The Task of the manager sleeps between messages, so the first answer waits for it to wake.
@@ -374,16 +377,6 @@ export function Manager({ run: routeRun, fresh }: { run?: string; fresh?: boolea
           <AttachedFiles files={sent.files} />
         </Msg>
       )}
-      {waiting && !live.text && !live.tool && (
-        <div role="status">
-          <Msg face={<Mark agent={agent} size={32} />} name={agent}>
-            <p class="tmsg-status">
-              {waking ? <Led tone="grey" word="waking" label="Waking the manager" /> : <Led tone="green" word="working" />}
-              {!waking && run && run.activity && run.activity.phrase && <span>{run.activity.phrase}</span>}
-            </p>
-          </Msg>
-        </div>
-      )}
       {stopped && <Quiet tone="grey">{archived ? ARCHIVED_LINE : 'Stopped. Your next message starts a new conversation.'}</Quiet>}
     </>
   );
@@ -404,7 +397,7 @@ export function Manager({ run: routeRun, fresh }: { run?: string; fresh?: boolea
           ) : undefined
         }
       />
-      <FollowBox end={end}>
+      <FollowBox end={end} foot={typing ? <Typing who={[{ agent, name: agent }]} phrase={waking ? 'Waking up' : typingPhrase(run, live)} /> : null}>
         {!runId && !sent ? <p class="thread-empty">Ask about the fleet, or ask for a bridge.</p> : (
           <Conversation
             run={run}

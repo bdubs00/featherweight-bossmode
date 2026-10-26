@@ -47,7 +47,7 @@ the plan does instead, and why.
 | A system font stack, or a popular neutral sans | Archivo, a variable grotesque, in the build. The two titles are set wide. | The wide cut reads as engraved panel lettering, and it gives the titles a voice without a second family. |
 | Rounded cards at 8 to 16 pixels with one soft grey shadow | 4-pixel radius everywhere, flat panes, and hard 1 or 2 pixel drops on things you press | A soft blur under every box makes every box equal. A hard drop marks the few things that act. |
 | A round presence dot on the corner of an avatar | A 9-pixel square light beside a word, in the row, never on the face | The word carries the meaning, the light only repeats it, and a face stays a face. |
-| A pulsing dot for "live" or "online" | Only the amber light breathes, and only for "needs you" | Motion is for the one state that asks for an action. A live stream stays still. |
+| A pulsing dot for "live" or "online" | Only the amber light breathes, and only for "needs you". The typing dots of an agent that works on an answer are the one other motion that repeats (section 4.5). | Motion is for the one state that asks for an action. A live stream stays still. The owner asked for the typing dots on 2026-10-26, because a chat app trains every person to read them as "an answer comes". |
 | The unread badge in the brand color | A black count chip (snow in graphite) | The accent stays reserved for the primary action, the active tab, and the heart. |
 | Uppercase section labels such as "BRIDGES" and "PLACES" | A sentence-case heading with its count as a chip on the same line | Uppercase labels with wide tracking are a template tell, and a count under a heading costs a line. |
 | Meta strings joined with middle dots, such as "5 members · working" | A gap between parts, a light beside its word, and nothing between them | The gap and the light already separate the parts. |
@@ -59,7 +59,7 @@ the plan does instead, and why.
 | 11-pixel labels under the app bar icons (the mockup) | 12 pixels | 11 pixels at weight 600 is too small for a label that names a place. |
 | The graphite error word #FF6B61 (the mockup) | #FF7B72 | #FF6B61 gives 4.4 to 1 on the graphite pane, under the 4.5 to 1 of body text. #FF7B72 gives 4.9 to 1. |
 | A soft wide shadow and a hairline under the same popover | Only floating layers (menus, the picker, dialogs) carry the soft shadow, below their hard edge | A soft shadow solves a real layering problem only where a layer floats over content. |
-| Decorative entrance motion on each section | Three motions: the amber light breathes, an arriving decision card settles once, and the reply chip slides in | Motion that answers a change shows what changed. Motion on load says nothing. |
+| Decorative entrance motion on each section | Four motions: the amber light breathes, an arriving decision card settles once, the reply chip slides in, and the dots of the typing line rise in turn | Motion that answers a change shows what changed. Motion on load says nothing. |
 | A sentence of help under every field and in every footer | A label, a limit in the error at the moment the person hits it, and a definition behind a question mark | The operator learns the page once and reads it a thousand times. |
 | Glyphs of the mockup that are not symmetric, such as the marks of writer and scribe | Every mark mirrors around its middle column | A symmetric mark reads as a face at 20 pixels. |
 | `■ Live  4 Tasks awake` at the foot of the list (the mockup) | The readout of the fleet (section 6): the caption `9 workers`, a recessed rack of square lamps, one per worker, and the figures `2 working  7 asleep`. The word Live goes, and `Connecting` or `Offline` shows only while the stream is down. | Live said nothing in the normal state. A green light beside `0 workers awake` looked like good news about an empty fleet. The page never says Task or pool to an operator, and the foot has the height of This bridge, so the two feet share one top line. |
@@ -228,17 +228,27 @@ to zero.
 
 ### 4.5 Motion
 
-Three things move, and only these.
+Four things move, and only these.
 
 | Token | Value | What |
 |---|---|---|
 | `--m-breathe` | 2.4s ease-in-out, forever | The glow of the amber light grows from 3 to 10 pixels and back |
 | `--m-settle` | 0.24s ease-out, once | A decision card that arrives on the stream rises 6 pixels into place |
 | `--m-slide` | 0.16s ease-out, once | The reply chip of the composer comes in from 6 pixels to the left |
+| `--m-typing` | 1.2s ease-in-out, forever | Each of the three dots of the typing line rises 3 pixels and darkens, 0.16 s after the dot before it |
+
+The typing line shows while an agent works on an answer. It sits at the
+foot of the thread, above the composer, and sticks there while the person
+reads further up. It holds the face of the agent and a bubble of three
+dots. In a bridge, it holds the faces of the seats that work, at most
+three, and their names. The phrase of the step follows the dots, such as
+"Thinking" or "Waiting for a worker". The line goes when the run stops,
+finishes, or waits for the person.
 
 Nothing moves on load. Hover changes color and nothing else, with no
-transition. `prefers-reduced-motion: reduce` turns all three off: the amber
-light holds a steady glow, and the card and the chip appear in place.
+transition. `prefers-reduced-motion: reduce` turns all four off: the amber
+light holds a steady glow, the card and the chip appear in place, and the
+three dots stand still.
 
 The answer that a live stream sends is not a motion. Its text grows as the
 model writes it, in a pending message. The message has no clock time, no

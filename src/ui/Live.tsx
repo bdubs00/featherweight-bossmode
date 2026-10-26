@@ -1,5 +1,5 @@
 // The live answer of a one-on-one view: the hook that opens the live
-// stream of a run while it works, and the quiet lines at the end of the
+// stream of a run while it works, and the quiet line at the end of the
 // thread. The pending answer grows as the model writes it and gives its
 // place to the real item once the view holds it. The bubble has no cursor
 // and no motion: only its text grows, so reduced motion changes nothing.
@@ -101,12 +101,7 @@ export function useLiveAnswer(runId: string, p: LiveInput): LiveAnswer {
 /** toolWord names a tool as the step lines name it, without the prefix of the front. */
 export const toolWord = (name: string): string => name.replace(/^front\./, '');
 
-/** LiveLines are the quiet lines after a pending answer: the tool that the model calls, and a busy live view. */
+/** LiveLines is the quiet line after a pending answer while the live view is busy. The typing line names the tool that the model calls (Typing.tsx). */
 export function LiveLines({ live }: { live: LiveAnswer }) {
-  return (
-    <>
-      {live.tool && <Quiet>{'Working: ' + toolWord(live.tool)}</Quiet>}
-      {live.busy && <Quiet>Live view is busy</Quiet>}
-    </>
-  );
+  return live.busy ? <Quiet>Live view is busy</Quiet> : null;
 }

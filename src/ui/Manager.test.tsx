@@ -50,7 +50,9 @@ describe('the manager', () => {
     });
     const el = mount(<Manager />);
     await settle();
-    expect(el.querySelector('[role="status"] .status')!.textContent).toBe('working');
+    // The manager types: its face and the three dots sit at the foot of the thread, and the sentence names it.
+    expect(el.querySelector('.typing .typing-dots')).not.toBeNull();
+    expect(el.querySelector('.typing .sr')!.textContent).toBe('manager is working.');
     expect(runReads()).toBe(0);
     await act(async () => {
       await vi.advanceTimersByTimeAsync(POLL_MS);
@@ -64,7 +66,7 @@ describe('the manager', () => {
     expect([...el.querySelectorAll('.tmsg .md')].map((m) => m.textContent!.trim())).toEqual(['Two bridges are open.']);
     // The end of a turn that did not fail says nothing.
     expect(el.textContent).not.toContain('The turn ended');
-    expect(el.querySelector('[role="status"] .status')).toBeNull();
+    expect(el.querySelector('.typing')).toBeNull();
     // The run completed and nothing waits, so the poll stops.
     await act(async () => {
       await vi.advanceTimersByTimeAsync(POLL_MS * 3);
@@ -98,9 +100,8 @@ describe('the manager', () => {
     api = fakeApi({ 'GET /v1/runs/run-w/transcript': { run: w, items: [ASK], next: 0, prev: 0 }, 'GET /v1/runs/run-w': w, 'GET /v1/tools': { tools: [] } });
     const el = mount(<Manager />);
     await settle();
-    const status = el.querySelector('[role="status"] .status')!;
-    expect(status.textContent).toBe('waking');
-    expect(status.getAttribute('title')).toBe('Waking the manager');
+    expect(el.querySelector('.typing .typing-words')!.textContent).toBe('Waking up');
+    expect(el.querySelector('.typing .sr')!.textContent).toBe('manager is working: Waking up');
     const reads = () => api.calls.filter((c) => c.path === '/v1/runs/run-w').length;
     await act(async () => {
       await vi.advanceTimersByTimeAsync(POLL_MS);
@@ -149,7 +150,7 @@ describe('the manager', () => {
     const start = api.calls.find((c) => c.method === 'POST')!;
     expect(start.path).toBe('/v1/runs?member=default%2Fmanager-0');
     expect(start.body).toEqual({ agent: 'manager', input: 'Hello', profile: { timeZone: ZONE } });
-    expect(el.querySelector('[role="status"] .status')!.textContent).toBe('waking');
+    expect(el.querySelector('.typing .typing-words')!.textContent).toBe('Waking up');
   });
 
   it('sends files with a message, starts a new conversation with them, and names them until the transcript holds them', async () => {

@@ -1106,3 +1106,18 @@ Rule 9 of section 1 holds for every string of the page.
 | `The front removes each one once it sleeps for <span>, and Remove removes them now.` | change | `The server removes each one once it sleeps for <span>, and Remove removes them now.` | done |
 | `Front matter` (the name of the fields of a skill for a screen reader) | change | `The fields of the skill` | done |
 
+
+## 12. The typing line
+
+The typing line takes the place of the status message of an answer that is on its way, and of the line of the tool that the model calls (DESIGN.md, section 4.5).
+
+### src/ui/Typing.tsx, src/ui/Manager.tsx, src/ui/Chat.tsx, src/ui/Fleet.tsx, src/ui/Member.tsx, src/ui/Channel.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| the message of the agent with the light `working` and the phrase of the step, at the end of the thread | change | the typing line at the foot of the thread: the face of the agent, three dots, and the phrase of the step, such as `Thinking` | done |
+| the message of the manager with the light `waking` and the tooltip `Waking the manager` | change | the typing line with the phrase `Waking up` | done |
+| the light `waiting for a worker` in the status message of a chat | change | the typing line with the phrase `Waiting for a worker` | done |
+| `Working: <tool>` (a quiet line of the thread) | change | the phrase `Working: <tool>` on the typing line, when the run gives no phrase of its step | done |
+| new | add | in a bridge: `<seat> is working`, `<seat> and <seat> are working`, or `<seat>, <seat>, and <n> more are working`, with `: <phrase>` when one seat works | done |
+| new | add | for a screen reader: `<name> is working.`, or `<name> is working: <phrase>`, without a second `Working` | done |

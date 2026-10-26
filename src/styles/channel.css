@@ -431,6 +431,13 @@
 .follow > .fresh {
   bottom: var(--s-3);
 }
+/* New below sits above the typing line at the foot of the box, which is 36 pixels high. */
+.follow.footed > .fresh {
+  bottom: calc(var(--s-3) + 36px);
+}
+.fresh.lifted {
+  bottom: calc(132px + 36px);
+}
 /* New below: the key that takes the person to what arrived under the fold. */
 .fresh {
   position: absolute;

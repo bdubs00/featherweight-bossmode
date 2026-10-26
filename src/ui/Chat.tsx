@@ -39,6 +39,7 @@ import { ContinuedFrom, Conversation, startRun, takeUpOf, usePoll, useTranscript
 import { useResult } from './RunPane';
 import { FollowBox, Msg, Quiet } from './Thread';
 import { useLiveAnswer } from './Live';
+import { Typing, typingPhrase } from './Typing';
 import { Avatar, Button, Chip, Find, Help, Led, Mark, PaneHeader } from './primitives';
 import { Menu } from './common';
 import { ConversationMenu, DeletedLine } from './History';
@@ -474,8 +475,10 @@ function ChatRun({ chat, runId }: { chat: QuickChat; runId: string }) {
   const waiting = !stopped && (!!sent || (lastUser >= 0 && !answered && !(run && run.state === 'completed'))) && !(run && run.state === 'input-required');
   const answers = useMemo(() => answerSeqs(t.items), [t.items]);
   const live = useLiveAnswer(runId, { working: works(run) || waiting, seq: run ? run.seq : 0, mark: lastSeq(t.items, run), answers });
-  // The end of the conversation: its newest item, the sent text, the live answer, and a card that waits.
-  const end = [t.items.length ? t.items[t.items.length - 1].seq : 0, sent ? 1 : 0, live.text.length, live.tool, run && run.pending ? run.pending.id : ''].join(':');
+  // The agent types while an answer is on its way, until the run stops or waits for the person.
+  const typing = !stopped && !(run && run.state === 'input-required') && (waiting || works(run));
+  // The end of the conversation: its newest item, the sent text, the live answer, a card that waits, and the typing line.
+  const end = [t.items.length ? t.items[t.items.length - 1].seq : 0, sent ? 1 : 0, live.text.length, live.tool, run && run.pending ? run.pending.id : '', typing ? 1 : 0].join(':');
   const start = useStart(run, runId);
   const picks = picksOfRun(run, runId, agent, start);
   const commands = useMemo(() => slashCommands(skills, picks.skills || loadable || (skills || []).map((s) => s.name)), [skills, picks.skills, loadable]);
@@ -530,16 +533,6 @@ function ChatRun({ chat, runId }: { chat: QuickChat; runId: string }) {
           <AttachedFiles files={sent.files} />
         </Msg>
       )}
-      {waiting && !live.text && !live.tool && (
-        <div role="status">
-          <Msg face={<Mark agent={chat.agent} size={32} />} name={chat.agent}>
-            <p class="tmsg-status">
-              {run && run.state === 'queued' && light ? <Led tone={light.tone} word={light.word} label={light.label} /> : <Led tone="green" word="working" />}
-              {run && run.activity && run.activity.phrase && <span>{run.activity.phrase}</span>}
-            </p>
-          </Msg>
-        </div>
-      )}
       {stopped && <Quiet tone="grey">{archived ? ARCHIVED_LINE : 'Stopped. Your next message starts a new chat.'}</Quiet>}
     </>
   );
@@ -571,7 +564,7 @@ function ChatRun({ chat, runId }: { chat: QuickChat; runId: string }) {
           ) : undefined
         }
       />
-      <FollowBox end={end}>
+      <FollowBox end={end} foot={typing ? <Typing who={[{ agent: chat.agent, name: chat.agent }]} phrase={typingPhrase(run, live)} /> : null}>
         <Conversation
           run={run}
           result={res}
