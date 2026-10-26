@@ -1110,8 +1110,10 @@ The work:
   the front says the start and the check, so the page says each fact once.
   A start that goes again shows retrying with an amber light that holds
   still, and its line says that the run failed and goes again.
-- A source of the settings of the front shows only the note that it
-  changes there, its start, and its agent, with no key.
+- A duty that the configuration of the server set up first opens as any
+  duty, with a line that says so. A message from the setup of the server
+  never shows: a line takes its place. A locked duty shows the sentence of
+  the server, and no key that changes it.
 - The cost of a duty says `Required, such as 0.50` in its field, so nobody
   reads a default amount. Catch up a missed time shows for a schedule
   only.

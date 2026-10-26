@@ -1393,15 +1393,24 @@ The rules of the page:
 - **New:** the history of a duty shows `decided` under each run, in words:
   `The manager allowed shell.exec: <reason>`, `Nobody answered in time, so
   git.push was denied.`, or `You stopped the run at bash: <reason>`.
-- A duty with `source` `file` is an entry of `workbench.sources`. The
-  front reads it with an agent, a start, and a readback, such as `When
-  another app calls the address of this source, each new event starts a
-  run of <agent>. An operator sets it in the settings of the front, so it
-  changes there.`, and with no action, empty limits, no `whileAway`, and
-  no notifications. It refuses every change with 409. So the page of such
-  a duty shows only `This duty comes from the settings of the front.
-  Change it there.`, When with the readback, and Agent with the mark and
-  the name of the agent, and no key: no Run now, Pause, Edit, or More.
+- **New:** the server imports each entry of `workbench.sources` once, as
+  an ordinary duty (the contract Sources into duties of 2026-10-26). Such
+  a duty has `origin` `{"kind": "config", "name"}`, and its page says
+  `First set up in the configuration of the server.` It opens in the
+  editor as any duty does.
+- A duty whose message comes from the setup of the server has `template`
+  true, or it asks its agent with no message. No route shows that
+  message. The editor starts with an empty field. A save with an empty
+  field sends `ask` with no `message`, and the server keeps its message.
+  A message of the person replaces it. In place of the message,
+  the page shows `The message comes from the setup of the server. Write a
+  message to replace it.`
+- A duty with `locked` true takes no change, no pause, and no delete: the
+  server answers 409 with `This duty is locked by the setup of this
+  server. The person who runs the server can change it.` The page shows
+  that sentence, Run now, and no key that changes the duty. An older
+  server marks such an entry with `source` `file`, and the page shows it
+  locked too.
 - The readback of the front says when a duty starts and, for a duty with a
   check, what the check looks for. The page says each fact once: with a
   readback, the page of a duty shows no section Check first, and the

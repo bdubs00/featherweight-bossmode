@@ -32,6 +32,11 @@ marked done is in the code already.
 8. The word pool never appears for an operator. An agent has workers. Keep is
    the number of workers that an agent keeps. A worker is awake or asleep.
    The word Task, for a worker, also stays out of the page.
+9. No text that a person sees says front. A sentence names the server, or
+   it names no actor. The rule holds for a label, a tooltip, a name for a
+   screen reader, and an error of the page. The name of a tool, such as
+   `front.pages_write`, is code, and a tooltip or Details can show it as
+   it is. Two examples are `A setting of the server` and `No check ran.`
 
 ## 2. The words
 
@@ -720,7 +725,7 @@ column Now names the string of the approved boards where one changed.
 | `triage, from 14 tickets` (a proposed row of the board) | change | `triage, 2 d`, the time of the proposal. The card of the routine says `Proposed from 14 tickets`, so the number shows once. | done |
 | `triage, signed off just now` (a row of the board) | change | `triage, 0 this week`, the meta of every live row. The quiet card says when. | done |
 | new | add | `Loading the routines.`, `No routine yet.`, `No routine holds those words.`, `Pick a routine.` | done |
-| new | add | `Routines are off.` with the question mark `Where routines are turned on` and `The setting workbench.routines.enabled turns them on. The front keeps them on its bus, which must be nats or mem.`, on a front that answers 404 to the list | done |
+| new | add | `Routines are off.` with the question mark `Where routines are turned on` and `The setting workbench.routines.enabled turns them on. The server keeps them on its bus, which must be nats or mem.`, on a front that answers 404 to the list | done |
 
 ### src/ui/Routines.tsx: a routine
 
@@ -842,7 +847,7 @@ stands for a value.
 | new | add | for a 422, the whole reason of the front under the words, and `What <agent> tried` with the readback of the record that the agent wrote, which the form does not take. A problem of a 400 shows under the words, or under the agent picker for `agent`. | done |
 | `Tool`, a field of text with a list of the tools | change | `Tool`, a choice with `Pick a tool`, `Loading the tools`, or `This agent has no tool to call`, each tool as `<phrase>, <tool>`. Without an agent: `Pick the agent first. Its tools show here.` | done |
 | new | add | `What the tool gets`, the head of the names and values of the input | done |
-| `Secret`, a field of text with the placeholder `Optional` | change | `Secret`, a choice with `No secret` and the secrets for the host of the address, and `<name>, not for this address` for a secret that the check names. The question mark `What the secret is` says `A setting of the front that holds the token of the address. The page never sees the token. Only the secrets for the host of the address show.` | done |
+| `Secret`, a field of text with the placeholder `Optional` | change | `Secret`, a choice with `No secret` and the secrets for the host of the address, and `<name>, not for this address` for a secret that the check names. The question mark `What the secret is` says `A setting of the server that holds the token of the address. The page never sees the token. Only the secrets for the host of the address show.` | done |
 | `Keeps the items where <filters>.` and `Remove the filters` | change | `Keep the items where`, a row per filter: a field, the test `is`, `is not`, `is one of`, `holds`, `is at least`, or `is at most`, and a value, with `Remove filter <n>` and `Add a filter`. The error is `At least and at most need a number.` | done |
 
 ### src/ui/Duties.tsx
@@ -853,7 +858,9 @@ stands for a value.
 | the title of a duty of another action | change | `<agent> posts in <bridge>` and ` to <handles>`, `<agent> opens a bridge from the playbook <title>`, or `Ask the manager`, then its message or its goal | done |
 | new | add | under a run of the history, `Decided while you were away` for a screen reader, and one line per decision: `The manager allowed <tool>: <reason>`, `The manager denied <tool>.`, `<person> stopped the run at <tool>.`, `You allowed <tool>.`, `Nobody answered in time, so <tool> was denied.`, or `Nobody answered in time, so the run stopped at <tool>.` | done |
 | `working` for a start that goes again | change | `retrying`, with an amber light that holds still, and under the run the reason of the front, such as `The run failed: <reason>. It goes again.`, or `The run failed, and it goes again.` without one | done |
-| `Run now`, `Pause`, `Edit`, More, Limits, While you are away, and Tell me about on a duty of the settings of the front | remove | only `This duty comes from the settings of the front. Change it there.`, When with the readback of the front, or `Another app starts it.` without one, and `Agent` with the name of the agent | done |
+| `This duty comes from the settings of the front. Change it there.` and the page of a source with no key | remove | a duty that the server imported opens as any duty, with `Edit`. At the top of its page: `First set up in the configuration of the server.` | done |
+| new | add | in place of a message that comes from the setup of the server: `The message comes from the setup of the server. Write a message to replace it.` The editor shows it under the empty field of the message. A locked duty leaves out the second sentence. | done |
+| new | add | a locked duty: `This duty is locked by the setup of this server. The person who runs the server can change it.`, with `Run now` and no key that changes the duty. Its editor shows only that sentence. | done |
 | Check first beside a readback that says the check | remove | the readback says the check once. Check first shows only without a readback | done |
 | `Open the run` for a start with no run | remove | a start that the queue never took links no run, in the history and in Activity | done |
 | `A run gets at most <limits>.` under Limits of a post or an open | change | a post says `A post spends nothing of its own. The seats of the bridge spend from their own budgets.`, and an open says `The bridge gets at most <n> turns.` Neither says the most per day | done |
@@ -890,7 +897,7 @@ stands for a value.
 |---|---|---|---|
 | `Notifications` in the account menu, and the dialog `Notifications` | change | `Where to reach me` in the account menu, and the dialog `Where to reach me` with `Loading your settings.` or `This workbench sends no notifications.` | done |
 | `Server`, `Topic`, and `Token` in the dialog | change | they move to the form of an ntfy place, in the dialog of a place | done |
-| `Send a test`, `Sent. Look for it on your phone.`, `The front sent nothing. Check the topic and the server.`, and `The test failed. <reason>` | change | `Send a test` on each place, named `Send a test to <name>` for a screen reader, then under its row `Sending.`, `Sent to <name>. Look for it there.`, `Not sent to <name>. <reason>`, `The front sent nothing to <name>.`, `The test failed. <reason>`, or `The test failed. The front gave this place no id.` | done |
+| `Send a test`, `Sent. Look for it on your phone.`, `The front sent nothing. Check the topic and the server.`, and `The test failed. <reason>` | change | `Send a test` on each place, named `Send a test to <name>` for a screen reader, then under its row `Sending.`, `Sent to <name>. Look for it there.`, `Not sent to <name>. <reason>`, `Nothing went to <name>.`, `The test failed. <reason>`, or `The test failed. The server gave this place no id.` | done |
 | new | add | `Nothing goes out until you add a place. Activity always shows what needs you.`, the empty list | done |
 | new | add | a place: its name, and where it reaches in words: `ntfy, topic <topic>`, `Slack`, `Discord`, `Teams`, `Webhook`, `Email to <address>`, `Through <agent>`, or `<label>, shared by an admin`. The list is `Your places` for a screen reader. | done |
 | new | add | the switches `Questions`, `Failures`, and `A daily digest` on each place, the group `What goes to <name>` for a screen reader, and the keys `Edit` and `Remove`, named `Edit <name>` and `Remove <name>` | done |
@@ -961,4 +968,16 @@ install as it is, which can hold any word.
 |---|---|---|---|
 | new | add | the line `This conversation is from a worker that was replaced. You can read it, and your next message starts a new conversation.` under an archived conversation | done |
 | `working` (an archived run that had not finished) | change | `ended`, with the tooltip `Its worker was replaced. You can read it.` | done |
+
+## 11. No front in the words of the page
+
+Rule 9 of section 1 holds for every string of the page.
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `The front ran no check.` | change | `No check ran.` | done |
+| `The front reports <word>.` (the tooltip of the state of a run of a duty) | change | `The server reports <word>.` | done |
+| `Finished. Its texts show once the front reads its worker.` | change | `Finished. Its messages show once its worker answers.` | done |
+| `The front removes each one once it sleeps for <span>, and Remove removes them now.` | change | `The server removes each one once it sleeps for <span>, and Remove removes them now.` | done |
+| `Front matter` (the name of the fields of a skill for a screen reader) | change | `The fields of the skill` | done |
 

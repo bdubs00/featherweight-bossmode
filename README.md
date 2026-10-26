@@ -87,7 +87,9 @@ and a quick chat with a history of six chats. Last come a fleet with two
 pools, a wiki of eight pages, and a face for every agent. The Routines place
 has nine routines of three agents: one needs your sign-off, four are live,
 one rehearses, one is proposed, and two are retired. The Duties place has
-five duties and two sources of the settings of the front. One duty reports
+five duties, and three duties that the server imported from its
+configuration: one with a message from the setup, one with a message of
+its own, and one that the setup locks. One duty reports
 each weekday, and its last start goes again after a failed run. One
 restores a backup each night and needs you. One watches a queue with a
 check that mostly sleeps, and the manager decided a question of one of its
