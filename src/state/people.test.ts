@@ -4,6 +4,8 @@ import { poolName } from '../lib/workers';
 import type { Roster } from './reducer';
 import {
   NOT_ON_A_BRIDGE,
+  agentGone,
+  deletingAgents,
   capacityWords,
   filterPeople,
   filterStatus,
@@ -170,6 +172,15 @@ describe('Not on a bridge, from the agents of the fleet', () => {
     const last = peopleOf(s).pop()!;
     expect(last.rows.map((r) => r.handle)).toContain('default');
     expect(last.rows.find((r) => r.handle === 'default')!.light).toBeNull();
+  });
+
+  it('leaves out an agent whose pool the server deletes, and says that it is gone', () => {
+    const going: Fleet = { ...real, pools: (real.pools || []).map((p) => (p.agent === 'scribe' ? { ...p, deleting: true } : p)) };
+    const s = { ...base(), agents: fleetAgents(going, own, []), fleet: going };
+    expect(peopleOf(s).pop()!.rows.map((r) => r.handle)).toEqual(['manager', 'writer']);
+    expect(deletingAgents(going)).toEqual(new Set(['scribe']));
+    expect(agentGone({ fleet: going, agents: own, config: null }, 'scribe')).toBe(true);
+    expect(agentGone({ fleet: going, agents: own, config: null }, 'writer')).toBe(false);
   });
 });
 

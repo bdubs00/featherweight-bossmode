@@ -321,6 +321,7 @@ export function FleetList({ current, member }: { current?: string; member?: stri
       <PaneHeader
         id="fleet-list-title"
         title="Fleet"
+        focusable
         count={loaded ? count : undefined}
         countLabel={count === 1 ? '1 member' : count + ' members'}
         actions={
