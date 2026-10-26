@@ -29,7 +29,7 @@ import { useResult } from './RunPane';
 import { FollowBox, Quiet } from './Thread';
 import { useLiveAnswer } from './Live';
 import { ARCHIVED_LINE, answerSeqs, lastSeq, works } from '../lib/chat';
-import { Profile } from './Profile';
+import { AgentGone, Profile } from './Profile';
 import { EmptyPane } from './Shell';
 import { useFleetAgent } from '../state/profiles';
 import { Confirm, Menu } from './common';
@@ -415,21 +415,6 @@ function useWorkerStart(starting: boolean): void {
     }, START_READ_MS);
     return () => clearInterval(t);
   }, [starting]);
-}
-
-/** AgentGone is the page of an agent that no longer exists, with the way back to the fleet. */
-export function AgentGone({ agent }: { agent: string }) {
-  return (
-    <section class="screen member-main agent-gone" aria-labelledby="agent-gone-title">
-      <PaneHeader id="agent-gone-title" title={agent} size="title" level={1} back={{ href: '#fleet', label: 'Fleet', to: 'list' }} />
-      <div class="empty center">
-        <p>This agent no longer exists.</p>
-        <Button href="#fleet" kind="primary">
-          Back to Fleet
-        </Button>
-      </div>
-    </section>
-  );
 }
 
 /**

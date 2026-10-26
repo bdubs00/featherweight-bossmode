@@ -601,6 +601,9 @@ export interface Agent {
   pool?: string;
   /** True for a profile of the front itself, which no worker of a pool runs. */
   front?: boolean;
+  /** For a profile that names no tools: the tools and the rules that its workers give it, as the dry run of PUT /v1/agents/{name} names them. */
+  workerTools?: string[];
+  workerPolicy?: Rules | null;
 }
 
 /** The display of an agent: GET /v1/faces and PATCH /v1/faces/{agent}. */

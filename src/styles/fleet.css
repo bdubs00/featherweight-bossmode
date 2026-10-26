@@ -685,15 +685,30 @@ a.file {
   font-size: var(--t-meta);
   color: var(--muted);
 }
+/* While the owner edits, the fields take the whole width of the pane under
+   the picture, and the keys wrap, so Save is never cut in a narrow pane. */
+.prof-ident.editing {
+  flex-wrap: wrap;
+}
+.prof-ident.editing .prof-ident-main {
+  flex-basis: 100%;
+}
 .prof-edit {
   display: flex;
   flex-direction: column;
   gap: var(--s-3);
   width: 100%;
+  min-width: 0;
+}
+.prof-edit .input {
+  width: 100%;
+  min-width: 0;
 }
 .prof-edit-do {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: var(--s-2);
 }
 .prof-sec {
@@ -740,6 +755,41 @@ a.file {
   overflow-wrap: anywhere;
 }
 .liked-did {
+  color: var(--ink);
+}
+/* A long answer folds to three lines until the person asks for more. */
+.liked-did.folded {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
+.liked-label {
+  font-weight: 600;
+  color: var(--muted);
+}
+.liked-note .liked-label,
+.liked-did .liked-label {
+  color: var(--ink);
+}
+button.liked-more {
+  appearance: none;
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-decoration: underline;
+  cursor: pointer;
+}
+/* The skills of an agent, each a link to its page. */
+.prof-skill-list {
+  margin: var(--s-2) 0 0;
+  font-size: var(--t-control);
+  line-height: var(--t-control-lh);
+  overflow-wrap: anywhere;
+}
+.prof-skill-list a {
   color: var(--ink);
 }
 .liked-asked {
@@ -811,10 +861,20 @@ a.file {
 }
 .worker-gaps {
   margin: var(--s-2) 0 0;
+  font-size: var(--t-meta);
+}
+.worker-gaps > p {
+  color: var(--word-amber);
+}
+.worker-gaps ul {
+  margin: var(--s-1) 0 0;
   padding: 0;
   list-style: none;
-  font-size: var(--t-meta);
-  color: var(--word-amber);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.worker-old {
+  display: inline-flex;
 }
 .today {
   display: flex;

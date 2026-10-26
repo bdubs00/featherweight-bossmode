@@ -111,9 +111,14 @@ describe('the profile', () => {
     await vi.waitFor(() => expect(el.querySelector('.today')).not.toBeNull());
     const heads = [...el.querySelectorAll('.prof-sec h3')].map((h) => h.textContent);
     expect(heads).toEqual(['What it can do', 'What people liked', 'Workers', 'Today']);
-    // Each heart: what the agent did, what was asked as a muted line, the note, and Open the run.
+    // Each heart: the note of the person first, what was asked as a muted line, the answer, and Open the run.
     const first = el.querySelectorAll('.liked li')[0];
-    expect([...first.querySelectorAll('.liked-body > *')].map((x) => x.className + ' ' + x.textContent)).toEqual(['liked-did Ran the lint.', 'liked-asked Migrate the cron module.', 'liked-note Clean.', 'prof-link Open the run']);
+    expect([...first.querySelectorAll('.liked-body > *')].map((x) => x.className + ' ' + x.textContent)).toEqual([
+      'liked-note Liked because: Clean.',
+      'liked-asked clip Asked: Migrate the cron module.',
+      'liked-did Answer: Ran the lint.',
+      'prof-link Open the run',
+    ]);
     expect(first.querySelector('a.prof-link')!.getAttribute('href')).toBe('#bridge/b1/run/01RUN1/migrator-1');
     expect(el.querySelectorAll('.liked li')[1].querySelector('.liked-note')).toBeNull();
     expect([...el.querySelectorAll('.prof-link')].map((a) => a.getAttribute('href'))).toContain('#pages/agents/migrator/learned.md');
@@ -123,9 +128,13 @@ describe('the profile', () => {
     expect(row.querySelector('.worker-name')!.textContent).toBe('crew-0');
     expect(row.querySelector('.status-word')!.textContent).toBe('awake');
     expect(el.querySelectorAll('.workers li')[1].textContent).toContain('old setup');
-    expect(el.querySelector('.worker-gaps')!.textContent).toBe('crew-9 runs an older configuration.');
+    expect(el.querySelector('.worker-old')!.getAttribute('title')).toBe('It takes the new setup of the agent when it starts again.');
+    // The words of the server for the gaps sit in a fold under one plain line.
+    expect(el.querySelector('.worker-gaps > p')!.textContent).toBe('Some changes have not reached the workers of this agent yet. An admin can read why.');
+    expect(el.querySelector('.worker-gaps details li')!.textContent).toBe('crew-9 runs an older configuration.');
     expect(el.querySelector('.today')!.textContent).toBe('7 runs$1.902 decisions');
     expect(el.querySelector('.prof-skills')!.textContent).toMatch(/^\d+ skills?$/);
+    expect(el.querySelector('.prof-skills')!.tagName).toBe('SPAN');
     expect(el.textContent!.toLowerCase()).not.toContain('pool');
     expect(calls.some((c) => c.path === '/v1/pools/crew')).toBe(true);
   });
@@ -291,5 +300,68 @@ describe('the profile', () => {
     expect([...other.querySelectorAll('button')].map((b) => b.textContent)).not.toContain('Edit');
     expect(other.querySelector('.prof-mark-key')).toBeNull();
     expect(other.querySelector('.prof-ident .mark')).not.toBeNull();
+  });
+
+  it('links each skill of the agent to its own page', async () => {
+    act(() => store.dispatch({ type: 'agent-skills', agent: 'migrator', skills: ['ansible-style', 'plan'] }));
+    const el = mount(<Profile agent="migrator" />);
+    const links = [...el.querySelectorAll('.prof-skill-list a')];
+    expect(links.map((a) => a.textContent)).toEqual(['ansible-style', 'plan']);
+    expect(links[0].getAttribute('href')).toBe('#skills/skill/ansible-style');
+  });
+
+  it('shows a sleeping worker without a time, since the page knows no moment when it fell asleep', async () => {
+    // The seat of an earlier test ran on crew-0. Its run is over now.
+    act(() => store.dispatch({ type: 'run', run: { id: 'run-migrator-1', agent: 'migrator', state: 'completed', seq: 99, createdAt: '', updatedAt: '' } }));
+    act(() => store.dispatch({ type: 'fleet', fleet: { ...STREAM_FLEET, pools: STREAM_FLEET.pools!.map((p) => (p.name === 'crew' ? { ...p, tasks: [{ name: 'crew-0', phase: 'Suspended', current: true }] } : p)) } }));
+    const el = mount(<Profile agent="migrator" />);
+    await vi.waitFor(() => expect(el.querySelectorAll('.workers li').length).toBe(1));
+    const row = el.querySelector('.workers li')!;
+    expect(row.querySelector('.status-word')!.textContent).toBe('asleep');
+    expect(row.querySelector('.worker-who')).toBeNull();
+  });
+
+  it('opens Edit with the name and the tagline that the profile shows, in focus, and Escape gives the focus back to Edit', async () => {
+    act(() => store.dispatch({ type: 'agents', agents: [{ name: 'migrator', role: 'owner', description: 'Moves Puppet modules.' }, { name: 'reviewer', role: 'operator' }, { name: 'manager', role: 'operator' }] }));
+    forgetProfiles();
+    const el = mount(<Profile agent="migrator" />);
+    const edit = [...el.querySelectorAll('button')].find((b) => b.textContent === 'Edit') as HTMLButtonElement;
+    act(() => edit.click());
+    const [name, tagline] = [...el.querySelectorAll('.prof-edit input')] as HTMLInputElement[];
+    await vi.waitFor(() => expect(document.activeElement).toBe(name));
+    expect(name.value).toBe('migrator');
+    expect(tagline.value).toBe('Moves Puppet modules.');
+    act(() => {
+      name.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    });
+    expect(el.querySelector('.prof-edit')).toBeNull();
+    const again = [...el.querySelectorAll('button')].find((b) => b.textContent === 'Edit') as HTMLButtonElement;
+    await vi.waitFor(() => expect(document.activeElement).toBe(again));
+  });
+
+  it('saves a field that keeps the name or the description of the agent as empty, so the face follows the profile', async () => {
+    act(() => store.dispatch({ type: 'agents', agents: [{ name: 'migrator', role: 'owner', description: 'Moves Puppet modules.' }, { name: 'reviewer', role: 'operator' }, { name: 'manager', role: 'operator' }] }));
+    forgetProfiles();
+    const f = fakeFetch([
+      ['PATCH', /^\/v1\/faces\/migrator$/, () => ({ agent: 'migrator', displayName: 'Mig', tagline: '' })],
+      ['GET', /^\/v1\/faces$/, () => ({ faces: [] })],
+    ]);
+    try {
+      const el = mount(<Profile agent="migrator" />);
+      act(() => ([...el.querySelectorAll('button')].find((b) => b.textContent === 'Edit') as HTMLButtonElement).click());
+      const [name] = [...el.querySelectorAll('.prof-edit input')] as HTMLInputElement[];
+      typeIn(name, 'Mig');
+      act(() => (el.querySelector('.prof-edit button[type="submit"]') as HTMLButtonElement).click());
+      await vi.waitFor(() => expect(f.calls.some((c) => c.method === 'PATCH')).toBe(true));
+      expect(f.calls.find((c) => c.method === 'PATCH')!.body).toEqual({ displayName: 'Mig', tagline: '' });
+    } finally {
+      f.restore();
+    }
+  });
+
+  it('says that an agent that no list names no longer exists, with the way back to the fleet', () => {
+    const el = mount(<Profile agent="walk-agent-1" />);
+    expect(el.textContent).toContain('This agent no longer exists.');
+    expect(el.querySelector('.empty a[href="#fleet"]')!.textContent).toBe('Back to Fleet');
   });
 });
