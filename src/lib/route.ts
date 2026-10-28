@@ -66,8 +66,8 @@ export interface SkillItem {
 
 export type Route =
   | { place: 'home' }
-  | { place: 'activity'; item?: string; board?: boolean }
-  | { place: 'tasks' }
+  | { place: 'activity'; item?: string }
+  | { place: 'work' }
   | { place: 'manager'; run?: string; fresh?: boolean }
   | { place: 'chat'; run?: string; fresh?: boolean; details?: boolean }
   | { place: 'new' }
@@ -83,7 +83,7 @@ export type Route =
   | { place: 'pages'; path?: string; mode: 'tree' | 'read' | 'history' | 'edit' | 'create'; version?: number };
 
 /** The places of the app bar. */
-export type Place = 'tasks' | 'results' | 'activity' | 'chat' | 'bridges' | 'fleet' | 'duties' | 'skills' | 'routines' | 'wiki' | 'manager' | 'account';
+export type Place = 'work' | 'results' | 'activity' | 'chat' | 'bridges' | 'fleet' | 'duties' | 'skills' | 'routines' | 'wiki' | 'manager' | 'account';
 
 /** The column that a narrow window shows for a route. */
 export type Column = 'list' | 'main' | 'details';
@@ -109,15 +109,14 @@ export function parseRoute(hash: string): Route {
   switch (head) {
     case 'bridges':
       return { place: 'home' };
-    // #tasks is the door and the board of the tasks of the person.
+    // #work is the door and the board of the work of the person. #tasks, the
+    // address of the prototype of the door, opens it too.
+    case 'work':
     case 'tasks':
-      return { place: 'tasks' };
+      return { place: 'work' };
     case 'activity':
       // The item is the key of a row of the inbox, such as d:<run>/<approval>.
       return rest.length && rest.join('/') ? { place: 'activity', item: rest.map(dec).join('/') } : { place: 'activity' };
-    // #work is the board of the work, a view of the place Activity.
-    case 'work':
-      return { place: 'activity', board: true };
     // #manager is the newest conversation with the manager, #manager/new a
     // new one, and #manager/<run> a past one.
     case 'manager':
@@ -216,10 +215,9 @@ export function hrefOf(r: Route): string {
   switch (r.place) {
     case 'home':
       return '#';
-    case 'tasks':
-      return '#tasks';
+    case 'work':
+      return '#work';
     case 'activity':
-      if (r.board) return '#work';
       return r.item ? '#activity/' + encPath(r.item) : '#activity';
     case 'manager':
       if (r.run) return '#manager/' + encodeURIComponent(r.run);
@@ -275,8 +273,8 @@ export function hrefOf(r: Route): string {
 /** placeOf names the place of the app bar that a route belongs to. */
 export function placeOf(r: Route): Place {
   switch (r.place) {
-    case 'tasks':
-      return 'tasks';
+    case 'work':
+      return 'work';
     case 'activity':
       return 'activity';
     case 'manager':
@@ -309,7 +307,7 @@ export function columnOf(r: Route): Column {
     case 'home':
       return 'list';
     case 'activity':
-      return r.item || r.board ? 'main' : 'list';
+      return r.item ? 'main' : 'list';
     case 'bridge':
       return r.pane === 'none' ? 'main' : 'details';
     case 'member':
@@ -344,7 +342,7 @@ export function parentOf(r: Route): Route {
       if (r.pane === 'roster') return { place: 'bridge', id: r.id, pane: 'none' };
       return { place: 'home' };
     case 'activity':
-      return r.item || r.board ? { place: 'activity' } : { place: 'home' };
+      return r.item ? { place: 'activity' } : { place: 'home' };
     case 'member':
       return r.profile ? { place: 'member', bridge: r.bridge, handle: r.handle, tab: 'chat' } : { place: 'fleet' };
     case 'fleet':

@@ -1,4 +1,4 @@
-// The board, at #board: one light per member, grouped by bridge, for a
+// The Lights, at #board: one light per member, grouped by bridge, for a
 // fleet too large for a list. A light is a 12-pixel target, 44 on touch,
 // with the handle in its tooltip and its status for a screen reader. A
 // click opens the member. A status strip on each group heading counts the
@@ -80,7 +80,7 @@ export function Board() {
     <section class="screen board" aria-labelledby="board-title">
       <PaneHeader
         id="board-title"
-        title="Board"
+        title="Lights"
         size="title"
         level={1}
         back={{ href: '#fleet', label: 'Fleet', to: 'list' }}

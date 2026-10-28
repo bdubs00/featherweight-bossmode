@@ -5,8 +5,13 @@
 //
 // A card is {"id", "kind", "title", "from": {"kind", "name", "via"}, "stage",
 // "next", "reason", "opened", "since", "ended", "agents", "parts", "links",
-// "costUSD", "lost"}. The stages, in the order of the flow: waiting,
-// working, needs-you, stopped, review, done. The fake builds the cards from
+// "costUSD", "lost", "verdict"}. The stages, in the order of the flow:
+// waiting, working, needs-you, stopped, review, done. A run is in review
+// only when its owner asked to check each result: the metadata
+// workbench.review is 1, or its duty has review. It leaves review on the
+// first reaction. A done card carries its verdict: accepted (a thumb up or
+// a heart), checked (the done check of the agent passed, stop checked),
+// sent-back (a thumb down), or unchecked. The fake builds the cards from
 // its bridges, its runs, and the history of its duties with the rules of
 // the workbench, in short: a bridge is one card, a start of a duty is one
 // card, the items of a batch are one card, and a conversation is one card.
@@ -21,7 +26,7 @@ const LANE = {
   working: ['is in work', 'are in work'],
   'needs-you': ['needs a person', 'need a person'],
   stopped: ['stopped', 'stopped'],
-  review: ['has a result to read', 'have a result to read'],
+  review: ['has a result to check', 'have a result to check'],
   done: ['is done', 'are done'],
 };
 
@@ -35,8 +40,24 @@ function span(d) {
   return plural(Math.floor(d / DAY), 'day', 'days');
 }
 
+/** inReview reports whether a run waits for its owner to check its result: it asked for a check, ended well, and has no reaction. */
+export function inReview(r) {
+  const md = r.metadata || {};
+  const re = r.reactions || {};
+  return r.state === 'completed' && md['workbench.review'] === '1' && !(re.up > 0 || re.down > 0 || re.heart > 0);
+}
+
+/** verdictOf is the verdict of a run that ended well: a person first, then the done check of the agent. */
+function verdictOf(r) {
+  const re = r.reactions || {};
+  if (re.down > 0) return 'sent-back';
+  if (re.up > 0 || re.heart > 0) return 'accepted';
+  if (r.stop === 'checked') return 'checked';
+  return 'unchecked';
+}
+
 /** runPart is the stage of one run, as the workbench words it. */
-function runPart(r, autonomous) {
+function runPart(r) {
   const p = { run: r.id, since: r.updatedAt, approval: '', lost: false };
   const open = !['completed', 'failed', 'canceled'].includes(r.state);
   if (r.archived && open) return { ...p, stage: 'stopped', lost: true, reason: 'Its worker was replaced before it ended, so it cannot go on.' };
@@ -52,11 +73,10 @@ function runPart(r, autonomous) {
     case 'suspended':
       return { ...p, stage: 'working', reason: r.activity && r.activity.tool ? 'Runs ' + r.activity.tool + '.' : 'Works.', since: r.createdAt };
     case 'completed': {
-      const re = r.reactions || {};
-      if (re.down > 0) return { ...p, stage: 'stopped', reason: 'A person marked the result wrong.' };
-      if (re.up > 0 || re.heart > 0) return { ...p, stage: 'done', reason: 'Accepted.' };
-      if (!String(r.output || '').trim() && !autonomous) return { ...p, stage: 'done', reason: 'Answered.' };
-      return autonomous ? { ...p, stage: 'review', reason: 'A result to read.' } : { ...p, stage: 'done', reason: 'Answered.' };
+      if (inReview(r)) return { ...p, stage: 'review', reason: 'A result to check.' };
+      const verdict = verdictOf(r);
+      const reason = { accepted: 'Accepted.', checked: 'Its done check passed.', 'sent-back': 'Sent back.', unchecked: 'Answered.' }[verdict];
+      return { ...p, stage: 'done', reason, verdict };
     }
     case 'failed':
       return { ...p, stage: 'stopped', reason: r.error ? 'Failed: ' + String(r.error).slice(0, 200) : 'Failed.' };
@@ -81,7 +101,7 @@ function partWords(c) {
     [c.waiting, 'waiting'],
     [c.working, 'working'],
     [c.stopped, 'stopped'],
-    [c.review, 'to review'],
+    [c.review, 'to check'],
     [c.done, 'done'],
   ]
     .filter(([n]) => n > 0)
@@ -109,6 +129,7 @@ function settle(card, parts, me) {
   if (top.run && (top.stage === 'needs-you' || top.stage === 'stopped')) card.links.run = top.run;
   card.links.approval = top.stage === 'needs-you' ? top.approval || '' : '';
   card.ended = card.stage === 'done' ? card.since : null;
+  if (card.stage === 'done') card.verdict = top.verdict || 'unchecked';
   card.next = { waiting: 'worker', working: 'agent', done: '' }[card.stage];
   if (card.next === undefined) card.next = card.managerDecides ? 'manager' : card.mine ? 'you' : 'person';
   if (card.stage !== 'needs-you') delete card.managerDecides;
@@ -168,7 +189,7 @@ export function board(S, me, { days = 7, all = false } = {}) {
           parts.push({ ...p, stage: 'review', reason: 'The seats ended their turns.', since: last });
       }
     }
-    if (b.state === 'closed') parts.push({ stage: 'done', reason: 'Closed.', since: b.closedAt || last });
+    if (b.state === 'closed') parts.push({ stage: 'done', reason: 'Closed.', since: b.closedAt || last, verdict: 'unchecked' });
     if (!parts.length) parts.push({ stage: 'stopped', reason: 'No seat.', since: last });
     card.agents = [...new Set(card.agents)].sort();
     cards.push(settle(card, parts, me));
@@ -192,11 +213,12 @@ export function board(S, me, { days = 7, all = false } = {}) {
       }
       if (r) card.title = r.title || card.title;
       let p;
-      if (r && e.state !== 'failed') p = runPart(r, true);
+      if (r && e.state !== 'failed') p = runPart(r);
       else if (e.state === 'retrying') p = { stage: 'waiting', reason: 'Goes again soon.', since: e.at };
       else if (e.state === 'failed') p = { stage: 'stopped', reason: e.reason || 'Stopped.', since: e.at, run: e.run };
       else if (e.state === 'input-required') p = { stage: 'needs-you', reason: 'Waits for you.', since: e.at, run: e.run };
-      else if (e.state === 'completed') p = { stage: 'review', reason: 'A result to read.', since: e.at, run: e.run };
+      else if (e.state === 'completed' && !e.verdict && d.review) p = { stage: 'review', reason: 'A result to check.', since: e.at, run: e.run };
+      else if (e.state === 'completed') p = { stage: 'done', reason: e.verdict === 'checked' ? 'Its done check passed.' : 'Done.', since: e.at, run: e.run, verdict: e.verdict || 'unchecked' };
       else p = { stage: 'working', reason: 'Works.', since: e.at, run: e.run };
       card.managerDecides = !!(d.whileAway && d.whileAway.decider === 'manager' && r && r.pending && !r.pending.schema);
       cards.push(settle(card, [p], me));
@@ -231,7 +253,7 @@ export function board(S, me, { days = 7, all = false } = {}) {
     if (!r.parent) c.links.run = r.id;
     if (r.usage) c.costUSD += r.usage.costUSD || 0;
     if (r.principal === me) c.mine = true;
-    const p = runPart(r, c.kind === 'job');
+    const p = runPart(r);
     if (c.kind === 'conversation') {
       if (!r.parent) for (const q of g.parts) q.quiet = true;
       else if (['stopped', 'review', 'done'].includes(p.stage)) p.quiet = true;
@@ -241,7 +263,8 @@ export function board(S, me, { days = 7, all = false } = {}) {
   for (const g of groups.values()) cards.push(settle(g.card, g.parts, me));
 
   // The board keeps the cards of the person, a card that did not end however old, and a card that ended in the window.
-  const shown = cards.filter((c) => (all || c.mine) && !((c.stage === 'done' || (c.stage === 'review' && c.kind !== 'bridge')) && now - ms(c.since) > days * DAY));
+  // A card in review waits for a person, so it stays however old it is.
+  const shown = cards.filter((c) => (all || c.mine) && !(c.stage === 'done' && now - ms(c.since) > days * DAY));
   const rank = Object.fromEntries(STAGES.map((s, i) => [s, i]));
   shown.sort((a, b) => rank[a.stage] - rank[b.stage] || (a.stage === 'done' ? ms(b.since) - ms(a.since) : ms(a.since) - ms(b.since)));
   const lanes = STAGES.map((stage) => {
@@ -259,7 +282,7 @@ export function board(S, me, { days = 7, all = false } = {}) {
 function sentence(lanes, n, days, now) {
   if (!n) return 'No work in the last ' + plural(days, 'day', 'days') + '.';
   const open = lanes.filter((l) => l.stage !== 'done').reduce((s, l) => s + l.count, 0);
-  const out = [plural(open, 'piece of work is open', 'pieces of work are open') + '.'];
+  const out = [plural(open, 'task is open', 'tasks are open') + '.'];
   for (const l of lanes) {
     if (!l.count || l.stage === 'done') continue;
     let s = l.count + ' ' + LANE[l.stage][l.count === 1 ? 0 : 1];

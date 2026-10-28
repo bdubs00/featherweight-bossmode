@@ -81,11 +81,11 @@ export interface PlaceItem {
 const lastOf: Partial<Record<Place, string>> = {};
 
 const PLACES: PlaceItem[] = [
+  { id: 'work', label: 'Work', glyph: 'tasks', href: '#work' },
   { id: 'results', label: 'Results', glyph: 'results', href: '#results' },
-  { id: 'tasks', label: 'Tasks', glyph: 'tasks', href: '#tasks' },
   { id: 'activity', label: 'Activity', glyph: 'activity', href: '#activity' },
   { id: 'chat', label: 'Chat', glyph: 'chat', href: '#chat' },
-  { id: 'bridges', label: 'Bridges', glyph: 'bridges', href: '#' },
+  { id: 'bridges', label: 'Bridges', glyph: 'bridges', href: '#bridges' },
   { id: 'fleet', label: 'Fleet', glyph: 'fleet', href: '#fleet' },
   { id: 'duties', label: 'Duties', glyph: 'duties', href: '#duties' },
   { id: 'skills', label: 'Skills', glyph: 'skills', href: '#skills' },
@@ -102,8 +102,8 @@ const THEMES: [ThemeChoice, string][] = [
 
 /** The names of the places in the title of the tab. */
 const PLACE_NAMES: Record<Place, string> = {
+  work: 'Work',
   results: 'Results',
-  tasks: 'Tasks',
   activity: 'Activity',
   chat: 'Chat',
   bridges: 'Bridges',
@@ -246,24 +246,35 @@ function AccountMenu({ onSignOut, onReach }: { onSignOut: () => void; onReach: (
 /**
  * placesOf gives the places of the app bar for the settings of the front.
  * Routines shows once the settings say that the front keeps routines, and
- * an older front that leaves the key out keeps the place. Tasks shows once
- * the settings name the door. With the door, a person who has not asked
- * for every place sees four: Tasks, Activity, Chat, and Wiki, and the place
- * of the screen that shows, so the bar always lights the place you are in.
+ * an older front that leaves the key out keeps the place. Work and Results
+ * show once the settings say work. With work, the bar shows five places:
+ * Work, Results, Activity, Chat, and Wiki. The other places wait behind
+ * More, unless the person asked for every place. The place of the screen
+ * that shows stays in the bar, so the bar always lights the place you are
+ * in.
  */
 export function placesOf(config: BossConfig | null, every = true, current?: Place): PlaceItem[] {
-  const door = !!(config && config.door);
-  const all = PLACES.filter((it) => (it.id !== 'routines' || (config && config.routines !== false)) && (it.id !== 'tasks' || door));
-  if (!door || every) return all;
-  return all.filter((it) => SIMPLE_PLACES.includes(it.id) || it.id === current);
+  const work = !!(config && config.work);
+  const all = PLACES.filter((it) => (it.id !== 'routines' || (config && config.routines !== false)) && ((it.id !== 'work' && it.id !== 'results') || work));
+  if (!work) return all;
+  const main = all.filter((it) => MAIN_PLACES.includes(it.id));
+  const more = all.filter((it) => !MAIN_PLACES.includes(it.id));
+  return every ? [...main, ...more] : [...main, ...more.filter((it) => it.id === current)];
 }
 
-/** The places of a person who has not asked for every place. */
-export const SIMPLE_PLACES: Place[] = ['tasks', 'activity', 'chat', 'wiki'];
+/** morePlaces gives the places behind More: the places of the bar that placesOf leaves out. */
+export function morePlaces(config: BossConfig | null, current?: Place): PlaceItem[] {
+  if (!config || !config.work) return [];
+  const shown = placesOf(config, false, current).map((it) => it.id);
+  return placesOf(config, true).filter((it) => !shown.includes(it.id));
+}
+
+/** The places of the bar with work, before More. */
+export const MAIN_PLACES: Place[] = ['work', 'results', 'activity', 'chat', 'wiki'];
 
 const EVERY_KEY = 'fw.bossmode.everyPlace';
 
-/** everyPlace reads whether the person asked for every place of the app bar. A browser without storage shows the four places. */
+/** everyPlace reads whether the person asked for every place of the app bar. A browser without storage shows the five places. */
 export function everyPlace(): boolean {
   try {
     return localStorage.getItem(EVERY_KEY) === '1';
@@ -272,7 +283,7 @@ export function everyPlace(): boolean {
   }
 }
 
-/** useEveryPlace is the switch More of the app bar, kept in the browser. */
+/** useEveryPlace is the switch More of the app bar in a wide window, kept in the browser. */
 function useEveryPlace(): [boolean, (on: boolean) => void] {
   const [on, setOn] = useState(everyPlace);
   const set = (v: boolean) => {
@@ -284,6 +295,79 @@ function useEveryPlace(): [boolean, (on: boolean) => void] {
     }
   };
   return [on, set];
+}
+
+const PHONE = '(max-width: 799px)';
+
+/** usePhone reports whether the window is narrow, where the places sit in a bar at the bottom. */
+function usePhone(): boolean {
+  const q = typeof window !== 'undefined' && window.matchMedia ? window.matchMedia(PHONE) : null;
+  const [on, setOn] = useState(() => !!q && q.matches);
+  useEffect(() => {
+    if (!q) return;
+    const f = () => setOn(q.matches);
+    q.addEventListener('change', f);
+    return () => q.removeEventListener('change', f);
+  }, []);
+  return on;
+}
+
+/**
+ * MoreMenu is the key More of a phone: a menu above the bar with the places
+ * that the bar leaves out. ArrowUp and ArrowDown move, and Escape closes it
+ * and gives the focus back to the key.
+ */
+function MoreMenu({ items }: { items: PlaceItem[] }) {
+  const [open, setOpen] = useState(false);
+  const btn = useRef<HTMLButtonElement>(null);
+  const list = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const first = list.current && (list.current.querySelector('[role="menuitem"]') as HTMLElement | null);
+    if (first) first.focus();
+    const away = (e: Event) => {
+      const t = e.target as Node;
+      if (list.current && !list.current.contains(t) && btn.current && !btn.current.contains(t)) setOpen(false);
+    };
+    document.addEventListener('pointerdown', away);
+    return () => document.removeEventListener('pointerdown', away);
+  }, [open]);
+  const onKey = (e: JSX.TargetedKeyboardEvent<HTMLDivElement>) => {
+    const all = [...(list.current ? list.current.querySelectorAll<HTMLElement>('[role="menuitem"]') : [])];
+    const i = all.indexOf(document.activeElement as HTMLElement);
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      setOpen(false);
+      if (btn.current) btn.current.focus();
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      all[(i + 1) % all.length].focus();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      all[(i - 1 + all.length) % all.length].focus();
+    } else if (e.key === 'Tab') {
+      setOpen(false);
+    }
+  };
+  return (
+    <div class="pop place-more-pop">
+      <button ref={btn} type="button" class="place place-more" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <Glyph name="more" size={22} />
+        <span class="place-label">More</span>
+      </button>
+      {open && (
+        <div ref={list} class="menu menu-more" role="menu" aria-label="More places" onKeyDown={onKey}>
+          {items.map((it) => (
+            <a role="menuitem" href={lastOf[it.id] || it.href} onClick={() => setOpen(false)}>
+              <Glyph name={it.glyph} size={20} />
+              <span class="t">{it.label}</span>
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 /**
@@ -317,12 +401,15 @@ export function AppBar({ route, place: placeProp, onSignOut, onReach }: { route:
     document.title = tabTitle(place, attention, theme.name);
   }, [place, attention, theme.name]);
   const [every, setEvery] = useEveryPlace();
-  const door = !!(config && config.door);
+  const phone = usePhone();
+  const work = !!(config && config.work);
+  // A phone keeps five places in the bar, and More opens a menu of the rest.
+  const wide = every && !phone;
   return (
     <nav class="appbar" aria-label="Places">
-      <LogoWell src={logo} name={theme.name} href="#" />
+      <LogoWell src={logo} name={theme.name} href={work ? '#work' : '#'} />
       <div class="places">
-        {placesOf(config, every, place).map((it) => {
+        {placesOf(config, wide, place).map((it) => {
           const on = it.id === place;
           const count = it.id === 'activity' ? attention : 0;
           return (
@@ -338,8 +425,9 @@ export function AppBar({ route, place: placeProp, onSignOut, onReach }: { route:
             </a>
           );
         })}
-        {door && (
-          <button type="button" class="place place-more" aria-pressed={every} title={every ? 'Show four places' : 'Show every place'} onClick={() => setEvery(!every)}>
+        {work && phone && <MoreMenu items={morePlaces(config, place)} />}
+        {work && !phone && (
+          <button type="button" class="place place-more" aria-pressed={every} title={every ? 'Show five places' : 'Show every place'} onClick={() => setEvery(!every)}>
             <Glyph name="more" size={22} />
             <span class="place-label">{every ? 'Fewer' : 'More'}</span>
           </button>

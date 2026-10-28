@@ -47,6 +47,7 @@ import {
   runLight,
   startWords,
   tellWords,
+  REVIEW_LINE,
   templatedOf,
   titleOfName,
   toWords,
@@ -557,6 +558,7 @@ function DutyView({ name, open }: { name: string; open?: string }) {
             Tell me about
           </h2>
           <p>{tellWords(d.notify, labelOf)}</p>
+          {d.review && <p>{REVIEW_LINE}</p>}
         </section>
         <section class="duty-sec" aria-labelledby="duty-history">
           <h2 class="t-sub duty-sec-head" id="duty-history">

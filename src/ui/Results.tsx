@@ -131,15 +131,15 @@ function Body({ v, onSaved }: { v: Value; onSaved: () => void }) {
         </Tile>
         <Tile
           label="Checked"
-          figure={(v.checks.accepted + v.checks.sentBack).toLocaleString()}
+          figure={checkedOf(v.checks).toLocaleString()}
           unit={'of ' + v.work.done.toLocaleString()}
-          help="A result is checked when a person gave it a thumb or a heart, or when a receipt of another system accepted or rejected it. The grade of a model does not count."
+          help="A result is checked when a person gave it a thumb or a heart, when a receipt of another system accepted or rejected it, or when the done check of the agent passed. The grade of a model does not count."
         >
           <Verdicts checks={v.checks} />
         </Tile>
         <Tile label="Spend" lead={v.spend.atLeast ? 'at least' : ''} figure={costText(v.spend.usd)}>
           <p class="t-meta">
-            <b class="rs-ink">{costText(v.spend.perDone)}</b> a done piece
+            <b class="rs-ink">{costText(v.spend.perDone)}</b> a done task
           </p>
           <p class="t-meta">
             {costText(v.spend.failedUSD)} on failed work · {costText(v.spend.coordinationUSD)} on coordination
@@ -156,7 +156,7 @@ function Body({ v, onSaved }: { v: Value; onSaved: () => void }) {
             </a>
           )}
         </Tile>
-        <Tile label="Time to done" figure={span(v.lead.medianSeconds)} unit="median" help="From the ask to the first end of a done piece. The time that a job waited in its queue before a worker took it is not in it.">
+        <Tile label="Time to done" figure={span(v.lead.medianSeconds)} unit="median" help="From the ask to the first end of a done task. The time that a job waited in its queue before a worker took it is not in it.">
           <Share share={v.lead.waitShare} />
           <p class="t-meta">
             {span(v.people.waitSeconds)} waiting on people, {pct(v.lead.waitShare)} of all the time to done
@@ -167,11 +167,11 @@ function Body({ v, onSaved }: { v: Value; onSaved: () => void }) {
           figure={v.estimated ? hours(v.estimated.minutes) : 'Not set'}
           unit={v.estimated ? 'est.' : ''}
           muted={!v.estimated}
-          help="The front measures no time that people spend. The owner of an agent sets the minutes that a person takes for one piece of a line, and the page multiplies them by the done pieces that nobody sent back."
+          help="The front measures no time that people spend. The owner of an agent sets the minutes that a person takes for one task of a line, and the page multiplies them by the done tasks that nobody sent back."
         >
           {v.estimated && (
             <p class="t-meta">
-              {v.estimated.pieces} pieces of {v.estimated.lines} {v.estimated.lines === 1 ? 'line' : 'lines'} · {v.work.done - v.estimated.pieces} without an estimate
+              {v.estimated.pieces} tasks of {v.estimated.lines} {v.estimated.lines === 1 ? 'line' : 'lines'} · {v.work.done - v.estimated.pieces} without an estimate
             </p>
           )}
         </Tile>
@@ -214,26 +214,36 @@ function Tile(p: { label: string; figure: string; unit?: string; lead?: string; 
   );
 }
 
+/** The verdicts in the order of the bar: a person accepted, a machine check passed, a person sent back, nobody checked. */
+const PARTS: [keyof ValueChecks, string][] = [
+  ['accepted', 'accepted'],
+  ['checked', 'checked'],
+  ['sentBack', 'sent back'],
+  ['unchecked', 'unchecked'],
+];
+
+/** checkedOf counts the done pieces that somebody or something checked: accepted, checked by a machine, or sent back. */
+export function checkedOf(c: ValueChecks): number {
+  return c.accepted + (c.checked || 0) + c.sentBack;
+}
+
 /** Verdicts is the bar of the done pieces by verdict, with the word and the count of each part. */
 function Verdicts({ checks, compact }: { checks: ValueChecks; compact?: boolean }) {
-  const total = checks.accepted + checks.sentBack + checks.unchecked;
-  const parts: [keyof ValueChecks, string][] = [
-    ['accepted', 'accepted'],
-    ['sentBack', 'sent back'],
-    ['unchecked', 'unchecked'],
-  ];
-  const label = parts.map(([k, w]) => checks[k] + ' ' + w).join(', ');
+  const n = (k: keyof ValueChecks) => checks[k] || 0;
+  const total = PARTS.reduce((t, [k]) => t + n(k), 0);
+  const parts = PARTS;
+  const label = parts.map(([k, w]) => n(k) + ' ' + w).join(', ');
   return (
     <div class={'rs-verdicts' + (compact ? ' compact' : '')}>
       <div class="rs-bar" role="img" aria-label={label}>
-        {total > 0 && parts.map(([k]) => (checks[k] > 0 ? <span class={'rs-seg seg-' + k} style={{ flexGrow: checks[k] }} /> : null))}
+        {total > 0 && parts.map(([k]) => (n(k) > 0 ? <span class={'rs-seg seg-' + k} style={{ flexGrow: n(k) }} /> : null))}
       </div>
       {!compact && (
         <ul class="rs-keys t-meta">
           {parts.map(([k, w]) => (
             <li>
               <span class={'rs-key seg-' + k} aria-hidden="true" />
-              <b class="rs-ink">{checks[k].toLocaleString()}</b> {w}
+              <b class="rs-ink">{n(k).toLocaleString()}</b> {w}
             </li>
           ))}
         </ul>
@@ -258,6 +268,9 @@ function Legend() {
     <ul class="rs-keys t-meta" aria-hidden="true">
       <li>
         <span class="rs-key seg-accepted" /> accepted
+      </li>
+      <li>
+        <span class="rs-key seg-checked" /> checked
       </li>
       <li>
         <span class="rs-key seg-sentBack" /> sent back
@@ -296,13 +309,14 @@ function Chart({ periods, unit }: { periods: ValuePeriod[]; unit: string }) {
           let y = base;
           const segs: [string, number][] = [
             ['accepted', p.accepted],
+            ['checked', p.checked || 0],
             ['sentBack', p.sentBack],
             ['unchecked', p.unchecked],
           ];
           return (
             <g class="rs-col">
               <title>
-                {day(p.start)} to {day(p.end)}: {p.done} done, {p.accepted} accepted, {p.sentBack} sent back, {p.unchecked} unchecked, {p.failed} failed, {costText(p.usd)}
+                {day(p.start)} to {day(p.end)}: {p.done} done, {p.accepted} accepted, {p.checked || 0} checked, {p.sentBack} sent back, {p.unchecked} unchecked, {p.failed} failed, {costText(p.usd)}
               </title>
               <rect class="rs-hit" x={i * 100} y={0} width={100} height={CH.h} />
               {segs.map(([k, c]) => {
@@ -355,10 +369,10 @@ function Lines({ lines, onSaved }: { lines: ValueLine[]; onSaved: () => void }) 
             Spend
           </th>
           <th scope="col" class="num narrow-hide">
-            A piece
+            A task
           </th>
           <th scope="col" class="phone-hide">
-            Minutes a piece
+            Minutes a task
           </th>
         </tr>
       </thead>
@@ -379,7 +393,7 @@ function Lines({ lines, onSaved }: { lines: ValueLine[]; onSaved: () => void }) 
             <td>
               <Verdicts checks={l.checks} compact />
               <span class="t-meta">
-                {l.checks.accepted + l.checks.sentBack} of {l.work.done}
+                {checkedOf(l.checks)} of {l.work.done}
               </span>
             </td>
             <td class="num narrow-hide">{l.work.done ? pct(l.noPerson / l.work.done) : ''}</td>
@@ -458,7 +472,7 @@ function Estimate({ line, owner, onSaved }: { line: ValueLine; owner: boolean; o
         min={0}
         max={2400}
         inputMode="numeric"
-        aria-label={'Minutes a piece of ' + line.name}
+        aria-label={'Minutes a task of ' + line.name}
         value={text}
         invalid={!!err}
         onInput={(x) => setText((x.target as HTMLInputElement).value)}

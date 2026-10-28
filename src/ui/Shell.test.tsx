@@ -60,9 +60,12 @@ describe('Shell', () => {
     expect(current.textContent).toContain('Bridges');
     const labels = () => [...el.querySelectorAll('.place-label')].map((x) => x.textContent);
     // Routines shows once the settings say that the front keeps routines.
-    expect(labels()).toEqual(['Results', 'Activity', 'Chat', 'Bridges', 'Fleet', 'Duties', 'Skills', 'Wiki', 'Manager']);
+    expect(labels()).toEqual(['Activity', 'Chat', 'Bridges', 'Fleet', 'Duties', 'Skills', 'Wiki', 'Manager']);
     act(() => store.dispatch({ type: 'config', config: { manager: null, placement: 'queue', maxMembers: 16, routines: true } }));
-    expect(labels()).toEqual(['Results', 'Activity', 'Chat', 'Bridges', 'Fleet', 'Duties', 'Skills', 'Routines', 'Wiki', 'Manager']);
+    expect(labels()).toEqual(['Activity', 'Chat', 'Bridges', 'Fleet', 'Duties', 'Skills', 'Routines', 'Wiki', 'Manager']);
+    // With work, the bar shows five places, the place of the screen, and More.
+    act(() => store.dispatch({ type: 'config', config: { manager: null, placement: 'queue', maxMembers: 16, routines: true, work: true } }));
+    expect(labels()).toEqual(['Work', 'Results', 'Activity', 'Chat', 'Wiki', 'Bridges', 'More']);
     act(() => store.dispatch({ type: 'config', config: null }));
     // The count of Activity counts what needs you. The page has not read the record of the bridge yet, so its needsYou counts.
     expect(el.querySelector('.place-count .sr')!.textContent).toBe('2 items need you');

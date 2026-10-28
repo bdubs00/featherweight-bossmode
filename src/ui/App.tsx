@@ -27,8 +27,7 @@ import { applyTheme, themeOf } from '../lib/theme';
 import { canonicalPath, columnOf, go, parentOf, parseRoute, placeOf, type Place, type Route } from '../lib/route';
 import { isTyping } from './keys';
 import { clearNotice, clearSaid, currentSaidLink, holdSaid, showError, undoSaid, useNotice, useSaid, useUndo } from './notice';
-import { EmptyPane, Shell, everyPlace, shownOf } from './Shell';
-import { TasksMain } from './Tasks';
+import { EmptyPane, Shell, shownOf } from './Shell';
 import { BridgeList } from './BridgeList';
 import { Channel } from './Channel';
 import { Roster } from './Roster';
@@ -169,8 +168,8 @@ interface Panes {
 /** panesOf names the screen of each pane for a route. */
 function panesOf(r: Route): Panes {
   switch (r.place) {
-    case 'tasks':
-      return { list: null, main: <TasksMain />, details: null };
+    case 'work':
+      return { list: null, main: <Work />, details: null };
     case 'home':
       return { list: <BridgeList current="" />, main: <Home />, details: null };
     case 'new':
@@ -182,7 +181,7 @@ function panesOf(r: Route): Panes {
         details: r.pane === 'run' && r.run ? <RunPane bridge={r.id} runId={r.run} handle={r.handle} /> : <Roster bridge={r.id} current={r.handle} />,
       };
     case 'activity':
-      return { list: <ActivityList item={r.item} board={r.board} />, main: r.board ? <Work /> : <ActivityMain item={r.item} />, details: null };
+      return { list: <ActivityList item={r.item} />, main: <ActivityMain item={r.item} />, details: null };
     case 'fleet':
       return { list: <FleetList current={r.agent} />, main: r.board ? <Board /> : <Fleet agent={r.agent} />, details: r.agent ? <AgentPane agent={r.agent} /> : null };
     case 'member':
@@ -380,6 +379,8 @@ export function App() {
       setAuth({ kind: 'ready' });
       const cfg = await api.config().catch(() => null);
       store.dispatch({ type: 'config', config: cfg });
+      // With work, the page opens on Work. An address that names a place keeps it.
+      if (cfg && cfg.work && (location.hash === '' || location.hash === '#')) go({ place: 'work' }, true);
       await Promise.all([loadBridges(), loadFaces().catch(showError), loadAgents().catch(showError)]);
       startStream(unauthorized);
       // The fleet, its open runs, and the skills fill the statuses of the
@@ -531,9 +532,7 @@ export function App() {
     );
   }
 
-  // With the door, the home of a person who has not asked for every place is Tasks, not Bridges.
-  const shown: Route = route.place === 'home' && config && config.door && !everyPlace() ? { place: 'tasks' } : route;
-  const panes = panesOf(shown);
-  const place = placeIn(shown);
-  return <Shell route={shown} place={place} list={panes.list} main={panes.main} details={panes.details} notice={notice ? <Notice text={notice} /> : said ? <Said text={said} undo={undo} /> : fresh ? <NewBuild /> : null} onSignOut={signOut} />;
+  const panes = panesOf(route);
+  const place = placeIn(route);
+  return <Shell route={route} place={place} list={panes.list} main={panes.main} details={panes.details} notice={notice ? <Notice text={notice} /> : said ? <Said text={said} undo={undo} /> : fresh ? <NewBuild /> : null} onSignOut={signOut} />;
 }

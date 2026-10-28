@@ -22,6 +22,8 @@ export interface ValueCounts {
 
 export interface ValueChecks {
   accepted: number;
+  /** A machine check passed: the done block of the agent ended the run with done: checked. An older front leaves it out. */
+  checked?: number;
   sentBack: number;
   unchecked: number;
 }
@@ -37,6 +39,7 @@ export interface ValuePeriod {
   end: string;
   done: number;
   accepted: number;
+  checked?: number;
   sentBack: number;
   unchecked: number;
   failed: number;

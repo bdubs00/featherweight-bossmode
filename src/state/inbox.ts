@@ -18,7 +18,7 @@ import { seatPresence, type Facts } from '../lib/status';
  * the channel: it needs you, and it is no card, so you answer it in the
  * bridge.
  */
-export type InboxKind = 'decision' | 'question' | 'asked' | 'failed' | 'stopped' | 'limit' | 'message' | 'duty-failed' | 'duty-paused' | 'duty-waits';
+export type InboxKind = 'decision' | 'question' | 'asked' | 'failed' | 'stopped' | 'limit' | 'message' | 'duty-failed' | 'duty-paused' | 'duty-waits' | 'result';
 
 /** The statuses of the inbox, in the order of attention. A seat at its limit did nothing wrong, and it waits for you to continue it. */
 export const INBOX_ORDER = ['needs-you', 'error', 'limit', 'working', 'idle', 'asleep'] as const;
@@ -277,6 +277,11 @@ function itemRows(s: InboxInput, seats: InboxRow[]): InboxRow[] {
       }
       const failed = it.kind === 'failure';
       out.push({ ...where, key: 'u:' + it.kind + '/' + (duty || it.run || it.text || ''), kind: failed ? 'duty-failed' : 'duty-paused', status: failed ? 'error' : 'limit', reason: it.text || '', at: it.since || '' });
+      continue;
+    }
+    // A result to check: its owner asked to check each result. Looks right and Needs work end it.
+    if (it.kind === 'result') {
+      if (it.run) out.push({ ...where, agent: it.agent || undefined, handle: it.agent || undefined, key: 'v:' + it.run, kind: 'result', status: 'needs-you', reason: it.text || '', at: it.since || '' });
       continue;
     }
     // A question of a bridge has its row in the bridge.

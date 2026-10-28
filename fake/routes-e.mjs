@@ -49,6 +49,8 @@
 // another bridge closes, and a playbook of weekly patching. A run that Run now starts carries the
 // metadata workbench.duty.
 
+import { inReview } from './routes-work.mjs';
+
 const MIN = 60_000;
 const DAY = 24 * 60 * MIN;
 const NAME = /^[a-z0-9_-]{1,63}$/;
@@ -505,11 +507,27 @@ export function register({ on, refuse, readJson, now, AGENTS, admin, S, publish 
       when: { schedule: { repeat: 'weekdays', times: ['16:00'], timeZone: 'Europe/Berlin' } },
       do: { ask: { message: 'Draft the release notes of {date} from the changes merged today. The notes of the last run were {last.title}.' } },
       limits: { budget: { maxCostUSD: 0.5, maxTurns: 40 }, perDayUSD: 2, overlap: 'skip', catchUp: '1h', retries: 1 },
+      // alice checks each draft, and hears of each result.
+      review: true,
+      notify: { failure: ['owner'], needsYou: ['owner'], result: ['owner'], resultWhen: 'always' },
       revision: 7,
     },
     // The last start failed and goes again. Its first run failed, so the start names none until the next attempt.
-    [{ at: ago(4), slot: ago(4), run: '', state: 'retrying', costUSD: 0.03, attempt: 1, reason: 'The run failed: the model answered 529 overloaded. It goes again.' }, ...runsOf(24 * 60, 6, (i, at) => ({ at: ago((i + 1) * 24 * 60 + 7), slot: at, run: 'duty-notes-' + i, state: 'completed', costUSD: 0.11 + i / 100 }))],
+    // The draft of yesterday waits for alice to check it. She accepted the drafts before it, and sent one back.
+    [
+      { at: ago(4), slot: ago(4), run: '', state: 'retrying', costUSD: 0.03, attempt: 1, reason: 'The run failed: the model answered 529 overloaded. It goes again.' },
+      ...runsOf(24 * 60, 6, (i, at) => ({ at: ago((i + 1) * 24 * 60 + 7), slot: at, run: 'duty-notes-' + i, state: 'completed', costUSD: 0.11 + i / 100, ...(i > 0 ? { verdict: i === 2 ? 'sent-back' : 'accepted' } : {}) })),
+    ],
   );
+  S.runs.set('duty-notes-0', {
+    id: 'duty-notes-0', agent: 'scribe', title: 'Release notes of yesterday', state: 'completed', seq: 6, origin: 'duty', principal: 'duty:daily-release-notes',
+    input: 'Draft the release notes of yesterday from the changes merged today.',
+    output: '## For people who run the fleet\n\n- A pool keeps its workers when only its packages change.\n- The wiki restores a removed page.\n\n## Changes that need an action\n\n- Set `workbench.bossmode.chat.agent` again after the upgrade.',
+    metadata: { 'workbench.duty': 'daily-release-notes', 'workbench.review': '1', 'fw.title': 'Release notes of yesterday' },
+    createdAt: ago(24 * 60 + 7), updatedAt: ago(24 * 60), member: 'default/crew-1', usage: { turns: 4, costUSD: 0.11 },
+  });
+  S.transcripts.set('duty-notes-0', [{ seq: 1, time: ago(24 * 60 + 7), kind: 'user', text: 'Draft the release notes of yesterday from the changes merged today.', who: 'duty:daily-release-notes' }]);
+  S.results.set('duty-notes-0', { runId: 'duty-notes-0', title: 'Release notes of yesterday', agent: 'scribe', status: 'ready', started: ago(24 * 60 + 7), changed: ago(24 * 60), next: [] });
   add(
     {
       name: 'nightly-restore-test',
@@ -519,7 +537,8 @@ export function register({ on, refuse, readJson, now, AGENTS, admin, S, publish 
       limits: { budget: { maxCostUSD: 1 }, overlap: 'skip', catchUp: '6h' },
       whileAway: { decider: 'nobody', timeout: '4h', then: 'cancel' },
     },
-    [{ at: ago(300), slot: ago(300), run: 'duty-restore-0', state: 'input-required', costUSD: 0.07 }, ...runsOf(24 * 60, 4, (i, at) => ({ at: ago((i + 1) * 24 * 60 + 300), slot: at, run: 'duty-restore-' + (i + 1), state: 'completed', costUSD: 0.21 }))],
+    // Each restore that ended passed the done check of the agent: the restored database answers. So each one is checked.
+    [{ at: ago(300), slot: ago(300), run: 'duty-restore-0', state: 'input-required', costUSD: 0.07 }, ...runsOf(24 * 60, 4, (i, at) => ({ at: ago((i + 1) * 24 * 60 + 300), slot: at, run: 'duty-restore-' + (i + 1), state: 'completed', costUSD: 0.21, verdict: 'checked' }))],
   );
   add(
     {
@@ -1020,6 +1039,12 @@ export function register({ on, refuse, readJson, now, AGENTS, admin, S, publish 
       else if (last && last.state === 'failed') items.push({ kind: 'failure', run: last.run || '', approval: '', duty: d.name, agent: d.agent, bridge: '', text: last.reason || 'The run failed.', since: last.at });
       const run = last && last.run ? S.runs.get(last.run) : null;
       if (run && run.state === 'input-required' && run.pending) items.push({ kind: run.pending.schema ? 'question' : 'approval', run: run.id, approval: run.pending.id, duty: d.name, agent: d.agent, bridge: '', text: d.agent + ' waits for your answer.', since: last.at });
+    }
+    // A result to check: a run whose owner asked to check each result, until a person reacts.
+    for (const r of S.runs.values()) {
+      if (!inReview(r)) continue;
+      const duty = (r.metadata || {})['workbench.duty'] || '';
+      items.push({ kind: 'result', run: r.id, approval: '', duty, agent: r.agent, bridge: '', text: (r.title || 'A result') + ' is ready to check.', since: r.updatedAt });
     }
     return { items };
   });

@@ -23,21 +23,23 @@ const card = (id: string, stage: WorkCard['stage'], extra: Partial<WorkCard> = {
 });
 
 const BOARD: WorkBoard = {
-  sentence: '3 pieces of work are open.',
+  sentence: '3 tasks are open.',
   days: 7,
   lanes: [
     { stage: 'waiting', count: 0, yours: 0 },
     { stage: 'working', count: 1, yours: 0, oldest: at(3) },
     { stage: 'needs-you', count: 1, yours: 1, oldest: at(2) },
     { stage: 'stopped', count: 1, yours: 1, oldest: at(1) },
-    { stage: 'review', count: 0, yours: 0 },
-    { stage: 'done', count: 1, yours: 0, oldest: at(4) },
+    { stage: 'review', count: 1, yours: 1, oldest: at(3) },
+    { stage: 'done', count: 2, yours: 0, oldest: at(4) },
   ],
   cards: [
     card('w', 'working', { next: 'agent' }),
     card('b', 'needs-you', { kind: 'bridge', next: 'you', reason: 'scribe asks: Who reads it?', links: { bridge: 'br-1', run: 'run-x', approval: '' }, parts: { needsYou: 1, review: 1, total: 2 } }),
     card('l', 'stopped', { next: 'you', lost: true, reason: 'Its worker was replaced before it ended, so it cannot go on.' }),
-    card('d', 'done', { kind: 'duty', from: { kind: 'duty', name: 'nightly', via: 'schedule' }, links: { duty: 'nightly', run: 'run-d' } }),
+    card('d', 'done', { kind: 'duty', from: { kind: 'duty', name: 'nightly', via: 'schedule' }, links: { duty: 'nightly', run: 'run-d' }, verdict: 'checked' }),
+    card('a', 'done', { verdict: 'sent-back' }),
+    card('r', 'review', { kind: 'duty', next: 'you', from: { kind: 'duty', name: 'notes', via: 'schedule' }, links: { duty: 'notes', run: 'run-r' } }),
   ],
 };
 
@@ -45,7 +47,10 @@ let calls: Call[] = [];
 let restore = () => {};
 
 beforeEach(() => {
-  const f = fakeFetch([['GET', /^\/v1\/work/, () => BOARD]]);
+  const f = fakeFetch([
+    ['GET', /^\/v1\/work/, () => BOARD],
+    ['POST', /^\/v1\/runs\/run-r\/reactions$/, () => ({ id: 'run-r', state: 'completed' })],
+  ]);
   calls = f.calls;
   restore = f.restore;
 });
@@ -64,16 +69,21 @@ describe('the board of the work', () => {
     const el = mount(<Work />);
     await settle();
     const heads = [...el.querySelectorAll('.work-lane-head h3')].map((h) => h.textContent);
-    expect(heads).toEqual(['Waiting', 'Working', 'Needs you', 'Stopped', 'To review', 'Done']);
+    expect(heads).toEqual(['Coming up', 'Working', 'Needs you', 'Stopped', 'To check', 'Done']);
     const lane = (stage: string) => el.querySelector('.lane-' + stage) as HTMLElement;
     expect(lane('needs-you').querySelectorAll('.work-card').length).toBe(1);
     expect(lane('needs-you').querySelector('.work-card')!.classList.contains('need')).toBe(true);
     expect(lane('needs-you').textContent).toContain('Yours');
-    expect(lane('needs-you').textContent).toContain('2 seats');
+    expect(lane('needs-you').textContent).toContain('2 agents');
     expect(lane('stopped').textContent).toContain('Lost');
     expect(lane('working').textContent).not.toContain('Yours');
+    // A done card says its verdict.
+    expect(lane('done').textContent).toContain('checked');
+    expect(lane('done').textContent).toContain('sent back');
     // The header counts the open cards, not the done ones.
-    expect(el.querySelector('.pane-head .chip [aria-hidden]')!.textContent).toBe('3');
+    expect(el.querySelector('.pane-head .chip [aria-hidden]')!.textContent).toBe('4');
+    // The door sits above the board.
+    expect(el.querySelector('#door-words')).not.toBeNull();
     expect(calls[0].path).toBe('/v1/work');
   });
 
@@ -89,17 +99,35 @@ describe('the board of the work', () => {
 
   it('opens the place of a card', () => {
     expect(hrefOfCard(BOARD.cards[1])).toBe('#bridge/br-1');
-    expect(hrefOfCard(BOARD.cards[3])).toBe('#duties/nightly');
+    expect(hrefOfCard(BOARD.cards[3])).toBe('#duties/nightly/run/run-d');
     expect(hrefOfCard(BOARD.cards[0])).toBe('#chat/run-w');
     expect(hrefOfCard(card('q', 'needs-you'))).toBe('#activity');
     expect(fromWords(card('m', 'working', { from: { kind: 'person', name: 'alice', via: 'manager' } }))).toBe('Manager for alice');
   });
 
-  it('lives at #work, a view of Activity', () => {
+  it('checks a result with Looks right, and asks for a note before Needs work sends it back', async () => {
+    const el = mount(<Work />);
+    await settle();
+    const lane = el.querySelector('.lane-review') as HTMLElement;
+    const key = (t: string) => [...lane.querySelectorAll('button')].find((b) => b.textContent === t)!;
+    await act(async () => key('Needs work').click());
+    await act(async () => key('Send back').click());
+    expect(lane.textContent).toContain('Say what must change.');
+    expect(calls.some((c) => c.method === 'POST')).toBe(false);
+    await act(async () => key('Cancel').click());
+    await act(async () => key('Looks right').click());
+    await settle();
+    const post = calls.find((c) => c.method === 'POST')!;
+    expect(post.path).toBe('/v1/runs/run-r/reactions');
+    expect(post.body).toEqual({ seq: 0, reaction: 'up' });
+  });
+
+  it('lives at #work, a place of its own, and #tasks opens it too', () => {
     const r = parseRoute('#work');
-    expect(r).toEqual({ place: 'activity', board: true });
+    expect(r).toEqual({ place: 'work' });
+    expect(parseRoute('#tasks')).toEqual({ place: 'work' });
     expect(hrefOf(r)).toBe('#work');
     expect(columnOf(r)).toBe('main');
-    expect(parentOf(r)).toEqual({ place: 'activity' });
+    expect(parentOf(r)).toEqual({ place: 'home' });
   });
 });

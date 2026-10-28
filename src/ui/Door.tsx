@@ -1,30 +1,27 @@
-// The Tasks place: one door for what a person needs done, and the board of
-// the tasks of the person. The person says the task in words, or starts
-// from a template in words. Read it back asks the server for a plan, and
-// the page shows it before anything starts: who does it, when, what it can
-// cost, what it asks you, what it never bothers you with, when you hear of
-// it, and where the result lands. The plan never names a cost, so Start
-// refuses until the person types the most that a run can cost.
+// The door of the Work place: one field for what a person needs done. The
+// person says the task in words, or starts from a template in words. Read
+// it back asks the server for a plan (POST /v1/work/plan), and the page
+// shows it before anything starts: who does it, when, what it can cost,
+// what it asks you, what it never bothers you with, when you hear of it,
+// where the result lands, and what it cannot do. The plan never names a
+// cost, so Start refuses until the person types the most that a run can
+// cost.
 //
 // Start sends the record of the plan to a route that exists already: a
 // duty for a task that repeats, a bridge for a team, and a run for a task
 // that runs once. The person never picks among duty, bridge, run, or chat.
-// The board shows the same tasks in four columns, as a kanban board does:
-// Needs you, Working, Coming up, and Done. A card opens the place that
-// holds the work.
+// The board under the door (Work.tsx) then shows the new task.
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
 import { ApiError } from '../api/client';
-import type { TaskCard, TaskPlan, TaskTell } from '../api/types';
+import type { TaskPlan, TaskTell } from '../api/types';
 import { hrefOf } from '../lib/route';
-import { nextShort, nextWords } from '../lib/duties';
-import { since } from '../lib/words';
-import type { Tone } from '../lib/presence';
+import { nextWords } from '../lib/duties';
 import { loadDuties } from '../state/duties';
 import { loadBridges } from '../state/actions';
 import { showError, showSaid } from './notice';
-import { Button, Card, Chip, Choices, Field, Input, Led, LineLed, Mark, PaneHeader, TextArea } from './primitives';
+import { Button, Card, Choices, Field, Input, LineLed, Mark, TextArea } from './primitives';
 
 /** A template: a label that names the work, and words that the person changes before Read it back. */
 export interface TaskTemplate {
@@ -48,22 +45,6 @@ const TELLS: { id: TaskTell; label: string }[] = [
   { id: 'found', label: 'Only when it finds something' },
   { id: 'failures', label: 'Only when it fails' },
 ];
-
-/** The columns of the board, in the order of attention. */
-export const COLUMNS: { id: TaskCard['column']; label: string; empty: string }[] = [
-  { id: 'needs', label: 'Needs you', empty: 'Nothing waits for you.' },
-  { id: 'working', label: 'Working', empty: 'Nothing works now.' },
-  { id: 'next', label: 'Coming up', empty: 'Nothing is planned.' },
-  { id: 'done', label: 'Done', empty: 'Nothing done this week.' },
-];
-
-/** toneOf is the light of a status word of the board. */
-export function toneOf(status: string): Tone {
-  if (status === 'needs you') return 'amber';
-  if (status === 'failed') return 'red';
-  if (status === 'working') return 'green';
-  return 'grey';
-}
 
 /** costOf reads the cost that the person typed: a positive number of dollars, or null. */
 export function costOf(text: string): number | null {
@@ -291,57 +272,8 @@ function Readback({ plan, onPlan, onStarted, busy }: { plan: TaskPlan; onPlan: (
   );
 }
 
-/** Board is the kanban board of the tasks of the person: four columns in the order of attention. */
-export function Board({ cards }: { cards: TaskCard[] | null }) {
-  return (
-    <section class="board" aria-labelledby="board-title">
-      <h2 class="t-heading" id="board-title">
-        Your tasks
-      </h2>
-      <div class="board-cols">
-        {COLUMNS.map((col) => {
-          const mine = (cards || []).filter((c) => c.column === col.id);
-          return (
-            <section class={'board-col board-' + col.id} aria-labelledby={'col-' + col.id}>
-              <h3 class="t-sub board-head" id={'col-' + col.id}>
-                {col.label}
-                <Chip tone={col.id === 'needs' && mine.length ? 'amber' : 'plain'} label={mine.length + (mine.length === 1 ? ' task' : ' tasks')}>
-                  {mine.length}
-                </Chip>
-              </h3>
-              {cards === null ? (
-                <p class="t-meta board-empty">Loading.</p>
-              ) : mine.length === 0 ? (
-                <p class="t-meta board-empty">{col.empty}</p>
-              ) : (
-                <ul class="board-cards">
-                  {mine.slice(0, 8).map((c) => (
-                    <li>
-                      <a class={'task-card' + (c.column === 'needs' ? ' need' : '')} href={c.open}>
-                        <Mark agent={c.agents[0] || 'chat'} size={20} />
-                        <span class="task-main">
-                          <span class="task-title">{c.title}</span>
-                          <span class="task-meta">
-                            <Led tone={toneOf(c.status)} word={c.status} still={c.column !== 'needs'} />
-                            <span title={new Date(c.at).toLocaleString()}>{c.column === 'next' ? nextShort(c.at) : since(c.at)}</span>
-                          </span>
-                        </span>
-                      </a>
-                    </li>
-                  ))}
-                  {mine.length > 8 && <li class="t-meta board-more">{mine.length - 8} more</li>}
-                </ul>
-              )}
-            </section>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
-/** TasksMain is the main pane of the Tasks place: the door, the readback or the templates, and the board. */
-export function TasksMain() {
+/** Door is the top of the Work place: the field, the templates or the readback, and what Start made. onStarted tells the board to read again. */
+export function Door({ onStarted }: { onStarted?: () => void }) {
   const [words, setWords] = useState('');
   const [plan, setPlan] = useState<TaskPlan | null>(null);
   // The words that the plan reads back, as the person sent them.
@@ -349,21 +281,7 @@ export function TasksMain() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [started, setStarted] = useState<Started | null>(null);
-  const [cards, setCards] = useState<TaskCard[] | null>(null);
   const box = useRef<HTMLTextAreaElement>(null);
-  const loadBoard = () =>
-    api
-      .tasks()
-      .then(setCards)
-      .catch((e) => {
-        setCards([]);
-        showError(e);
-      });
-  useEffect(() => {
-    loadBoard();
-    const t = setInterval(loadBoard, 60_000);
-    return () => clearInterval(t);
-  }, []);
   const read = async (agent?: string, tell?: TaskTell) => {
     const w = words.trim();
     if (!w) {
@@ -386,96 +304,92 @@ export function TasksMain() {
   };
   const stale = !!plan && asked !== words.trim();
   return (
-    <section class="screen tasks" aria-labelledby="tasks-title">
-      <PaneHeader id="tasks-title" title="Tasks" size="title" level={1} focusable />
-      <div class="scroll pad tasks-body">
-        <form
-          class="door"
-          onSubmit={(e) => {
-            e.preventDefault();
-            read();
+    <div class="door-top">
+      <form
+        class="door"
+        onSubmit={(e) => {
+          e.preventDefault();
+          read();
+        }}
+      >
+        <label class="t-heading door-ask" for="door-words">
+          What do you need done?
+        </label>
+        <TextArea
+          id="door-words"
+          ref={box}
+          rows={3}
+          value={words}
+          invalid={!!error}
+          placeholder="Every Monday at 9am, sum up what our competitors shipped last week."
+          onInput={(e) => {
+            setWords((e.target as HTMLTextAreaElement).value);
+            setError('');
           }}
-        >
-          <label class="t-heading door-ask" for="door-words">
-            What do you need done?
-          </label>
-          <TextArea
-            id="door-words"
-            ref={box}
-            rows={3}
-            value={words}
-            invalid={!!error}
-            placeholder="Every Monday at 9am, sum up what our competitors shipped last week."
-            onInput={(e) => {
-              setWords((e.target as HTMLTextAreaElement).value);
-              setError('');
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                e.preventDefault();
-                read();
-              }
-            }}
-          />
-          {error && (
-            <p class="field-error" role="alert">
-              {error}
-            </p>
-          )}
-          <div class="door-keys">
-            <Button type="submit" kind={plan && !stale ? 'secondary' : 'primary'} aria-disabled={busy || undefined}>
-              {plan && stale ? 'Read it back again' : 'Read it back'}
-            </Button>
-          </div>
-        </form>
-        {plan && !stale ? (
-          <Readback
-            plan={plan}
-            busy={busy}
-            onPlan={(agent, tell) => read(agent, tell)}
-            onStarted={(s) => {
-              setStarted(s);
-              setPlan(null);
-              setWords('');
-              showSaid(s.said, { href: s.href, label: 'Open it' });
-              loadBoard();
-            }}
-          />
-        ) : (
-          !plan && (
-            <section class="door-templates" aria-labelledby="templates-title">
-              <h2 class="t-sub" id="templates-title">
-                Or start from
-              </h2>
-              <div class="door-picks">
-                {TEMPLATES.map((t) => (
-                  <Button
-                    kind="secondary"
-                    size="s"
-                    onClick={() => {
-                      setWords(t.words);
-                      setPlan(null);
-                      setError('');
-                      if (box.current) box.current.focus();
-                    }}
-                  >
-                    {t.label}
-                  </Button>
-                ))}
-              </div>
-            </section>
-          )
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+              e.preventDefault();
+              read();
+            }
+          }}
+        />
+        {error && (
+          <p class="field-error" role="alert">
+            {error}
+          </p>
         )}
-        {started && (
-          <Card quiet title={started.title} class="readback-done">
-            <p>{started.said}</p>
-            <p>
-              <a href={started.href}>Open it</a>
-            </p>
-          </Card>
-        )}
-        <Board cards={cards} />
-      </div>
-    </section>
+        <div class="door-keys">
+          <Button type="submit" kind={plan && !stale ? 'secondary' : 'primary'} aria-disabled={busy || undefined}>
+            {plan && stale ? 'Read it back again' : 'Read it back'}
+          </Button>
+        </div>
+      </form>
+      {plan && !stale ? (
+        <Readback
+          plan={plan}
+          busy={busy}
+          onPlan={(agent, tell) => read(agent, tell)}
+          onStarted={(s) => {
+            setStarted(s);
+            setPlan(null);
+            setWords('');
+            showSaid(s.said, { href: s.href, label: 'Open it' });
+            if (onStarted) onStarted();
+          }}
+        />
+      ) : (
+        !plan && (
+          <section class="door-templates" aria-labelledby="templates-title">
+            <h2 class="t-sub" id="templates-title">
+              Or start from
+            </h2>
+            <div class="door-picks">
+              {TEMPLATES.map((t) => (
+                <Button
+                  kind="secondary"
+                  size="s"
+                  onClick={() => {
+                    setWords(t.words);
+                    setPlan(null);
+                    setError('');
+                    if (box.current) box.current.focus();
+                  }}
+                >
+                  {t.label}
+                </Button>
+              ))}
+            </div>
+          </section>
+        )
+      )}
+      {started && (
+        <Card quiet title={started.title} class="readback-done">
+          <p>{started.said}</p>
+          <p>
+            <a href={started.href}>Open it</a>
+          </p>
+        </Card>
+      )}
+    </div>
   );
 }

@@ -1,14 +1,12 @@
-// The fake routes of the Tasks place: the door that reads back what a
-// person needs done before anything starts, and the board of the tasks of
-// the person.
+// The fake route of the door of the Work place: it reads back what a
+// person needs done before anything starts. The board under the door is
+// GET /v1/work (routes-work.mjs).
 //
-//   POST /v1/tasks/plan   {"words", "agent"?, "tell"?}: the plan in words, and in start the
+//   POST /v1/work/plan    {"words", "agent"?, "tell"?}: the plan in words, and in start the
 //                         record that Start sends to a route that exists already:
 //                         PUT /v1/duties/{name}, POST /v1/bridges, or POST /v1/runs?member=.
 //                         The plan never names a cost. The page refuses Start until the
 //                         person types the most that a run can cost.
-//   GET  /v1/tasks        {"tasks": [<card>]}: the board, each card in one column of
-//                         needs, working, next, or done.
 //
 // The fake reads the words with rules, not with a model, so the same words
 // always give the same plan. A schedule comes from the grammar of the
@@ -18,8 +16,6 @@
 // start.
 
 import { parseSay, readbackOf, nextOf, zoneOk } from './routes-e.mjs';
-
-const DAY = 24 * 60 * 60_000;
 
 /** The topics that name an agent, in the order of the test. */
 const TOPICS = [
@@ -149,7 +145,7 @@ export function register({ on, refuse, readJson, S, FLEET, port }) {
     return { lo: Math.min(...all), hi: Math.max(...all), n: 12 + seen.length };
   };
 
-  on('POST', '/v1/tasks/plan', async (c) => {
+  on('POST', '/v1/work/plan', async (c) => {
     const body = await readJson(c.req);
     for (const k of Object.keys(body)) if (!['words', 'agent', 'tell'].includes(k)) refuse(400, `json: unknown field "${k}"`);
     const words = String(body.words || '').replace(/\s+/g, ' ').trim();
@@ -212,7 +208,9 @@ export function register({ on, refuse, readJson, S, FLEET, port }) {
     // What it asks you, what it never bothers you with, and when you hear of it.
     const asks = [];
     for (const x of who) for (const a of ASKS[x.agent] || []) if (!asks.includes(a)) asks.push(a);
-    if (SIGNOFF.test(w)) asks.push('Before it goes out: you read the final text and say it is ready');
+    // Words that ask to see the work make each result wait for Looks right or Needs work.
+    const check = SIGNOFF.test(w);
+    if (check) asks.push(kind === 'repeat' ? 'After each run: you check the result, Looks right or Needs work' : 'Before it goes out: you read the final text and say it is ready');
     asks.push('When it is not sure what you mean. The question waits for you');
     const quiet = ['While it works'];
     if (kind === 'team') quiet.push('While the agents pass the work between them');
@@ -246,6 +244,7 @@ export function register({ on, refuse, readJson, S, FLEET, port }) {
           do: { ask: { message } },
           limits: { budget: {}, overlap: 'skip', catchUp: '6h' },
           whileAway: { decider: 'nobody', timeout: '24h', then: 'deny' },
+          ...(check ? { review: true } : {}),
           notify: { failure: ['owner'], needsYou: ['owner'], result: tell === 'failures' ? [] : ['owner'], resultWhen: tell === 'found' ? 'found' : 'always' },
         },
       };
@@ -253,7 +252,7 @@ export function register({ on, refuse, readJson, S, FLEET, port }) {
     } else if (kind === 'team') {
       start = { bridge: { title, goal: words, placement: 'queue', members: seats, caps: { maxTurns: 400 }, delegation: { report: true } } };
     } else {
-      start = { run: { member: agent === 'chat' ? 'default/manager-0' : memberOf(agent), body: { agent, input: words, title, metadata: agent === 'chat' ? { 'fw.view': 'quickchat' } : { 'fw.view': 'task' } } } };
+      start = { run: { member: agent === 'chat' ? 'default/manager-0' : memberOf(agent), body: { agent, input: words, title, metadata: { 'fw.view': agent === 'chat' ? 'quickchat' : 'task', ...(check ? { 'workbench.review': '1' } : {}) } } } };
     }
     return {
       words, kind, title, who,
@@ -261,42 +260,5 @@ export function register({ on, refuse, readJson, S, FLEET, port }) {
       when: when ? { said: when.said, readback: readbackOf(when.schedule), next: nextOf(when.schedule, 3) } : { readback: 'Now, once.', next: [] },
       cost, asks, quiet, tell, result, gaps, problems, start, open,
     };
-  });
-
-  on('GET', '/v1/tasks', async (c) => {
-    const [duties, inbox, bridges] = await Promise.all([inner(c, '/v1/duties'), inner(c, '/v1/inbox'), inner(c, '/v1/bridges')]);
-    const me = c.person.subject;
-    const cards = [];
-    for (const it of (inbox && inbox.items) || []) {
-      const decide = it.kind === 'approval' || it.kind === 'question';
-      cards.push({ id: 'i:' + it.kind + ':' + (it.duty || it.run), kind: 'item', column: 'needs', title: it.text, agents: [it.agent], status: it.kind === 'paused' ? 'paused' : it.kind === 'failure' ? 'failed' : 'needs you', at: it.since, open: decide || !it.duty ? '#activity' : '#duties/' + encodeURIComponent(it.duty), detail: it.duty || '' });
-    }
-    for (const b of (bridges && bridges.bridges) || []) {
-      const full = S.bridges.get(b.id);
-      const agents = full ? [...new Set(full.members.filter((m) => !m.fired).map((m) => m.agent))] : [];
-      if (b.state === 'open') cards.push({ id: 'b:' + b.id, kind: 'bridge', column: b.needsYou ? 'needs' : 'working', title: b.title, agents, status: b.needsYou ? 'needs you' : 'working', at: b.lastAt || b.createdAt, open: '#bridge/' + encodeURIComponent(b.id), detail: b.memberCount + ' agents' });
-      else if (Date.now() - Date.parse(b.closedAt || b.createdAt) < 7 * DAY) cards.push({ id: 'b:' + b.id, kind: 'bridge', column: 'done', title: b.title, agents, status: 'done', at: b.closedAt || b.createdAt, open: '#bridge/' + encodeURIComponent(b.id) });
-    }
-    const named = new Set(cards.map((x) => x.id));
-    for (const d of (duties && duties.duties) || []) {
-      const last = d.state && d.state.lastRun;
-      if (!d.paused && d.next && d.next.length) cards.push({ id: 'd:' + d.name, kind: 'duty', column: 'next', title: d.title || d.name, agents: [d.agent], status: 'scheduled', at: d.next[0], open: '#duties/' + encodeURIComponent(d.name), detail: d.readback });
-      if (last && last.state === 'completed' && Date.now() - Date.parse(last.at) < 7 * DAY && !named.has('i:failure:' + d.name)) {
-        cards.push({ id: 'r:' + d.name + ':' + last.at, kind: 'duty', column: 'done', title: last.title || d.title || d.name, agents: [d.agent], status: 'done', at: last.at, open: last.run ? '#duties/' + encodeURIComponent(d.name) + '/run/' + encodeURIComponent(last.run) : '#duties/' + encodeURIComponent(d.name), cost: last.costUSD });
-      }
-      if (last && ['running', 'queued'].includes(last.state)) cards.push({ id: 'w:' + d.name, kind: 'duty', column: 'working', title: d.title || d.name, agents: [d.agent], status: 'working', at: last.at, open: '#duties/' + encodeURIComponent(d.name) });
-    }
-    for (const r of S.runs.values()) {
-      if (r.principal !== me || (r.metadata && r.metadata['workbench.duty'])) continue;
-      const view = r.metadata && r.metadata['fw.view'];
-      if (view !== 'task' && view !== 'quickchat') continue;
-      const open = view === 'quickchat' ? '#chat/' + encodeURIComponent(r.id) : '#fleet/' + encodeURIComponent(r.agent);
-      if (['queued', 'running'].includes(r.state)) cards.push({ id: 'run:' + r.id, kind: 'run', column: 'working', title: r.title, agents: [r.agent], status: 'working', at: r.updatedAt, open });
-      else if (r.state === 'input-required') cards.push({ id: 'run:' + r.id, kind: 'run', column: 'needs', title: r.title, agents: [r.agent], status: 'needs you', at: r.updatedAt, open });
-      else if (Date.now() - Date.parse(r.updatedAt) < 7 * DAY) cards.push({ id: 'run:' + r.id, kind: 'run', column: 'done', title: r.title, agents: [r.agent], status: r.state === 'failed' ? 'failed' : 'done', at: r.updatedAt, open, cost: r.usage && r.usage.costUSD });
-    }
-    // Newest first in every column, and the next start first in Coming up.
-    cards.sort((a, b) => (a.column === 'next' ? Date.parse(a.at) - Date.parse(b.at) : Date.parse(b.at) - Date.parse(a.at)));
-    return { tasks: cards };
   });
 }

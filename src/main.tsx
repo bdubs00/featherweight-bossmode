@@ -17,7 +17,7 @@ import './styles/routines.css';
 import './styles/duties.css';
 import './styles/results.css';
 import './styles/work.css';
-import './styles/tasks.css';
+import './styles/door.css';
 
 applyChoice(readChoice());
 render(<App />, document.getElementById('app')!);

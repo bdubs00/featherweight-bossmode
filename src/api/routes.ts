@@ -57,7 +57,6 @@ import type {
   Today,
   Tool,
   Transcript,
-  TaskCard,
   TaskPlan,
   TaskTell,
   Whoami,
@@ -338,9 +337,7 @@ export const api = {
 
   /** planTask reads the words of a person back as a plan, before anything starts. agent and tell change the plan. */
   planTask: (words: string, agent?: string, tell?: TaskTell) =>
-    dutyCall<TaskPlan>('/v1/tasks/plan', { method: 'POST', body: { words, ...(agent ? { agent } : {}), ...(tell ? { tell } : {}) } }),
-  /** tasks reads the board of the person: what needs you, what works, what comes next, and what is done. */
-  tasks: () => call<{ tasks: TaskCard[] }>('/v1/tasks').then((r) => (r && r.tasks) || []),
+    dutyCall<TaskPlan>('/v1/work/plan', { method: 'POST', body: { words, ...(agent ? { agent } : {}), ...(tell ? { tell } : {}) } }),
   /** inbox lists what needs the person: approvals, questions, failures, and paused duties. */
   inbox: () => call<{ items: InboxItem[] }>('/v1/inbox').then((r) => (r && r.items) || []),
   /** work reads the board of the work: one card per piece of work, from the request to its end. */

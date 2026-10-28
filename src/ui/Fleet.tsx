@@ -327,7 +327,7 @@ export function FleetList({ current, member }: { current?: string; member?: stri
         countLabel={count === 1 ? '1 member' : count + ' members'}
         actions={
           <>
-            <IconButton icon="board" label="Board" aria-pressed={board} onClick={() => go(board ? { place: 'fleet' } : { place: 'fleet', board: true })} />
+            <IconButton icon="board" label="Lights" aria-pressed={board} onClick={() => go(board ? { place: 'fleet' } : { place: 'fleet', board: true })} />
             <Button href="#new-agent" size="s" icon="plus" class="key-icon" aria-label="New agent" title="New agent" />
           </>
         }

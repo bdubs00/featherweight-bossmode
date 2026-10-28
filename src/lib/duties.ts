@@ -8,7 +8,7 @@
 import type { CheckFirst, CheckFound, CheckWhere, Day, Duty, DutyDecided, DutyDo, DutyEvent, DutyProblem, DutyRecord, DutyRun, DutySecret, Repeat, Schedule, Tool } from '../api/types';
 import type { Light } from './presence';
 import { costText } from './cost';
-import { personName, plainText } from './words';
+import { list, personName, plainText } from './words';
 import type { DutySeed } from './route';
 import { globMatch } from './glob';
 
@@ -775,6 +775,9 @@ export function limitWords(l: DutyRecord['limits'] | undefined, schedule = true,
   return out;
 }
 
+/** REVIEW_LINE says that each result of a duty waits for its owner to check it. */
+export const REVIEW_LINE = 'Each result waits for you to check it: Looks right or Needs work.';
+
 /** awayWords reads back who decides while the person is away. */
 export function awayWords(w: DutyRecord['whileAway'] | undefined): string {
   const a = w || { decider: 'manager', timeout: '2h', then: 'deny' };
@@ -803,7 +806,9 @@ export function channelWords(label: string): string {
 export function tellWords(n: DutyRecord['notify'] | undefined, labelOf: (name: string) => string = (x) => x): string {
   const fail = !!(n && n.failure && n.failure.includes('owner'));
   const ask = !!(n && n.needsYou && n.needsYou.includes('owner'));
-  const own = fail && ask ? 'Failures and questions.' : fail ? 'Failures.' : ask ? 'Questions.' : 'Nothing.';
+  const result = !!(n && n.result && n.result.includes('owner'));
+  const parts = [fail ? 'failures' : '', ask ? 'questions' : '', result ? (n && n.resultWhen === 'found' ? 'each result that found something' : 'each result') : ''].filter(Boolean);
+  const own = parts.length ? list(parts).replace(/^./, (c) => c.toUpperCase()) + '.' : 'Nothing.';
   const fails = channelsIn(n && n.failure);
   const asks = channelsIn(n && n.needsYou);
   const more = [...new Set([...fails, ...asks])].map((c) => {
@@ -996,6 +1001,11 @@ export interface DutyForm {
   then: 'deny' | 'cancel';
   failures: boolean;
   questions: boolean;
+  /** You hear of each result, or only of a result that found something. */
+  results: boolean;
+  found: boolean;
+  /** Each result waits for you to check it. */
+  review: boolean;
   /** The shared channels of the operator that hear of a failure and of a question, by name. */
   channelFailures: string[];
   channelQuestions: string[];
@@ -1036,6 +1046,9 @@ export function emptyForm(zone: string): DutyForm {
     then: 'deny',
     failures: true,
     questions: true,
+    results: false,
+    found: false,
+    review: false,
     channelFailures: [],
     channelQuestions: [],
   };
@@ -1149,6 +1162,9 @@ export function formOf(d: Duty, zone: string): DutyForm {
     then: w && w.then === 'cancel' ? 'cancel' : 'deny',
     failures: !d.notify || !d.notify.failure ? true : d.notify.failure.includes('owner'),
     questions: !d.notify || !d.notify.needsYou ? true : d.notify.needsYou.includes('owner'),
+    results: !!(d.notify && d.notify.result && d.notify.result.includes('owner')),
+    found: !!(d.notify && d.notify.resultWhen === 'found'),
+    review: !!d.review,
     channelFailures: channelsIn(d.notify && d.notify.failure),
     channelQuestions: channelsIn(d.notify && d.notify.needsYou),
   };
@@ -1357,6 +1373,13 @@ export function recordOf(f: DutyForm, base: Duty | null, name: string): DutyReco
       needsYou: keepOthers(b && b.notify ? b.notify.needsYou : undefined, f.questions, f.channelQuestions),
     },
   };
+  // The results and the check of each result. A record without them leaves them out, as an older front writes it.
+  const result = keepOthers(b && b.notify ? b.notify.result : undefined, f.results, channelsIn(b && b.notify ? b.notify.result : undefined));
+  if (result.length || (b && b.notify && b.notify.result)) {
+    r.notify!.result = result;
+    r.notify!.resultWhen = f.found ? 'found' : 'always';
+  }
+  if (f.review || (b && b.review !== undefined)) r.review = f.review;
   if (b && b.pool) r.pool = b.pool;
   const check = checkOf(f.check);
   if (check) r.checkFirst = check;

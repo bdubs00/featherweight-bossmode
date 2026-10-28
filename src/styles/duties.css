@@ -668,3 +668,6 @@
 .book-task-fold[open] .book-task-more {
   display: none;
 }
+.check.duty-sub {
+  padding-left: 28px;
+}

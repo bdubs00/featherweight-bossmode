@@ -3,8 +3,8 @@ import { render, type ComponentChildren } from 'preact';
 import { act } from 'preact/test-utils';
 import type { TaskPlan } from '../api/types';
 import { fakeFetch } from './testkit-b';
-import { placesOf } from './Shell';
-import { Board, TasksMain, costOf, monthWords, startPlan, toneOf } from './Tasks';
+import { morePlaces, placesOf } from './Shell';
+import { Door, costOf, monthWords, startPlan } from './Door';
 
 let box: HTMLElement | null = null;
 let restore: (() => void) | null = null;
@@ -62,25 +62,23 @@ describe('the words of the door', () => {
     expect(monthWords(plan(), null)).toBe('');
     expect(monthWords(plan({ kind: 'once' }), 0.5)).toBe('');
   });
-  it('lights only what needs you amber', () => {
-    expect(toneOf('needs you')).toBe('amber');
-    expect(toneOf('failed')).toBe('red');
-    expect(toneOf('working')).toBe('green');
-    expect(toneOf('scheduled')).toBe('grey');
-  });
 });
 
-describe('placesOf with the door', () => {
+describe('placesOf with work', () => {
   const base = { manager: null, placement: 'queue' as const, maxMembers: 16 };
   const ids = (...a: Parameters<typeof placesOf>) => placesOf(...a).map((p) => p.id);
-  it('shows no Tasks place without the door, and every place as before', () => {
-    expect(ids(base)).not.toContain('tasks');
+  it('shows neither Work nor Results without work, and every place of before', () => {
+    expect(ids(base)).not.toContain('work');
+    expect(ids(base)).not.toContain('results');
     expect(ids(base, false)).toHaveLength(9);
+    expect(morePlaces(base)).toEqual([]);
   });
-  it('shows four places to a person who has not asked for every place, and the place of the screen', () => {
-    expect(ids({ ...base, door: true }, false)).toEqual(['tasks', 'activity', 'chat', 'wiki']);
-    expect(ids({ ...base, door: true }, false, 'duties')).toEqual(['tasks', 'activity', 'chat', 'duties', 'wiki']);
-    expect(ids({ ...base, door: true }, true)).toHaveLength(10);
+  it('shows five places and More to a person who has not asked for every place, and the place of the screen', () => {
+    expect(ids({ ...base, work: true }, false)).toEqual(['work', 'results', 'activity', 'chat', 'wiki']);
+    expect(ids({ ...base, work: true }, false, 'duties')).toEqual(['work', 'results', 'activity', 'chat', 'wiki', 'duties']);
+    expect(ids({ ...base, work: true }, true)).toHaveLength(11);
+    expect(morePlaces({ ...base, work: true }).map((p) => p.id)).toEqual(['bridges', 'fleet', 'duties', 'skills', 'routines', 'manager']);
+    expect(morePlaces({ ...base, work: true }, 'duties').map((p) => p.id)).toEqual(['bridges', 'fleet', 'skills', 'routines', 'manager']);
   });
 });
 
@@ -103,14 +101,13 @@ describe('Start', () => {
   });
 });
 
-describe('TasksMain', () => {
+describe('Door', () => {
   it('asks for words before it reads them back, then refuses Start until the person types a cost', async () => {
     const f = fakeFetch([
-      ['GET', /\/v1\/tasks$/, () => ({ tasks: [] })],
-      ['POST', /\/v1\/tasks\/plan$/, () => plan()],
+      ['POST', /\/v1\/work\/plan$/, () => plan()],
     ]);
     restore = f.restore;
-    const el = mount(<TasksMain />);
+    const el = mount(<Door />);
     await settle();
     const read = [...el.querySelectorAll('button')].find((b) => b.textContent === 'Read it back')!;
     act(() => read.click());
@@ -127,23 +124,5 @@ describe('TasksMain', () => {
     await settle();
     expect(el.textContent).toContain('Say the most that one run can cost');
     expect(f.calls.some((c) => c.method === 'PUT')).toBe(false);
-  });
-});
-
-describe('Board', () => {
-  it('puts each card in its column, and says so for an empty column', () => {
-    const el = mount(
-      <Board
-        cards={[
-          { id: '1', kind: 'item', column: 'needs', title: 'backup waits for your answer.', agents: ['backup'], status: 'needs you', at: new Date().toISOString(), open: '#activity' },
-          { id: '2', kind: 'duty', column: 'next', title: 'Nightly drift', agents: ['ops'], status: 'scheduled', at: new Date(Date.now() + 3_600_000).toISOString(), open: '#duties/drift' },
-        ]}
-      />,
-    );
-    const cols = [...el.querySelectorAll('.board-col')];
-    expect(cols.map((c) => c.querySelector('h3')!.firstChild!.textContent)).toEqual(['Needs you', 'Working', 'Coming up', 'Done']);
-    expect(cols[0].textContent).toContain('backup waits for your answer.');
-    expect(cols[1].textContent).toContain('Nothing works now.');
-    expect(cols[2].querySelector('a')!.getAttribute('href')).toBe('#duties/drift');
   });
 });

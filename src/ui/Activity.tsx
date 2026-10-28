@@ -30,7 +30,7 @@ import { decisionTitle, excerpt, personName, plainText, senderName, since } from
 import { briefOf, planOf } from '../lib/decision';
 import { answerQuestion, decide } from '../state/actions';
 import { useInboxRows, type InboxView } from '../state/activity';
-import { ensureChannels, ensureEntries, ensureResults } from '../state/fetchers';
+import { ensureChannels, ensureEntries, ensureResults, ensureRuns } from '../state/fetchers';
 import { cardOf, keyAction, type InboxRow } from '../state/inbox';
 import { store, useSelect } from '../state/store';
 import { selectFacts } from '../state/reducer';
@@ -44,7 +44,8 @@ import { markDone, madeOf, settledOf, useMade } from '../state/done';
 import { loadInbox, useDutyLabel } from '../state/duties';
 import { dutyLabel } from '../lib/duties';
 import { EmptyPane } from './Shell';
-import { Avatar, Button, Card, IconButton, Led, Mark, PaneHeader } from './primitives';
+import { Avatar, Button, Card, Led, Mark, PaneHeader } from './primitives';
+import { ResultKeys } from './ResultKeys';
 
 const TWO_PANES = '(min-width: 800px)';
 
@@ -430,6 +431,7 @@ function RowFace({ r }: { r: InboxRow }) {
 function RowStatus({ r }: { r: InboxRow }) {
   const h = useHeld(r.key);
   if (h) return <Led tone="grey" word={h.act === 'allow' ? 'allowed' : h.act === 'deny' ? 'denied' : 'answered'} label="It goes out in a few seconds. Undo takes it back." />;
+  if (r.kind === 'result') return <Led tone="amber" word="to check" />;
   if (r.status === 'needs-you') return <Led tone="amber" word="needs you" />;
   if (r.kind === 'duty-paused') return <Led tone="grey" word="paused" />;
   if (r.kind === 'duty-failed') return <Led tone="red" word="failed" />;
@@ -459,7 +461,7 @@ function rowText(r: InboxRow): string {
 function rowName(r: InboxRow): string {
   if (r.kind === 'message' && r.entry) return senderName(r.entry.from);
   // A row of a duty names its agent, as a row of a seat does, and its chip names the duty.
-  if (r.kind === 'duty-failed' || r.kind === 'duty-paused' || r.kind === 'duty-waits') return r.agent || (r.duty ? dutyLabel(r.duty) : 'A duty');
+  if (r.kind === 'duty-failed' || r.kind === 'duty-paused' || r.kind === 'duty-waits' || r.kind === 'result') return r.agent || (r.duty ? dutyLabel(r.duty) : 'A duty');
   return r.handle || '';
 }
 
@@ -524,7 +526,38 @@ function InboxItem({ r, on, rows }: { r: InboxRow; on: boolean; rows: InboxRow[]
   );
 }
 
-export function ActivityList({ item, board }: { item?: string; board?: boolean }) {
+/**
+ * ResultCard is the card of a result to check: the answer of the run, a
+ * link to the run, and Looks right and Needs work. After either key, the
+ * main pane moves to the next item that needs you, as after a decision.
+ */
+function ResultCard({ r, name, rows }: { r: InboxRow; name: string; rows: InboxRow[] }) {
+  const run = useSelect((s) => (r.run ? s.runs[r.run] : undefined));
+  useEffect(() => {
+    if (r.run) ensureRuns([r.run]);
+  }, [r.run]);
+  const title = (run && run.title) || r.reason || 'The result';
+  const open = r.duty && r.run ? hrefOf({ place: 'duties', name: r.duty, run: r.run }) : r.run ? hrefOf({ place: 'chat', run: r.run }) : '';
+  return (
+    <Card title={title} tone="amber" label={'A result of ' + name + ' to check'} actions={<ResultKeys run={r.run!} title={title} primary onDone={() => afterResult(r, rows)} />}>
+      {run && run.output ? <Markdown text={excerpt(run.output, 1200)} refs /> : <p class="inbox-said">{run ? 'The run gave no text.' : 'Loading the result.'}</p>}
+      {open && (
+        <p>
+          <a href={open}>Open the run</a>
+        </p>
+      )}
+    </Card>
+  );
+}
+
+/** afterResult reads the inbox again and moves to the next item that needs you. */
+function afterResult(r: InboxRow, rows: InboxRow[]): void {
+  loadInbox().catch(() => {});
+  const next = rows.find((x) => x.key !== r.key && x.status === 'needs-you');
+  go(next ? { place: 'activity', item: next.key } : { place: 'activity' }, true);
+}
+
+export function ActivityList({ item }: { item?: string }) {
   const { rows, loaded, settled } = useInbox();
   const ready = useRef(settled);
   ready.current = settled;
@@ -601,13 +634,7 @@ export function ActivityList({ item, board }: { item?: string; board?: boolean }
   return (
     <section class="screen activity" aria-labelledby="activity-title" data-focus-own>
       {/* The chip counts what the list shows. What needs you shows by its lights and by the count on the app bar, which counts the same rows less the new messages. */}
-      <PaneHeader
-        id="activity-title"
-        title="Activity"
-        count={loaded ? rows.length : undefined}
-        countLabel={rows.length === 1 ? '1 item' : rows.length + ' items'}
-        actions={<IconButton icon="board" label="Work" aria-pressed={!!board} onClick={() => go(board ? { place: 'activity' } : { place: 'activity', board: true })} />}
-      />
+      <PaneHeader id="activity-title" title="Activity" count={loaded ? rows.length : undefined} countLabel={rows.length === 1 ? '1 item' : rows.length + ' items'} />
       <div class="scroll" ref={list} onKeyDown={onKey}>
         <div class="inbox" role="list" aria-label="Activity">
           {/* Each row keeps its own element, so a row that leaves takes its focus with it, and a new row never inherits the focus of another. */}
@@ -712,6 +739,7 @@ export function ActivityMain({ item }: { item?: string }) {
               }}
             />
           )}
+          {r.kind === 'result' && r.run && <ResultCard r={r} name={name} rows={rows} />}
           {isDutyRow(r) && (
             <div class="inbox-stop">
               <p class="inbox-stop-line">

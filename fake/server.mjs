@@ -23,7 +23,7 @@
 //   FAKE_ASLEEP=1      every worker of the fleet sleeps, as a fleet at night with no worker awake
 //   FAKE_ASK=<tool>    the manager waits for a decision on one call: bridge_open, pages_write, spawn_task, create_issue, or env
 //   FAKE_PACKAGES=0    the settings say that the deployment has no package mirror, so no profile shows Packages
-//   FAKE_DOOR=0        the settings name no door, so the page shows no Tasks place and every place of the app bar
+//   FAKE_WORK=0        the settings name no work, so the page shows no Work and no Results, and every place of the app bar
 
 import http from 'node:http';
 import fs from 'node:fs';
@@ -835,8 +835,8 @@ on('GET', '/v1/bossmode', (c) => {
     templates: TEMPLATES,
     chat: { agent: CHAT_AGENT, member: MANAGER_MEMBER },
     packages: PACKAGES,
-    // The Tasks place: a door that reads what a person needs done back before it starts. FAKE_DOOR=0 leaves it out.
-    door: process.env.FAKE_DOOR !== '0',
+    // The places Work and Results: GET /v1/work, POST /v1/work/plan, and GET /v1/value. FAKE_WORK=0 leaves them out.
+    work: process.env.FAKE_WORK !== '0',
   };
 });
 on('GET', '/v1/bossmode/logo', (c) => {
@@ -1297,6 +1297,21 @@ on('POST', '/v1/runs/([^/]+)/reactions', async (c, id) => {
   // The reaction is one more event of the run, so its seq grows.
   run.seq += 1;
   run.updatedAt = now();
+  // Needs work on a result to check: the front sends the note to the agent
+  // as a follow-up, so the run works on it again, and ends a few seconds later.
+  const review = run.metadata && run.metadata['workbench.review'] === '1';
+  if (review && body.reaction === 'down' && body.note && run.state === 'completed') {
+    const note = String(body.note);
+    items.push({ seq: items.length + 1, time: now(), kind: 'user', text: 'Needs work: ' + note, who: c.person.subject });
+    Object.assign(run, { state: 'running', seq: run.seq + 1, updatedAt: now(), reworks: (run.reworks || 0) + 1 });
+    publish('run', run);
+    setTimeout(() => {
+      items.push({ seq: items.length + 1, time: now(), kind: 'assistant', text: 'I changed it as you asked: ' + note });
+      // The new answer is a new result to check.
+      Object.assign(run, { state: 'completed', output: (run.output || '') + '\n\nChanged: ' + note, reactions: {}, seq: run.seq + 1, updatedAt: now() });
+      publish('run', run);
+    }, 4000);
+  }
   publish('run', run);
   return run;
 });

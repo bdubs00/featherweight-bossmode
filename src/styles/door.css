@@ -1,0 +1,209 @@
+/* The door of the Work place, the readback of a plan, the keys of a
+   result to check, and the key More of the app bar. The screen lays out
+   the primitives and adds no color, radius, shadow, type size, or motion:
+   every value is a token. */
+
+.work-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-5);
+}
+/* The pane scrolls, so no part of it shrinks to fit. */
+.work-body > *,
+.door-top > * {
+  flex: none;
+}
+/* The door, the readback, and the templates keep the reading measure, in the middle of a wide pane. */
+.door-top {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-5);
+  width: 100%;
+  max-width: calc(var(--measure) + 210px);
+  margin-inline: auto;
+}
+.work-board-sec {
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--line);
+}
+/* The words of a count for a screen reader stay inside the pane that scrolls. */
+.work-board-sec,
+.work-lane-head {
+  position: relative;
+}
+
+/* ---------- the door ---------- */
+.door {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+.door-ask {
+  margin: 0;
+}
+.door-keys {
+  display: flex;
+  justify-content: flex-end;
+}
+.door-templates {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+.door-templates > h2 {
+  color: var(--muted);
+}
+.door-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+
+/* ---------- the readback ---------- */
+.rb {
+  display: flex;
+  flex-direction: column;
+  margin: var(--s-2) 0 0;
+}
+.rb-row {
+  display: grid;
+  grid-template-columns: 148px 1fr;
+  gap: var(--s-3);
+  padding: var(--s-3) 0;
+  border-top: 1px solid var(--line-soft);
+}
+.rb-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.rb dt {
+  font-size: var(--t-meta);
+  line-height: var(--t-body-lh);
+  font-weight: 700;
+  color: var(--muted);
+}
+.rb dd {
+  margin: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+}
+.rb p {
+  margin: 0;
+}
+.rb-who,
+.rb-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+}
+.rb-who li {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+.rb-list li {
+  padding-left: var(--s-3);
+  position: relative;
+}
+/* A short dash leads each line of a list, in the color of the lines. */
+.rb-list li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 11px;
+  width: 6px;
+  height: 1px;
+  background: var(--muted);
+}
+.rb-other {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin-top: var(--s-1);
+}
+.rb-other > .t-meta {
+  flex: none;
+  color: var(--muted);
+}
+.rb-other > select {
+  max-width: 220px;
+}
+.rb-money {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  max-width: 160px;
+  font-weight: 700;
+}
+.rb-gap {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+}
+.rb .choices {
+  grid-template-columns: 1fr;
+}
+.readback .card-actions {
+  flex-wrap: wrap;
+}
+
+/* ---------- the key More of the app bar ---------- */
+.place-more {
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* Work and Results have no list, so a narrow window keeps the places at the bottom of their main pane. */
+@media (max-width: 799px) {
+  .shell[data-place='work'][data-show='main'] .appbar,
+  .shell[data-place='results'][data-show='main'] .appbar {
+    display: flex;
+  }
+}
+
+/* ---------- a result to check: Looks right and Needs work ---------- */
+.result-keys {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--s-2);
+}
+.work-card .result-keys {
+  justify-content: flex-start;
+  margin-top: var(--s-1);
+}
+.result-note {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  width: 100%;
+}
+
+/* ---------- the menu More of a phone ---------- */
+.place-more-pop {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.place-more-pop > .place {
+  flex: 1 1 auto;
+}
+.menu-more {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  min-width: 200px;
+}
+.menu-more a {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}

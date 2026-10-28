@@ -40,8 +40,8 @@ export interface BossConfig {
   routines?: boolean;
   /** True when the deployment has a package mirror, so the profile of an agent that a pool runs shows Packages. An older front leaves it out. */
   packages?: boolean;
-  /** True when the front serves the door of the Tasks place, POST /v1/tasks/plan and GET /v1/tasks. An older front leaves it out, and the page shows every place. */
-  door?: boolean;
+  /** True when the front serves GET /v1/work, POST /v1/work/plan, and GET /v1/value. The page then shows the places Work and Results and opens on Work. An older front leaves it out, and the page shows the places of before. */
+  work?: boolean;
 }
 
 /** A child Task whose parent Task is gone, from GET /v1/fleet/orphans. */
@@ -1078,6 +1078,10 @@ export interface WhileAway {
 export interface DutyNotify {
   failure?: string[];
   needsYou?: string[];
+  /** Who hears of each result of a run that ended well. An older front leaves it out. */
+  result?: string[];
+  /** always, or found: only a result that found something. */
+  resultWhen?: 'always' | 'found';
 }
 
 /** One run of a duty, as lastRun and the history show it. */
@@ -1142,6 +1146,8 @@ export interface DutyRecord {
   limits: DutyLimits;
   whileAway?: WhileAway;
   notify?: DutyNotify;
+  /** True when each result waits for its owner to check it: Looks right or Needs work. Each start sets workbench.review on its run. */
+  review?: boolean;
   runAs?: string;
   paused?: boolean;
   /** The revision that the person read, on a change, so a change in the meantime answers 409. */
@@ -1238,7 +1244,8 @@ export interface DutyOptions {
 
 /** One item of GET /v1/inbox: what needs the person. kind is approval, question, failure, or paused. */
 export interface InboxItem {
-  kind: 'approval' | 'question' | 'failure' | 'paused' | string;
+  /** result: a run whose owner asked to check each result, until a person reacts (docs/CONTRACT.md, section 21). */
+  kind: 'approval' | 'question' | 'failure' | 'paused' | 'result' | string;
   run?: string;
   /** The id of the approval that the run waits for, or "" for a question of a seat in a bridge and for a failure or a paused duty. */
   approval?: string;
@@ -1417,7 +1424,7 @@ export interface PackagesBody {
 /** A stage of a card of the board of the work, in the order of the flow. */
 export type WorkStage = 'waiting' | 'working' | 'needs-you' | 'stopped' | 'review' | 'done';
 
-/** One piece of work on the board, from GET /v1/work (docs/CONTRACT.md, section 19). */
+/** One piece of work on the board, a task in the words of the page, from GET /v1/work (docs/CONTRACT.md, section 19). */
 export interface WorkCard {
   id: string;
   /** conversation, bridge, duty, job, or event. */
@@ -1438,7 +1445,12 @@ export interface WorkCard {
   costUSD: number;
   /** True when the pool replaced the worker of a part that had not ended. */
   lost?: boolean;
+  /** The verdict of a done card: accepted (a thumb up or a heart), checked (a machine check passed), sent-back (a thumb down), or unchecked. */
+  verdict?: WorkVerdict;
 }
+
+/** The verdict on a result: a person accepted it, a machine check passed, a person sent it back, or nobody checked it. */
+export type WorkVerdict = 'accepted' | 'checked' | 'sent-back' | 'unchecked';
 
 /** One lane of the board: the cards of a stage, the cards whose next move is the person's, and the oldest wait. */
 export interface WorkLane {
@@ -1456,7 +1468,7 @@ export interface WorkBoard {
   days: number;
 }
 
-/* ---------- the Tasks place: the door and the board ---------- */
+/* ---------- the door of the Work place ---------- */
 
 /** How a task runs: once now, on a schedule, or by a team of agents. */
 export type TaskKind = 'once' | 'repeat' | 'team';
@@ -1475,7 +1487,7 @@ export interface PlanWho {
 }
 
 /**
- * The answer of POST /v1/tasks/plan: the words of the person read back
+ * The answer of POST /v1/work/plan: the words of the person read back
  * before anything starts. start holds the record that Start sends to a
  * route that exists. The plan never names a cost: the page refuses Start
  * until the person types one.
@@ -1498,21 +1510,4 @@ export interface TaskPlan {
   start: { duty?: DutyRecord & { notify?: DutyNotify & { result?: string[]; resultWhen?: 'always' | 'found' } }; bridge?: { title: string; goal: string; placement?: Placement; members: { handle: string; agent: string; task: string }[]; caps?: Record<string, number>; delegation?: Record<string, boolean> }; run?: { member: string; body: NewRun } };
   /** The address of what Start makes, when the plan knows it. */
   open: string;
-}
-
-/** One card of the board of GET /v1/tasks. */
-export interface TaskCard {
-  id: string;
-  kind: 'item' | 'bridge' | 'duty' | 'run';
-  column: 'needs' | 'working' | 'next' | 'done';
-  title: string;
-  agents: string[];
-  /** The status word, such as needs you, working, scheduled, done, failed, or paused. */
-  status: string;
-  /** The moment of the card: since when it waits or works, its next start, or its end. */
-  at: string;
-  /** The address of the page that holds the work. */
-  open: string;
-  detail?: string;
-  cost?: number;
 }

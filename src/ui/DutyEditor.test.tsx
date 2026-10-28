@@ -143,6 +143,8 @@ describe('New duty', () => {
     expect([...el.querySelectorAll<HTMLInputElement>('section[aria-labelledby="duty-tell-head"] input')].map((i) => [i.closest('label')!.textContent, i.checked])).toEqual([
       ['Failures', true],
       ['Questions', true],
+      ['Results', false],
+      ['Ask me to check each result', false],
     ]);
     expect(fieldOf(el, 'Time zone')!.value).toBe(ZONE);
   });
@@ -592,7 +594,7 @@ describe('Tell me about', () => {
     const el = mount(<DutyEditor name="nightly-restore" />);
     await settle();
     expect(tell(el)).toEqual([
-      ['You', ['Failures on', 'Questions on']],
+      ['You', ['Failures on', 'Questions on', 'Results off', 'Ask me to check each result off']],
       ['The Ops room channel', ['Failures off', 'Questions off']],
       ['The pager channel', ['Failures on', 'Questions off']],
     ]);
@@ -611,7 +613,7 @@ describe('Tell me about', () => {
     api = fakeApi({ 'GET /v1/duties': { duties: [], paused: false }, 'PUT /v1/duties/new?dryRun=true': dry() });
     const el = mount(<DutyEditor />);
     await settle();
-    expect(tell(el)).toEqual([['Tell me about', ['Failures on', 'Questions on']]]);
+    expect(tell(el)).toEqual([['Tell me about', ['Failures on', 'Questions on', 'Results off', 'Ask me to check each result off']]]);
   });
 });
 

@@ -87,7 +87,7 @@ describe('Results', () => {
     expect(text).toContain('Not set');
     expect(box.querySelector('#results-sentence')!.textContent).toContain('the agents finished 12 pieces');
     // The hatch of sent back and the three verdicts have words beside their colors.
-    expect(box.querySelector('.rs-verdicts .rs-bar')!.getAttribute('aria-label')).toBe('3 accepted, 1 sent back, 8 unchecked');
+    expect(box.querySelector('.rs-verdicts .rs-bar')!.getAttribute('aria-label')).toBe('3 accepted, 0 checked, 1 sent back, 8 unchecked');
   });
 
   it('keeps the window that the person picks', async () => {

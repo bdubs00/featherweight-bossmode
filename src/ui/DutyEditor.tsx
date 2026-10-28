@@ -70,6 +70,8 @@ import {
   formOf,
   hasCheck,
   limitWords,
+  awayWords,
+  REVIEW_LINE,
   MAX_TITLE,
   moneyIn,
   monthDayOf,
@@ -1240,6 +1242,20 @@ function EditorForm({ name, seed, base: read, heading, back: home }: FormProps) 
                 <input type="checkbox" checked={f.questions} onChange={(e) => patch({ questions: (e.target as HTMLInputElement).checked })} />
                 <span>Questions</span>
               </label>
+              <label class="check">
+                <input type="checkbox" checked={f.results} onChange={(e) => patch({ results: (e.target as HTMLInputElement).checked })} />
+                <span>Results</span>
+              </label>
+              {f.results && (
+                <label class="check duty-sub">
+                  <input type="checkbox" checked={f.found} onChange={(e) => patch({ found: (e.target as HTMLInputElement).checked })} />
+                  <span>Only a result that found something</span>
+                </label>
+              )}
+              <label class="check">
+                <input type="checkbox" checked={f.review} onChange={(e) => patch({ review: (e.target as HTMLInputElement).checked })} />
+                <span>Ask me to check each result</span>
+              </label>
             </div>
             {tellTo.map((c, i) => (
               <div role="group" aria-labelledby={'duty-tell-' + i}>
@@ -1304,6 +1320,8 @@ function EditorForm({ name, seed, base: read, heading, back: home }: FormProps) 
           {/* The readback of the front holds the check already. Without it, the page says the check in its own words. */}
           {reviewed && !review.readback && <p>{checkWords(reviewed, agentName || 'the agent')}</p>}
           <p>{limitWords(record().limits, true, f.act)[0]}</p>
+          <p>{awayWords(record().whileAway)}</p>
+          {record().review && <p>{REVIEW_LINE}</p>}
         </Confirm>
       )}
     </section>

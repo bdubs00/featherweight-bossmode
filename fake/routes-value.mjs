@@ -36,11 +36,11 @@ function rng(seed) {
 
 const LINES = [
   { key: 'duty:daily-release-notes', kind: 'duty', name: 'daily-release-notes', agent: 'scribe', perDay: 1, weekdays: true, usd: [0.02, 0.05], accept: 0.7, back: 0.1, acts: [0, 1], lead: [4, 9], wait: 0, fail: 0.04 },
-  { key: 'duty:nightly-restore-test', kind: 'duty', name: 'nightly-restore-test', agent: 'backup', perDay: 1, usd: [0.18, 0.24], accept: 0.15, back: 0, acts: [1, 1], lead: [12, 20], wait: [90, 330], fail: 0.05 },
+  { key: 'duty:nightly-restore-test', kind: 'duty', name: 'nightly-restore-test', agent: 'backup', perDay: 1, usd: [0.18, 0.24], accept: 0.15, back: 0, check: 0.8, acts: [1, 1], lead: [12, 20], wait: [90, 330], fail: 0.05 },
   { key: 'agent:migrator', kind: 'agent', name: 'migrator', agent: 'migrator', perDay: 2, usd: [0.09, 0.42], accept: 0.4, back: 0.12, acts: [1, 3], lead: [18, 70], wait: [5, 60], fail: 0.06, stop: 0.03 },
   { key: 'agent:reviewer', kind: 'agent', name: 'reviewer', agent: 'reviewer', perDay: 2.5, usd: [0.02, 0.06], accept: 0.05, back: 0.02, acts: [0, 0], lead: [2, 6], wait: 0, fail: 0.02 },
   { key: 'duty:helpdesk-tickets', kind: 'duty', name: 'helpdesk-tickets', agent: 'triage', perDay: 6, usd: [0.002, 0.006], accept: 0, back: 0, acts: [0, 0], lead: [0.3, 1.2], wait: 0, fail: 0.01 },
-  { key: 'agent:tester', kind: 'agent', name: 'tester', agent: 'tester', perDay: 0.8, usd: [0.04, 0.1], accept: 0.1, back: 0.05, acts: [0, 1], lead: [6, 15], wait: [2, 10], fail: 0.2 },
+  { key: 'agent:tester', kind: 'agent', name: 'tester', agent: 'tester', perDay: 0.8, usd: [0.04, 0.1], accept: 0.1, back: 0.05, check: 0.5, acts: [0, 1], lead: [6, 15], wait: [2, 10], fail: 0.2 },
 ];
 const COORDINATION = [
   { agent: 'manager', perDay: 1.5, usd: [0.01, 0.04] },
@@ -67,7 +67,8 @@ function generate(t0) {
         const waitMin = ln.wait && acts > 0 ? pick(ln.wait) : 0;
         const leadMin = pick(ln.lead) + waitMin;
         const v = r();
-        const verdict = state !== 'completed' ? '' : v < ln.accept ? 'accepted' : v < ln.accept + ln.back ? 'rejected' : '';
+        // A person comes first. Then the done check of the agent: a restore that answers, or a role whose tests pass.
+        const verdict = state !== 'completed' ? '' : v < ln.accept ? 'accepted' : v < ln.accept + ln.back ? 'rejected' : v < ln.accept + ln.back + (ln.check || 0) ? 'checked' : '';
         out.push({
           line: ln, created, state, acts, verdict,
           rework: verdict === 'rejected' && r() < 0.6 ? 1 : 0,
@@ -113,10 +114,10 @@ function fold(data, days, nowMs, estimates) {
   const since = nowMs - days * DAY;
   const step = days <= 7 ? DAY : 7 * DAY;
   const periods = [];
-  for (let end = nowMs; end > since; end -= step) periods.unshift({ start: Math.max(end - step, since), end, done: 0, accepted: 0, sentBack: 0, unchecked: 0, failed: 0, usd: 0 });
+  for (let end = nowMs; end > since; end -= step) periods.unshift({ start: Math.max(end - step, since), end, done: 0, accepted: 0, checked: 0, sentBack: 0, unchecked: 0, failed: 0, usd: 0 });
   const ans = {
     days, since: new Date(since).toISOString(), until: new Date(nowMs).toISOString(), sentence: '',
-    work: { pieces: 0, done: 0, failed: 0, stopped: 0, open: 0 }, checks: { accepted: 0, sentBack: 0, unchecked: 0 },
+    work: { pieces: 0, done: 0, failed: 0, stopped: 0, open: 0 }, checks: { accepted: 0, checked: 0, sentBack: 0, unchecked: 0 },
     people: { actions: 0, noPerson: 0, reworked: 0, waitSeconds: 0, waitingNow: 0, handled: 0 },
     lead: { measured: 0, medianSeconds: 0, waitShare: 0 },
     spend: { usd: 0, perDone: 0, failedUSD: 0, coordinationUSD: 0, unpriced: 0, atLeast: false },
@@ -131,7 +132,7 @@ function fold(data, days, nowMs, estimates) {
     const ln = p.line;
     let l = lines.get(ln.key);
     if (!l) {
-      l = { key: ln.key, kind: ln.kind, name: ln.name, agent: ln.agent, work: { pieces: 0, done: 0, failed: 0, stopped: 0, open: 0 }, checks: { accepted: 0, sentBack: 0, unchecked: 0 }, actions: 0, noPerson: 0, medianLeadSeconds: 0, usd: 0, perDone: 0, unpriced: 0, leads: [] };
+      l = { key: ln.key, kind: ln.kind, name: ln.name, agent: ln.agent, work: { pieces: 0, done: 0, failed: 0, stopped: 0, open: 0 }, checks: { accepted: 0, checked: 0, sentBack: 0, unchecked: 0 }, actions: 0, noPerson: 0, medianLeadSeconds: 0, usd: 0, perDone: 0, unpriced: 0, leads: [] };
       lines.set(ln.key, l);
     }
     const per = periods.find((x) => p.created >= x.start && p.created < x.end);
@@ -157,7 +158,7 @@ function fold(data, days, nowMs, estimates) {
       ans.work.done++;
       l.work.done++;
       if (per) per.done++;
-      const k = p.verdict === 'accepted' ? 'accepted' : p.verdict === 'rejected' ? 'sentBack' : 'unchecked';
+      const k = p.verdict === 'accepted' ? 'accepted' : p.verdict === 'rejected' ? 'sentBack' : p.verdict === 'checked' ? 'checked' : 'unchecked';
       ans.checks[k]++;
       l.checks[k]++;
       if (per) per[k]++;
@@ -224,20 +225,20 @@ function fold(data, days, nowMs, estimates) {
 function sentence(a) {
   let s = `In the last ${a.days} days, `;
   if (!a.work.pieces) return s + 'the agents finished no work that you can view.';
-  s += `the agents finished ${plural(a.work.done, 'piece', 'pieces')} of work`;
+  s += `the agents finished ${plural(a.work.done, 'task', 'tasks')}`;
   if (a.work.failed + a.work.stopped) s += `, and ${a.work.failed + a.work.stopped} failed or stopped`;
   s += '.';
   if (a.work.done) {
-    s += ` People accepted ${a.checks.accepted} and sent back ${a.checks.sentBack}; ${a.checks.unchecked} ${a.checks.unchecked === 1 ? 'is' : 'are'} unchecked.`;
+    s += ` People accepted ${a.checks.accepted} and sent back ${a.checks.sentBack}. A done check passed for ${a.checks.checked}. ${a.checks.unchecked} ${a.checks.unchecked === 1 ? 'is' : 'are'} unchecked.`;
     s += ` ${a.people.noPerson} of the ${a.work.done} finished without an action of a person.`;
   }
   if (a.people.waitSeconds) s += ` Work waited ${duration(a.people.waitSeconds)} for people.`;
   s += ` The work cost ${a.spend.atLeast ? 'at least ' : ''}$${a.spend.usd.toFixed(2)}`;
-  if (a.work.done) s += `, $${a.spend.perDone.toFixed(2)} for each finished piece`;
+  if (a.work.done) s += `, $${a.spend.perDone.toFixed(2)} for each finished task`;
   s += '.';
   if (a.spend.unpriced) s += ` ${plural(a.spend.unpriced, 'run has', 'runs have')} tokens without a price.`;
   if (a.estimated) s += ` At the estimates of people, the finished work of ${plural(a.estimated.lines, 'line', 'lines')} would take a person ${duration(a.estimated.minutes * 60)}.`;
-  if (a.partial) s += ` ${plural(a.unknown, 'piece has', 'pieces have')} no record of the actions of people.`;
+  if (a.partial) s += ` ${plural(a.unknown, 'task has', 'tasks have')} no record of the actions of people.`;
   return s;
 }
 
