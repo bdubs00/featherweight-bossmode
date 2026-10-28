@@ -1179,11 +1179,41 @@ Left out, and why:
 - The approvals and questions of a duty that sit on a bridge show in their
   bridge, so the items of the inbox of those kinds add no row.
 
-### 11.11 The Tasks place (prototype of 2026-10-27)
+### 11.11 Work, Results, and a result to check
 
-A person who has not read the docs says what they need done, reads the plan back, and starts it. The place has no list pane and no details pane. The main pane holds, top to bottom: the door (a heading, a recess of three lines, and Read it back), the templates or the readback, and the board.
+With `work: true` in `GET /v1/bossmode`, the app bar shows Work, Results,
+Activity, Chat, and Wiki, then More. A wide window opens the other places
+in the bar, and the key says Fewer. A phone opens a menu of those places
+above the bar, as the menu of the account opens. The place of the screen
+that shows stays in the bar. Work and Results have no list pane, so a
+narrow window keeps the bar at the bottom of their main pane. The page
+opens on Work.
 
-- The readback is a card, because it waits for a decision: the hard edge, the groove band, and the one orange key, Start. A definition list holds its rows, a muted label of 148 pixels beside each value, and one line under a narrow window.
-- The cost is a field with no value. Start refuses an empty field with the error under it. The page never fills a cost.
-- The board is a kanban board of four columns in the order of attention: Needs you, Working, Coming up, and Done. A column is a recess with its heading and its count chip, amber for Needs you once it holds a card. A card is a key on paper with a hard drop of one pixel. It holds the mark of its agent at 20 pixels, its title, and its status light with its word. A card that needs you takes `--wash-need`. A medium window shows two columns, and a narrow one stacks them.
-- The app bar shows four places and More while the person has not asked for every place. The choice lives in the browser, `fw.bossmode.everyPlace`. A narrow window keeps the bar at the bottom of the Tasks place, because the place has no list.
+Work holds the door on top and the board below, in one pane that scrolls.
+
+- The door keeps the reading measure in the middle of the pane: a heading,
+  a recess of three lines, and Read it back.
+- The readback is a card, because it waits for a decision: the hard edge,
+  the groove band, and the one orange key, Start. A definition list holds
+  its rows, a muted label of 148 pixels beside each value, and one line
+  under a narrow window. The cost is a field with no value, and Start
+  refuses an empty field with the error under it.
+- The board has six lanes in the order of the flow. A wide window shows
+  them side by side, and a narrow one stacks them. A lane head holds its
+  light and word, its count, and the age of its oldest card. A card is a
+  surface of the card ground with a soft line. Its title is the link, in
+  ink, underlined on hover. A card that needs you takes `--wash-need`. A
+  lost card has a dashed edge. A done card shows its verdict with a light:
+  green for accepted and checked, red for sent back, and grey for
+  unchecked.
+- A card To check holds Needs work and Looks right as secondary keys, so
+  the board keeps no orange key. In Activity, the card of a result is the
+  decision of its pane: an amber light, and Looks right as the primary key.
+- Needs work opens the note in place, with Cancel and Send back.
+
+Results shows checked by a machine as a green ring on the ground of the
+card, beside the full green of a person who accepted. The ring reads apart
+for a person who does not tell the greens apart. The tiles name their
+figures in sentence case, and a meta line joins its parts with a comma.
+
+The lights view of Fleet is Lights, at `#board`.

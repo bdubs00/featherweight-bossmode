@@ -18,6 +18,8 @@
 // A run that only the archive holds and that did not end is stopped and
 // lost. A card that did not end stays however old it is.
 
+import { nextOf } from './routes-e.mjs';
+
 const DAY = 24 * 60 * 60 * 1000;
 const STAGES = ['waiting', 'working', 'needs-you', 'stopped', 'review', 'done'];
 const WEIGHT = { 'needs-you': 6, working: 5, waiting: 4, stopped: 3, review: 2, done: 1 };
@@ -223,6 +225,21 @@ export function board(S, me, { days = 7, all = false } = {}) {
       card.managerDecides = !!(d.whileAway && d.whileAway.decider === 'manager' && r && r.pending && !r.pending.schema);
       cards.push(settle(card, [p], me));
     }
+  }
+
+  // The start that comes next of a duty of the person is one card in Coming up, unless a start is open already.
+  for (const d of (S.duties || new Map()).values()) {
+    if (d.paused || d.owner !== me) continue;
+    const s = d.when && d.when.schedule;
+    const open = (d.history || []).some((e) => ['retrying', 'queued', 'running', 'input-required'].includes(e.state));
+    if (!s || open) continue;
+    const next = nextOf(s, 1)[0];
+    if (!next) continue;
+    const card = blank('duty:' + d.name + '@next', 'duty', d.title || d.name, { kind: 'duty', name: d.name, via: 'schedule' }, next);
+    card.links.duty = d.name;
+    card.agents = [d.agent];
+    card.mine = true;
+    cards.push(settle(card, [{ stage: 'waiting', reason: 'Starts on its schedule.', since: next }], me));
   }
 
   // The other runs: a batch is one card, a conversation is one card.

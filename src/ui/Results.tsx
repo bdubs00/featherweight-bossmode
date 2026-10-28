@@ -87,7 +87,7 @@ export function Results() {
   const v = value && value.days === days ? value : null;
   return (
     <section class="screen results" aria-labelledby="results-title" aria-describedby={v ? 'results-sentence' : undefined}>
-      <PaneHeader id="results-title" title="Results" size="title" level={1} back={{ href: '#', label: 'Bridges', to: 'list' }}>
+      <PaneHeader id="results-title" title="Results" size="title" level={1}>
         <Tabs label="Window" items={WINDOWS.map((d) => ({ id: String(d), label: d + ' days' }))} current={String(days)} onSelect={pick} />
       </PaneHeader>
       <div class="scroll pad">
@@ -125,8 +125,8 @@ function Body({ v, onSaved }: { v: Value; onSaved: () => void }) {
       <div class="rs-tiles">
         <Tile label="Done" figure={v.work.done.toLocaleString()}>
           <p class="t-meta">
-            {v.work.failed + v.work.stopped} failed or stopped · {v.work.open} open
-            {(v.work.lost || 0) > 0 && <> · {v.work.lost} lost</>}
+            {v.work.failed + v.work.stopped} failed or stopped, {v.work.open} open
+            {(v.work.lost || 0) > 0 && <>, {v.work.lost} lost</>}
           </p>
         </Tile>
         <Tile
@@ -142,13 +142,13 @@ function Body({ v, onSaved }: { v: Value; onSaved: () => void }) {
             <b class="rs-ink">{costText(v.spend.perDone)}</b> a done task
           </p>
           <p class="t-meta">
-            {costText(v.spend.failedUSD)} on failed work · {costText(v.spend.coordinationUSD)} on coordination
+            {costText(v.spend.failedUSD)} on failed work, {costText(v.spend.coordinationUSD)} on coordination
           </p>
           {v.spend.unpriced > 0 && <Led tone="grey" word={v.spend.unpriced + (v.spend.unpriced === 1 ? ' run without a price' : ' runs without a price')} />}
         </Tile>
         <Tile label="Needed nobody" figure={v.people.noPerson.toLocaleString()} unit={'of ' + v.work.done.toLocaleString()}>
           <p class="t-meta">
-            {v.people.actions.toLocaleString()} actions of people · {v.people.reworked} sent back with a message
+            {v.people.actions.toLocaleString()} actions of people, {v.people.reworked} sent back with a message
           </p>
           {v.people.waitingNow > 0 && (
             <a class="rs-now" href="#activity">
@@ -171,7 +171,7 @@ function Body({ v, onSaved }: { v: Value; onSaved: () => void }) {
         >
           {v.estimated && (
             <p class="t-meta">
-              {v.estimated.pieces} tasks of {v.estimated.lines} {v.estimated.lines === 1 ? 'line' : 'lines'} · {v.work.done - v.estimated.pieces} without an estimate
+              {v.estimated.pieces} tasks of {v.estimated.lines} {v.estimated.lines === 1 ? 'line' : 'lines'}, {v.work.done - v.estimated.pieces} without an estimate
             </p>
           )}
         </Tile>

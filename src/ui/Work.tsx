@@ -15,7 +15,9 @@ import { useEffect, useState } from 'preact/hooks';
 import { api } from '../api/routes';
 import type { WorkBoard, WorkCard, WorkStage, WorkVerdict } from '../api/types';
 import { personName, since } from '../lib/words';
+import { nextShort } from '../lib/duties';
 import { store } from '../state/store';
+import { useDutyLabel } from '../state/duties';
 import { Empty } from './common';
 import { Door } from './Door';
 import { ResultKeys } from './ResultKeys';
@@ -119,6 +121,8 @@ function useBoard(all: boolean, again: number): { board: WorkBoard | null; faile
 }
 
 function CardView({ c, now, onDecided }: { c: WorkCard; now: number; onDecided: () => void }) {
+  // A card of a duty names the duty by its title, once the page reads the duties.
+  const duty = useDutyLabel(c.from && c.from.kind === 'duty' ? c.from.name || '' : '');
   const lane = LANES[c.stage];
   const total = c.parts && c.parts.total > 1 ? c.parts.total : 0;
   const verdict = c.stage === 'done' && c.verdict ? VERDICTS[c.verdict] : null;
@@ -131,7 +135,8 @@ function CardView({ c, now, onDecided }: { c: WorkCard; now: number; onDecided: 
         {c.next === 'manager' && <span class="work-yours">Manager</span>}
         {c.lost && <span class="work-lost">Lost</span>}
         <time class="work-age" dateTime={c.since} title={new Date(c.since).toLocaleString()}>
-          {since(c.since, now)}
+          {/* A start that comes next says when it starts, a wait or a work since when. */}
+          {Date.parse(c.since) > now ? nextShort(c.since) : since(c.since, now)}
         </time>
       </span>
       <a class="work-title clip2" href={hrefOfCard(c)} aria-label={c.title + ', ' + (verdict ? verdict.word : lane.word) + (c.reason ? ', ' + c.reason : '')}>
@@ -140,7 +145,7 @@ function CardView({ c, now, onDecided }: { c: WorkCard; now: number; onDecided: 
       {c.reason && <span class="work-reason clip2">{c.reason}</span>}
       <span class="work-meta">
         {verdict && <Led tone={verdict.tone} word={verdict.word} still />}
-        <span class="clip">{fromWords(c)}</span>
+        <span class="clip">{duty || fromWords(c)}</span>
         {total > 0 && <span>{total + (c.kind === 'bridge' ? ' agents' : ' parts')}</span>}
       </span>
       {c.stage === 'review' && run && <ResultKeys run={run} title={c.title} size="s" onDone={onDecided} />}
@@ -160,7 +165,7 @@ function LaneView({ stage, cards, count, oldest, now, onDecided }: { stage: Work
         <Chip tone={stage === 'needs-you' && count > 0 ? 'amber' : 'plain'} label={count === 1 ? '1 task' : count + ' tasks'}>
           {count}
         </Chip>
-        {oldest && stage !== 'done' && stage !== 'working' && (
+        {oldest && Date.parse(oldest) <= now && stage !== 'done' && stage !== 'working' && (
           <time class="work-oldest" dateTime={oldest} title={'The oldest since ' + new Date(oldest).toLocaleString()}>
             {since(oldest, now)}
           </time>

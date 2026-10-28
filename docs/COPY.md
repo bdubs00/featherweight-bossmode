@@ -1122,46 +1122,78 @@ The typing line takes the place of the status message of an answer that is on it
 | new | add | in a bridge: `<seat> is working`, `<seat> and <seat> are working`, or `<seat>, <seat>, and <n> more are working`, with `: <phrase>` when one seat works | done |
 | new | add | for a screen reader: `<name> is working.`, or `<name> is working: <phrase>`, without a second `Working` | done |
 
-## 13. The board of the work
+## 13. Work, Results, and a result to check
 
-| Place | String |
-|---|---|
-| The key in the head of Activity | `Work` |
-| The title of the board | `Work`, with the count of the open cards |
-| The key for every card | `Everyone` |
-| The lanes | `Waiting`, `Working`, `Needs you`, `Stopped`, `To review`, `Done` |
-| The kinds | `Chat`, `Bridge`, `Duty`, `Job`, `Event` |
-| The next move of the person | `Yours` |
-| The next move of the manager | `Manager` |
-| A card whose worker was replaced | `Lost` |
-| The parts of a card | `5 seats`, `12 runs` |
-| A board that did not load | `The board did not load.` |
-
-## 13. The Tasks place: the door and the board (prototype of 2026-10-27)
-
-The Tasks place needs `door: true` in `GET /v1/bossmode`. It is the home of a person who has not asked for every place. A task is what a person asks of an agent, as section 2 says. The person never picks among a duty, a bridge, a run, or a chat: the readback says how the task runs.
-
-### src/ui/Tasks.tsx
-
-| Now | Verdict | New text | Who |
-|---|---|---|---|
-| new | add | `Tasks` (the place and the title of the pane) | flow/door |
-| new | add | `What do you need done?` (the label of the door) and the placeholder `Every Monday at 9am, sum up what our competitors shipped last week.` | flow/door |
-| new | add | `Read it back`, and `Read it back again` after the words changed | flow/door |
-| new | add | `Or start from`, and the templates `A weekly summary of competitors`, `A draft, reviewed before it goes out`, `A nightly check of hosts`, `A big job, split across agents`, `New tickets, sorted each morning`, and `A question, answered now` | flow/door |
-| new | add | the rows of the readback: `Who`, `When`, `What it can cost`, `It asks you`, `It stays quiet`, `You hear of it`, `The result`, and `It cannot` | flow/door |
-| new | add | `<agent> does it`, `checks it`, `takes a share`, `tests each part`, and `Someone else` with `Keep <agent>` | flow/door |
-| new | add | `The most one run can cost`, and for a team `The most the whole team can spend` | flow/door |
-| new | add | `At most $<n> a month: about <n> runs at most $<n> each.` | flow/door |
-| new | add | `Each result`, `Only when it finds something`, and `Only when it fails` | flow/door |
-| new | add | the errors `Say what you need done.`, `Say the most that one run can cost, such as 0.50.`, and `Say the most that the whole team can spend, such as 5.00.` | flow/door |
-| new | add | `Change the details` and `Start`, then `Set. <readback>` or `Started. <agents> work on it now.` with `Open it` | flow/door |
-| new | add | `Your tasks`, and the columns `Needs you`, `Working`, `Coming up`, and `Done` | flow/door |
-| new | add | for an empty column: `Nothing waits for you.`, `Nothing works now.`, `Nothing is planned.`, and `Nothing done this week.` | flow/door |
+The places Work and Results need `work: true` in `GET /v1/bossmode`. A task
+is what a person asks of an agent, as section 2 says: a card of the board.
+The page never shows pool, member, job, run id, or Task in these places.
 
 ### src/ui/Shell.tsx
 
 | Now | Verdict | New text | Who |
 |---|---|---|---|
-| nine places | change | with the door: `Tasks`, `Activity`, `Chat`, `Wiki`, and the place of the screen that shows | flow/door |
-| new | add | the key `More`, which shows every place, and then `Fewer` | flow/door |
+| nine places | change | with work: `Work`, `Results`, `Activity`, `Chat`, `Wiki`, and the place of the screen that shows | integration |
+| new | add | the key `More`, which shows every place in a wide window and then says `Fewer` | integration |
+| new | add | on a phone, the menu `More places` of More: `Bridges`, `Fleet`, `Duties`, `Skills`, `Routines`, and `Manager` | integration |
+
+### src/ui/Door.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| new | add | `What do you need done?` (the label of the door) and the placeholder `Every Monday at 9am, sum up what our competitors shipped last week.` | integration |
+| new | add | `Read it back`, and `Read it back again` after the words changed | integration |
+| new | add | `Or start from`, and the templates `A weekly summary of competitors`, `A draft, reviewed before it goes out`, `A nightly check of hosts`, `A big job, split across agents`, `New tickets, sorted each morning`, and `A question, answered now` | integration |
+| new | add | the rows of the readback: `Who`, `When`, `What it can cost`, `It asks you`, `It stays quiet`, `You hear of it`, `The result`, and `It cannot` | integration |
+| new | add | `<agent> does it`, `checks it`, `takes a share`, `tests each part`, and `Someone else` with `Keep <agent>` | integration |
+| new | add | `The most one run can cost`, and for a team `The most the whole team can spend` | integration |
+| new | add | `At most $<n> a month: about <n> runs at most $<n> each.` | integration |
+| new | add | `Each result`, `Only when it finds something`, and `Only when it fails` | integration |
+| new | add | the errors `Say what you need done.`, `Say the most that one run can cost, such as 0.50.`, and `Say the most that the whole team can spend, such as 5.00.` | integration |
+| new | add | `Change the details` and `Start`, then `Set. <readback>` or `Started. <agents> work on it now.` with `Open it` | integration |
+
+### src/ui/Work.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| new | add | `Work` (the place and the title), with the count of the open tasks, such as `11 open tasks` for a screen reader | integration |
+| new | add | the key `Everyone` | integration |
+| new | add | the lanes `Coming up`, `Working`, `Needs you`, `Stopped`, `To check`, and `Done`, each with a count such as `3 tasks` | integration |
+| new | add | the kinds `Chat`, `Team`, `Duty`, `Batch`, and `Event` | integration |
+| new | add | the tags `Yours`, `Manager`, and `Lost` | integration |
+| new | add | the verdicts of a done card: `accepted`, `checked`, `sent back`, and `unchecked` | integration |
+| new | add | the parts of a card: `5 agents` for a team, `12 parts` for the rest | integration |
+| new | add | `Loading the board.` and `The board did not load.` | integration |
+
+### src/ui/ResultKeys.tsx and src/ui/Activity.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| new | add | `Looks right` and `Needs work`, then the note `What must change?` with `Cancel` and `Send back` | integration |
+| new | add | the errors of a note: `Say what must change.` and `Say it in at most 1,000 characters.` | integration |
+| new | add | the notices `Marked as right: <title>.` and `Sent back with your note: <title>.` | integration |
+| new | add | the light of a row `to check`, the card title of the run, `Open the run`, `The run gave no text.`, and `Loading the result.` | integration |
+
+### src/ui/Results.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| new | add | `Results`, and the tabs `7 days`, `30 days`, and `90 days` | integration |
+| new | add | the tiles `Done`, `Checked`, `Spend`, `Needed nobody`, `Time to done`, and `Hours of a person`, in sentence case | integration |
+| new | add | the verdicts `accepted`, `checked`, `sent back`, and `unchecked` under the bar of Checked and in the legend | integration |
+| `<n> failed or stopped · <n> open` and the other meta lines with a middle dot | change | a comma between the parts, such as `20 failed or stopped, 1 open` (rule 7) | integration |
+| new | add | `at least`, `a done task`, `Not set`, `est.`, `A task`, and `Minutes a task` | integration |
+
+### src/ui/Duties.tsx, src/ui/DutyEditor.tsx, src/lib/duties.ts
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `Failures and questions.` (Tell me about) | change | the list of what the person hears of, such as `Failures, questions, and each result.` or `Failures and each result that found something.` | integration |
+| new | add | `Each result waits for you to check it: Looks right or Needs work.` on the page of a duty and in its save dialog | integration |
+| new | add | the switches `Results`, `Only a result that found something`, and `Ask me to check each result` under You | integration |
+| the save dialog says the schedule and the limits | change | the dialog also says who decides while the person is away, such as `The manager decides a question for you. After 2 hours without an answer, the answer is no.` | integration |
+
+### src/ui/Board.tsx, src/ui/Fleet.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `Board` (the title of the view of the lights, and the key in the head of Fleet) | change | `Lights` | integration |

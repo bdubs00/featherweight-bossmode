@@ -1587,85 +1587,54 @@ The page treats an archived run as a run that ended:
   reads it once, with no poll and no live answer.
 
 
-## 19. Results
+## 19. Work: the board and the door
 
-The Results place reads what the work of the agents gave and took over a
-window. The workbench answers from its package `value`. The page keeps the
-types in `src/api/value.ts`.
+A front that serves the routes of this section and of section 20 sends
+`work: true` in `GET /v1/bossmode`. The page then shows the places Work and
+Results and opens on Work. Without it, the page is the page of before.
 
-| Route | Answer |
+| Route | What the page does with it |
 |---|---|
-| `GET /v1/value?days=7` | The value of the window. `days` is 7, 30, or 90, and 30 without it. Another number answers 400. |
-| `PUT /v1/value/estimates` | Body `{"line", "minutes"}`. It answers the line with its `estimate`. Zero minutes removes the estimate. A line that the person does not see in 90 days answers 404. A person who does not own the agent of the line gets 403. Minutes past 2400 answer 400. |
+| `GET /v1/work?days=7&all=false` | The board under the door. The page reads it at the open of Work and every 30 seconds. It also reads it two seconds after a change of the store, after a start at the door, and after Looks right or Needs work. `all=true` comes from the key Everyone. `days` is 7, 30, or 90. The MCP tool `work` gives the same answer. |
+| `POST /v1/work/plan` | `{"words", "agent"?, "tell"?}`, with the header `X-Time-Zone`. Read it back sends the words. A change of Someone else sends `agent`, and a change of You hear of it sends `tell`. The answer is the plan below. A 400 `{"problems": ["words: ..."]}` shows under the door. The route starts nothing and saves nothing. The MCP tool `work_plan` gives the same answer. |
 
-The value:
-
-```json
-{"days": 30, "since": "...", "until": "...", "sentence": "In the last 30 days, ...",
- "work": {"pieces": 394, "done": 373, "failed": 17, "stopped": 3, "open": 1},
- "checks": {"accepted": 44, "sentBack": 14, "unchecked": 315},
- "people": {"actions": 172, "noPerson": 270, "reworked": 9, "waitSeconds": 498756, "waitingNow": 1, "handled": 0},
- "lead": {"measured": 373, "medianSeconds": 134, "waitShare": 0.676},
- "spend": {"usd": 29.04, "perDone": 0.078, "failedUSD": 1.65, "coordinationUSD": 1.43, "unpriced": 2, "atLeast": true},
- "estimated": {"minutes": 4525, "lines": 2, "pieces": 64},
- "periods": [{"start", "end", "done", "accepted", "sentBack", "unchecked", "failed", "usd"}],
- "lines": [{"key": "duty:daily-release-notes", "kind": "duty", "name": "daily-release-notes", "agent": "scribe",
-            "work": {...}, "checks": {...}, "actions": 3, "noPerson": 10, "medianLeadSeconds": 420,
-            "usd": 0.81, "perDone": 0.04, "unpriced": 0,
-            "estimate": {"minutes": 25, "by": "bob@example.com", "at": "..."}, "estimatedMinutes": 450}],
- "partial": false, "unknown": 0}
-```
-
-- A piece of work is a run without a parent that is no branch, no check
-  run, and no run of the manager or of the quick chat.
-- `checks` splits the done pieces by the first thumb, heart, or receipt.
-  A grade of a model is no verdict.
-- If runs have tokens without a price, `spend.atLeast` is true. The page
-  then says at least.
-- If a person set the minutes of a piece of a line, `estimated` and
-  `estimate` exist. Otherwise the page shows Not set.
-
-## 19. The board of the work
-
-`GET /v1/work` answers the board of the work of the caller: one card per
-piece of work, from the request to its end. The MCP tool `work` calls the
-same Go function (the package `work` of the workbench, branch
-`flow/board`). The query takes `days`, 1 to 90 and 7 by default, and
-`all=true` for every card that the caller can view.
+The board:
 
 ```json
-{"sentence": "...", "days": 7,
+{"sentence": "11 tasks are open. ...", "days": 7,
  "lanes": [{"stage": "needs-you", "count": 1, "yours": 1, "oldest": "..."}],
  "cards": [{"id": "bridge:br-1", "kind": "bridge", "title": "...",
             "from": {"kind": "person", "name": "...", "via": "bridge"},
             "stage": "needs-you", "next": "you", "reason": "scribe asks: ...",
             "opened": "...", "since": "...", "ended": null, "agents": ["scribe"],
             "parts": {"needsYou": 1, "review": 1, "total": 2},
-            "links": {"bridge": "br-1", "run": "...", "approval": "", "runs": ["..."]},
-            "costUSD": 0.12, "lost": false}]}
+            "links": {"bridge": "br-1", "run": "...", "approval": "", "duty": "", "runs": ["..."]},
+            "costUSD": 0.12, "lost": false, "verdict": "unchecked"}]}
 ```
 
-The stages, in the order of the flow: `waiting`, `working`, `needs-you`,
-`stopped`, `review`, `done`. A kind is `conversation`, `bridge`, `duty`,
-`job`, or `event`. `next` is `worker`, `agent`, `you`, `person`, `manager`,
-or empty for a done card. A card that did not end stays on the board
-however old it is. When the pool replaced the worker of a part that had
-not ended, `lost` is true.
-
-The page shows the board at `#work`, a view of the place Activity, with
-the key Work in the head of Activity. A click on a card opens its bridge,
-its duty, Activity for a card that needs the person, or its conversation.
-
-## 19. The door and the board of the Tasks place (prototype of 2026-10-27)
-
-The page chose these shapes, and `fake/routes-door.mjs` serves them. No
-workbench serves them yet. A front that serves both routes sends `door:
-true` in `GET /v1/bossmode`.
-
-| Route | What the page does with it |
-|---|---|
-| `POST /v1/tasks/plan` | `{"words", "agent"?, "tell"?}`, with the header `X-Time-Zone`. Read it back sends the words. A change of Someone else sends `agent`, and a change of You hear of it sends `tell`. The answer is the plan below. A 400 `{"problems": ["words: ..."]}` shows under the door. The route starts nothing and saves nothing. |
-| `GET /v1/tasks` | `{"tasks": [<card>]}`. The board reads it at the open of the place, each minute, and after a start. |
+- The stages, in the order of the flow, and their words on the page:
+  `waiting` Coming up, `working` Working, `needs-you` Needs you, `stopped`
+  Stopped, `review` To check, and `done` Done. The backend decides the
+  stage. The page only shows it.
+- `review`: the run ended well, and its owner asked to check each result.
+  The run carries the metadata `workbench.review` = `1`, or its duty has
+  `review: true`. The card leaves review on the first reaction.
+- **New:** `verdict` of a done card: `accepted` (a thumb up or a heart),
+  `checked` (the done check of the agent passed, `done: checked` from the
+  kernel), `sent-back` (a thumb down), or `unchecked`. The page shows the
+  word beside a light: green for accepted and checked, red for sent back,
+  and grey for unchecked.
+- **New:** `waiting` also holds the start that comes next of a duty of the
+  caller, with `since` at that start. The page then shows the time of the
+  start, not an age.
+- A kind is `conversation`, `bridge`, `duty`, `job`, or `event`. The page
+  says Chat, Team, Duty, Batch, and Event. `next` is `worker`, `agent`,
+  `you`, `person`, `manager`, or empty for a done card. The page tags
+  `you` as Yours and `manager` as Manager.
+- If the pool replaced the worker of a part that had not ended, `lost` is
+  true, and the card says Lost.
+- The title of a card opens its bridge, its duty or its run of a duty,
+  Activity for a card that needs the person, or its conversation.
 
 A plan:
 
@@ -1697,11 +1666,80 @@ A plan:
   bridge, and `budget.maxCostUSD` of a run.
 - The plan never names a cost. `cost.basis` says what runs of the agent
   cost, and `runsPerMonth` lets the page say the most a month can cost.
-- **New for the workbench:** `notify.result` and `notify.resultWhen`
-  (`always` or `found`) of a duty, and `caps.maxCostUSD` of a bridge.
-  Neither exists yet.
+  Start stays refused until the person types a cost.
+- A duty that the plan makes has `whileAway.decider` `nobody`. When the
+  words ask to see the work, such as show me, the duty has `review: true`
+  and a run has the metadata `workbench.review` = `1`.
+- **New for the duties:** `notify.result` (who hears of each result) and
+  `notify.resultWhen` (`always` or `found`), and `review`. The editor of a
+  duty keeps all three, and the page of a duty shows them.
+- **New for the bridges:** `caps.maxCostUSD`.
 
-A card: `{"id", "kind", "column", "title", "agents", "status", "at", "open", "detail"?, "cost"?}`.
-`column` is `needs`, `working`, `next`, or `done`. `at` is the start of a
-wait, the start of work, the next start, or the end. `open` is the address
-of the page that holds the work.
+## 20. Results
+
+The Results place reads what the work of the agents gave and took over a
+window. The workbench answers from its package `value`. The page keeps the
+types in `src/api/value.ts`.
+
+| Route | Answer |
+|---|---|
+| `GET /v1/value?days=7` | The value of the window. `days` is 7, 30, or 90, and 30 without it. Another number answers 400. |
+| `PUT /v1/value/estimates` | Body `{"line", "minutes"}`. It answers the line with its `estimate`. Zero minutes removes the estimate. A line that the person does not see in 90 days answers 404. A person who does not own the agent of the line gets 403. Minutes past 2400 answer 400. |
+
+The value:
+
+```json
+{"days": 30, "since": "...", "until": "...", "sentence": "In the last 30 days, ...",
+ "work": {"pieces": 394, "done": 373, "failed": 17, "stopped": 3, "open": 1},
+ "checks": {"accepted": 44, "checked": 30, "sentBack": 14, "unchecked": 285},
+ "people": {"actions": 172, "noPerson": 270, "reworked": 9, "waitSeconds": 498756, "waitingNow": 1, "handled": 0},
+ "lead": {"measured": 373, "medianSeconds": 134, "waitShare": 0.676},
+ "spend": {"usd": 29.04, "perDone": 0.078, "failedUSD": 1.65, "coordinationUSD": 1.43, "unpriced": 2, "atLeast": true},
+ "estimated": {"minutes": 4525, "lines": 2, "pieces": 64},
+ "periods": [{"start", "end", "done", "accepted", "checked", "sentBack", "unchecked", "failed", "usd"}],
+ "lines": [{"key": "duty:daily-release-notes", "kind": "duty", "name": "daily-release-notes", "agent": "scribe",
+            "work": {...}, "checks": {...}, "actions": 3, "noPerson": 10, "medianLeadSeconds": 420,
+            "usd": 0.81, "perDone": 0.04, "unpriced": 0,
+            "estimate": {"minutes": 25, "by": "bob@example.com", "at": "..."}, "estimatedMinutes": 450}],
+ "partial": false, "unknown": 0}
+```
+
+- A task is a run without a parent that is no branch, no check run, and no
+  run of the manager or of the quick chat. The JSON keeps the key
+  `pieces`.
+- `checks` splits the done tasks by their verdict: the first thumb, heart,
+  or receipt of a person, then the done check of the agent. A grade of a
+  model is no verdict.
+- **New:** `checked` counts the done tasks whose `fw.run.finished` carries
+  `done: checked`. An older front leaves it out, and the page counts it as
+  0. The figure Checked adds accepted, checked, and sent back. The bar
+  shows checked as its own segment: a green ring.
+- If runs have tokens without a price, `spend.atLeast` is true. The page
+  then says at least.
+- If a person set the minutes of a task of a line, `estimated` and
+  `estimate` exist. Otherwise the page shows Not set.
+
+## 21. A result to check
+
+A run whose owner asked to check each result waits in two places: the lane
+To check of the board, and Activity, where `GET /v1/inbox` gives it an item
+of the kind `result`:
+
+```json
+{"kind": "result", "run": "duty-notes-0", "approval": "", "duty": "daily-release-notes",
+ "agent": "scribe", "bridge": "", "text": "Release notes of yesterday is ready to check.", "since": "..."}
+```
+
+- Activity shows a row with the light `to check`, and the app bar counts
+  it, as it needs a person. The main pane shows the answer of the run, a
+  link to the run, Needs work, and Looks right.
+- Looks right sends `POST /v1/runs/{id}/reactions` with
+  `{"seq": 0, "reaction": "up"}`.
+- Needs work opens a note. Send back refuses an empty note and a note past
+  1 KB, then sends `{"seq": 0, "reaction": "down", "note": "..."}`.
+- **New for the front:** a reaction with `seq` 0 on a run in review goes on
+  the `fw.run.finished` of the run, so the kernel records a receipt and
+  the verdict counts. After a thumb down with a note, the front sends the
+  note to the agent as a follow-up message. The run then works again, and
+  its new answer is a new result to check.
+- The item leaves the inbox on the first reaction.

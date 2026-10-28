@@ -18,6 +18,7 @@ import { ApiError } from '../api/client';
 import type { TaskPlan, TaskTell } from '../api/types';
 import { hrefOf } from '../lib/route';
 import { nextWords } from '../lib/duties';
+import { list } from '../lib/words';
 import { loadDuties } from '../state/duties';
 import { loadBridges } from '../state/actions';
 import { showError, showSaid } from './notice';
@@ -83,7 +84,7 @@ export async function startPlan(plan: TaskPlan, cost: number): Promise<Started> 
   if (s.bridge) {
     const b = await api.openBridge({ ...s.bridge, caps: { ...(s.bridge.caps || {}), maxCostUSD: cost } } as Parameters<typeof api.openBridge>[0]);
     loadBridges().catch(() => {});
-    return { title: plan.title, said: 'Started. ' + plan.who.map((w) => w.name).join(' and ') + ' work on it now.', href: hrefOf({ place: 'bridge', id: b.id, pane: 'none' }) };
+    return { title: plan.title, said: 'Started. ' + list(plan.who.map((w) => w.name)) + ' work on it now.', href: hrefOf({ place: 'bridge', id: b.id, pane: 'none' }) };
   }
   if (s.run) {
     const r = await api.start(s.run.member, { ...s.run.body, budget: { maxCostUSD: cost } } as Parameters<typeof api.start>[1]);
