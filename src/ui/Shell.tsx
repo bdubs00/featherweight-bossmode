@@ -17,7 +17,7 @@
 import type { ComponentChildren, JSX } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
-import type { BossConfig } from '../api/types';
+import type { BossConfig, Whoami } from '../api/types';
 import { useSelect } from '../state/store';
 import { loadInbox } from '../state/duties';
 import { useOffline } from '../state/reach';
@@ -262,6 +262,29 @@ export function placesOf(config: BossConfig | null, every = true, current?: Plac
   return every ? [...main, ...more] : [...main, ...more.filter((it) => it.id === current)];
 }
 
+/**
+ * operates reports whether the person can start work and read the wiki: an
+ * admin, the token of the fleet, or a person with the operator or the owner
+ * role on an agent, as the front checks both. A viewer of every agent, such
+ * as a sponsor, operates nothing. A whoami that names no role, as an older
+ * front or a test sends it, keeps every place.
+ */
+export function operates(me: Whoami | null | undefined): boolean {
+  if (!me) return true;
+  if (me.admin || isToken(me.principal)) return true;
+  const roles = Object.values(me.roles || {});
+  if (!roles.length) return true;
+  return roles.some((r) => r === 'operator' || r === 'owner');
+}
+
+/** The places that need the operator role: the quick chat starts runs, and the wiki needs it to read. */
+const OPERATOR_PLACES: Place[] = ['chat', 'wiki'];
+
+/** opensOn is the place where the page opens with work: Work for a person who can start work, else Results, which answers a sponsor. */
+export function opensOn(me: Whoami | null | undefined): 'work' | 'results' {
+  return operates(me) ? 'work' : 'results';
+}
+
 /** morePlaces gives the places behind More: the places of the bar that placesOf leaves out. */
 export function morePlaces(config: BossConfig | null, current?: Place): PlaceItem[] {
   if (!config || !config.work) return [];
@@ -317,7 +340,7 @@ function usePhone(): boolean {
  * that the bar leaves out. ArrowUp and ArrowDown move, and Escape closes it
  * and gives the focus back to the key.
  */
-function MoreMenu({ items }: { items: PlaceItem[] }) {
+function MoreMenu({ items, dot }: { items: PlaceItem[]; dot?: boolean }) {
   const [open, setOpen] = useState(false);
   const btn = useRef<HTMLButtonElement>(null);
   const list = useRef<HTMLDivElement>(null);
@@ -355,6 +378,7 @@ function MoreMenu({ items }: { items: PlaceItem[] }) {
       <button ref={btn} type="button" class="place place-more" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
         <Glyph name="more" size={22} />
         <span class="place-label">More</span>
+        {dot && <ManagerDot />}
       </button>
       {open && (
         <div ref={list} class="menu menu-more" role="menu" aria-label="More places" onKeyDown={onKey}>
@@ -362,6 +386,7 @@ function MoreMenu({ items }: { items: PlaceItem[] }) {
             <a role="menuitem" href={lastOf[it.id] || it.href} onClick={() => setOpen(false)}>
               <Glyph name={it.glyph} size={20} />
               <span class="t">{it.label}</span>
+              {it.id === 'manager' && <ManagerDot />}
             </a>
           ))}
         </div>
@@ -372,8 +397,11 @@ function MoreMenu({ items }: { items: PlaceItem[] }) {
 
 /**
  * AppBar is the column of places: the logo well, the places, and the
- * account. onReach opens Where to reach me. place is the place to light,
- * when the route alone does not say it.
+ * account. With work, a wide window shows five places and the key More,
+ * which opens every place in the bar and then says Fewer. It is a
+ * disclosure: it says whether it is open, and Escape on it folds the
+ * places back. A phone opens More as a menu. onReach opens Where to reach
+ * me. place is the place to light, when the route alone does not say it.
  */
 export function AppBar({ route, place: placeProp, onSignOut, onReach }: { route: Route; place?: Place; onSignOut: () => void; onReach: () => void }) {
   const place = placeProp || placeOf(route);
@@ -383,6 +411,10 @@ export function AppBar({ route, place: placeProp, onSignOut, onReach }: { route:
   const offline = useOffline();
   const theme = themeOf(config);
   const logo = useLogo(theme.logo);
+  // A person who operates no agent gets no place that refuses them: the quick chat and the wiki.
+  const me = useSelect((s) => s.me);
+  const can = operates(me);
+  const usable = (it: PlaceItem) => can || it.id === place || !OPERATOR_PLACES.includes(it.id);
   // A run that starts to wait for the person, such as a decision in a chat
   // with an agent, reaches the page on the stream at once. Its row of
   // Activity comes from the inbox, so the count reads the inbox then, and
@@ -397,6 +429,18 @@ export function AppBar({ route, place: placeProp, onSignOut, onReach }: { route:
   useEffect(() => {
     if (waiting) loadInbox().catch(() => {});
   }, [waiting]);
+  // A result that its owner asked to check comes back on the stream when
+  // its run ends, also after Needs work. The count and Activity read the
+  // inbox then, so the new result shows at once.
+  const toCheck = useSelect((s) =>
+    Object.keys(s.runs)
+      .filter((id) => s.runs[id].state === 'completed' && !!s.runs[id].metadata && s.runs[id].metadata!['workbench.review'] === '1')
+      .sort()
+      .join(','),
+  );
+  useEffect(() => {
+    if (toCheck) loadInbox().catch(() => {});
+  }, [toCheck]);
   useEffect(() => {
     document.title = tabTitle(place, attention, theme.name);
   }, [place, attention, theme.name]);
@@ -405,31 +449,52 @@ export function AppBar({ route, place: placeProp, onSignOut, onReach }: { route:
   const work = !!(config && config.work);
   // A phone keeps five places in the bar, and More opens a menu of the rest.
   const wide = every && !phone;
+  // The places that More hides. The dot of the manager moves to More while
+  // More hides the place Manager, so an answer of the manager never waits unseen.
+  const hidden = work && !wide ? morePlaces(config, place).filter(usable).map((it) => it.id) : [];
+  const managerHidden = hidden.includes('manager');
   return (
     <nav class="appbar" aria-label="Places">
-      <LogoWell src={logo} name={theme.name} href={work ? '#work' : '#'} />
+      <LogoWell src={logo} name={theme.name} href={work ? '#' + opensOn(me) : '#'} />
       <div class="places">
-        {placesOf(config, wide, place).map((it) => {
-          const on = it.id === place;
-          const count = it.id === 'activity' ? attention : 0;
-          return (
-            <a class={'place' + (on ? ' on' : '')} href={on ? it.href : lastOf[it.id] || it.href} aria-current={on ? 'page' : undefined}>
-              <Glyph name={it.glyph} size={22} />
-              <span class="place-label">{it.label}</span>
-              {count > 0 && (
-                <Chip tone="ink" class={'place-count' + (offline ? ' stale' : '')} label={(count === 1 ? '1 item needs you' : count + ' items need you') + (offline ? ', as the page read it last' : '')}>
-                  {countText(count)}
-                </Chip>
-              )}
-              {it.id === 'manager' && <ManagerDot />}
-            </a>
-          );
-        })}
-        {work && phone && <MoreMenu items={morePlaces(config, place)} />}
+        {placesOf(config, wide, place)
+          .filter(usable)
+          .map((it) => {
+            const on = it.id === place;
+            const count = it.id === 'activity' ? attention : 0;
+            return (
+              <a class={'place' + (on ? ' on' : '')} href={on ? it.href : lastOf[it.id] || it.href} aria-current={on ? 'page' : undefined}>
+                <Glyph name={it.glyph} size={22} />
+                <span class="place-label">{it.label}</span>
+                {count > 0 && (
+                  <Chip tone="ink" class={'place-count' + (offline ? ' stale' : '')} label={(count === 1 ? '1 item needs you' : count + ' items need you') + (offline ? ', as the page read it last' : '')}>
+                    {countText(count)}
+                  </Chip>
+                )}
+                {it.id === 'manager' && <ManagerDot />}
+              </a>
+            );
+          })}
+        {work && phone && <MoreMenu items={morePlaces(config, place).filter(usable)} dot={managerHidden} />}
         {work && !phone && (
-          <button type="button" class="place place-more" aria-pressed={every} title={every ? 'Show five places' : 'Show every place'} onClick={() => setEvery(!every)}>
+          <button
+            type="button"
+            class="place place-more"
+            aria-expanded={every}
+            title={every ? 'Show five places' : 'Show every place'}
+            onClick={() => setEvery(!every)}
+            onKeyDown={(e) => {
+              // Escape folds the places back, and never leaves the screen.
+              if (e.key === 'Escape' && every) {
+                e.preventDefault();
+                e.stopPropagation();
+                setEvery(false);
+              }
+            }}
+          >
             <Glyph name="more" size={22} />
             <span class="place-label">{every ? 'Fewer' : 'More'}</span>
+            {managerHidden && <ManagerDot />}
           </button>
         )}
       </div>

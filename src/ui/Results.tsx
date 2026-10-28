@@ -1,7 +1,9 @@
 // Results: what the work of the agents gave and what it took, for a person
 // who pays for the agents and decides whether they are worth it. One pane:
-// the window, five figures, the done work by period with the verdicts of
-// people, and the lines of work. Every figure is what the records hold: an
+// the window, six figures, the done work by period with the verdicts of
+// people, and the lines of work. A result that waits for a check and a
+// task that waits for a person link to Activity, and the name of a line
+// opens its duty or its agent. Every figure is what the records hold: an
 // unchecked result shows as unchecked, a spend with unpriced tokens says
 // at least, and hours of a person show only from an estimate that names
 // the person who set it. The operator metrics stay in Prometheus.
@@ -11,8 +13,10 @@ import { ApiError } from '../api/client';
 import { valueApi, WINDOWS, type Value, type ValueChecks, type ValueLine, type ValuePeriod, type Window } from '../api/value';
 import { fleetAgents } from '../lib/agents';
 import { costText } from '../lib/cost';
+import { hrefOf } from '../lib/route';
 import { personName } from '../lib/words';
 import { useSelect } from '../state/store';
+import { useInboxRows } from '../state/activity';
 import { Face } from './common';
 import { Button, Help, Input, Led, PaneHeader, Tabs } from './primitives';
 
@@ -59,7 +63,45 @@ export function hours(minutes: number): string {
 export const pct = (x: number): string => Math.round(x * 100) + '%';
 
 /** day words a moment as a short date, such as Oct 21. */
-const day = (iso: string): string => new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+const day = (iso: string | number): string => new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+
+const DAY_MS = 86_400_000;
+
+/**
+ * periodWords names a column of the chart. A day says the date that most of
+ * it covers, because a day of the window ends now and not at midnight. A
+ * week says its first day. A period shorter than its unit, such as the
+ * first week of a window of 30 days, also says its length, so a short
+ * column never reads as a slow week.
+ */
+export function periodWords(p: { start: string; end: string }, unit: 'day' | 'week'): { label: string; short: string } {
+  const a = Date.parse(p.start);
+  const b = Date.parse(p.end);
+  const len = b - a;
+  const label = unit === 'day' ? day(a + len / 2) : day(a);
+  const full = unit === 'day' ? DAY_MS : 7 * DAY_MS;
+  if (!(len > 0) || len >= full - 60_000) return { label, short: '' };
+  const days = Math.round(len / DAY_MS);
+  return { label, short: days < 1 ? 'under a day' : days === 1 ? '1 day' : days + ' days' };
+}
+
+/**
+ * firstWork names the start of the first period with work when periods
+ * before it hold none, such as an archive that began 2 weeks ago in a
+ * window of 90 days. A sponsor then reads why 30 and 90 days agree.
+ */
+export function firstWork(v: Pick<Value, 'periods' | 'work'>): string {
+  if (!v.work.pieces) return '';
+  const i = v.periods.findIndex((p) => p.done + p.failed + p.sentBack + p.unchecked + p.accepted > 0 || p.usd > 0);
+  return i > 0 ? day(v.periods[i].start) : '';
+}
+
+/** lineHref is the address of what a line of work is: the page of its duty, or the profile of its agent. A source has no page. */
+export function lineHref(l: Pick<ValueLine, 'kind' | 'name' | 'agent'>): string {
+  if (l.kind === 'duty') return hrefOf({ place: 'duties', name: l.name });
+  if (l.kind === 'agent') return hrefOf({ place: 'fleet', agent: l.agent, profile: true });
+  return '';
+}
 
 const KIND_WORD: Record<ValueLine['kind'], string> = { duty: 'duty', source: 'source', agent: 'agent' };
 
@@ -99,7 +141,11 @@ export function Results() {
             </Button>
           </p>
         )}
-        {!v && !error && <p class="t-meta">Loading</p>}
+        {!v && !error && (
+          <p class="t-meta" role="status">
+            Loading the results.
+          </p>
+        )}
         {v && <Body v={v} onSaved={() => setTick((n) => n + 1)} />}
       </div>
     </section>
@@ -107,7 +153,15 @@ export function Results() {
 }
 
 function Body({ v, onSaved }: { v: Value; onSaved: () => void }) {
-  const unit = v.days <= 7 ? 'day' : 'week';
+  const unit: 'day' | 'week' = v.days <= 7 ? 'day' : 'week';
+  // The results that wait for a check of the person, as Activity lists them.
+  const { rows } = useInboxRows();
+  const toCheck = rows.filter((r) => r.kind === 'result');
+  // The decisions and questions that wait for this person, as Activity
+  // lists them. "Waiting for you" counts only these, never the waits of a
+  // task that the person cannot decide.
+  const mine = rows.filter((r) => r.status === 'needs-you' && r.kind !== 'result');
+  const measured = v.lead.measured > 0;
   return (
     <div class="rs">
       <p class="sr" id="results-sentence">
@@ -115,15 +169,46 @@ function Body({ v, onSaved }: { v: Value; onSaved: () => void }) {
       </p>
       <p class="rs-span t-meta">
         <time dateTime={v.since}>{day(v.since)}</time> to <time dateTime={v.until}>{day(v.until)}</time>
+        {firstWork(v) && <span>Nothing before {firstWork(v)}</span>}
         {v.partial && (
           <>
             {' '}
-            <Led tone="grey" word={'Partial: ' + v.unknown + ' without a record'} />
+            <Led
+              tone="grey"
+              word={'Partial: ' + (v.unknown || 0) + ((v.unknown || 0) === 1 ? ' task' : ' tasks') + ' without a record of people'}
+              label="An older server kept no record of the checks and the actions of people for these tasks."
+            />
           </>
         )}
       </p>
+      {v.work.pieces === 0 ? (
+        <Nothing days={v.days} />
+      ) : (
+        <Figures v={v} unit={unit} toCheck={toCheck} mine={mine} measured={measured} onSaved={onSaved} />
+      )}
+    </div>
+  );
+}
+
+/** Nothing is a window without work: it says so once, and the key starts a task, in place of a wall of zeros. */
+function Nothing({ days }: { days: number }) {
+  return (
+    <div class="empty rs-nothing">
+      <p>No work in the last {days} days.</p>
+      <Button href="#work">Start a task</Button>
+    </div>
+  );
+}
+
+function Figures({ v, unit, toCheck, mine, measured, onSaved }: { v: Value; unit: 'day' | 'week'; toCheck: { key: string }[]; mine: { key: string }[]; measured: boolean; onSaved: () => void }) {
+  return (
+    <>
       <div class="rs-tiles">
-        <Tile label="Done" figure={v.work.done.toLocaleString()}>
+        <Tile
+          label="Done"
+          figure={v.work.done.toLocaleString()}
+          help="A task is one thing that a person or a duty asked of an agent, such as a start of a duty or a message to an agent. The work of the manager and of the quick chat is no task. Its cost shows as coordination under Spend."
+        >
           <p class="t-meta">
             {v.work.failed + v.work.stopped} failed or stopped, {v.work.open} open
             {(v.work.lost || 0) > 0 && <>, {v.work.lost} lost</>}
@@ -136,42 +221,76 @@ function Body({ v, onSaved }: { v: Value; onSaved: () => void }) {
           help="A result is checked when a person gave it a thumb or a heart, when a receipt of another system accepted or rejected it, or when the done check of the agent passed. The grade of a model does not count."
         >
           <Verdicts checks={v.checks} />
+          {toCheck.length > 0 && (
+            <a class="rs-now" href={hrefOf({ place: 'activity', item: toCheck[0].key })}>
+              <Led tone="amber" word={toCheck.length + ' to check'} />
+            </a>
+          )}
         </Tile>
-        <Tile label="Spend" lead={v.spend.atLeast ? 'at least' : ''} figure={costText(v.spend.usd)}>
-          <p class="t-meta">
-            <b class="rs-ink">{costText(v.spend.perDone)}</b> a done task
-          </p>
+        <Tile
+          label="Spend"
+          lead={v.spend.atLeast ? 'at least' : ''}
+          figure={costText(v.spend.usd)}
+          help="What the models of the agents cost in the window, for all the work, also the work that failed. Coordination is the manager and the quick chat. The spend says at least when some runs used a model without a price."
+        >
+          {v.work.done > 0 && (!v.spend.atLeast || v.spend.perDone >= 0.01) && (
+            <p class="t-meta">
+              {v.spend.atLeast && 'at least '}
+              <b class="rs-ink">{costText(v.spend.perDone)}</b> a done task
+            </p>
+          )}
           <p class="t-meta">
             {costText(v.spend.failedUSD)} on failed work, {costText(v.spend.coordinationUSD)} on coordination
           </p>
           {v.spend.unpriced > 0 && <Led tone="grey" word={v.spend.unpriced + (v.spend.unpriced === 1 ? ' run without a price' : ' runs without a price')} />}
         </Tile>
-        <Tile label="Needed nobody" figure={v.people.noPerson.toLocaleString()} unit={'of ' + v.work.done.toLocaleString()}>
+        <Tile
+          label="Needed nobody"
+          figure={v.people.noPerson.toLocaleString()}
+          unit={'of ' + v.work.done.toLocaleString()}
+          help="A done task needed nobody when no person decided for it or wrote to it after the ask. A decision that the manager or a timeout made is no action of a person. A thumb on the result afterwards does not count either."
+        >
           <p class="t-meta">
-            {v.people.actions.toLocaleString()} actions of people, {v.people.reworked} sent back with a message
+            {v.people.actions === 1 ? '1 action of a person' : v.people.actions.toLocaleString() + ' actions of people'}, {v.people.reworked} followed up after they ended
+            {(v.people.handled || 0) > 0 && <>, {v.people.handled} {v.people.handled === 1 ? 'decision' : 'decisions'} without a named person</>}
           </p>
-          {v.people.waitingNow > 0 && (
-            <a class="rs-now" href="#activity">
-              <Led tone="amber" word={v.people.waitingNow + ' waiting for you'} />
+          {mine.length > 0 ? (
+            <a class="rs-now" href={hrefOf({ place: 'activity', item: mine[0].key })}>
+              <Led tone="amber" word={mine.length + ' waiting for you'} />
             </a>
+          ) : (
+            v.people.waitingNow > 0 && <Led tone="grey" word={v.people.waitingNow + ' waiting for a person'} />
           )}
         </Tile>
-        <Tile label="Time to done" figure={span(v.lead.medianSeconds)} unit="median" help="From the ask to the first end of a done task. The time that a job waited in its queue before a worker took it is not in it.">
-          <Share share={v.lead.waitShare} />
-          <p class="t-meta">
-            {span(v.people.waitSeconds)} waiting on people, {pct(v.lead.waitShare)} of all the time to done
-          </p>
+        <Tile
+          label="Time to done"
+          figure={measured ? span(v.lead.medianSeconds) : 'None yet'}
+          unit={measured ? 'median' : ''}
+          muted={!measured}
+          help="From the ask to the first end of a done task. Half of the done tasks took this long or less. The bar adds up the time of all the done tasks and shows the part that waited for a person, so a few long waits weigh much. The time that a task waited for a worker is not in it."
+        >
+          {measured && (
+            <>
+              <Share share={v.lead.waitShare} />
+              <p class="t-meta">{pct(v.lead.waitShare)} of the time to done waited on people</p>
+              {v.people.waitSeconds > 0 && (
+                <p class="t-meta">
+                  {span(v.people.waitSeconds)} of waits on people in all{v.people.waitingNow > 0 && <>, {v.people.waitingNow} still open</>}
+                </p>
+              )}
+            </>
+          )}
         </Tile>
         <Tile
           label="Hours of a person"
           figure={v.estimated ? hours(v.estimated.minutes) : 'Not set'}
           unit={v.estimated ? 'est.' : ''}
           muted={!v.estimated}
-          help="The front measures no time that people spend. The owner of an agent sets the minutes that a person takes for one task of a line, and the page multiplies them by the done tasks that nobody sent back."
+          help="Nothing measures the time that people spend. The owner of an agent sets the minutes that a person takes for one task of a line, in Lines of work. The page multiplies them by the done tasks that nobody sent back."
         >
           {v.estimated && (
             <p class="t-meta">
-              {v.estimated.pieces} tasks of {v.estimated.lines} {v.estimated.lines === 1 ? 'line' : 'lines'}, {v.work.done - v.estimated.pieces} without an estimate
+              {v.estimated.pieces === 1 ? '1 task' : v.estimated.pieces + ' tasks'} of {v.estimated.lines} {v.estimated.lines === 1 ? 'line' : 'lines'}, {v.work.done - v.estimated.pieces} without an estimate
             </p>
           )}
         </Tile>
@@ -193,7 +312,7 @@ function Body({ v, onSaved }: { v: Value; onSaved: () => void }) {
         </div>
         <Lines lines={v.lines} onSaved={onSaved} />
       </section>
-    </div>
+    </>
   );
 }
 
@@ -286,8 +405,10 @@ function Legend() {
 const CH = { h: 180, top: 20, foot: 36, gap: 2 };
 
 /** Chart draws one column per period: the done pieces stacked by verdict, the count on top, and the failed pieces under the date. */
-function Chart({ periods, unit }: { periods: ValuePeriod[]; unit: string }) {
+function Chart({ periods, unit }: { periods: ValuePeriod[]; unit: 'day' | 'week' }) {
   const n = Math.max(1, periods.length);
+  const words = periods.map((p) => periodWords(p, unit));
+  const said = periods.map((p, i) => words[i].label + (words[i].short ? ', ' + words[i].short : '') + ': ' + p.done + ' done' + (p.failed ? ', ' + p.failed + ' failed' : '')).join('; ');
   const w = 100 * n;
   const max = Math.max(1, ...periods.map((p) => p.done));
   const plot = CH.h - CH.top - CH.foot;
@@ -295,7 +416,7 @@ function Chart({ periods, unit }: { periods: ValuePeriod[]; unit: string }) {
   const bw = 40;
   return (
     <div class="rs-chart">
-      <svg viewBox={`0 0 ${w} ${CH.h}`} preserveAspectRatio="none" role="img" aria-label={'Done by ' + unit + ': ' + periods.map((p) => day(p.start) + ' ' + p.done).join(', ')}>
+      <svg viewBox={`0 0 ${w} ${CH.h}`} preserveAspectRatio="none" role="img" aria-label={'Done by ' + unit + '. ' + said}>
         <defs>
           <pattern id="rs-hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
             <rect class="rs-hatch-ground" width="5" height="5" />
@@ -330,11 +451,12 @@ function Chart({ periods, unit }: { periods: ValuePeriod[]; unit: string }) {
           );
         })}
       </svg>
-      <ol class="rs-axis t-meta" style={{ gridTemplateColumns: `repeat(${n}, 1fr)` }}>
-        {periods.map((p) => (
-          <li>
+      <ol class="rs-axis t-meta" aria-hidden="true" style={{ gridTemplateColumns: `repeat(${n}, 1fr)` }}>
+        {periods.map((p, i) => (
+          <li title={day(p.start) + ' to ' + day(p.end)}>
             <b class="rs-ink">{p.done}</b>
-            <span>{day(p.start)}</span>
+            <span>{words[i].label}</span>
+            {words[i].short && <span class="rs-short">{words[i].short}</span>}
             {p.failed > 0 && <span class="rs-failed">{p.failed} failed</span>}
           </li>
         ))}
@@ -369,7 +491,7 @@ function Lines({ lines, onSaved }: { lines: ValueLine[]; onSaved: () => void }) 
             Spend
           </th>
           <th scope="col" class="num narrow-hide">
-            A task
+            Per task
           </th>
           <th scope="col" class="phone-hide">
             Minutes a task
@@ -382,13 +504,23 @@ function Lines({ lines, onSaved }: { lines: ValueLine[]; onSaved: () => void }) 
             <th scope="row" class="rs-line">
               <span class="rs-line-name">
                 <Face agent={l.agent} size={20} />
-                <span class="clip">{l.name}</span>
+                {lineHref(l) ? (
+                  <a class="clip" href={lineHref(l)} title={l.name}>
+                    {l.name}
+                  </a>
+                ) : (
+                  <span class="clip" title={l.name}>
+                    {l.name}
+                  </span>
+                )}
               </span>
               <span class="t-meta">{KIND_WORD[l.kind]}</span>
             </th>
             <td class="num">
               <b>{l.work.done.toLocaleString()}</b>
-              {l.work.failed + l.work.stopped > 0 && <span class="t-meta rs-failed"> {l.work.failed + l.work.stopped} failed</span>}
+              {l.work.failed > 0 && <span class="t-meta rs-failed"> {l.work.failed} failed</span>}
+              {l.work.stopped > 0 && <span class="t-meta rs-failed"> {l.work.stopped} stopped</span>}
+              {(l.work.lost || 0) > 0 && <span class="t-meta rs-failed"> {l.work.lost} lost</span>}
             </td>
             <td>
               <Verdicts checks={l.checks} compact />
@@ -399,10 +531,9 @@ function Lines({ lines, onSaved }: { lines: ValueLine[]; onSaved: () => void }) 
             <td class="num narrow-hide">{l.work.done ? pct(l.noPerson / l.work.done) : ''}</td>
             <td class="num narrow-hide">{l.medianLeadSeconds ? span(l.medianLeadSeconds) : ''}</td>
             <td class="num phone-hide">
-              {l.unpriced > 0 && <span class="t-meta">at least </span>}
-              {costText(l.usd)}
+              <LineSpend usd={l.usd} unpriced={l.unpriced} />
             </td>
-            <td class="num narrow-hide">{l.work.done ? costText(l.perDone) : ''}</td>
+            <td class="num narrow-hide">{l.work.done ? <LineSpend usd={l.perDone} unpriced={l.unpriced} each /> : ''}</td>
             <td class="phone-hide">
               <Estimate line={l} owner={owner(l.agent)} onSaved={onSaved} />
             </td>
@@ -411,6 +542,29 @@ function Lines({ lines, onSaved }: { lines: ValueLine[]; onSaved: () => void }) 
       </tbody>
     </table>
     </div>
+  );
+}
+
+/**
+ * LineSpend is the spend of a line, or of one of its tasks. With runs that
+ * have no price, a figure of a cent or more says at least, and a smaller
+ * one says nothing it cannot back: the spend says no price when nothing
+ * had a price, and the cost of a task says unknown.
+ */
+export function LineSpend({ usd, unpriced, each }: { usd: number; unpriced: number; each?: boolean }) {
+  if (unpriced <= 0) return <>{costText(usd)}</>;
+  const title = unpriced === 1 ? '1 run without a price' : unpriced + ' runs without a price';
+  if (usd >= 0.01)
+    return (
+      <span title={title}>
+        <span class="t-meta rs-lead-line">at least</span>
+        {costText(usd)}
+      </span>
+    );
+  return (
+    <span class="t-meta" title={title}>
+      {each ? 'unknown' : usd > 0 ? 'under $0.01, more without a price' : 'no price'}
+    </span>
   );
 }
 
@@ -426,7 +580,7 @@ function Estimate({ line, owner, onSaved }: { line: ValueLine; owner: boolean; o
       <span class="rs-est">
         {e ? (
           <span title={'Set by ' + e.by + ' on ' + day(e.at)}>
-            <b>{e.minutes} min</b> <span class="t-meta">{personName(e.by)}</span>
+            <b>{e.minutes} min</b> <span class="t-meta">by {personName(e.by)}</span>
           </span>
         ) : (
           <span class="t-meta">Not set</span>

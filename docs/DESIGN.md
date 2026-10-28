@@ -1183,7 +1183,16 @@ Left out, and why:
 
 With `work: true` in `GET /v1/bossmode`, the app bar shows Work, Results,
 Activity, Chat, and Wiki, then More. A wide window opens the other places
-in the bar, and the key says Fewer. A phone opens a menu of those places
+in the bar, and the key says Fewer. The key is a disclosure: it says
+whether it is open, and Escape on it folds the places back. Eleven places
+and More need about 900 pixels, so on a shorter window the places scroll
+between the logo well and the account, and the account stays in sight.
+Under 960 pixels of height each place takes less padding. While More hides
+Manager, the dot of an answer of the manager sits on More.
+A person who operates no agent, such as a sponsor who views every agent,
+gets no Chat and no Wiki, because both refuse that person. The page opens
+that person on Results, which answers what the work gave, and the logo
+leads there too. A phone opens a menu of those places
 above the bar, as the menu of the account opens. The place of the screen
 that shows stays in the bar. Work and Results have no list pane, so a
 narrow window keeps the bar at the bottom of their main pane. The page
@@ -1212,7 +1221,10 @@ Work holds the door on top and the board below, in one pane that scrolls.
 - Needs work opens the note in place, with Cancel and Send back.
 
 Results shows checked by a machine as a green ring on the ground of the
-card, beside the full green of a person who accepted. The ring reads apart
+card, beside the full green of a person who accepted. A day of the chart
+says the date that most of it covers, a week says its first day, and a
+period shorter than its unit says its length. "Waiting for you" counts
+only what the person can decide. The ring reads apart
 for a person who does not tell the greens apart. The tiles name their
 figures in sentence case, and a meta line joins its parts with a comma.
 

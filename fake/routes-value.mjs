@@ -19,11 +19,17 @@
 // bound. Bob set an estimate for the release notes, and alice for the
 // migrations. FAKE_VALUE_PARTIAL=1 leaves the facts out of the oldest
 // pieces, as an archive that a server before the value wrote.
+// FAKE_VALUE_EMPTY=1 holds no work at all, as a new deployment.
+//
+// The runs of the fake whose owner asked to check each result also count,
+// with the verdict of their reactions. So Looks right and Needs work in
+// Activity move the figures of Results, as on a real front.
 
 const MIN = 60_000;
 const HOUR = 60 * MIN;
 const DAY = 24 * HOUR;
 const PARTIAL = process.env.FAKE_VALUE_PARTIAL === '1';
+const EMPTY = process.env.FAKE_VALUE_EMPTY === '1';
 
 /** rng is a small seeded generator, so every start of the fake has the same data. */
 function rng(seed) {
@@ -47,8 +53,37 @@ const COORDINATION = [
   { agent: 'chat', perDay: 1, usd: [0.005, 0.02] },
 ];
 
+/**
+ * livePieces gives the runs of the fake whose owner asked to check each
+ * result, as pieces of the line of their duty. A thumb up or a heart
+ * accepts a result, a thumb down sends it back, and a run that works again
+ * after Needs work is open. A thumb is a verdict, and the note of Needs
+ * work is an action of a person, as value.Fold counts them.
+ */
+function livePieces(runs) {
+  const out = [];
+  for (const r of runs.values()) {
+    const md = r.metadata || {};
+    if (md['workbench.review'] !== '1') continue;
+    const duty = md['workbench.duty'] || '';
+    const key = duty ? 'duty:' + duty : 'agent:' + r.agent;
+    const line = LINES.find((l) => l.key === key) || { key, kind: duty ? 'duty' : 'agent', name: duty || r.agent, agent: r.agent };
+    const re = r.reactions || {};
+    const done = r.state === 'completed';
+    const verdict = !done ? '' : re.down > 0 ? 'rejected' : re.up > 0 || re.heart > 0 ? 'accepted' : '';
+    const created = Date.parse(r.createdAt);
+    out.push({
+      line, created, state: done ? 'completed' : r.state === 'failed' ? 'failed' : 'running', acts: r.reworks || 0, verdict,
+      rework: r.reworks ? 1 : 0, waitMs: 0, leadMs: done ? Math.max(0, Date.parse(r.updatedAt) - created) : 0,
+      usd: (r.usage && r.usage.costUSD) || 0.03, unpriced: false, facts: true,
+    });
+  }
+  return out;
+}
+
 /** pieces makes 90 days of pieces of work before the time t0, newest last. */
 function generate(t0) {
+  if (EMPTY) return { pieces: [], coord: [] };
   const r = rng(20261027);
   const pick = ([a, b]) => a + (b - a) * r();
   const out = [];
@@ -242,7 +277,7 @@ function sentence(a) {
   return s;
 }
 
-export function register({ on, refuse, readJson, AGENTS }) {
+export function register({ on, refuse, readJson, AGENTS, S }) {
   // The time of the data: the start of the fake, on a whole minute.
   const t0 = Math.floor(Date.now() / MIN) * MIN;
   const data = generate(t0);
@@ -251,12 +286,14 @@ export function register({ on, refuse, readJson, AGENTS }) {
     ['agent:migrator', { minutes: 90, by: 'alice@example.com', at: new Date(t0 - 12 * DAY).toISOString() }],
   ]);
   const roleOf = (agent) => (AGENTS.find((a) => a.name === agent) || { role: '' }).role;
+  // The seeded pieces and the runs of the fake that wait for a check or got one.
+  const withLive = () => (EMPTY ? data : { pieces: [...data.pieces, ...livePieces(S.runs)], coord: data.coord });
 
   on('GET', '/v1/value', (c) => {
     const raw = c.url.searchParams.get('days');
     const days = raw === null || raw === '' ? 30 : Number(raw);
     if (![7, 30, 90].includes(days)) refuse(400, 'days is 7, 30, or 90');
-    return fold(data, days, Date.now(), estimates);
+    return fold(withLive(), days, Date.now(), estimates);
   });
 
   on('PUT', '/v1/value/estimates', async (c) => {
@@ -264,12 +301,12 @@ export function register({ on, refuse, readJson, AGENTS }) {
     const line = String((body && body.line) || '').trim();
     const minutes = Number(body && body.minutes);
     if (!Number.isInteger(minutes) || minutes < 0 || minutes > 2400) refuse(400, 'minutes is from 0 to 2400');
-    const all = fold(data, 90, Date.now(), estimates);
+    const all = fold(withLive(), 90, Date.now(), estimates);
     const l = all.lines.find((x) => x.key === line);
     if (!l) refuse(404, `no line of work "${line}" that you can view in the last 90 days`);
     if (roleOf(l.agent) !== 'owner') refuse(403, `you do not own the agent ${l.agent}`);
     if (minutes === 0) estimates.delete(line);
     else estimates.set(line, { minutes, by: c.person.subject, at: new Date().toISOString() });
-    return fold(data, 90, Date.now(), estimates).lines.find((x) => x.key === line);
+    return fold(withLive(), 90, Date.now(), estimates).lines.find((x) => x.key === line);
   });
 }

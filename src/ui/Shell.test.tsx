@@ -5,7 +5,7 @@ import type { Fleet } from '../api/types';
 import { store } from '../state/store';
 import { fakeFetch } from './testkit-b';
 import { forgetReach, noteAnswer } from '../state/reach';
-import { FleetFoot, GRACE_MS, RACK_LAMPS, Shell, captionOf, isToken, placesOf, shownOf, tabTitle } from './Shell';
+import { FleetFoot, GRACE_MS, RACK_LAMPS, Shell, captionOf, isToken, opensOn, operates, placesOf, shownOf, tabTitle } from './Shell';
 
 let box: HTMLElement | null = null;
 
@@ -235,3 +235,41 @@ describe('FleetFoot', () => {
     expect(captionOf(12)).toBe('12 workers');
   });
 });
+
+describe('the places of a person who operates no agent', () => {
+  const viewer = { principal: { subject: 'erin', name: 'erin@quillwork.example', kind: 'user' }, roles: { writer: 'viewer', ops: 'viewer' }, admin: false, canCreate: false };
+  it('says who operates: an admin, the token, an operator or an owner, and a whoami without roles', () => {
+    expect(operates(viewer)).toBe(false);
+    expect(operates({ ...viewer, roles: { writer: 'viewer', ops: 'operator' } })).toBe(true);
+    expect(operates({ ...viewer, roles: { writer: 'owner' } })).toBe(true);
+    expect(operates({ ...viewer, admin: true })).toBe(true);
+    expect(operates({ ...viewer, principal: { subject: 'token', kind: 'token' } })).toBe(true);
+    expect(operates({ ...viewer, roles: {} })).toBe(true);
+    expect(operates(null)).toBe(true);
+    // A sponsor opens on Results, which answers what the work gave.
+    expect(opensOn(viewer)).toBe('results');
+    expect(opensOn({ ...viewer, roles: { writer: 'operator' } })).toBe('work');
+  });
+
+  it('leaves out Chat and Wiki, which refuse a viewer, and the logo opens Results', () => {
+    act(() => {
+      store.dispatch({ type: 'me', me: viewer });
+      store.dispatch({ type: 'config', config: { manager: null, placement: 'queue', maxMembers: 16, routines: true, work: true } });
+    });
+    const el = mount(<Shell route={{ place: 'results' }} list={null} main={<p>main</p>} details={null} onSignOut={() => {}} />);
+    expect([...el.querySelectorAll('.place-label')].map((x) => x.textContent)).toEqual(['Work', 'Results', 'Activity', 'More']);
+    expect(el.querySelector('.logo-well')!.getAttribute('href')).toBe('#results');
+    // Every place: the places that refuse a viewer stay out.
+    localStorage.setItem('fw.bossmode.everyPlace', '1');
+    act(() => render(null, el));
+    el.remove();
+    const all = mount(<Shell route={{ place: 'results' }} list={null} main={<p>main</p>} details={null} onSignOut={() => {}} />);
+    expect([...all.querySelectorAll('.place-label')].map((x) => x.textContent)).toEqual(['Work', 'Results', 'Activity', 'Bridges', 'Fleet', 'Duties', 'Skills', 'Routines', 'Manager', 'Fewer']);
+    localStorage.removeItem('fw.bossmode.everyPlace');
+    act(() => {
+      store.dispatch({ type: 'me', me: null });
+      store.dispatch({ type: 'config', config: null });
+    });
+  });
+});
+

@@ -17,6 +17,10 @@
 .rs-ink {
   color: var(--ink);
 }
+/* A window without work: one line and the key that starts a task, at the left edge as the figures. */
+.rs-nothing {
+  padding: var(--s-5) 0;
+}
 .rs-error {
   display: flex;
   flex-wrap: wrap;
@@ -74,6 +78,15 @@
   text-decoration: none;
 }
 
+/* A status line in a tile wraps, so a long count such as 245 runs without a price stays whole on a phone. */
+.rs-tile .status {
+  white-space: normal;
+  align-items: flex-start;
+}
+.rs-tile .status .led {
+  margin-top: 4px;
+}
+
 /* A bar of parts: thin, with a gap of the surface between two parts. */
 .rs-bar {
   display: flex;
@@ -112,6 +125,8 @@
   fill: var(--card);
   stroke: var(--led-green);
   stroke-width: 2;
+  /* The chart stretches its view box to the pane, so the ring keeps 2 pixels on every side. */
+  vector-effect: non-scaling-stroke;
 }
 .seg-unchecked {
   background: var(--led-grey);
@@ -215,6 +230,10 @@
 .rs-failed {
   color: var(--word-red);
 }
+/* A period shorter than its unit, such as the first week of 30 days, says its length. */
+.rs-short {
+  color: var(--muted);
+}
 
 /* The lines of work: a table that scrolls on its own in a narrow pane. */
 .rs-table {
@@ -240,12 +259,25 @@
 }
 .rs-lines thead th {
   color: var(--muted);
-  white-space: nowrap;
   border-bottom: 1px solid var(--line);
+  vertical-align: bottom;
 }
 .rs-lines .num {
   text-align: right;
+}
+.rs-lines td.num {
   white-space: nowrap;
+}
+/* A head of two words wraps, so the table fits a pane of 900 pixels. */
+.rs-lines thead th {
+  min-width: 56px;
+}
+.rs-lead-line {
+  display: block;
+}
+/* The failed tasks of a line sit under its done count, so the column stays narrow. */
+.rs-lines td.num > .rs-failed {
+  display: block;
 }
 .rs-lines td:nth-child(3) {
   min-width: 132px;
@@ -271,10 +303,18 @@
 .rs-line .clip {
   max-width: 220px;
 }
+.rs-line a {
+  color: var(--ink);
+  text-decoration: none;
+}
+.rs-line a:hover {
+  text-decoration: underline;
+}
 .rs-est {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--s-2);
+  gap: 0 var(--s-2);
   white-space: nowrap;
 }
 .rs-est-edit {
@@ -292,10 +332,14 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
-@media (max-width: 799px) {
+/* Under 1000 pixels the table keeps the line, its done tasks, its checks,
+   its spend, and the minutes of a task, so the key Set stays in sight. */
+@media (max-width: 999px) {
   .rs-lines .narrow-hide {
     display: none;
   }
+}
+@media (max-width: 799px) {
   .rs-line .clip {
     max-width: 140px;
   }
@@ -327,4 +371,17 @@
   .rs-axis li > span {
     font-size: var(--t-caption);
   }
+}
+
+/* A result to check in Activity: the task that the run was asked, above its answer. */
+.result-ask {
+  margin-bottom: var(--s-3);
+  padding-bottom: var(--s-3);
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.result-ask-label {
+  font-weight: 700;
+  color: var(--ink);
 }

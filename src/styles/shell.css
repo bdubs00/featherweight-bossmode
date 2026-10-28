@@ -57,6 +57,25 @@
   flex-direction: column;
   gap: var(--s-2);
   padding: var(--s-2) 6px 0;
+  /* With every place, eleven places and More need about 900 pixels. On a
+     shorter window the places scroll, and the logo well and the account
+     keep their room: the bar never pushes the account out of sight. */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+.appbar > .logo-well,
+.appbar > .account {
+  flex: none;
+}
+/* A short window gives each place less padding, so more of them show. */
+@media (max-height: 959px) {
+  .places {
+    gap: var(--s-1);
+  }
+  .place {
+    padding: var(--s-2) 0 var(--s-1);
+  }
 }
 .place {
   position: relative;
@@ -90,6 +109,18 @@
   min-width: 18px;
   height: 18px;
   padding: 0 5px;
+}
+/* The key More is a button, and the reset of a button sets its font: it
+   takes the label of the other places, so the six labels read as one row. */
+.appbar .place.place-more {
+  font-size: var(--t-caption);
+  line-height: var(--t-control-lh);
+  font-weight: 600;
+}
+/* In the menu More of a phone, the dot of the manager follows its label. */
+.menu.menu-more .place-dot {
+  position: static;
+  margin-left: auto;
 }
 .account {
   margin: auto 6px var(--s-4);
@@ -549,6 +580,8 @@ dialog.confirm .notify-said.field-error {
     gap: var(--s-1);
     min-width: 0;
     padding: var(--s-1);
+    /* The menu More opens above the bar, so the row never clips. */
+    overflow: visible;
   }
   .place {
     flex: 1;
