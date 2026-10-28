@@ -196,14 +196,15 @@
 .place-more-pop > .place {
   flex: 1 1 auto;
 }
-.menu-more {
-  position: absolute;
+.menu.menu-more {
+  top: auto;
   right: 0;
   bottom: calc(100% + 8px);
   min-width: 200px;
 }
-.menu-more a {
-  display: flex;
+.menu.menu-more > a {
+  flex-direction: row;
   align-items: center;
   gap: var(--s-2);
+  min-height: var(--h-row);
 }

@@ -14,7 +14,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import { api } from '../api/routes';
 import type { WorkBoard, WorkCard, WorkStage, WorkVerdict } from '../api/types';
-import { since } from '../lib/words';
+import { personName, since } from '../lib/words';
 import { store } from '../state/store';
 import { Empty } from './common';
 import { Door } from './Door';
@@ -66,10 +66,12 @@ export function fromWords(c: WorkCard): string {
     case 'duty':
     case 'app':
       return name;
-    default:
-      if (f.via === 'manager') return 'Manager for ' + name;
-      if (f.via === 'mcp') return name + ' in an MCP client';
-      return name;
+    default: {
+      const who = f.kind === 'person' ? personName(name) : name;
+      if (f.via === 'manager') return 'Manager for ' + who;
+      if (f.via === 'mcp') return who + ' in an MCP client';
+      return who;
+    }
   }
 }
 

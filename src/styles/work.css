@@ -81,8 +81,6 @@
 }
 .work-kind {
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
   color: var(--muted);
 }
 .work-yours {
@@ -105,6 +103,11 @@
   font-size: var(--t-body);
   line-height: var(--t-body-lh);
   font-weight: 700;
+  color: var(--ink);
+  text-decoration: none;
+}
+.work-title:hover {
+  text-decoration: underline;
 }
 .work-reason {
   font-size: var(--t-meta);
@@ -117,6 +120,9 @@
   font-size: var(--t-caption);
   color: var(--muted);
   min-width: 0;
+}
+.work-meta > .status {
+  flex: none;
 }
 .work-meta > span:last-child:not(:first-child) {
   margin-left: auto;

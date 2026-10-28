@@ -540,7 +540,7 @@ function ResultCard({ r, name, rows }: { r: InboxRow; name: string; rows: InboxR
   const open = r.duty && r.run ? hrefOf({ place: 'duties', name: r.duty, run: r.run }) : r.run ? hrefOf({ place: 'chat', run: r.run }) : '';
   return (
     <Card title={title} tone="amber" label={'A result of ' + name + ' to check'} actions={<ResultKeys run={r.run!} title={title} primary onDone={() => afterResult(r, rows)} />}>
-      {run && run.output ? <Markdown text={excerpt(run.output, 1200)} refs /> : <p class="inbox-said">{run ? 'The run gave no text.' : 'Loading the result.'}</p>}
+      {run && run.output ? <Markdown text={run.output.length > 1500 ? run.output.slice(0, 1500) + '…' : run.output} refs /> : <p class="inbox-said">{run ? 'The run gave no text.' : 'Loading the result.'}</p>}
       {open && (
         <p>
           <a href={open}>Open the run</a>

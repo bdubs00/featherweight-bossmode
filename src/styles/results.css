@@ -46,9 +46,8 @@
   gap: var(--s-2);
   min-height: 22px;
 }
+/* A tile names its figure in sentence case: an uppercase label is a template tell (docs/DESIGN.md, section 3). */
 .rs-tile-head h2 {
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
   color: var(--muted);
 }
 .rs-figure {

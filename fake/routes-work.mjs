@@ -218,7 +218,7 @@ export function board(S, me, { days = 7, all = false } = {}) {
       else if (e.state === 'failed') p = { stage: 'stopped', reason: e.reason || 'Stopped.', since: e.at, run: e.run };
       else if (e.state === 'input-required') p = { stage: 'needs-you', reason: 'Waits for you.', since: e.at, run: e.run };
       else if (e.state === 'completed' && !e.verdict && d.review) p = { stage: 'review', reason: 'A result to check.', since: e.at, run: e.run };
-      else if (e.state === 'completed') p = { stage: 'done', reason: e.verdict === 'checked' ? 'Its done check passed.' : 'Done.', since: e.at, run: e.run, verdict: e.verdict || 'unchecked' };
+      else if (e.state === 'completed') p = { stage: 'done', reason: { accepted: 'Accepted.', checked: 'Its done check passed.', 'sent-back': 'Sent back.' }[e.verdict] || 'Done.', since: e.at, run: e.run, verdict: e.verdict || 'unchecked' };
       else p = { stage: 'working', reason: 'Works.', since: e.at, run: e.run };
       card.managerDecides = !!(d.whileAway && d.whileAway.decider === 'manager' && r && r.pending && !r.pending.schema);
       cards.push(settle(card, [p], me));
