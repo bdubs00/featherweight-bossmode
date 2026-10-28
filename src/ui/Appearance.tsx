@@ -15,7 +15,7 @@ export function Appearance() {
   const choice = useChoice();
   return (
     <section class="screen appearance" aria-labelledby="appearance-title">
-      <PaneHeader id="appearance-title" title="Appearance" size="title" level={1} back={{ href: '#', label: 'Bridges', to: 'list' }} />
+      <PaneHeader id="appearance-title" title="Appearance" size="title" level={1} back={{ href: '#', label: 'Teams', to: 'list' }} />
       <div class="scroll pad">
         <div class="make">
           <Choices name="theme" legend="Theme" value={choice} options={CHOICES.map(([id, label]) => ({ id, label }))} onChange={setChoice} />

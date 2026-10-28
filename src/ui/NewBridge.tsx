@@ -109,7 +109,7 @@ export function hasErrors(e: BridgeErrors): boolean {
  */
 export function bridgeErrors(f: BridgeForm, hasManager: boolean): BridgeErrors {
   const out: BridgeErrors = { seat: {}, seatField: {}, caps: {} };
-  if (!f.goal.trim()) out.goal = 'Write the goal of the bridge.';
+  if (!f.goal.trim()) out.goal = 'Write the goal of the team.';
   if (f.placement === 'spawn' && !hasManager) out.placement = 'A fresh sandbox per seat needs a manager. Pick keep warm workers, or set up a manager.';
   if (f.mode === 'pick') {
     if (f.seats.length === 0) out.seats = 'Member 1 needs an agent.';
@@ -356,7 +356,7 @@ export function NewBridge() {
   const manager = f.mode === 'manager';
   return (
     <section class="screen newbridge" aria-labelledby="new-title">
-      <PaneHeader id="new-title" title="Open a bridge" size="title" level={1} back={{ href: '#', label: 'Bridges', to: 'list' }} />
+      <PaneHeader id="new-title" title="Open a team" size="title" level={1} back={{ href: '#', label: 'Teams', to: 'list' }} />
       <form class="scroll pad" ref={box} onSubmit={submit} noValidate>
         <div class="make">
           {books && books.length > 0 && <PlaybookPick value={from} onChange={startFrom} label="Start from a playbook" empty="No playbook" />}
@@ -397,7 +397,7 @@ export function NewBridge() {
                       )}
                       {s.agent !== s.handle && <span class="t-meta">{s.agent}</span>}
                     </div>
-                    <Input aria-label={'Task of ' + s.handle} placeholder={'What ' + s.handle + ' does on this bridge'} value={s.task} invalid={err.seatField[s.key] === 'task'} onInput={(e) => setSeat(s.key, { task: (e.target as HTMLInputElement).value, own: true })} />
+                    <Input aria-label={'Task of ' + s.handle} placeholder={'What ' + s.handle + ' does on this team'} value={s.task} invalid={err.seatField[s.key] === 'task'} onInput={(e) => setSeat(s.key, { task: (e.target as HTMLInputElement).value, own: true })} />
                     {err.seat[s.key] && (
                       <span class="field-error" role="alert">
                         {err.seat[s.key]}
@@ -431,7 +431,7 @@ export function NewBridge() {
               <>
                 <fieldset>
                   <legend>
-                    Caps <Help label="What the caps are">Each cap counts the whole bridge. The bridge stops at a cap until you raise it. An empty field keeps the usual cap of the server.</Help>
+                    Caps <Help label="What the caps are">Each cap counts the whole team. The team stops at a cap until you raise it. An empty field keeps the usual cap of the server.</Help>
                   </legend>
                   <div class="field-row">
                     {CAPS.map(([k, label]) => (
@@ -457,14 +457,14 @@ export function NewBridge() {
           <div class="form-end">
             <Button onClick={cancel}>Cancel</Button>
             <Button type="submit" kind="primary" disabled={busy}>
-              {manager ? 'Ask the manager' : 'Open bridge'}
+              {manager ? 'Ask the manager' : 'Open team'}
             </Button>
           </div>
         </div>
       </form>
       {discard && (
         <Confirm
-          title="Throw away this bridge?"
+          title="Throw away this team?"
           confirm="Throw away"
           danger
           onCancel={() => setDiscard(false)}
@@ -474,7 +474,7 @@ export function NewBridge() {
             go('#');
           }}
         >
-          <p>The job and the seats that you wrote go. No bridge opens.</p>
+          <p>The job and the seats that you wrote go. No team opens.</p>
         </Confirm>
       )}
     </section>

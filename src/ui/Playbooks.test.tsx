@@ -177,7 +177,7 @@ describe('New bridge', () => {
       ['Add and remove members', false],
       ['Write a report on close', false],
     ]);
-    click(keyNamed(el, 'Open bridge'));
+    click(keyNamed(el, 'Open team'));
     await settle();
     const post = api.calls.find((c) => c.method === 'POST')!;
     expect(post.body).toEqual({

@@ -66,7 +66,7 @@ describe('the direct thread', () => {
       ['Created roles/a.yml', '', false],
       ['Reading the fleet', '', false],
       ['Wrote', 'notes/cron.md', false],
-      ['Posting to the bridge', '', false],
+      ['Posting to the team', '', false],
       ['Searched the wiki for "cron"', '', false],
     ]);
   });
@@ -85,9 +85,9 @@ describe('the direct thread', () => {
     ];
     const placed = placedSteps(done);
     expect([...placed.keys()]).toEqual([4]);
-    expect(placed.get(4)).toMatchObject({ text: 'Opened the bridge', bridge: '01m5kpw79kyq9j8nbpnhvtwm95', target: 'Release notes for 2.4', at: at(3) });
+    expect(placed.get(4)).toMatchObject({ text: 'Opened the team', bridge: '01m5kpw79kyq9j8nbpnhvtwm95', target: 'Release notes for 2.4', at: at(3) });
     const denied: Item[] = [...waiting, { seq: 3, time: at(2), kind: 'decided', id: 'ap', text: 'deny' }, { seq: 4, time: at(3), kind: 'result', callId: 'm2', isError: true, text: 'denied' }];
-    expect(stepsOf(denied)[0]).toMatchObject({ text: 'Did not open the bridge', target: 'Release notes for 2.4', isError: true, worded: true });
+    expect(stepsOf(denied)[0]).toMatchObject({ text: 'Did not open the team', target: 'Release notes for 2.4', isError: true, worded: true });
     expect(stepsOf(denied)[0].bridge).toBeUndefined();
   });
 

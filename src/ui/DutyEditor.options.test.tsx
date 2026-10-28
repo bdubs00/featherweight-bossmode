@@ -131,9 +131,9 @@ describe('what the front serves', () => {
     const el = mount(<DutyEditor />);
     await settle();
     expect([...el.querySelectorAll('input[name="duty-start"]')].map((i) => i.closest('label')!.textContent)).toEqual(['On a schedule', 'When something happens']);
-    expect([...el.querySelectorAll('input[name="duty-do"]')].map((i) => i.closest('label')!.textContent)).toEqual(['Ask the agent', 'Post in a bridge', 'Open a bridge from a playbook', 'Ask the manager']);
+    expect([...el.querySelectorAll('input[name="duty-do"]')].map((i) => i.closest('label')!.textContent)).toEqual(['Ask the agent', 'Post in a team', 'Open a team from a playbook', 'Ask the manager']);
     click(radio(el, 'duty-start', 'event'));
-    expect(optionsOf(fieldOf(el, 'What happens'))).toEqual(['Pick what happens', 'When a bridge closes', 'When a question waits too long', 'When a page changes']);
+    expect(optionsOf(fieldOf(el, 'What happens'))).toEqual(['Pick what happens', 'When a team closes', 'When a question waits too long', 'When a page changes']);
   });
 });
 
@@ -149,7 +149,7 @@ describe('When', () => {
     change(fieldOf(el, 'Of the agent'), 'migrator');
     await settle();
     expect((lastPut().body as DutyRecord).when).toEqual({ event: { kind: 'bridge.closed', agent: 'migrator' } });
-    expect(text(el.querySelector('.duty-readback-box .duty-readback'))).toBe('When a bridge of Migrator closes.');
+    expect(text(el.querySelector('.duty-readback-box .duty-readback'))).toBe('When a team of Migrator closes.');
     expect(keyNamed(el, 'What happened')).toBeTruthy();
     change(fieldOf(el, 'What happens'), 'question.waiting');
     expect(fieldOf(el, 'Waits longer than')!.value).toBe('1h');
@@ -192,7 +192,7 @@ describe('When', () => {
     await settle();
     expect(radio(el, 'duty-start', 'event')!.checked).toBe(true);
     expect(fieldOf(el, 'What happens')!.value).toBe('routine.ready');
-    expect(optionsOf(fieldOf(el, 'What happens'))).toEqual(['Pick what happens', 'When a bridge closes', 'When a routine is ready']);
+    expect(optionsOf(fieldOf(el, 'What happens'))).toEqual(['Pick what happens', 'When a team closes', 'When a routine is ready']);
     expect((fieldOf(el, 'Ask Migrator') as unknown as HTMLTextAreaElement).value).toBe('Read [What happened].');
   });
 
@@ -234,14 +234,14 @@ describe('What', () => {
     fill(el);
     click(radio(el, 'duty-do', 'post'));
     // Only the open bridges are choices.
-    expect(optionsOf(fieldOf(el, 'Bridge'))).toEqual(['Pick a bridge', 'Migrate Puppet']);
+    expect(optionsOf(fieldOf(el, 'Team'))).toEqual(['Pick a team', 'Migrate Puppet']);
     click(keyNamed(el, 'Save duty'));
     await settle();
-    expect(text(fieldOf(el, 'Bridge')!.closest('label')!.querySelector('.field-error'))).toBe('Pick the bridge.');
-    change(fieldOf(el, 'Bridge'), 'b1');
+    expect(text(fieldOf(el, 'Team')!.closest('label')!.querySelector('.field-error'))).toBe('Pick the team.');
+    change(fieldOf(el, 'Team'), 'b1');
     const members = [...el.querySelectorAll('.duty-to label.check')];
     expect(members.map((l) => l.textContent)).toEqual(['migrator-1', 'reviewer']);
-    expect(text(el.querySelector('.duty-to .t-meta'))).toBe('Everyone on the bridge reads it.');
+    expect(text(el.querySelector('.duty-to .t-meta'))).toBe('Everyone on the team reads it.');
     click(members[1].querySelector('input'));
     expect(text(el.querySelector('.duty-to .t-meta'))).toBe('1 member reads it.');
     typeIn(fieldOf(el, 'Message'), 'Review what changed since ');
@@ -270,13 +270,13 @@ describe('What', () => {
     expect(optionsOf(fieldOf(el, 'Playbook'))).toEqual(['Pick a playbook', 'weekly-patching: Patch the lab hosts and report.']);
     // The budget of an open is the turns of the bridge, and nothing else.
     expect(fieldOf(el, 'The most a run can cost')).toBeNull();
-    const turns = () => fieldOf(el, 'The most turns of the bridge')!;
+    const turns = () => fieldOf(el, 'The most turns of the team')!;
     const said = () => text(turns().closest('label')!.querySelector('.field-error'));
     expect(turns().placeholder).toBe('Required, such as 40');
     click(keyNamed(el, 'Save duty'));
     await settle();
     expect(text(fieldOf(el, 'Playbook')!.closest('label')!.querySelector('.field-error'))).toBe('Pick a playbook.');
-    expect(said()).toBe('A duty that opens a bridge needs the most turns of the whole bridge, such as 40.');
+    expect(said()).toBe('A duty that opens a team needs the most turns of the whole team, such as 40.');
     expect(turns().getAttribute('aria-invalid')).toBe('true');
     change(fieldOf(el, 'Playbook'), 'weekly-patching');
     typeIn(fieldOf(el, 'Goal'), 'Patch on ');
@@ -295,7 +295,7 @@ describe('What', () => {
     expect((lastPut().body as DutyRecord).do).toEqual({ open: { playbook: 'weekly-patching', goal: 'Patch on {date}' } });
     // The cost that fill typed for asking stays out of the record of an open.
     expect((lastPut().body as DutyRecord).limits).toEqual({ budget: { maxTurns: 40 }, overlap: 'skip', catchUp: '1h' });
-    expect(text(document.querySelector('dialog.confirm'))).toContain('The bridge gets at most 40 turns.');
+    expect(text(document.querySelector('dialog.confirm'))).toContain('The team gets at most 40 turns.');
     click(keyNamed(document.querySelector('dialog.confirm')!, 'Cancel'));
     // The playbooks have a tab of their own, with Rename and Delete.
     expect(el.querySelector('.duty-books a')!.getAttribute('href')).toBe('#playbooks');
@@ -338,7 +338,7 @@ describe('What', () => {
 });
 
 describe('Limits', () => {
-  const POST_WORDS = 'A post spends nothing of its own. The seats of the bridge spend from their own budgets.';
+  const POST_WORDS = 'A post spends nothing of its own. The seats of the team spend from their own budgets.';
   const limits = (el: HTMLElement) => el.querySelector('section[aria-labelledby="duty-limits-head"]')!;
   const labels = (el: HTMLElement) => [...limits(el).querySelectorAll('.field-label')].map(labelOf);
 
@@ -355,7 +355,7 @@ describe('Limits', () => {
     expect(labels(el)).toEqual(['Catch up a missed time']);
     expect(text(limits(el).querySelector('.duty-spends'))).toBe(POST_WORDS);
     expect([...limits(el).querySelectorAll('legend')].map(labelOf)).toEqual(['If the last run still works']);
-    change(fieldOf(el, 'Bridge'), 'b1');
+    change(fieldOf(el, 'Team'), 'b1');
     typeIn(fieldOf(el, 'Message'), 'Review what changed.');
     click(keyNamed(el, 'Save duty'));
     await settle();
@@ -368,10 +368,10 @@ describe('Limits', () => {
     click(radio(el, 'duty-do', 'open'));
     await settle();
     // An open shows one field, and the turns of a run do not carry over to the bridge.
-    expect(labels(el)).toEqual(['The most turns of the bridge', 'Catch up a missed time']);
-    expect(fieldOf(el, 'The most turns of the bridge')!.value).toBe('');
+    expect(labels(el)).toEqual(['The most turns of the team', 'Catch up a missed time']);
+    expect(fieldOf(el, 'The most turns of the team')!.value).toBe('');
     expect(limits(el).querySelector('.duty-spends')).toBeNull();
-    typeIn(fieldOf(el, 'The most turns of the bridge'), '40');
+    typeIn(fieldOf(el, 'The most turns of the team'), '40');
     click(radio(el, 'duty-do', 'ask'));
     // Back to ask, the budget that the person typed is still there.
     expect(labels(el)).toEqual(['The most a run can cost', 'Most turns', 'The most per day', 'Catch up a missed time']);
@@ -394,8 +394,8 @@ describe('Limits', () => {
     await settle();
     expect(radio(el, 'duty-do', 'open')!.checked).toBe(true);
     // No silent limit: the turns of the bridge stay empty until the person writes them.
-    expect(labels(el)).toEqual(['The most turns of the bridge', 'Catch up a missed time']);
-    expect(fieldOf(el, 'The most turns of the bridge')!.value).toBe('');
+    expect(labels(el)).toEqual(['The most turns of the team', 'Catch up a missed time']);
+    expect(fieldOf(el, 'The most turns of the team')!.value).toBe('');
   });
 });
 

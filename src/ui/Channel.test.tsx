@@ -74,7 +74,7 @@ afterEach(() => {
 afterAll(() => f.restore());
 
 describe('the channel', () => {
-  it('has the title, the tabs with the count of the decisions that wait, Close bridge, and More', async () => {
+  it('has the title, the tabs with the count of the decisions that wait, Close team, and More', async () => {
     const el = mount(<Channel id={B} />);
     await settle();
     expect(el.querySelector('h1')!.textContent).toBe('Migrate the remaining Puppet modules');
@@ -84,7 +84,7 @@ describe('the channel', () => {
     expect(tabs[1].getAttribute('href')).toBe('#bridge/b-chan/wiki');
     expect(tabs[2].getAttribute('href')).toBe('#bridge/b-chan/decisions');
     expect(tabs[2].querySelector('.chip-amber .sr')!.textContent).toBe('1 decision waits');
-    expect([...el.querySelectorAll('.pane-actions button')].map((b) => b.textContent || b.getAttribute('aria-label'))).toEqual(['Close bridge', 'More']);
+    expect([...el.querySelectorAll('.pane-actions button')].map((b) => b.textContent || b.getAttribute('aria-label'))).toEqual(['Close team', 'More']);
     act(() => (el.querySelector('button[aria-label="More"]') as HTMLButtonElement).click());
     expect([...el.querySelectorAll('[role="menuitem"]')].map((x) => x.textContent)).toEqual(['What the manager can do', 'Save as playbook', 'Make this a duty']);
   });
@@ -237,21 +237,21 @@ describe('the channel', () => {
   it('asks before it closes the bridge, in the words of its key', async () => {
     const el = mount(<Channel id={B} />);
     await settle();
-    act(() => ([...el.querySelectorAll('.pane-actions button')].find((b) => b.textContent === 'Close bridge') as HTMLButtonElement).click());
+    act(() => ([...el.querySelectorAll('.pane-actions button')].find((b) => b.textContent === 'Close team') as HTMLButtonElement).click());
     const dialog = el.querySelector('dialog.confirm')!;
     expect(dialog.querySelector('h2')!.textContent).toBe('Close Migrate the remaining Puppet modules?');
     expect(dialog.querySelector('p')!.textContent).toBe('Members finish what they do. The channel takes no new message. The manager writes a report. You can reopen it from More.');
-    expect([...dialog.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Cancel', 'Close bridge']);
+    expect([...dialog.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Cancel', 'Close team']);
   });
 
-  it('moves Close bridge into More below 1500 pixels, so the title keeps its room, and the tabs to a strip where the window is narrow', async () => {
+  it('moves Close team into More below 1500 pixels, so the title keeps its room, and the tabs to a strip where the window is narrow', async () => {
     width = 1440;
     let el = mount(<Channel id={B} />);
     await settle();
     expect([...el.querySelectorAll('.pane-actions button')].map((b) => b.textContent || b.getAttribute('aria-label'))).toEqual(['More']);
     expect(el.querySelector('.pane-actions a.collapsed-only')!.getAttribute('href')).toBe('#bridge/b-chan/roster');
     act(() => (el.querySelector('button[aria-label="More"]') as HTMLButtonElement).click());
-    expect([...el.querySelectorAll('[role="menuitem"]')].map((x) => x.textContent)).toEqual(['What the manager can do', 'Save as playbook', 'Make this a duty', 'Close bridge']);
+    expect([...el.querySelectorAll('[role="menuitem"]')].map((x) => x.textContent)).toEqual(['What the manager can do', 'Save as playbook', 'Make this a duty', 'Close team']);
     expect(el.querySelector('.pane-head .tabs')).not.toBeNull();
     unmountAll();
     width = 390;
@@ -264,8 +264,8 @@ describe('the channel', () => {
   it('says a bridge is not here, with the key Bridges, and raises no notice for the 404', async () => {
     clearNotice();
     const el = mount(<Channel id="b-gone" />);
-    expect(el.querySelector('.empty p')!.textContent).toBe('This bridge is not here. It was removed, or you cannot see it.');
-    expect(el.querySelector('.empty a')!.textContent).toBe('Bridges');
+    expect(el.querySelector('.empty p')!.textContent).toBe('This team is not here. It was removed, or you cannot see it.');
+    expect(el.querySelector('.empty a')!.textContent).toBe('Teams');
     await settle();
     expect(f.seen.some((x) => x.path.startsWith('/v1/bridges/b-gone'))).toBe(true);
     expect(currentNotice()).toBe('');

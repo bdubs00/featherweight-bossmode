@@ -57,15 +57,15 @@ describe('Shell', () => {
     expect(el.querySelector('main.pane-main')!.textContent).toBe('main');
     expect(el.querySelector('aside.pane-details')!.textContent).toBe('details');
     const current = el.querySelector('.place[aria-current="page"]')!;
-    expect(current.textContent).toContain('Bridges');
+    expect(current.textContent).toContain('Teams');
     const labels = () => [...el.querySelectorAll('.place-label')].map((x) => x.textContent);
     // Routines shows once the settings say that the front keeps routines.
-    expect(labels()).toEqual(['Activity', 'Chat', 'Bridges', 'Fleet', 'Duties', 'Skills', 'Wiki', 'Manager']);
+    expect(labels()).toEqual(['Activity', 'Chat', 'Teams', 'Fleet', 'Duties', 'Skills', 'Wiki', 'Manager']);
     act(() => store.dispatch({ type: 'config', config: { manager: null, placement: 'queue', maxMembers: 16, routines: true } }));
-    expect(labels()).toEqual(['Activity', 'Chat', 'Bridges', 'Fleet', 'Duties', 'Skills', 'Routines', 'Wiki', 'Manager']);
+    expect(labels()).toEqual(['Activity', 'Chat', 'Teams', 'Fleet', 'Duties', 'Skills', 'Routines', 'Wiki', 'Manager']);
     // With work, the bar shows five places, the place of the screen, and More.
     act(() => store.dispatch({ type: 'config', config: { manager: null, placement: 'queue', maxMembers: 16, routines: true, work: true } }));
-    expect(labels()).toEqual(['Work', 'Results', 'Activity', 'Chat', 'Wiki', 'Bridges', 'More']);
+    expect(labels()).toEqual(['Work', 'Results', 'Activity', 'Chat', 'Wiki', 'Teams', 'More']);
     act(() => store.dispatch({ type: 'config', config: null }));
     // The count of Activity counts what needs you. The page has not read the record of the bridge yet, so its needsYou counts.
     expect(el.querySelector('.place-count .sr')!.textContent).toBe('2 items need you');
@@ -105,7 +105,7 @@ describe('the account and the tab', () => {
 
   it('names the place, the count of what needs you, and the deployment in the title of the tab', () => {
     expect(tabTitle('activity', 2, 'Homelab')).toBe('(2) Activity - Homelab');
-    expect(tabTitle('bridges', 0, '')).toBe('Bridges - Bossmode');
+    expect(tabTitle('bridges', 0, '')).toBe('Teams - Bossmode');
     mount(<Shell route={{ place: 'manager' }} list={null} main={<p>main</p>} details={null} onSignOut={() => {}} />);
     // The bridge of the first test still needs you twice.
     expect(document.title).toMatch(/^(\(\d+\) )?Manager - Bossmode$/);
@@ -113,7 +113,7 @@ describe('the account and the tab', () => {
 
   it('lights the place that the page names, and starts with a link that skips the places', () => {
     const el = mount(<Shell route={{ place: 'member', bridge: 'b1', handle: 'migrator-1', tab: 'chat' }} place="bridges" list={null} main={<h1 class="t-title">main</h1>} details={null} onSignOut={() => {}} />);
-    expect(el.querySelector('.place[aria-current="page"]')!.textContent).toContain('Bridges');
+    expect(el.querySelector('.place[aria-current="page"]')!.textContent).toContain('Teams');
     const skip = el.querySelector('.shell > a.skip') as HTMLAnchorElement;
     expect(skip.textContent).toBe('Skip to the content');
     expect(skip.getAttribute('href')).toBe('#main');
@@ -264,7 +264,7 @@ describe('the places of a person who operates no agent', () => {
     act(() => render(null, el));
     el.remove();
     const all = mount(<Shell route={{ place: 'results' }} list={null} main={<p>main</p>} details={null} onSignOut={() => {}} />);
-    expect([...all.querySelectorAll('.place-label')].map((x) => x.textContent)).toEqual(['Work', 'Results', 'Activity', 'Bridges', 'Fleet', 'Duties', 'Skills', 'Routines', 'Manager', 'Fewer']);
+    expect([...all.querySelectorAll('.place-label')].map((x) => x.textContent)).toEqual(['Work', 'Results', 'Activity', 'Teams', 'Fleet', 'Duties', 'Skills', 'Routines', 'Manager', 'Fewer']);
     localStorage.removeItem('fw.bossmode.everyPlace');
     act(() => {
       store.dispatch({ type: 'me', me: null });

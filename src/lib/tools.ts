@@ -104,8 +104,8 @@ function bridgeText(bases: string[]): string {
   const all = bases.some((b) => b.includes('*'));
   const posts = all || bases.some((b) => /post|send|open|close|add|remove/.test(b));
   const reads = all || bases.some((b) => /read|list/.test(b));
-  if (posts && reads) return 'Read and post in bridges';
-  return posts ? 'Post in bridges' : 'Read bridges';
+  if (posts && reads) return 'Read and post in teams';
+  return posts ? 'Post in teams' : 'Read teams';
 }
 
 /** familyOf names the family of a tool that a person counts as one ability: the wiki or the bridges. */
@@ -152,12 +152,12 @@ export function abilitiesOf(names: string[], catalog: Tool[] | null | undefined)
     }
     const fam = familyOf(name);
     if (fam) {
-      put(fam, name, () => ({ text: '', noun: fam === 'wiki' ? 'the wiki' : 'bridges' }));
+      put(fam, name, () => ({ text: '', noun: fam === 'wiki' ? 'the wiki' : 'teams' }));
       continue;
     }
     const server = serverName(catalog, name);
     if (server) {
-      put('server:' + server, name, () => (server === 'front' ? { text: 'Use the bridges, the wiki, and the fleet', noun: 'the bridges and the wiki' } : { text: 'Use the tools of ' + server, noun: server }));
+      put('server:' + server, name, () => (server === 'front' ? { text: 'Use the teams, the wiki, and the fleet', noun: 'the teams and the wiki' } : { text: 'Use the tools of ' + server, noun: server }));
       continue;
     }
     const src = serverOf(name);

@@ -8,7 +8,9 @@
 // it opens, and again when the phases of the workers change on the stream.
 // The page never says pool: it says Workers and Keep. Where the deployment
 // has a package mirror, an agent that a pool runs also has the section
-// Packages (Packages.tsx).
+// Packages (Packages.tsx). A person who views every agent and operates
+// none, such as a sponsor, reads no page of the wiki, which refuses them:
+// the profile then shows no What people liked.
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
@@ -36,6 +38,7 @@ import { useToolCatalog } from '../state/tools';
 import { forgetReads, readCache, useEventRead } from '../state/eventread';
 import { PackagesSection } from './Packages';
 import { poolOfAgent, rulesWithPackages, withPackages } from '../lib/packages';
+import { viewsAll } from '../lib/agents';
 
 const WORKER_HELP = 'A worker runs the work of one agent, one seat at a time. Keep is how many it keeps ready.';
 /** The tooltip of a worker of an older setup of its agent. */
@@ -577,6 +580,7 @@ export function Profile({ agent, back }: { agent: string; back?: { href: string;
   const file = useRef<HTMLInputElement>(null);
   const editKey = useRef<HTMLButtonElement>(null);
   const gone = useSelect((s) => agentGone(s, agent));
+  const noWiki = useSelect((s) => viewsAll(s.me));
   useEffect(() => {
     setEdit(false);
     setSaid('');
@@ -705,7 +709,8 @@ export function Profile({ agent, back }: { agent: string; back?: { href: string;
           </section>
         )}
         <AgentDuties agent={agent} />
-        <Liked agent={agent} />
+        {/* The wiki refuses a person who views every agent, such as a sponsor, so the profile reads no page for them. */}
+        {!noWiki && <Liked agent={agent} />}
         <Workers agent={agent} owner={owner} pool={pool} setPool={setPool} />
         {packagePool && <PackagesSection key={packagePool} agent={agent} pool={packagePool} owner={owner} onSwitch={setSectionSwitch} />}
         <TodaySec agent={agent} today={today} />

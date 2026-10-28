@@ -244,7 +244,7 @@ function BridgeFoot({ bridge }: { bridge: string }) {
   if (!u || !u.reported) return null;
   return (
     <footer class="pane-foot bridge-foot">
-      <div class="t-meta">This bridge</div>
+      <div class="t-meta">This team</div>
       <div class="nums">
         {usageParts(u, pages).map((p) => (
           <span>

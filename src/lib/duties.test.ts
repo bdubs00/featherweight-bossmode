@@ -317,7 +317,7 @@ describe('a duty in words', () => {
     expect(dutyTitle(d)).toBe('daily-homelab-report');
     expect(dutyTitle({ name: 'weekly-patching' })).toBe('weekly-patching');
     expect(dutyWhat(d)).toBe("Write the report of [Today's date].");
-    expect(dutyWhat({ do: { open: { playbook: 'weekly-patching' } } })).toBe('Open a bridge from the playbook weekly-patching');
+    expect(dutyWhat({ do: { open: { playbook: 'weekly-patching' } } })).toBe('Open a team from the playbook weekly-patching');
     expect(dutyWhat({ do: {} })).toBe('');
     expect(dutyLight(duty({ paused: true, state: { pausedReason: 'Three runs in a row failed.' } }))).toMatchObject({ word: 'paused', label: 'Three runs in a row failed.' });
     expect(dutyLight(d, true).word).toBe('paused');
@@ -396,11 +396,11 @@ describe('the problems of the front', () => {
 
 describe('events and actions', () => {
   it('say an event in words and write only the fields of its kind', () => {
-    expect(eventWords({ kind: 'bridge.closed' })).toBe('When a bridge closes');
+    expect(eventWords({ kind: 'bridge.closed' })).toBe('When a team closes');
     // A cap of a duty is its most per day, the words of its field.
     expect(eventWords({ kind: 'cap.reached' })).toBe('When a duty reaches its most per day');
     expect(startWords({ when: { webhook: { auth: { mode: 'bearer' } } } } as never)).toBe('When another app calls the server');
-    expect(eventWords({ kind: 'bridge.closed', agent: 'triage' }, (a) => a.toUpperCase())).toBe('When a bridge of TRIAGE closes');
+    expect(eventWords({ kind: 'bridge.closed', agent: 'triage' }, (a) => a.toUpperCase())).toBe('When a team of TRIAGE closes');
     expect(eventWords({ kind: 'question.waiting', after: '2h' })).toBe('When a question waits longer than 2 hours');
     expect(eventWords({ kind: 'page.changed', path: 'homelab/' })).toBe('When a page under homelab/ changes');
     expect(eventWords({ kind: 'something.new' })).toBe('When something happens in the fleet');
@@ -429,7 +429,7 @@ describe('events and actions', () => {
     expect([s.agent, s.act, s.message, s.cost]).toEqual(['manager', 'manager', 'Check the backups.', '']);
     expect(seededForm({ act: 'nonsense' as never }, 'UTC').act).toBe('ask');
     const opts = { fresh: false, name: 'x', taken: [], keepsWhen: false };
-    expect(formErrors({ ...s, act: 'post', cost: '1' }, opts)).toEqual({ bridge: 'Pick the bridge.' });
+    expect(formErrors({ ...s, act: 'post', cost: '1' }, opts)).toEqual({ bridge: 'Pick the team.' });
     expect(formErrors({ ...s, act: 'open', message: '', bridgeTurns: '40' }, opts)).toEqual({ playbook: 'Pick a playbook.' });
     expect(formErrors({ ...s, start: 'event', cost: '1' }, opts)).toEqual({ when: 'Pick what starts the duty.' });
     expect(formErrors({ ...s, cost: '1', when: { ...s.when, start: '2026-12-01', end: '2026-11-01' } }, opts)).toEqual({ dates: 'The last day comes before the first day.' });
@@ -496,7 +496,7 @@ describe('the limits of each action', () => {
     expect(recordOf({ ...base, act: 'post' }, null, 'x').limits).toEqual({ overlap: 'queue', catchUp: '6h' });
     expect(formErrors({ ...base, act: 'post', cost: '', turns: 'x', perDay: 'x' }, opts)).toEqual({});
     expect(limitWords(d.limits, true, 'post')).toEqual([POST_SPENDS, 'A time that comes while the last run works is skipped.', 'A missed time runs once, within 1 hour.']);
-    expect(POST_SPENDS).toBe('A post spends nothing of its own. The seats of the bridge spend from their own budgets.');
+    expect(POST_SPENDS).toBe('A post spends nothing of its own. The seats of the team spend from their own budgets.');
   });
 
   it('send only the turns of the bridge for an open, and require them', () => {
@@ -512,19 +512,19 @@ describe('the limits of each action', () => {
     expect(formErrors({ ...base, act: 'open', bridgeTurns: '' }, opts)).toEqual({ turns: OPEN_NEEDS_TURNS });
     expect(formErrors({ ...base, act: 'open', bridgeTurns: '0' }, opts)).toEqual({ turns: 'Write a whole number.' });
     expect(formErrors({ ...base, act: 'open', cost: '', bridgeTurns: '40' }, opts)).toEqual({});
-    expect(OPEN_NEEDS_TURNS).toBe('A duty that opens a bridge needs the most turns of the whole bridge, such as 40.');
-    expect(limitWords(d.limits, false, 'open')).toEqual(['The bridge gets at most 40 turns.', 'A start that comes while the last run works is skipped.']);
-    expect(limitWords({ budget: { maxTurns: 1 } }, false, 'open')[0]).toBe('The bridge gets at most 1 turn.');
+    expect(OPEN_NEEDS_TURNS).toBe('A duty that opens a team needs the most turns of the whole team, such as 40.');
+    expect(limitWords(d.limits, false, 'open')).toEqual(['The team gets at most 40 turns.', 'A start that comes while the last run works is skipped.']);
+    expect(limitWords({ budget: { maxTurns: 1 } }, false, 'open')[0]).toBe('The team gets at most 1 turn.');
   });
 
   it('show a problem of the budget beside the turns of the bridge for an open, and at the top for a post', () => {
-    const ps = ['limits.budget: A bridge counts turns. Give maxTurns, such as 40, and leave out the other limits.', 'limits.budget.maxTurns: A duty that opens a bridge needs the most turns of the whole bridge, such as 40.', 'limits.perDayUSD: Too much.'];
+    const ps = ['limits.budget: A bridge counts turns. Give maxTurns, such as 40, and leave out the other limits.', 'limits.budget.maxTurns: A duty that opens a team needs the most turns of the whole team, such as 40.', 'limits.perDayUSD: Too much.'];
     expect(dutyProblems(ps, 'open')).toEqual({
-      turns: ['A bridge counts turns. Give maxTurns, such as 40, and leave out the other limits.', 'A duty that opens a bridge needs the most turns of the whole bridge, such as 40.'],
+      turns: ['A bridge counts turns. Give maxTurns, such as 40, and leave out the other limits.', 'A duty that opens a team needs the most turns of the whole team, such as 40.'],
       top: ['Too much.'],
     });
-    expect(dutyProblems(ps, 'post')).toEqual({ top: ['A bridge counts turns. Give maxTurns, such as 40, and leave out the other limits.', 'A duty that opens a bridge needs the most turns of the whole bridge, such as 40.', 'Too much.'] });
-    expect(dutyProblems(ps, 'ask')).toEqual({ cost: ['A bridge counts turns. Give maxTurns, such as 40, and leave out the other limits.'], turns: ['A duty that opens a bridge needs the most turns of the whole bridge, such as 40.'], perDay: ['Too much.'] });
+    expect(dutyProblems(ps, 'post')).toEqual({ top: ['A bridge counts turns. Give maxTurns, such as 40, and leave out the other limits.', 'A duty that opens a team needs the most turns of the whole team, such as 40.', 'Too much.'] });
+    expect(dutyProblems(ps, 'ask')).toEqual({ cost: ['A bridge counts turns. Give maxTurns, such as 40, and leave out the other limits.'], turns: ['A duty that opens a team needs the most turns of the whole team, such as 40.'], perDay: ['Too much.'] });
   });
 });
 

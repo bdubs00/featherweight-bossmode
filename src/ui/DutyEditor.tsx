@@ -141,8 +141,8 @@ const DRAFT = 'new';
 /** The words of each action, as the choice of What says them. */
 const ACT_WORDS: Record<Act, string> = {
   ask: 'Ask the agent',
-  post: 'Post in a bridge',
-  open: 'Open a bridge from a playbook',
+  post: 'Post in a team',
+  open: 'Open a team from a playbook',
   manager: 'Ask the manager',
 };
 
@@ -228,7 +228,7 @@ function backTo(hash: string): string {
     case 'manager':
       return 'the manager';
     case 'bridge':
-      return 'the bridge';
+      return 'the team';
     case 'fleet':
     case 'member':
       return 'the conversation';
@@ -541,13 +541,13 @@ function BridgeFields({ bridge, to, onChange, error, toError }: { bridge: string
   const other = bridge && !open.some((b) => b.id === bridge) ? bridges.byId[bridge] : undefined;
   return (
     <>
-      <Field label="Bridge" error={error} class="duty-narrow">
+      <Field label="Team" error={error} class="duty-narrow">
         <select class="recess" value={bridge} aria-invalid={error ? true : undefined} onChange={(e) => onChange({ bridge: (e.target as HTMLSelectElement).value, to: [] })}>
-          <option value="">{open.length ? 'Pick a bridge' : 'No bridge is open'}</option>
+          <option value="">{open.length ? 'Pick a team' : 'No team is open'}</option>
           {open.map((b) => (
             <option value={b.id}>{b.title}</option>
           ))}
-          {bridge && !open.some((b) => b.id === bridge) && <option value={bridge}>{other ? other.title + ', closed' : 'A bridge that you cannot see'}</option>}
+          {bridge && !open.some((b) => b.id === bridge) && <option value={bridge}>{other ? other.title + ', closed' : 'A team that you cannot see'}</option>}
         </select>
       </Field>
       {bridge && members.length > 0 && (
@@ -561,7 +561,7 @@ function BridgeFields({ bridge, to, onChange, error, toError }: { bridge: string
               </label>
             ))}
           </div>
-          <p class="t-meta">{to.length ? (to.length === 1 ? '1 member reads it.' : to.length + ' members read it.') : 'Everyone on the bridge reads it.'}</p>
+          <p class="t-meta">{to.length ? (to.length === 1 ? '1 member reads it.' : to.length + ' members read it.') : 'Everyone on the team reads it.'}</p>
           {toError && (
             <span class="field-error" role="alert">
               {toError}
@@ -1140,7 +1140,7 @@ function EditorForm({ name, seed, base: read, heading, back: home }: FormProps) 
             {f.act === 'post' ? (
               <p class="duty-spends">{POST_SPENDS}</p>
             ) : f.act === 'open' ? (
-              <Field label="The most turns of the bridge" error={joinError(err.turns, pr.turns)} class="duty-narrow">
+              <Field label="The most turns of the team" error={joinError(err.turns, pr.turns)} class="duty-narrow">
                 <Input type="number" min={1} inputMode="numeric" value={f.bridgeTurns} invalid={!!(err.turns || pr.turns)} placeholder="Required, such as 40" onInput={(e) => patch({ bridgeTurns: (e.target as HTMLInputElement).value })} />
               </Field>
             ) : (

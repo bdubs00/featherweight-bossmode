@@ -78,7 +78,7 @@ function input(): PeopleInput {
 }
 
 describe('the people list', () => {
-  it('groups the seats of the open bridges in the order of the bridges, with Not on a bridge last', () => {
+  it('groups the seats of the open bridges in the order of the bridges, with Not on a team last', () => {
     const groups = peopleOf(input());
     expect(groups.map((g) => g.title)).toEqual(['Release notes', 'Migrate Puppet', NOT_ON_A_BRIDGE]);
     expect(groups[0].href).toBe('#bridge/b2');
@@ -100,7 +100,7 @@ describe('the people list', () => {
     expect(g.rows.some((r) => r.handle === 'reviewer')).toBe(false);
   });
 
-  it('shows Not on a bridge only when every open bridge has its roster', () => {
+  it('shows Not on a team only when every open bridge has its roster', () => {
     const s = input();
     delete s.rosters.b2;
     expect(peopleOf(s).map((g) => g.title)).toEqual(['Migrate Puppet']);
@@ -149,7 +149,7 @@ describe('the presence words', () => {
   });
 });
 
-describe('Not on a bridge, from the agents of the fleet', () => {
+describe('Not on a team, from the agents of the fleet', () => {
   // The front names only its own profile, default. The pools run the
   // migrator and the scribe, and a member holds the writer.
   const real: Fleet = {

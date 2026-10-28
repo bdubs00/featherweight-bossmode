@@ -321,7 +321,7 @@ export function MemberMain({ bridge, handle, tab }: { bridge: string; handle: st
       <section class="screen member-main">
         <PaneHeader title={handle} size="title" level={1} back={backTo(bridge, b ? b.title : '')} />
         <div class="empty">
-          <p>{loaded ? handle + ' has no seat on this bridge, or no run yet.' : 'Loading the member.'}</p>
+          <p>{loaded ? handle + ' has no seat on this team, or no run yet.' : 'Loading the member.'}</p>
         </div>
       </section>
     );
@@ -366,7 +366,7 @@ export function MemberMain({ bridge, handle, tab }: { bridge: string; handle: st
       {tab === 'chat' && <Chat bridge={bridge} m={m} items={t.items} closed={!!b && b.state === 'closed'} stopped={stopped} reason={fail.line} said={fail.said} />}
       {tab === 'run' && (
         <div class="scroll">
-          {runId ? <RunView runId={runId} result={res} bridge={bridge} member={m} who={handle} items={t.items} endSeq={end ? end.seq : undefined} gone={t.gone} archived={archived} wakes={wakes} /> : <p class="run-note">{handle + ' has no seat on this bridge, or no run yet.'}</p>}
+          {runId ? <RunView runId={runId} result={res} bridge={bridge} member={m} who={handle} items={t.items} endSeq={end ? end.seq : undefined} gone={t.gone} archived={archived} wakes={wakes} /> : <p class="run-note">{handle + ' has no seat on this team, or no run yet.'}</p>}
         </div>
       )}
       {tab === 'files' && <div class="scroll">{runId && <FilesView runId={runId} result={res} items={t.items} wakes={wakes} gone={t.gone} archived={archived} />}</div>}

@@ -126,14 +126,14 @@ export function lineWords(e: Pick<Entry, 'event' | 'text' | 'page'>, me: Me): Li
       if ((m = /^(\S+) lost its run\b/.exec(t))) return out(handleOf(m[1]) + ' lost its worker');
       return out(firstWord(t) + ' lost its worker');
     case 'opened':
-      if ((m = /^(.+?) opened the bridge\b/.exec(t))) return out(by(m[1]) + ' opened the bridge');
-      return out('The bridge opened');
+      if ((m = /^(.+?) opened the bridge\b/.exec(t))) return out(by(m[1]) + ' opened the team');
+      return out('The team opened');
     case 'closed':
-      if ((m = /^(.+?) closed the bridge\b/.exec(t))) return out(by(m[1]) + ' closed the bridge');
-      return out('The bridge closed');
+      if ((m = /^(.+?) closed the bridge\b/.exec(t))) return out(by(m[1]) + ' closed the team');
+      return out('The team closed');
     case 'reopened':
-      if ((m = /^(.+?) opened the bridge again\b/.exec(t))) return out(by(m[1]) + ' reopened the bridge');
-      return out('The bridge opened again');
+      if ((m = /^(.+?) opened the bridge again\b/.exec(t))) return out(by(m[1]) + ' reopened the team');
+      return out('The team opened again');
     case 'joined':
       if ((m = /^(.+?) added (\S+?):/.exec(t)) || (m = /^(.+?) added (\S+?)\.?$/.exec(t))) return out(`${by(m[1])} seated ${handleOf(m[2])}`);
       return out(firstWord(t) + ' took the seat');
@@ -154,7 +154,7 @@ export function lineWords(e: Pick<Entry, 'event' | 'text' | 'page'>, me: Me): Li
       if ((m = /^(.+?) changed the settings\b/.exec(t))) return out(by(m[1]) + ' changed the settings');
       if (/^nobody writes a report\b/i.test(t)) return out('No report');
       if (e.page && (m = /^(\S+) changed\b/.exec(t))) return out(by(m[1]) + ' changed a page', true, e.page);
-      return out('The bridge changed', true, e.page || undefined);
+      return out('The team changed', true, e.page || undefined);
     }
     case 'finished':
       if ((m = /^(\S+) finished\b/.exec(t))) return out(handleOf(m[1]) + ' finished');
@@ -183,13 +183,13 @@ export function lineWords(e: Pick<Entry, 'event' | 'text' | 'page'>, me: Me): Li
       }
       return out('Failed');
     case 'cap':
-      if ((m = /^The bridge reached its cap of (\d+) messages\b/.exec(t))) return out(`The bridge reached its cap of ${m[1]} messages`);
-      if ((m = /^The bridge reached its cap of (\d+) turns\b/.exec(t))) return out(`The bridge reached its cap of ${m[1]} turns`);
-      if ((m = /^The bridge reached its cap of (\d+) deliveries a minute\b/.exec(t))) return out(`The bridge reached its cap of ${m[1]} a minute`);
+      if ((m = /^The bridge reached its cap of (\d+) messages\b/.exec(t))) return out(`The team reached its cap of ${m[1]} messages`);
+      if ((m = /^The bridge reached its cap of (\d+) turns\b/.exec(t))) return out(`The team reached its cap of ${m[1]} turns`);
+      if ((m = /^The bridge reached its cap of (\d+) deliveries a minute\b/.exec(t))) return out(`The team reached its cap of ${m[1]} a minute`);
       if ((m = /^(\S+) cannot take messages: its run stopped at a limit\b/.exec(t))) return out(handleOf(m[1]) + ' stopped at a limit');
       if ((m = /^(\S+) cannot take messages\b/.exec(t))) return out(handleOf(m[1]) + ' cannot take messages');
       if ((m = /^(\S+) and (\S+) exchanged \d+ messages\b/.exec(t))) return out(`${handleOf(m[1])} and ${handleOf(m[2])} reached their cap`);
-      return out('The bridge reached a cap');
+      return out('The team reached a cap');
   }
   // An event that the page does not know keeps the sentence of the backend.
   return { text: t, raw: true };

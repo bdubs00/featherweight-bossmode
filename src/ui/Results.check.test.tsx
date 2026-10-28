@@ -155,7 +155,7 @@ describe('More on a phone', () => {
     await act(async () => more.click());
     expect(more.getAttribute('aria-expanded')).toBe('true');
     expect([...el.querySelectorAll('.menu-more [role="menuitem"]')].map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
-      ['Bridges', '#bridges'],
+      ['Teams', '#bridges'],
       ['Fleet', '#fleet'],
       ['Duties', '#duties'],
       ['Skills', '#skills'],

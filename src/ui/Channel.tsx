@@ -97,8 +97,8 @@ function ChannelComposer(p: { id: string; closed: boolean; reply: Entry | null; 
   return (
     <Composer
       draft={p.id}
-      label="Message the bridge"
-      placeholder="Message the bridge"
+      label="Message the team"
+      placeholder="Message the team"
       members={members}
       disabled={p.closed ? 'Closed. Reopen it to send.' : ''}
       reply={r ? { seq: r.seq, who: senderName(r.from), text: r.text, handle: r.from.kind === 'agent' ? r.from.handle : undefined } : null}
@@ -398,7 +398,7 @@ function WikiTab({ id }: { id: string }) {
         </div>
       )}
       {pages.length > 0 && (
-        <ul class="prows" ref={list} aria-label="Pages of this bridge">
+        <ul class="prows" ref={list} aria-label="Pages of this team">
           {pages.map((p) => {
             // A page under the folder of the bridge needs no folder in its name.
             const where = (p.path.startsWith(head) ? p.path.slice(head.length) : p.path).replace(/\.md$/, '');
@@ -579,12 +579,12 @@ export function Channel({ id, tab: tabProp }: { id: string; tab?: BridgeTab }) {
 
   if (!b) {
     return (
-      <section class="screen channel" aria-label="Bridge">
-        <PaneHeader title="Bridge" size="title" level={1} back={{ href: '#', label: 'Bridges', to: 'list' }} />
+      <section class="screen channel" aria-label="Team">
+        <PaneHeader title="Team" size="title" level={1} back={{ href: '#', label: 'Teams', to: 'list' }} />
         {known ? (
           <div class="empty center">
-            <p>This bridge is not here. It was removed, or you cannot see it.</p>
-            <Button href="#">Bridges</Button>
+            <p>This team is not here. It was removed, or you cannot see it.</p>
+            <Button href="#">Teams</Button>
           </div>
         ) : (
           <Empty>Loading the channel.</Empty>
@@ -598,7 +598,7 @@ export function Channel({ id, tab: tabProp }: { id: string; tab?: BridgeTab }) {
   const base = { place: 'bridge' as const, id, pane: 'none' as const };
   const tabs = (
     <Tabs
-      label="Bridge"
+      label="Team"
       current={tab}
       items={[
         { id: 'posts', label: 'Posts', href: hrefOf(base) },
@@ -614,7 +614,7 @@ export function Channel({ id, tab: tabProp }: { id: string; tab?: BridgeTab }) {
         title={b.title}
         size="title"
         level={1}
-        back={{ href: '#', label: 'Bridges', to: 'list' }}
+        back={{ href: '#', label: 'Teams', to: 'list' }}
         actions={
           <>
             <Button href={hrefOf({ place: 'bridge', id, pane: 'roster' })} size="s" class="collapsed-only">
@@ -622,7 +622,7 @@ export function Channel({ id, tab: tabProp }: { id: string; tab?: BridgeTab }) {
             </Button>
             {!closed && wide && (
               <Button size="s" onClick={() => setConfirm('close')}>
-                Close bridge
+                Close team
               </Button>
             )}
             <Menu
@@ -632,7 +632,7 @@ export function Channel({ id, tab: tabProp }: { id: string; tab?: BridgeTab }) {
                 { label: 'Save as playbook', onSelect: () => setConfirm('playbook') },
                 // A closed bridge becomes a duty that opens a bridge from its playbook. An open one becomes a duty that posts in it.
                 { label: 'Make this a duty', onSelect: () => (closed ? setConfirm('duty') : go({ place: 'duties', fresh: true, seed: { agent: firstAgent, act: 'post', bridge: id } })) },
-                ...(closed ? [{ label: 'Reopen', onSelect: () => attempt(() => patchBridge(id, { state: 'open' })) }] : wide ? [] : [{ label: 'Close bridge', danger: true, onSelect: () => setConfirm('close') }]),
+                ...(closed ? [{ label: 'Reopen', onSelect: () => attempt(() => patchBridge(id, { state: 'open' })) }] : wide ? [] : [{ label: 'Close team', danger: true, onSelect: () => setConfirm('close') }]),
               ]}
             />
           </>
@@ -649,7 +649,7 @@ export function Channel({ id, tab: tabProp }: { id: string; tab?: BridgeTab }) {
       {confirm === 'close' && (
         <Confirm
           title={'Close ' + b.title + '?'}
-          confirm="Close bridge"
+          confirm="Close team"
           danger
           onCancel={() => setConfirm(null)}
           onConfirm={async () => {

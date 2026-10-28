@@ -15,7 +15,7 @@ beforeEach(() => {
   seedFleet();
 });
 
-/** openQuiet opens the group Not on a bridge, which folds by default, as a click of the person does. */
+/** openQuiet opens the group Not on a team, which folds by default, as a click of the person does. */
 const openQuiet = () => localStorage.setItem(FOLD_KEY, JSON.stringify({ none: { open: true, attention: false } }));
 
 afterEach(() => {
@@ -49,11 +49,11 @@ describe('the people list', () => {
     expect(head.querySelector('.led-green')).toBeNull();
   });
 
-  it('groups the seats under the title of their bridge, then Not on a bridge', () => {
+  it('groups the seats under the title of their bridge, then Not on a team', () => {
     openQuiet();
     const el = mount(<FleetList member="b1/migrator-1" />);
     const titles = [...el.querySelectorAll('.people-title')].map((x) => x.textContent);
-    expect(titles).toEqual(['Migrate Puppet', 'Not on a bridge']);
+    expect(titles).toEqual(['Migrate Puppet', 'Not on a team']);
     expect(el.querySelector('a.people-title')!.getAttribute('href')).toBe('#bridge/b1');
     expect(handles(el)).toEqual(['migrator-1', 'migrator-2', 'reviewer', 'manager']);
   });
@@ -107,13 +107,13 @@ describe('folding a bridge in the people list', () => {
   const click = (b: HTMLElement) => act(() => b.click());
 
   it('folds every group unless a member in it needs attention', () => {
-    // Migrate Puppet holds migrator-2, which needs you. Not on a bridge holds the manager, which is awake.
+    // Migrate Puppet holds migrator-2, which needs you. Not on a team holds the manager, which is awake.
     const el = mount(<FleetList />);
     expect(handles(el)).toEqual(['migrator-1', 'migrator-2', 'reviewer']);
     expect(foldKey(el, 0).getAttribute('aria-expanded')).toBe('true');
     expect(foldKey(el, 0).getAttribute('aria-label')).toBe('Hide the members of Migrate Puppet');
     expect(foldKey(el, 1).getAttribute('aria-expanded')).toBe('false');
-    expect(foldKey(el, 1).getAttribute('aria-label')).toBe('Show the members of Not on a bridge');
+    expect(foldKey(el, 1).getAttribute('aria-label')).toBe('Show the members of Not on a team');
     expect(localStorage.getItem(FOLD_KEY)).toBeNull();
   });
 

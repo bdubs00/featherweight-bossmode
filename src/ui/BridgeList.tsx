@@ -6,7 +6,11 @@
 // one with the newest entry first. A filter field shows above the list once
 // it holds more than ten bridges. A filter shows the closed bridges that
 // match under a heading, and a filter that matches none says so, with the
-// key Clear. The foot holds the readout of the fleet.
+// key Clear. The foot holds the readout of the fleet. The words of the
+// place say team, as the card of a team on the board of Work says Team: one
+// thing has one name. The routes and the code keep the word bridge. A
+// person who can start no run, such as a viewer of every agent, gets no New
+// and no Open a team, as the server refuses both.
 
 import { memo } from 'preact/compat';
 import { useEffect, useState } from 'preact/hooks';
@@ -15,6 +19,7 @@ import { useSelect } from '../state/store';
 import { selectFacts } from '../state/reducer';
 import { seatPresence } from '../lib/status';
 import { hrefOf } from '../lib/route';
+import { mayStart } from '../lib/agents';
 import { useRoving } from './keys';
 import { FleetFoot } from './Shell';
 import { Glyph } from './icons';
@@ -130,6 +135,8 @@ export function BridgeList({ current }: { current: string }) {
   useEffect(() => {
     if (loaded && openIds) ensureRosters();
   }, [loaded, openIds]);
+  // A person who can start no run, such as a viewer of every agent, gets no key that opens a team.
+  const start = useSelect((s) => !s.me || mayStart(s.me));
   const [showClosed, setShowClosed] = useState(false);
   const [filter, setFilter] = useState('');
   const list = useRoving<HTMLDivElement>();
@@ -146,24 +153,26 @@ export function BridgeList({ current }: { current: string }) {
     <section class="screen bridge-list" aria-labelledby="bridges-title">
       <PaneHeader
         id="bridges-title"
-        title="Bridges"
+        title="Teams"
         count={loaded ? allOpen.length : undefined}
-        countLabel={allOpen.length === 1 ? '1 open bridge' : allOpen.length + ' open bridges'}
+        countLabel={allOpen.length === 1 ? '1 open team' : allOpen.length + ' open teams'}
         actions={
-          <Button href="#new" size="s">
-            New
-          </Button>
+          start ? (
+            <Button href="#new" size="s">
+              New
+            </Button>
+          ) : undefined
         }
       />
       {many && (
         <div class="list-find">
-          <Find label="Find a bridge" value={filter} onInput={setFilter} />
+          <Find label="Find a team" value={filter} onInput={setFilter} />
         </div>
       )}
       <div class="scroll" ref={list}>
         {filtering && open.length === 0 && closed.length === 0 && (
           <div class="empty" role="status">
-            <p>No bridge matches {filter.trim()}.</p>
+            <p>No team matches {filter.trim()}.</p>
             <Button size="s" onClick={() => setFilter('')}>
               Clear
             </Button>
@@ -178,13 +187,15 @@ export function BridgeList({ current }: { current: string }) {
         </div>
         {loaded && allOpen.length === 0 && (
           <div class="empty">
-            <p>No bridge is open.</p>
-            <Button href="#new" kind="primary">
-              Open a bridge
-            </Button>
+            <p>No team is open.</p>
+            {start && (
+              <Button href="#new" kind="primary">
+                Open a team
+              </Button>
+            )}
           </div>
         )}
-        {!loaded && <p class="empty">Loading the bridges.</p>}
+        {!loaded && <p class="empty">Loading the teams.</p>}
         {closed.length > 0 && (
           <>
             {/* A filter shows every closed bridge that matches, so the group is a heading then, not a toggle that does nothing. */}

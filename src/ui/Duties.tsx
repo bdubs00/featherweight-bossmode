@@ -649,7 +649,7 @@ function DoWords({ d, agentName, title, locked }: { d: Duty; agentName: string; 
           <Mark agent={d.agent} size={24} />
           <span>
             {agent} posts in{' '}
-            {bridge ? <a href={hrefOf({ place: 'bridge', id: x.post.bridge, pane: 'none' })}>{bridge.title}</a> : 'a bridge that you cannot see'}
+            {bridge ? <a href={hrefOf({ place: 'bridge', id: x.post.bridge, pane: 'none' })}>{bridge.title}</a> : 'a team that you cannot see'}
             {x.post.to && x.post.to.length ? ' to ' + listWords(x.post.to) : ''}
           </span>
         </p>
@@ -663,7 +663,7 @@ function DoWords({ d, agentName, title, locked }: { d: Duty; agentName: string; 
         <p class="duty-who">
           <Mark agent={d.agent} size={24} />
           <span>
-            {agent} opens a bridge from the playbook {x.open.playbook}
+            {agent} opens a team from the playbook {x.open.playbook}
           </span>
         </p>
         {x.open.goal && <MessageWords text={x.open.goal} />}

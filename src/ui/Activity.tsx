@@ -725,7 +725,7 @@ export function ActivityMain({ item }: { item?: string }) {
     <>
       {r.bridge && (
         <span class="meta clip member-where">
-          in <a href={hrefOf({ place: 'bridge', id: r.bridge, pane: 'none' })}>{r.bridgeTitle || 'a bridge'}</a>
+          in <a href={hrefOf({ place: 'bridge', id: r.bridge, pane: 'none' })}>{r.bridgeTitle || 'a team'}</a>
         </span>
       )}
       {r.duty && <DutyChip name={r.duty} />}

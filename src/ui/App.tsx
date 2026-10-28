@@ -129,6 +129,7 @@ function useRoute(): Route {
 
 /** Home is the main pane of Bridges with no bridge open: the last bridge, the newest open one, or an invitation. */
 function Home() {
+  const start = useSelect((s) => !s.me || mayStart(s.me));
   const loaded = useSelect((s) => s.bridges.loaded);
   const first = useSelect((s) => (lastBridge && s.bridges.byId[lastBridge] ? lastBridge : s.bridges.order.find((id) => s.bridges.byId[id].state === 'open')));
   useEffect(() => {
@@ -136,16 +137,18 @@ function Home() {
     if (first && window.matchMedia(TWO_PANES).matches) go({ place: 'bridge', id: first, pane: 'none' }, true);
   }, [first]);
   return (
-    <EmptyPane back={{ href: '#', label: 'Bridges' }}>
+    <EmptyPane back={{ href: '#', label: 'Teams' }}>
       {loaded && !first ? (
         <>
-          <p>No bridge is open. Open one, or ask the manager to open one.</p>
-          <Button href="#new" kind="primary">
-            Open a bridge
-          </Button>
+          <p>No team is open. Open one, or ask the manager to open one.</p>
+          {start && (
+            <Button href="#new" kind="primary">
+              Open a team
+            </Button>
+          )}
         </>
       ) : (
-        <p>Loading the bridges.</p>
+        <p>Loading the teams.</p>
       )}
     </EmptyPane>
   );

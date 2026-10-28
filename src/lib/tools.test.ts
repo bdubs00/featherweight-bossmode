@@ -20,7 +20,7 @@ describe('abilitiesOf', () => {
 
   it('makes the tools of the wiki one ability, and the tools of the bridges another', () => {
     const a = abilitiesOf(['bash', 'front.bridge_read', 'front.bridge_post', 'front.pages_list', 'front.pages_read', 'front.pages_write', 'front.pages_search', 'front.pages_history'], CATALOG);
-    expect(a.map((x) => x.text)).toEqual(['Run shell commands', 'Read and post in bridges', 'Read and write the wiki']);
+    expect(a.map((x) => x.text)).toEqual(['Run shell commands', 'Read and post in teams', 'Read and write the wiki']);
     expect(a[2].names).toHaveLength(5);
     expect(a[2].noun).toBe('the wiki');
   });
@@ -28,14 +28,14 @@ describe('abilitiesOf', () => {
   it('words a family by what its tools do', () => {
     expect(abilitiesOf(['front.pages_read', 'front.pages_search'], CATALOG)[0].text).toBe('Read the wiki');
     expect(abilitiesOf(['front.pages_*'], CATALOG)[0].text).toBe('Read and write the wiki');
-    expect(abilitiesOf(['front.bridge_read'], CATALOG)[0].text).toBe('Read bridges');
+    expect(abilitiesOf(['front.bridge_read'], CATALOG)[0].text).toBe('Read teams');
   });
 
   it('names a whole server once, as a glob or by the name of a source of the catalog', () => {
     expect(abilitiesOf(['ansible.*'], CATALOG).map((x) => x.text)).toEqual(['Use the tools of ansible']);
     expect(abilitiesOf(['github'], CATALOG).map((x) => x.text)).toEqual(['Use the tools of github']);
     // No text of the page says front: its tools are the bridges, the wiki, and the fleet.
-    expect(abilitiesOf(['front.*'], CATALOG).map((x) => x.text)).toEqual(['Use the bridges, the wiki, and the fleet']);
+    expect(abilitiesOf(['front.*'], CATALOG).map((x) => x.text)).toEqual(['Use the teams, the wiki, and the fleet']);
   });
 
   it('takes the first sentence of a description without a phrase, the words of the kernel without the catalog, and the name last', () => {

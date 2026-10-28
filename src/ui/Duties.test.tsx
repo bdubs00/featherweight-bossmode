@@ -356,17 +356,17 @@ describe('the page of a duty', () => {
     expect(what()).toBe("What it does Scribe posts in Homelab operations to reviewer and tester Review Today's date.");
     expect(el.querySelector('section[aria-labelledby="duty-what"] a[href="#bridge/b1"]')).toBeTruthy();
     // A post spends nothing of its own.
-    expect(limits()).toBe('Limits A post spends nothing of its own. The seats of the bridge spend from their own budgets. A time that comes while the last run works is skipped. A missed time runs once, within 1 hour.');
+    expect(limits()).toBe('Limits A post spends nothing of its own. The seats of the team spend from their own budgets. A time that comes while the last run works is skipped. A missed time runs once, within 1 hour.');
     unmountAll();
     api.restore();
     const open = base({ name: 'patching', do: { open: { playbook: 'weekly-patching', goal: 'Patch on {date}.' } }, limits: { budget: { maxTurns: 40 }, overlap: 'skip', catchUp: '1h' }, when: { event: { kind: 'bridge.closed', agent: 'triage' } } });
     api = fakeApi(one(open));
     el = mount(<DutyMain name="patching" />);
     await settle();
-    expect(what()).toBe("What it does Scribe opens a bridge from the playbook weekly-patching Patch on Today's date.");
-    expect(text(el.querySelector('.duty-readback'))).toBe('When a bridge of Triage closes');
+    expect(what()).toBe("What it does Scribe opens a team from the playbook weekly-patching Patch on Today's date.");
+    expect(text(el.querySelector('.duty-readback'))).toBe('When a team of Triage closes');
     // The budget of an open is the turns of the bridge. An event has starts, not times, and misses none.
-    expect(limits()).toBe('Limits The bridge gets at most 40 turns. A start that comes while the last run works is skipped.');
+    expect(limits()).toBe('Limits The team gets at most 40 turns. A start that comes while the last run works is skipped.');
     unmountAll();
     api.restore();
     const manager = base({ name: 'ask-boss', do: { manager: { message: 'Sum up the week.' } } });

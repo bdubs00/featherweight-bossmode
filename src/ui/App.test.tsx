@@ -137,7 +137,7 @@ describe('a form and the keys of the page', () => {
       document.body.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
     });
 
-  it('keeps Open a bridge on Escape and on /, and gives the half-filled job back after a move away', async () => {
+  it('keeps Open a team on Escape and on /, and gives the half-filled job back after a move away', async () => {
     sessionStorage.clear();
     const el = mount(<App />);
     await vi.waitFor(() => expect(el.querySelector('.appbar, nav')).not.toBeNull());
@@ -169,7 +169,7 @@ describe('the conversation of a seat', () => {
     await vi.waitFor(() => expect(el.querySelector('.appbar, nav')).not.toBeNull());
     await visit('#bridge/b1/roster');
     await visit('#member/b1/migrator-1');
-    expect(lit(el)).toBe('Bridges');
+    expect(lit(el)).toBe('Teams');
     expect(el.querySelector('.pane-list #bridges-title')).not.toBeNull();
     const back = el.querySelector('.member-main .pane-head a.back') as HTMLAnchorElement;
     expect(back.getAttribute('href')).toBe('#bridge/b1/roster');
@@ -177,7 +177,7 @@ describe('the conversation of a seat', () => {
     expect(backOf({ place: 'member', bridge: 'b1', handle: 'migrator-1', tab: 'chat' })).toEqual({ place: 'bridge', id: 'b1', pane: 'roster' });
     // A move between the tabs of the seat keeps the place.
     await visit('#member/b1/migrator-1/run');
-    expect(lit(el)).toBe('Bridges');
+    expect(lit(el)).toBe('Teams');
   });
 
   it('stays in Fleet when the Fleet place opens it', async () => {

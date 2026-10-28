@@ -353,7 +353,7 @@ describe('the member conversation', () => {
     expect(more.getAttribute('aria-expanded')).toBe('true');
     expect(el.querySelector('pre.command.run-fail-raw')!.textContent).toBe(PREFILL);
     // The steps say what the run did, with the page that it wrote.
-    await vi.waitFor(() => expect([...el.querySelectorAll('.run-steps li > span')].map((x) => x.textContent)).toEqual(['Read the channel', 'Wrote ' + PAGE, 'Posted to the bridge']));
+    await vi.waitFor(() => expect([...el.querySelectorAll('.run-steps li > span')].map((x) => x.textContent)).toEqual(['Read the channel', 'Wrote ' + PAGE, 'Posted to the team']));
     act(() => (el.querySelector('.run-fail .seat-again') as HTMLButtonElement).click());
     await vi.waitFor(() => expect(calls.some((c) => c.method === 'PATCH')).toBe(true));
     expect(calls.find((c) => c.method === 'PATCH')).toEqual({ method: 'PATCH', path: '/v1/bridges/b1/members/notes', body: { task: 'Write the runbook of the alerts' } });
@@ -393,6 +393,6 @@ describe('the member conversation', () => {
 
   it('says so for a seat that is not on the bridge', () => {
     const el = mount(<MemberMain bridge="b1" handle="nobody" tab="chat" />);
-    expect(el.textContent).toContain('nobody has no seat on this bridge, or no run yet.');
+    expect(el.textContent).toContain('nobody has no seat on this team, or no run yet.');
   });
 });

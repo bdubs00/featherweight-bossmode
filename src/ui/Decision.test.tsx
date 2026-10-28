@@ -107,7 +107,7 @@ describe('the plan of a call that is not a shell command', () => {
     state: 'pending',
   };
 
-  it('reads the goal of Open bridge from its start, and links the bridges and the pages that it names', () => {
+  it('reads the goal of Open team from its start, and links the bridges and the pages that it names', () => {
     act(() => {
       store.dispatch({ type: 'bridges', bridges: [bridgeOf('br-px', { title: 'Proxmox automation' })] });
       store.dispatch({ type: 'pages', pages: [{ path: 'k3s/proxmox/facts.md', title: 'Facts', hash: 'h', size: 1, by: 'token', at: '' }] });
@@ -119,7 +119,7 @@ describe('the plan of a call that is not a shell command', () => {
     expect([...g.querySelectorAll('a')].map((a) => a.getAttribute('href'))).toEqual(['#pages/k3s/proxmox/facts.md', '#bridge/br-px']);
   });
 
-  it('says what Open bridge opens before Details: the title, the goal, and each seat, and never the rule id', () => {
+  it('says what Open team opens before Details: the title, the goal, and each seat, and never the rule id', () => {
     const el = mount(<DecisionCard d={open} who="manager" />);
     const card = el.querySelector('section.card')!;
     expect(card.textContent).toContain('manager wants to open a bridge.');
@@ -130,7 +130,7 @@ describe('the plan of a call that is not a shell command', () => {
       ['writer-3', '', 'Write runbooks/cron.md and runbooks/nginx.md'],
       ['checker', 'reviewer', 'Review each runbook'],
     ]);
-    expect(keys(el)).toEqual(['Deny', 'Open bridge']);
+    expect(keys(el)).toEqual(['Deny', 'Open team']);
     expect(card.querySelector('.rule')!.textContent).toBe('Rule: ask before a tool that changes things');
     expect(card.textContent).not.toContain('rule: ask');
     expect(card.querySelector('pre')).toBeNull();

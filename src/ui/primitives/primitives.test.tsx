@@ -183,11 +183,11 @@ describe('GrooveBand and PaneHeader', () => {
   });
 
   it('puts the count on the heading line, and a back link to the column before', () => {
-    const el = mount(<PaneHeader title="Bridges" count={3} countLabel="3 open bridges" back={{ href: '#', label: 'Bridges', to: 'list' }} actions={<Button size="s">New</Button>} />);
+    const el = mount(<PaneHeader title="Teams" count={3} countLabel="3 open teams" back={{ href: '#', label: 'Teams', to: 'list' }} actions={<Button size="s">New</Button>} />);
     const head = el.querySelector('header.pane-head')!;
-    expect(head.querySelector('h2')!.textContent).toBe('Bridges');
-    expect(head.querySelector('.chip .sr')!.textContent).toBe('3 open bridges');
-    expect(head.querySelector('a.back.to-list')!.getAttribute('aria-label')).toBe('Back to Bridges');
+    expect(head.querySelector('h2')!.textContent).toBe('Teams');
+    expect(head.querySelector('.chip .sr')!.textContent).toBe('3 open teams');
+    expect(head.querySelector('a.back.to-list')!.getAttribute('aria-label')).toBe('Back to Teams');
     expect(el.querySelector('header + .groove')).not.toBeNull();
   });
 });

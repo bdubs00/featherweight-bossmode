@@ -95,7 +95,7 @@ function useHistory(chat: QuickChat | null): { runs: Run[]; loaded: boolean } {
 export function NoChat() {
   return (
     <section class="screen chat-main" aria-labelledby="chat-title">
-      <PaneHeader id="chat-title" title="Chat" size="title" level={1} back={{ href: '#', label: 'Bridges', to: 'list' }} />
+      <PaneHeader id="chat-title" title="Chat" size="title" level={1} back={{ href: '#', label: 'Teams', to: 'list' }} />
       <div class="empty center">
         <p>
           No quick chat is set up.{' '}
