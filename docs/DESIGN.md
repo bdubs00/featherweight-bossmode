@@ -1206,7 +1206,12 @@ door and the lanes above it.
   row, next to Start, so Enter in the field starts only after the person
   read every other row. The readback takes the width of the door.
 - After Start, a quiet card in place of the readback says what Start made,
-  with Open it, and takes the focus. No notice says it a second time.
+  with Open it, and takes the focus. No notice says it a second time. Its
+  line `Now:` follows the card of the task on the board, so it never says
+  that the task works after it ended.
+- A person who can start no task, such as a viewer of every agent, gets no
+  door: one line says who can start a task. The board of that person
+  opens on everyone, because their own board is always empty.
 - The board has six lanes in the order of the flow. A wide window shows
   them side by side, and a narrow one stacks them. A lane head holds its
   light and word, its count, and the age of its oldest card. The head stays

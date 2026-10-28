@@ -156,6 +156,17 @@
 .door-top .card {
   max-width: none;
 }
+/* Where the task that Start made stands now, from the board. */
+.door-now {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-1) var(--s-2);
+}
+/* A person who can start no task reads one line in the place of the door. */
+.door-none {
+  margin: 0;
+}
 .door-started:focus {
   outline: none;
 }

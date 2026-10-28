@@ -3,7 +3,7 @@ import { act } from 'preact/test-utils';
 import type { WorkBoard, WorkCard } from '../api/types';
 import { parseRoute, hrefOf, columnOf, parentOf } from '../lib/route';
 import { store } from '../state/store';
-import { Work, hrefOfCard, fromWords, labelOfCard, DONE_SHOWN } from './Work';
+import { Work, hrefOfCard, fromWords, labelOfCard, cardOfMade, DONE_SHOWN } from './Work';
 import { at, fakeFetch, mount, unmountAll, type Call } from './testkit-b';
 
 const card = (id: string, stage: WorkCard['stage'], extra: Partial<WorkCard> = {}): WorkCard => ({
@@ -139,6 +139,9 @@ describe('the board of the work', () => {
     expect(fromWords(card('y', 'working'), 'alice@example.com')).toBe('You');
     expect(fromWords(card('y', 'working', { from: { kind: 'person', name: 'alice', via: 'manager' } }), 'alice@example.com')).toBe('Manager for you');
     expect(fromWords(card('y', 'working'), 'bob@example.com')).toBe('alice');
+    // A bridge names the person by the name of the sign-in, a run by the subject.
+    expect(fromWords(card('y', 'working', { from: { kind: 'person', name: 'alice@quillwork.example', via: 'bridge' } }), ['alice', 'alice@quillwork.example'])).toBe('You');
+    expect(fromWords(card('y', 'working', { from: { kind: 'person', name: 'alice', via: 'page' } }), ['alice', 'alice@quillwork.example'])).toBe('You');
     store.dispatch({ type: 'me', me: { principal: { subject: 'alice@example.com' }, roles: {}, admin: false, canCreate: true } as never });
     const titled = card('t', 'waiting', { kind: 'duty', title: 'nightly', from: { kind: 'duty', name: 'nightly', via: 'schedule' }, agents: ['backup-keeper'], links: { duty: 'nightly' } });
     const f = fakeFetch([['GET', /^\/v1\/work/, () => ({ ...BOARD, cards: [...BOARD.cards, titled] })], ['GET', /^\/v1\/duties$/, () => ({ duties: [] })]]);
@@ -276,12 +279,51 @@ describe('the board of the work', () => {
       await settle();
       expect(el.querySelectorAll('.work-lane-head .led-grey').length).toBe(6);
       expect(el.querySelector('.work-lane-head .breathe')).toBeNull();
-      expect(el.querySelector('.work-none')!.textContent).toContain('No work in the last 7 days.');
+      expect(el.querySelector('.work-none')!.textContent).toContain('You have no task in the last 7 days.');
       await act(async () => [...el.querySelectorAll('button')].find((b) => b.textContent === 'Say what you need done')!.click());
       expect(document.activeElement).toBe(el.querySelector('#door-words'));
     } finally {
       f.restore();
     }
+  });
+
+  it('says why the board of the person is empty, and shows the tasks of everyone on a key', async () => {
+    const empty: WorkBoard = { sentence: 'No work in the last 7 days.', days: 7, lanes: BOARD.lanes.map((l) => ({ stage: l.stage, count: 0, yours: 0 })), cards: [] };
+    const f = fakeFetch([['GET', /^\/v1\/work/, (_b) => empty]]);
+    try {
+      const el = mount(<Work />);
+      await settle();
+      const key = [...el.querySelectorAll('button')].find((b) => b.textContent === 'Show the tasks of everyone')!;
+      await act(async () => key.click());
+      await settle();
+      expect(f.calls.some((c) => c.path === '/v1/work?all=true')).toBe(true);
+      expect([...el.querySelectorAll('button')].find((b) => b.textContent === 'Everyone')!.getAttribute('aria-pressed')).toBe('true');
+    } finally {
+      f.restore();
+    }
+  });
+
+  it('gives a person who can start no task no door, and opens the board on everyone', async () => {
+    store.dispatch({ type: 'me', me: { principal: { subject: 'erin' }, roles: { writer: 'viewer', ops: 'viewer' }, admin: false, canCreate: false } as never });
+    try {
+      const el = mount(<Work />);
+      await settle();
+      expect(el.querySelector('#door-words')).toBeNull();
+      expect(el.textContent).toContain('Only an owner or an operator of an agent can start a task.');
+      expect(calls[0].path).toBe('/v1/work?all=true');
+      expect([...el.querySelectorAll('button')].find((b) => b.textContent === 'Everyone')!.getAttribute('aria-pressed')).toBe('true');
+    } finally {
+      store.dispatch({ type: 'me', me: null });
+    }
+  });
+
+  it('finds the card of what Start made: its run, its bridge, or the open card of its duty', () => {
+    const b: WorkBoard = { ...BOARD, cards: [...BOARD.cards, card('n', 'waiting', { kind: 'duty', links: { duty: 'notes' } })] };
+    expect(cardOfMade(b, { run: 'run-w' })!.id).toBe('w');
+    expect(cardOfMade(b, { bridge: 'br-1' })!.id).toBe('b');
+    expect(cardOfMade(b, { duty: 'notes' })!.id).toBe('r');
+    expect(cardOfMade(b, { run: 'nothing' })).toBeUndefined();
+    expect(cardOfMade(null, { run: 'run-w' })).toBeUndefined();
   });
 
   it('lives at #work, a place of its own, and #tasks opens it too', () => {

@@ -16,9 +16,10 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
 import { ApiError } from '../api/client';
-import type { TaskPlan, TaskTell } from '../api/types';
+import type { ComponentChildren } from 'preact';
+import type { TaskPlan, TaskTell, Whoami } from '../api/types';
 import { hrefOf } from '../lib/route';
-import { nextWords } from '../lib/duties';
+import { nextWords, timeOf } from '../lib/duties';
 import { list } from '../lib/words';
 import { loadDuties } from '../state/duties';
 import { loadBridges } from '../state/actions';
@@ -48,6 +49,19 @@ const TELLS: { id: TaskTell; label: string }[] = [
   { id: 'failures', label: 'Only when it fails' },
 ];
 
+/**
+ * mayStartWork reports whether the person can start a task at the door: an
+ * admin, a person who can create agents, a person with the role owner or
+ * operator on an agent, and a person whose roles name no agent, because the
+ * backend decides. A viewer of every agent, such as a sponsor, cannot. It
+ * follows mayStart of src/lib/agents.ts on the branch drive/flow.
+ */
+export function mayStartWork(me: Pick<Whoami, 'admin' | 'canCreate' | 'roles'> | null | undefined): boolean {
+  if (!me) return true;
+  const roles = Object.values(me.roles || {});
+  return me.admin || me.canCreate || roles.length === 0 || roles.some((r) => r === 'owner' || r === 'operator');
+}
+
 /** costOf reads the cost that the person typed: a positive number of dollars, or null. */
 export function costOf(text: string): number | null {
   const t = text.trim().replace(/^\$/, '');
@@ -67,10 +81,12 @@ export function monthWords(plan: Pick<TaskPlan, 'kind' | 'cost'>, cost: number |
 }
 
 /** What Start made, for the quiet card that follows it. */
-interface Started {
+export interface Started {
   title: string;
   said: string;
   href: string;
+  /** What Start made, so the board can say where it stands now: a run, a bridge, or a duty. */
+  made: { run?: string; bridge?: string; duty?: string };
 }
 
 /** start sends the record of a plan, with the cost of the person, to the route that makes it. It answers what it made. */
@@ -80,17 +96,17 @@ export async function startPlan(plan: TaskPlan, cost: number): Promise<Started> 
     const d = s.duty;
     const saved = await api.putDuty(d.name, { ...d, limits: { ...d.limits, budget: { ...(d.limits && d.limits.budget), maxCostUSD: cost } } });
     loadDuties().catch(() => {});
-    return { title: plan.title, said: 'Set. ' + (saved.readback || plan.when.readback), href: hrefOf({ place: 'duties', name: saved.name || d.name }) };
+    return { title: plan.title, said: 'Set. ' + (saved.readback || plan.when.readback), href: hrefOf({ place: 'duties', name: saved.name || d.name }), made: { duty: saved.name || d.name } };
   }
   if (s.bridge) {
     const b = await api.openBridge({ ...s.bridge, caps: { ...(s.bridge.caps || {}), maxCostUSD: cost } } as Parameters<typeof api.openBridge>[0]);
     loadBridges().catch(() => {});
-    return { title: plan.title, said: 'Started. ' + list(plan.who.map((w) => w.name)) + ' work on it now.', href: hrefOf({ place: 'bridge', id: b.id, pane: 'none' }) };
+    return { title: plan.title, said: 'Started with ' + list(plan.who.map((w) => w.name)) + ' at ' + timeOf(new Date().toISOString()) + '.', href: hrefOf({ place: 'bridge', id: b.id, pane: 'none' }), made: { bridge: b.id } };
   }
   if (s.run) {
     const r = await api.start(s.run.member, { ...s.run.body, budget: { maxCostUSD: cost } } as Parameters<typeof api.start>[1]);
     const chat = s.run.body.metadata && s.run.body.metadata['fw.view'] === 'quickchat';
-    return { title: plan.title, said: 'Started. ' + (plan.who[0] ? plan.who[0].name : 'The agent') + ' works on it now.', href: chat ? hrefOf({ place: 'chat', run: r.id }) : hrefOf({ place: 'fleet', agent: s.run.body.agent }) };
+    return { title: plan.title, said: 'Started with ' + (plan.who[0] ? plan.who[0].name : 'the agent') + ' at ' + timeOf(new Date().toISOString()) + '.', href: chat ? hrefOf({ place: 'chat', run: r.id }) : hrefOf({ place: 'fleet', agent: s.run.body.agent }), made: { run: r.id } };
   }
   throw new Error('The plan names nothing to start.');
 }
@@ -276,7 +292,7 @@ function Readback({ plan, onPlan, onStarted, busy }: { plan: TaskPlan; onPlan: (
 }
 
 /** Door is the top of the Work place: the field, the templates or the readback, and what Start made. onStarted tells the board to read again. */
-export function Door({ onStarted }: { onStarted?: () => void }) {
+export function Door({ onStarted, follow }: { onStarted?: () => void; follow?: (made: Started['made']) => ComponentChildren }) {
   const [words, setWords] = useState('');
   const [plan, setPlan] = useState<TaskPlan | null>(null);
   // The words that the plan reads back, as the person sent them.
@@ -357,6 +373,8 @@ export function Door({ onStarted }: { onStarted?: () => void }) {
         <div class="door-started" ref={done} tabIndex={-1} role="status">
           <Card quiet title={started.title} class="readback-done">
             <p>{started.said}</p>
+            {/* Where the task stands now, from the board, so the note never says that it works after it ended. */}
+            {follow && follow(started.made)}
             <p>
               <a href={started.href}>Open it</a>
             </p>

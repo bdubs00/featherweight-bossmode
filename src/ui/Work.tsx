@@ -24,7 +24,7 @@ import { nextShort, titleOfName } from '../lib/duties';
 import { hrefOf } from '../lib/route';
 import { store, useSelect } from '../state/store';
 import { useDutyLabel } from '../state/duties';
-import { Door } from './Door';
+import { Door, mayStartWork, type Started } from './Door';
 import { ResultKeys } from './ResultKeys';
 import { focusLost, smooth, useRoving } from './keys';
 import { Button, Chip, Led, PaneHeader } from './primitives';
@@ -94,11 +94,12 @@ export function hrefOfCard(c: WorkCard): string {
   return '#work';
 }
 
-/** isMe reports whether the name of a person on a card is the person who reads the board. */
-const isMe = (name: string, me: string) => !!me && (name === me || (!name.includes('@') && name === personName(me)));
+/** isMe reports whether the name of a person on a card is the person who reads the board. A card can name the person by the subject or by the name of the sign-in, such as alice or alice@quillwork.example. */
+const isMe = (name: string, me: string[]) => me.some((m) => !!m && (name === m || (!name.includes('@') && name === personName(m))));
 
-/** fromWords says who asked for a card, in a few words. The person who reads the board is You. */
-export function fromWords(c: WorkCard, me = ''): string {
+/** fromWords says who asked for a card, in a few words. The person who reads the board, by any of the names in me, is You. */
+export function fromWords(c: WorkCard, me: string | string[] = []): string {
+  const mine_ = typeof me === 'string' ? [me] : me;
   const f = c.from || { kind: '' };
   const name = f.name || '';
   switch (f.kind) {
@@ -106,7 +107,7 @@ export function fromWords(c: WorkCard, me = ''): string {
     case 'app':
       return name;
     default: {
-      const mine = f.kind === 'person' && isMe(name, me);
+      const mine = f.kind === 'person' && isMe(name, mine_);
       const who = mine ? 'You' : f.kind === 'person' ? personName(name) : name;
       if (f.via === 'manager') return 'Manager for ' + (mine ? 'you' : who);
       if (f.via === 'mcp') return who + ' in an MCP client';
@@ -177,7 +178,8 @@ function whoWords(c: WorkCard, label: string, faces: Record<string, { displayNam
 function CardView({ c, now, onDecided }: { c: WorkCard; now: number; onDecided: () => void }) {
   // A card of a duty names the duty by its title, once the page reads the duties.
   const duty = useDutyLabel(c.from && c.from.kind === 'duty' ? c.from.name || '' : '');
-  const me = useSelect((s) => (s.me && s.me.principal ? s.me.principal.subject : ''));
+  const subject = useSelect((s) => (s.me && s.me.principal ? s.me.principal.subject : ''));
+  const signin = useSelect((s) => (s.me && s.me.principal ? s.me.principal.name || '' : ''));
   const faces = useSelect((s) => s.faces);
   const total = c.parts && c.parts.total > 1 ? c.parts.total : 0;
   const verdict = c.stage === 'done' && c.verdict ? VERDICTS[c.verdict] : null;
@@ -200,7 +202,7 @@ function CardView({ c, now, onDecided }: { c: WorkCard; now: number; onDecided: 
       {c.reason && <span class="work-reason clip2">{c.reason}</span>}
       <span class="work-meta">
         {verdict && <Led tone={verdict.tone} word={verdict.word} still />}
-        <span class="clip">{whoWords(c, duty || fromWords(c, me), faces)}</span>
+        <span class="clip">{whoWords(c, duty || fromWords(c, [subject, signin]), faces)}</span>
         {total > 0 && <span>{total + (c.kind === 'bridge' ? ' agents' : ' parts')}</span>}
       </span>
       {c.stage === 'review' && run && <ResultKeys run={run} title={c.title} size="s" onDone={onDecided} />}
@@ -275,8 +277,49 @@ export function Glance({ board }: { board: WorkBoard }) {
   );
 }
 
+/** cardOfMade finds the card of what Start made: the card of its run or of its bridge, or the open card of its duty. */
+export function cardOfMade(board: WorkBoard | null, made: Started['made']): WorkCard | undefined {
+  if (!board) return undefined;
+  const cards = board.cards;
+  if (made.run) return cards.find((c) => c.links.run === made.run || (c.links.runs || []).includes(made.run!));
+  if (made.bridge) return cards.find((c) => c.links.bridge === made.bridge);
+  if (made.duty) return cards.find((c) => c.links.duty === made.duty && c.stage !== 'done') || cards.find((c) => c.links.duty === made.duty);
+  return undefined;
+}
+
+/** Follow says where the task that Start made stands now: the word and the light of its lane or its verdict, and why. */
+function Follow({ board, made }: { board: WorkBoard | null; made: Started['made'] }) {
+  const c = cardOfMade(board, made);
+  if (!c) return null;
+  const v = c.stage === 'done' && c.verdict ? VERDICTS[c.verdict] : null;
+  const lane = LANES[c.stage];
+  return (
+    <p class="door-now">
+      <span class="t-meta">Now:</span> <Led tone={v ? v.tone : lane.tone} word={v ? lane.word + ', ' + v.word : lane.word} still />
+      {c.reason && <span class="t-meta"> {c.reason}</span>}
+    </p>
+  );
+}
+
 /** WorkBoardView is the board of six lanes. onDecided reads the board again after Looks right or Needs work, and onRetry after a failed read. */
-export function WorkBoardView({ board, failed, onDecided, onRetry }: { board: WorkBoard | null; failed: boolean; onDecided: () => void; onRetry?: () => void }) {
+export function WorkBoardView({
+  board,
+  failed,
+  onDecided,
+  onRetry,
+  mine = false,
+  canStart = true,
+  onEveryone,
+}: {
+  board: WorkBoard | null;
+  failed: boolean;
+  onDecided: () => void;
+  onRetry?: () => void;
+  /** True when the board shows only the tasks of the person, not of everyone. */
+  mine?: boolean;
+  canStart?: boolean;
+  onEveryone?: () => void;
+}) {
   const now = Date.now();
   if (failed && !board)
     return (
@@ -294,10 +337,20 @@ export function WorkBoardView({ board, failed, onDecided, onRetry }: { board: Wo
     <>
       {board.cards.length === 0 && (
         <div class="empty work-none">
-          <p>{board.sentence || 'No tasks yet.'}</p>
-          <Button size="s" onClick={focusDoor}>
-            Say what you need done
-          </Button>
+          {/* The board of the person says why it is empty, and offers the cards of everyone. */}
+          <p>{mine ? 'You have no task in the last ' + (board.days === 1 ? 'day' : board.days + ' days') + '.' : board.sentence || 'No tasks yet.'}</p>
+          <span class="work-none-keys">
+            {canStart && (
+              <Button size="s" onClick={focusDoor}>
+                Say what you need done
+              </Button>
+            )}
+            {mine && onEveryone && (
+              <Button size="s" onClick={onEveryone}>
+                Show the tasks of everyone
+              </Button>
+            )}
+          </span>
         </div>
       )}
       <div class="work-board" onKeyDown={acrossLanes}>
@@ -334,7 +387,12 @@ function focusDoor(): void {
 
 /** Work is the place Work: the line on top, the door, then the board. The header counts the open tasks. */
 export function Work() {
-  const [all, setAll] = useState(false);
+  // A person who can start no task, such as a sponsor, has no task of their own, so the board opens on everyone.
+  const me = useSelect((s) => s.me);
+  const canStart = mayStartWork(me);
+  const [pick, setPick] = useState<boolean | null>(null);
+  const all = pick === null ? !canStart : pick;
+  const setAll = (x: boolean) => setPick(x);
   const [again, setAgain] = useState(0);
   const { board, failed, reload } = useBoard(all, again);
   // After Looks right or Send back, the card leaves To check. The focus then stays in that lane.
@@ -363,7 +421,11 @@ export function Work() {
       />
       <div class="scroll pad work-body">
         {board && <Glance board={board} />}
-        <Door onStarted={() => setAgain((n) => n + 1)} />
+        {canStart ? (
+          <Door onStarted={() => setAgain((n) => n + 1)} follow={(made) => <Follow board={board} made={made} />} />
+        ) : (
+          <p class="t-meta door-none">You can follow the work here. Only an owner or an operator of an agent can start a task.</p>
+        )}
         <section class="work-board-sec" aria-labelledby="board-title">
           <h2 class="sr" id="board-title">
             The board
@@ -376,6 +438,9 @@ export function Work() {
               reload();
             }}
             onRetry={reload}
+            mine={!all}
+            canStart={canStart}
+            onEveryone={() => setAll(true)}
           />
         </section>
       </div>

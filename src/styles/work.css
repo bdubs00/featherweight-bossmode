@@ -204,3 +204,8 @@
 .work-none {
   padding: 0 0 var(--s-4);
 }
+.work-none-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}

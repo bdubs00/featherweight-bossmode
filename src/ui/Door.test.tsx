@@ -98,6 +98,9 @@ describe('Start', () => {
     const post = f.calls.find((c) => c.method === 'POST')!;
     expect((post.body as { caps: { maxCostUSD: number } }).caps.maxCostUSD).toBe(5);
     expect(s.href).toBe('#bridge/br-1');
+    // The note stays true after the team ends: it says when it started and with whom, not that it works now.
+    expect(s.said).toMatch(/^Started with Writer at \d{1,2}:\d{2}/);
+    expect(s.made).toEqual({ bridge: 'br-1' });
   });
 });
 
