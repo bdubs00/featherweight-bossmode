@@ -27,7 +27,7 @@ import { applyTheme, themeOf } from '../lib/theme';
 import { canonicalPath, columnOf, go, parentOf, parseRoute, placeOf, type Place, type Route } from '../lib/route';
 import { isTyping } from './keys';
 import { clearNotice, clearSaid, currentSaidLink, holdSaid, showError, undoSaid, useNotice, useSaid, useUndo } from './notice';
-import { EmptyPane, Shell, shownOf } from './Shell';
+import { EmptyPane, Shell, opensOn, shownOf } from './Shell';
 import { BridgeList } from './BridgeList';
 import { Channel } from './Channel';
 import { Roster } from './Roster';
@@ -379,8 +379,9 @@ export function App() {
       setAuth({ kind: 'ready' });
       const cfg = await api.config().catch(() => null);
       store.dispatch({ type: 'config', config: cfg });
-      // With work, the page opens on Work. An address that names a place keeps it.
-      if (cfg && cfg.work && (location.hash === '' || location.hash === '#')) go({ place: 'work' }, true);
+      // With work, the page opens on Work, and on Results for a person who
+      // can start no work, such as a sponsor. An address that names a place keeps it.
+      if (cfg && cfg.work && (location.hash === '' || location.hash === '#')) go({ place: opensOn(me) }, true);
       await Promise.all([loadBridges(), loadFaces().catch(showError), loadAgents().catch(showError)]);
       startStream(unauthorized);
       // The fleet, its open runs, and the skills fill the statuses of the
@@ -473,6 +474,8 @@ export function App() {
         // Where three panes show, the list and the main pane stay, so Escape
         // goes back only from what the details pane or the main pane opened.
         const wide = window.matchMedia(THREE_PANES).matches;
+        // Work and Results are places of their own with no parent: Escape stays there.
+        if (r.place === 'work' || r.place === 'results') return;
         // A form stays too, as the editor of a duty does: a stray Escape never throws its work away.
         if (wide && shown !== 'details' && (r.place === 'bridge' || r.place === 'home' || r.place === 'manager' || r.place === 'chat' || r.place === 'activity' || r.place === 'member' || r.place === 'routines' || r.place === 'duties' || r.place === 'new' || r.place === 'new-agent' || (r.place === 'fleet' && !r.board) || (r.place === 'skills' && !r.item))) return;
         e.preventDefault();

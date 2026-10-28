@@ -146,8 +146,10 @@ function Body({ v, onSaved }: { v: Value; onSaved: () => void }) {
   // The results that wait for a check of the person, as Activity lists them.
   const { rows } = useInboxRows();
   const toCheck = rows.filter((r) => r.kind === 'result');
-  // The first decision or question that waits for the person, where "waiting for you" leads.
-  const waits = rows.find((r) => r.status === 'needs-you' && r.kind !== 'result');
+  // The decisions and questions that wait for this person, as Activity
+  // lists them. "Waiting for you" counts only these, never the waits of a
+  // task that the person cannot decide.
+  const mine = rows.filter((r) => r.status === 'needs-you' && r.kind !== 'result');
   const measured = v.lead.measured > 0;
   return (
     <div class="rs">
@@ -170,7 +172,7 @@ function Body({ v, onSaved }: { v: Value; onSaved: () => void }) {
       {v.work.pieces === 0 ? (
         <Nothing days={v.days} />
       ) : (
-        <Figures v={v} unit={unit} toCheck={toCheck} waits={waits ? waits.key : ''} measured={measured} onSaved={onSaved} />
+        <Figures v={v} unit={unit} toCheck={toCheck} mine={mine} measured={measured} onSaved={onSaved} />
       )}
     </div>
   );
@@ -186,8 +188,7 @@ function Nothing({ days }: { days: number }) {
   );
 }
 
-function Figures(p: { v: Value; unit: 'day' | 'week'; toCheck: { key: string }[]; waits: string; measured: boolean; onSaved: () => void }) {
-  const { v, unit, toCheck, measured, onSaved } = p;
+function Figures({ v, unit, toCheck, mine, measured, onSaved }: { v: Value; unit: 'day' | 'week'; toCheck: { key: string }[]; mine: { key: string }[]; measured: boolean; onSaved: () => void }) {
   return (
     <>
       <div class="rs-tiles">
@@ -240,10 +241,12 @@ function Figures(p: { v: Value; unit: 'day' | 'week'; toCheck: { key: string }[]
             {v.people.actions.toLocaleString()} actions of people, {v.people.reworked} sent back with a message
             {(v.people.handled || 0) > 0 && <>, {v.people.handled} {v.people.handled === 1 ? 'decision' : 'decisions'} without a named person</>}
           </p>
-          {v.people.waitingNow > 0 && (
-            <a class="rs-now" href={hrefOf({ place: 'activity', item: p.waits || undefined })}>
-              <Led tone="amber" word={v.people.waitingNow + ' waiting for you'} />
+          {mine.length > 0 ? (
+            <a class="rs-now" href={hrefOf({ place: 'activity', item: mine[0].key })}>
+              <Led tone="amber" word={mine.length + ' waiting for you'} />
             </a>
+          ) : (
+            v.people.waitingNow > 0 && <Led tone="grey" word={v.people.waitingNow + ' waiting for a person'} />
           )}
         </Tile>
         <Tile
@@ -256,9 +259,12 @@ function Figures(p: { v: Value; unit: 'day' | 'week'; toCheck: { key: string }[]
           {measured && (
             <>
               <Share share={v.lead.waitShare} />
-              <p class="t-meta">
-                {span(v.people.waitSeconds)} waiting on people, {pct(v.lead.waitShare)} of all the time to done
-              </p>
+              <p class="t-meta">{pct(v.lead.waitShare)} of the time to done waited on people</p>
+              {v.people.waitSeconds > 0 && (
+                <p class="t-meta">
+                  {span(v.people.waitSeconds)} of waits on people in all{v.people.waitingNow > 0 && <>, {v.people.waitingNow} still open</>}
+                </p>
+              )}
             </>
           )}
         </Tile>
@@ -499,7 +505,9 @@ function Lines({ lines, onSaved }: { lines: ValueLine[]; onSaved: () => void }) 
             </th>
             <td class="num">
               <b>{l.work.done.toLocaleString()}</b>
-              {l.work.failed + l.work.stopped > 0 && <span class="t-meta rs-failed"> {l.work.failed + l.work.stopped} failed</span>}
+              {l.work.failed > 0 && <span class="t-meta rs-failed"> {l.work.failed} failed</span>}
+              {l.work.stopped > 0 && <span class="t-meta rs-failed"> {l.work.stopped} stopped</span>}
+              {(l.work.lost || 0) > 0 && <span class="t-meta rs-failed"> {l.work.lost} lost</span>}
             </td>
             <td>
               <Verdicts checks={l.checks} compact />

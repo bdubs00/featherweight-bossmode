@@ -109,7 +109,11 @@ describe('Results', () => {
     expect(text).toContain('8 unchecked');
     expect(text).toContain('at least $1.50');
     expect(text).toContain('2 runs without a price');
-    expect(text).toContain('1 waiting for you');
+    // The inbox holds nothing for this person, so the open wait names no "you".
+    expect(text).toContain('1 waiting for a person');
+    expect(text).not.toContain('waiting for you');
+    expect(text).toContain('25% of the time to done waited on people');
+    expect(text).toContain('2 h of waits on people in all, 1 still open');
     expect(text).toContain('Not set');
     expect(box.querySelector('#results-sentence')!.textContent).toContain('the agents finished 12 pieces');
     // The hatch of sent back and the three verdicts have words beside their colors.
@@ -163,8 +167,8 @@ describe('Results', () => {
     const check = [...box.querySelectorAll('a.rs-now')].find((a) => a.textContent === '1 to check') as HTMLAnchorElement;
     expect(check).toBeTruthy();
     expect(check.getAttribute('href')).toBe('#activity/v%3Arun-notes');
-    // Without a decision in the inbox, "waiting for you" opens Activity.
-    expect((box.querySelector('a.rs-now[href="#activity"]') as HTMLElement).textContent).toBe('1 waiting for you');
+    // A result to check is no decision: nothing waits for this person to decide.
+    expect([...box.querySelectorAll('a.rs-now')].map((a) => a.textContent)).toEqual(['1 to check']);
     const names = [...box.querySelectorAll('tbody th a')].map((a) => [a.textContent, a.getAttribute('href')]);
     expect(names).toEqual([
       ['migrator', '#fleet/migrator/profile'],
@@ -204,14 +208,23 @@ describe('Results', () => {
     const box = mount(<Results />);
     await flush();
     expect(box.textContent).toContain('5 actions of people, 1 sent back with a message, 3 decisions without a named person');
-    expect(box.textContent).not.toContain('waiting for you');
+    expect(box.textContent).not.toContain('waiting for');
   });
 
-  it('leads "waiting for you" to the first decision that waits in Activity', async () => {
+  it('counts in "waiting for you" only the decisions of this person, and leads to the first one', async () => {
     inbox = [{ kind: 'approval', run: 'run-restore', approval: 'ap-restore', duty: 'nightly', agent: 'backup', bridge: '', text: 'backup waits for your answer.', since: '2026-10-27T11:00:00Z' }];
     const box = mount(<Results />);
     await flush();
     const wait = [...box.querySelectorAll('a.rs-now')].find((a) => a.textContent === '1 waiting for you')!;
     expect(wait.getAttribute('href')).toBe('#activity/d%3Arun-restore/ap-restore');
+    expect(box.textContent).not.toContain('waiting for a person');
+  });
+
+  it('names failed, stopped, and lost tasks of a line apart', async () => {
+    over = { lines: [{ key: 'agent:writer', kind: 'agent', name: 'writer', agent: 'writer', work: { pieces: 6, done: 3, failed: 1, stopped: 1, open: 0, lost: 1 }, checks: { accepted: 0, checked: 3, sentBack: 0, unchecked: 0 }, actions: 0, noPerson: 3, medianLeadSeconds: 5, usd: 0.01, perDone: 0.003, unpriced: 0 }] };
+    const box = mount(<Results />);
+    await flush();
+    const done = box.querySelector('tbody td.num')!;
+    expect(done.textContent).toBe('3 1 failed 1 stopped 1 lost');
   });
 });

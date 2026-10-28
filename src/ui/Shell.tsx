@@ -17,7 +17,7 @@
 import type { ComponentChildren, JSX } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
-import type { BossConfig } from '../api/types';
+import type { BossConfig, Whoami } from '../api/types';
 import { useSelect } from '../state/store';
 import { loadInbox } from '../state/duties';
 import { useOffline } from '../state/reach';
@@ -262,6 +262,29 @@ export function placesOf(config: BossConfig | null, every = true, current?: Plac
   return every ? [...main, ...more] : [...main, ...more.filter((it) => it.id === current)];
 }
 
+/**
+ * operates reports whether the person can start work and read the wiki: an
+ * admin, the token of the fleet, or a person with the operator or the owner
+ * role on an agent, as the front checks both. A viewer of every agent, such
+ * as a sponsor, operates nothing. A whoami that names no role, as an older
+ * front or a test sends it, keeps every place.
+ */
+export function operates(me: Whoami | null | undefined): boolean {
+  if (!me) return true;
+  if (me.admin || isToken(me.principal)) return true;
+  const roles = Object.values(me.roles || {});
+  if (!roles.length) return true;
+  return roles.some((r) => r === 'operator' || r === 'owner');
+}
+
+/** The places that need the operator role: the quick chat starts runs, and the wiki needs it to read. */
+const OPERATOR_PLACES: Place[] = ['chat', 'wiki'];
+
+/** opensOn is the place where the page opens with work: Work for a person who can start work, else Results, which answers a sponsor. */
+export function opensOn(me: Whoami | null | undefined): 'work' | 'results' {
+  return operates(me) ? 'work' : 'results';
+}
+
 /** morePlaces gives the places behind More: the places of the bar that placesOf leaves out. */
 export function morePlaces(config: BossConfig | null, current?: Place): PlaceItem[] {
   if (!config || !config.work) return [];
@@ -388,6 +411,10 @@ export function AppBar({ route, place: placeProp, onSignOut, onReach }: { route:
   const offline = useOffline();
   const theme = themeOf(config);
   const logo = useLogo(theme.logo);
+  // A person who operates no agent gets no place that refuses them: the quick chat and the wiki.
+  const me = useSelect((s) => s.me);
+  const can = operates(me);
+  const usable = (it: PlaceItem) => can || it.id === place || !OPERATOR_PLACES.includes(it.id);
   // A run that starts to wait for the person, such as a decision in a chat
   // with an agent, reaches the page on the stream at once. Its row of
   // Activity comes from the inbox, so the count reads the inbox then, and
@@ -424,29 +451,31 @@ export function AppBar({ route, place: placeProp, onSignOut, onReach }: { route:
   const wide = every && !phone;
   // The places that More hides. The dot of the manager moves to More while
   // More hides the place Manager, so an answer of the manager never waits unseen.
-  const hidden = work && !wide ? morePlaces(config, place).map((it) => it.id) : [];
+  const hidden = work && !wide ? morePlaces(config, place).filter(usable).map((it) => it.id) : [];
   const managerHidden = hidden.includes('manager');
   return (
     <nav class="appbar" aria-label="Places">
-      <LogoWell src={logo} name={theme.name} href={work ? '#work' : '#'} />
+      <LogoWell src={logo} name={theme.name} href={work ? '#' + opensOn(me) : '#'} />
       <div class="places">
-        {placesOf(config, wide, place).map((it) => {
-          const on = it.id === place;
-          const count = it.id === 'activity' ? attention : 0;
-          return (
-            <a class={'place' + (on ? ' on' : '')} href={on ? it.href : lastOf[it.id] || it.href} aria-current={on ? 'page' : undefined}>
-              <Glyph name={it.glyph} size={22} />
-              <span class="place-label">{it.label}</span>
-              {count > 0 && (
-                <Chip tone="ink" class={'place-count' + (offline ? ' stale' : '')} label={(count === 1 ? '1 item needs you' : count + ' items need you') + (offline ? ', as the page read it last' : '')}>
-                  {countText(count)}
-                </Chip>
-              )}
-              {it.id === 'manager' && <ManagerDot />}
-            </a>
-          );
-        })}
-        {work && phone && <MoreMenu items={morePlaces(config, place)} dot={managerHidden} />}
+        {placesOf(config, wide, place)
+          .filter(usable)
+          .map((it) => {
+            const on = it.id === place;
+            const count = it.id === 'activity' ? attention : 0;
+            return (
+              <a class={'place' + (on ? ' on' : '')} href={on ? it.href : lastOf[it.id] || it.href} aria-current={on ? 'page' : undefined}>
+                <Glyph name={it.glyph} size={22} />
+                <span class="place-label">{it.label}</span>
+                {count > 0 && (
+                  <Chip tone="ink" class={'place-count' + (offline ? ' stale' : '')} label={(count === 1 ? '1 item needs you' : count + ' items need you') + (offline ? ', as the page read it last' : '')}>
+                    {countText(count)}
+                  </Chip>
+                )}
+                {it.id === 'manager' && <ManagerDot />}
+              </a>
+            );
+          })}
+        {work && phone && <MoreMenu items={morePlaces(config, place).filter(usable)} dot={managerHidden} />}
         {work && !phone && (
           <button
             type="button"
