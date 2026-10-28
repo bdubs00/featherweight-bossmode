@@ -98,6 +98,9 @@ describe('Start', () => {
     const post = f.calls.find((c) => c.method === 'POST')!;
     expect((post.body as { caps: { maxCostUSD: number } }).caps.maxCostUSD).toBe(5);
     expect(s.href).toBe('#bridge/br-1');
+    // The note stays true after the team ends: it says when it started and with whom, not that it works now.
+    expect(s.said).toMatch(/^Started with Writer at \d{1,2}:\d{2}/);
+    expect(s.made).toEqual({ bridge: 'br-1' });
   });
 });
 
@@ -124,5 +127,73 @@ describe('Door', () => {
     await settle();
     expect(el.textContent).toContain('Say the most that one run can cost');
     expect(f.calls.some((c) => c.method === 'PUT')).toBe(false);
+  });
+
+  it('lets the person pick another agent for a team, and names an agent with a capital', async () => {
+    const team = plan({
+      kind: 'team',
+      who: [{ agent: 'reviewer', name: 'reviewer', does: 'takes a share', count: 3 }],
+      others: [{ agent: 'ops', name: 'ops' }, { agent: 'writer', name: 'Writer' }],
+      when: { readback: 'Now, once.', next: [] },
+      start: { bridge: { title: 'T', goal: 'G', members: [] } },
+    });
+    const f = fakeFetch([['POST', /\/v1\/work\/plan$/, () => team]]);
+    restore = f.restore;
+    const el = mount(<Door />);
+    act(() => [...el.querySelectorAll('button')].find((b) => b.textContent === 'A big job, split across agents')!.click());
+    act(() => [...el.querySelectorAll('button')].find((b) => b.textContent === 'Read it back')!.click());
+    await settle();
+    expect(el.querySelector('.rb-who strong')!.textContent).toBe('Reviewer');
+    const pick = el.querySelector('.rb-other select') as HTMLSelectElement;
+    expect([...pick.options].map((o) => o.textContent)).toEqual(['Keep Reviewer', 'Ops', 'Writer']);
+    act(() => {
+      pick.value = 'ops';
+      pick.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await settle();
+    const again = f.calls.filter((c) => c.method === 'POST').pop()!;
+    expect((again.body as { agent: string }).agent).toBe('ops');
+  });
+
+  it('puts the cost last, beside Start, and says the next starts apart', async () => {
+    const f = fakeFetch([['POST', /\/v1\/work\/plan$/, () => plan({ when: { said: 'every monday', readback: 'Every Monday at 9:00 AM, New York time.', next: ['2026-11-02T14:00:00Z', '2026-11-09T14:00:00Z'] }, gaps: ['No agent here can send email.'] })]]);
+    restore = f.restore;
+    const el = mount(<Door />);
+    act(() => [...el.querySelectorAll('button')].find((b) => b.textContent === 'A weekly summary of competitors')!.click());
+    act(() => [...el.querySelectorAll('button')].find((b) => b.textContent === 'Read it back')!.click());
+    await settle();
+    const rows = [...el.querySelectorAll('.rb dt')].map((d) => d.textContent);
+    expect(rows).toEqual(['Who', 'When', 'It asks you', 'It stays quiet', 'You hear of it', 'The result', 'It cannot', 'What it can cost']);
+    const next = [...el.querySelectorAll('.rb p.t-meta')].find((p) => (p.textContent || '').startsWith('Next:'))!;
+    expect(next.textContent!.split('; ')).toHaveLength(2);
+  });
+
+  it('after Start, says what it made in place of the readback and gives it the focus, with no second notice', async () => {
+    const f = fakeFetch([
+      ['POST', /\/v1\/work\/plan$/, () => plan()],
+      ['PUT', /\/v1\/duties\/sum-up-what-acme-shipped$/, (b) => ({ ...(b as object), readback: 'Every Monday at 9:00 AM, New York time.' })],
+      ['GET', /\/v1\/duties$/, () => ({ duties: [] })],
+    ]);
+    restore = f.restore;
+    let started = 0;
+    const el = mount(<Door onStarted={() => started++} />);
+    act(() => [...el.querySelectorAll('button')].find((b) => b.textContent === 'A weekly summary of competitors')!.click());
+    act(() => [...el.querySelectorAll('button')].find((b) => b.textContent === 'Read it back')!.click());
+    await settle();
+    const cost = el.querySelector('.rb-money input') as HTMLInputElement;
+    act(() => {
+      cost.value = '0.10';
+      cost.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    act(() => [...el.querySelectorAll('button')].find((b) => b.textContent === 'Start')!.click());
+    await settle();
+    await settle();
+    expect(started).toBe(1);
+    const done = el.querySelector('.door-started') as HTMLElement;
+    expect(done.textContent).toContain('Set. Every Monday at 9:00 AM, New York time.');
+    expect(document.activeElement).toBe(done);
+    // The card stands above the templates, where the readback stood.
+    expect(done.compareDocumentPosition(el.querySelector('.door-templates')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(document.querySelector('.notice')).toBeNull();
   });
 });

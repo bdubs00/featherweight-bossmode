@@ -1630,11 +1630,14 @@ The board:
 - A kind is `conversation`, `bridge`, `duty`, `job`, or `event`. The page
   says Chat, Team, Duty, Batch, and Event. `next` is `worker`, `agent`,
   `you`, `person`, `manager`, or empty for a done card. The page tags
-  `you` as Yours and `manager` as Manager.
+  `you` as Your move and `manager` as Manager decides.
 - If the pool replaced the worker of a part that had not ended, `lost` is
   true, and the card says Lost.
 - The title of a card opens its bridge, its duty or its run of a duty,
-  Activity for a card that needs the person, or its conversation.
+  Activity for a card that needs the person, or its conversation. A card
+  whose next move is the person's and that sits on no bridge opens its item
+  of Activity: `#activity/d:<run>/<approval>` for a decision, and
+  `#activity/v:<run>` for a result to check.
 
 A plan:
 

@@ -3,11 +3,14 @@
 // reaction up on the run. Needs work opens a note, and Send back sends the
 // reaction down with the note. The front records the reaction on the end of
 // the run, so it counts as a verdict, and it sends the note to the agent as
-// a follow-up message (docs/CONTRACT.md, section 21).
+// a follow-up message (docs/CONTRACT.md, section 21). Escape or Cancel
+// closes the note and gives the focus back to Needs work. After a decision,
+// the focus goes to the nearest key that still stands, as holdFocus says.
 
 import { useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
 import { ApiError } from '../api/client';
+import { holdFocus } from './keys';
 import { showError, showSaid } from './notice';
 import { Button, TextArea } from './primitives';
 
@@ -28,6 +31,13 @@ export function ResultKeys({ run, title, size = 'm', primary, onDone }: { run: s
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const box = useRef<HTMLTextAreaElement>(null);
+  const needs = useRef<HTMLButtonElement>(null);
+  /** close puts the note away and gives the focus back to Needs work. */
+  const close = () => {
+    setWriting(false);
+    setError('');
+    setTimeout(() => needs.current && needs.current.focus(), 0);
+  };
   const send = async (reaction: 'up' | 'down') => {
     if (busy) return;
     if (reaction === 'down') {
@@ -39,12 +49,14 @@ export function ResultKeys({ run, title, size = 'm', primary, onDone }: { run: s
       }
     }
     setBusy(true);
+    const after = holdFocus();
     try {
       await api.reactRun(run, 0, reaction, reaction === 'down' ? note.trim() : undefined);
       showSaid(reaction === 'up' ? 'Marked as right: ' + title + '.' : 'Sent back with your note: ' + title + '.');
       setWriting(false);
       setNote('');
       if (onDone) onDone();
+      after();
     } catch (e) {
       if (e instanceof ApiError && e.status === 400) setError(e.message);
       else showError(e);
@@ -67,6 +79,12 @@ export function ResultKeys({ run, title, size = 'm', primary, onDone }: { run: s
             setNote((e.target as HTMLTextAreaElement).value);
             setError('');
           }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              close();
+            }
+          }}
         />
         {error && (
           <span class="field-error" role="alert">
@@ -74,7 +92,7 @@ export function ResultKeys({ run, title, size = 'm', primary, onDone }: { run: s
           </span>
         )}
         <div class="result-keys">
-          <Button size={size} kind="quiet" onClick={() => setWriting(false)}>
+          <Button size={size} kind="quiet" onClick={close}>
             Cancel
           </Button>
           <Button size={size} kind={primary ? 'primary' : 'secondary'} aria-disabled={busy || undefined} onClick={() => send('down')}>
@@ -87,6 +105,7 @@ export function ResultKeys({ run, title, size = 'm', primary, onDone }: { run: s
   return (
     <div class="result-keys">
       <Button
+        ref={needs}
         size={size}
         onClick={() => {
           setWriting(true);

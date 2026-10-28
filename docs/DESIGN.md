@@ -1199,6 +1199,11 @@ narrow window keeps the bar at the bottom of their main pane. The page
 opens on Work.
 
 Work holds the door on top and the board below, in one pane that scrolls.
+A line above the door says where the next move is the person's, such as
+`1 task needs you`, `1 to check`, and `4 stopped`, then what works.
+Each part is a quiet key with the light of its lane, and it takes the focus
+to the first card of that lane. Thus a phone shows what waits before the
+door and the lanes above it.
 
 - The door keeps the reading measure in the middle of the pane: a heading,
   a recess of three lines, and Read it back.
@@ -1206,17 +1211,36 @@ Work holds the door on top and the board below, in one pane that scrolls.
   the groove band, and the one orange key, Start. A definition list holds
   its rows, a muted label of 148 pixels beside each value, and one line
   under a narrow window. The cost is a field with no value, and Start
-  refuses an empty field with the error under it.
+  refuses an empty field with the error under it. The cost is the last
+  row, next to Start, so Enter in the field starts only after the person
+  read every other row. The readback takes the width of the door.
+- After Start, a quiet card in place of the readback says what Start made,
+  with Open it, and takes the focus. No notice says it a second time. Its
+  line `Now:` follows the card of the task on the board, so it never says
+  that the task works after it ended.
+- A person who can start no task, such as a viewer of every agent, gets no
+  door: one line says who can start a task. The board of that person
+  opens on everyone, because their own board is always empty.
 - The board has six lanes in the order of the flow. A wide window shows
   them side by side, and a narrow one stacks them. A lane head holds its
-  light and word, its count, and the age of its oldest card. A card is a
-  surface of the card ground with a soft line. Its title is the link, in
-  ink, underlined on hover. A card that needs you takes `--wash-need`. A
+  light and word, its count, and the age of its oldest card. The head stays
+  at the top of the pane while its lane scrolls under it, on the ground of
+  the pane. A card is a surface of the card ground with a soft line. Its
+  title is the link, in ink, underlined on hover, and the link covers the
+  whole card. A lane is one stop of the Tab key. ArrowUp and ArrowDown
+  move between its cards, and ArrowLeft and ArrowRight move to the lane
+  before or after. Done shows its five newest cards and the quiet key
+  `Show all <n>`. An empty lane has a still grey light, because a lit or
+  breathing light says that something is there. A board with no task says
+  its sentence above the lanes, with a key that takes the focus to the
+  door. A card that needs you takes `--wash-need`. A
   lost card has a dashed edge. A done card shows its verdict with a light:
   green for accepted and checked, red for sent back, and grey for
   unchecked.
 - A card To check holds Needs work and Looks right as secondary keys, so
-  the board keeps no orange key. In Activity, the card of a result is the
+  the board keeps no orange key. Only a card whose check is the move of the
+  person holds them. Under Everyone, the result of another person reads
+  only. In Activity, the card of a result is the
   decision of its pane: an amber light, and Looks right as the primary key.
 - Needs work opens the note in place, with Cancel and Send back.
 

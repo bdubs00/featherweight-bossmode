@@ -1,27 +1,29 @@
 // The door of the Work place: one field for what a person needs done. The
 // person says the task in words, or starts from a template in words. Read
 // it back asks the server for a plan (POST /v1/work/plan), and the page
-// shows it before anything starts: who does it, when, what it can cost,
-// what it asks you, what it never bothers you with, when you hear of it,
-// where the result lands, and what it cannot do. The plan never names a
-// cost, so Start refuses until the person types the most that a run can
-// cost.
+// shows it before anything starts: who does it, when, what it asks you,
+// what it never bothers you with, when you hear of it, where the result
+// lands, what it cannot do, and last, beside Start, what it can cost. The
+// plan never names a cost, so Start refuses until the person types the most
+// that a run can cost.
 //
 // Start sends the record of the plan to a route that exists already: a
 // duty for a task that repeats, a bridge for a team, and a run for a task
 // that runs once. The person never picks among duty, bridge, run, or chat.
-// The board under the door (Work.tsx) then shows the new task.
+// The board under the door (Work.tsx) then shows the new task, and a quiet
+// card in place of the readback says what Start made and takes the focus.
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
 import { ApiError } from '../api/client';
-import type { TaskPlan, TaskTell } from '../api/types';
+import type { ComponentChildren } from 'preact';
+import type { TaskPlan, TaskTell, Whoami } from '../api/types';
 import { hrefOf } from '../lib/route';
-import { nextWords } from '../lib/duties';
+import { nextWords, timeOf, titleOfName } from '../lib/duties';
 import { list } from '../lib/words';
 import { loadDuties } from '../state/duties';
 import { loadBridges } from '../state/actions';
-import { showError, showSaid } from './notice';
+import { showError } from './notice';
 import { Button, Card, Choices, Field, Input, LineLed, Mark, TextArea } from './primitives';
 
 /** A template: a label that names the work, and words that the person changes before Read it back. */
@@ -32,7 +34,8 @@ export interface TaskTemplate {
 
 /** The templates of the door, in plain words. A deployment could name its own. */
 export const TEMPLATES: TaskTemplate[] = [
-  { label: 'A weekly summary of competitors', words: 'Every Monday at 9am, sum up what our competitors Acme and Globex shipped last week.' },
+  // A template names no company: a person who keeps the words as they are gets a summary of their own competitors, not of made-up ones.
+  { label: 'A weekly summary of competitors', words: 'Every Monday at 9am, sum up what our competitors shipped last week.' },
   { label: 'A draft, reviewed before it goes out', words: 'Write the launch email for our new pricing, have it reviewed, and show me before it goes out.' },
   { label: 'A nightly check of hosts', words: 'Every night, check the web hosts for drift from their Ansible roles. Tell me only when something drifted.' },
   { label: 'A big job, split across agents', words: 'Split the migration of the remaining Puppet modules to Ansible across 3 agents, with a review and a test of each part.' },
@@ -46,6 +49,22 @@ const TELLS: { id: TaskTell; label: string }[] = [
   { id: 'found', label: 'Only when it finds something' },
   { id: 'failures', label: 'Only when it fails' },
 ];
+
+/**
+ * mayStartWork reports whether the person can start a task at the door: an
+ * admin, a person who can create agents, a person with the role owner or
+ * operator on an agent, and a person whose roles name no agent, because the
+ * backend decides. A viewer of every agent, such as a sponsor, cannot. It
+ * follows mayStart of src/lib/agents.ts on the branch drive/flow.
+ */
+export function mayStartWork(me: Pick<Whoami, 'admin' | 'canCreate' | 'roles'> | null | undefined): boolean {
+  if (!me) return true;
+  const roles = Object.values(me.roles || {});
+  return me.admin || me.canCreate || roles.length === 0 || roles.some((r) => r === 'owner' || r === 'operator');
+}
+
+/** agentWords names an agent as the rest of the page does: the name of its face, else its name with a capital, such as Writer for writer. */
+export const agentWords = (a: { agent: string; name?: string }): string => (a.name && a.name !== a.agent ? a.name : titleOfName(a.agent));
 
 /** costOf reads the cost that the person typed: a positive number of dollars, or null. */
 export function costOf(text: string): number | null {
@@ -66,10 +85,12 @@ export function monthWords(plan: Pick<TaskPlan, 'kind' | 'cost'>, cost: number |
 }
 
 /** What Start made, for the quiet card that follows it. */
-interface Started {
+export interface Started {
   title: string;
   said: string;
   href: string;
+  /** What Start made, so the board can say where it stands now: a run, a bridge, or a duty. */
+  made: { run?: string; bridge?: string; duty?: string };
 }
 
 /** start sends the record of a plan, with the cost of the person, to the route that makes it. It answers what it made. */
@@ -79,17 +100,17 @@ export async function startPlan(plan: TaskPlan, cost: number): Promise<Started> 
     const d = s.duty;
     const saved = await api.putDuty(d.name, { ...d, limits: { ...d.limits, budget: { ...(d.limits && d.limits.budget), maxCostUSD: cost } } });
     loadDuties().catch(() => {});
-    return { title: plan.title, said: 'Set. ' + (saved.readback || plan.when.readback), href: hrefOf({ place: 'duties', name: saved.name || d.name }) };
+    return { title: plan.title, said: 'Set. ' + (saved.readback || plan.when.readback), href: hrefOf({ place: 'duties', name: saved.name || d.name }), made: { duty: saved.name || d.name } };
   }
   if (s.bridge) {
     const b = await api.openBridge({ ...s.bridge, caps: { ...(s.bridge.caps || {}), maxCostUSD: cost } } as Parameters<typeof api.openBridge>[0]);
     loadBridges().catch(() => {});
-    return { title: plan.title, said: 'Started. ' + list(plan.who.map((w) => w.name)) + ' work on it now.', href: hrefOf({ place: 'bridge', id: b.id, pane: 'none' }) };
+    return { title: plan.title, said: 'Started with ' + list(plan.who.map(agentWords)) + ' at ' + timeOf(new Date().toISOString()) + '.', href: hrefOf({ place: 'bridge', id: b.id, pane: 'none' }), made: { bridge: b.id } };
   }
   if (s.run) {
     const r = await api.start(s.run.member, { ...s.run.body, budget: { maxCostUSD: cost } } as Parameters<typeof api.start>[1]);
     const chat = s.run.body.metadata && s.run.body.metadata['fw.view'] === 'quickchat';
-    return { title: plan.title, said: 'Started. ' + (plan.who[0] ? plan.who[0].name : 'The agent') + ' works on it now.', href: chat ? hrefOf({ place: 'chat', run: r.id }) : hrefOf({ place: 'fleet', agent: s.run.body.agent }) };
+    return { title: plan.title, said: 'Started with ' + (plan.who[0] ? agentWords(plan.who[0]) : 'the agent') + ' at ' + timeOf(new Date().toISOString()) + '.', href: chat ? hrefOf({ place: 'chat', run: r.id }) : hrefOf({ place: 'fleet', agent: s.run.body.agent }), made: { run: r.id } };
   }
   throw new Error('The plan names nothing to start.');
 }
@@ -160,21 +181,22 @@ function Readback({ plan, onPlan, onStarted, busy }: { plan: TaskPlan; onPlan: (
                 <li>
                   <Mark agent={w.agent} size={20} />
                   <span>
-                    <strong>{w.name}</strong> {w.count && w.count > 1 ? '(' + w.count + ') ' : ''}
+                    <strong>{agentWords(w)}</strong> {w.count && w.count > 1 ? '(' + w.count + ') ' : ''}
                     {w.does}
                   </span>
                 </li>
               ))}
             </ul>
-            {(!team || agentProblem) && plan.others.length > 0 && (
+            {/* A team can get another agent too: the plan then gives the shares to that agent. */}
+            {plan.others.length > 0 && (
               <label class="rb-other">
                 <span class="t-meta">{first ? 'Someone else' : 'Pick an agent'}</span>
                 <select class="recess" value="" onChange={(e) => onPlan((e.target as HTMLSelectElement).value || undefined)} disabled={busy}>
-                  <option value="">{first ? 'Keep ' + first.name : 'Pick one'}</option>
+                  <option value="">{first ? 'Keep ' + agentWords(first) : 'Pick one'}</option>
                   {plan.others
                     .filter((o) => !first || o.agent !== first.agent)
                     .map((o) => (
-                      <option value={o.agent}>{o.name}</option>
+                      <option value={o.agent}>{agentWords(o)}</option>
                     ))}
                 </select>
               </label>
@@ -190,36 +212,7 @@ function Readback({ plan, onPlan, onStarted, busy }: { plan: TaskPlan; onPlan: (
           <dt>When</dt>
           <dd>
             <p>{plan.when.readback}</p>
-            {plan.when.next.length > 0 && <p class="t-meta">Next: {plan.when.next.map((t) => nextWords(t)).join(', ')}</p>}
-          </dd>
-        </div>
-        <div class="rb-row">
-          <dt>What it can cost</dt>
-          <dd>
-            <Field label={team ? 'The most the whole team can spend' : 'The most one run can cost'} error={error} id="rb-cost">
-              <span class="rb-money">
-                <span aria-hidden="true">$</span>
-                <Input
-                  ref={field}
-                  inputMode="decimal"
-                  value={cost}
-                  invalid={!!error}
-                  aria-describedby={error ? 'rb-cost-error' : undefined}
-                  onInput={(e) => {
-                    setCost((e.target as HTMLInputElement).value);
-                    setError('');
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      start();
-                    }
-                  }}
-                />
-              </span>
-            </Field>
-            {plan.cost.basis && <p class="t-meta">{plan.cost.basis}</p>}
-            {monthWords(plan, n) && <p class="t-meta">{monthWords(plan, n)}</p>}
+            {plan.when.next.length > 0 && <p class="t-meta">Next: {plan.when.next.map((t) => nextWords(t)).join('; ')}</p>}
           </dd>
         </div>
         <div class="rb-row">
@@ -268,13 +261,43 @@ function Readback({ plan, onPlan, onStarted, busy }: { plan: TaskPlan; onPlan: (
             </dd>
           </div>
         )}
+        {/* The cost comes last, beside Start: the field that Start needs sits next to it, after every row that the person reads first. */}
+        <div class="rb-row">
+          <dt>What it can cost</dt>
+          <dd>
+            <Field label={team ? 'The most the whole team can spend' : 'The most one run can cost'} error={error} id="rb-cost">
+              <span class="rb-money">
+                <span aria-hidden="true">$</span>
+                <Input
+                  ref={field}
+                  inputMode="decimal"
+                  value={cost}
+                  invalid={!!error}
+                  aria-describedby={error ? 'rb-cost-error' : undefined}
+                  onInput={(e) => {
+                    setCost((e.target as HTMLInputElement).value);
+                    setError('');
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      start();
+                    }
+                  }}
+                />
+              </span>
+            </Field>
+            {plan.cost.basis && <p class="t-meta">{plan.cost.basis}</p>}
+            {monthWords(plan, n) && <p class="t-meta">{monthWords(plan, n)}</p>}
+          </dd>
+        </div>
       </dl>
     </Card>
   );
 }
 
 /** Door is the top of the Work place: the field, the templates or the readback, and what Start made. onStarted tells the board to read again. */
-export function Door({ onStarted }: { onStarted?: () => void }) {
+export function Door({ onStarted, follow }: { onStarted?: () => void; follow?: (made: Started['made']) => ComponentChildren }) {
   const [words, setWords] = useState('');
   const [plan, setPlan] = useState<TaskPlan | null>(null);
   // The words that the plan reads back, as the person sent them.
@@ -283,6 +306,11 @@ export function Door({ onStarted }: { onStarted?: () => void }) {
   const [error, setError] = useState('');
   const [started, setStarted] = useState<Started | null>(null);
   const box = useRef<HTMLTextAreaElement>(null);
+  const done = useRef<HTMLDivElement>(null);
+  // What Start made takes the focus, where the readback stood, so the keys go on from there.
+  useEffect(() => {
+    if (started && done.current) done.current.focus();
+  }, [started]);
   const read = async (agent?: string, tell?: TaskTell) => {
     const w = words.trim();
     if (!w) {
@@ -345,6 +373,19 @@ export function Door({ onStarted }: { onStarted?: () => void }) {
           </Button>
         </div>
       </form>
+      {/* What Start made stands where the readback stood, above the templates. */}
+      {started && (
+        <div class="door-started" ref={done} tabIndex={-1} role="status">
+          <Card quiet title={started.title} class="readback-done">
+            <p>{started.said}</p>
+            {/* Where the task stands now, from the board, so the note never says that it works after it ended. */}
+            {follow && follow(started.made)}
+            <p>
+              <a href={started.href}>Open it</a>
+            </p>
+          </Card>
+        </div>
+      )}
       {plan && !stale ? (
         <Readback
           plan={plan}
@@ -354,7 +395,6 @@ export function Door({ onStarted }: { onStarted?: () => void }) {
             setStarted(s);
             setPlan(null);
             setWords('');
-            showSaid(s.said, { href: s.href, label: 'Open it' });
             if (onStarted) onStarted();
           }}
         />
@@ -382,14 +422,6 @@ export function Door({ onStarted }: { onStarted?: () => void }) {
             </div>
           </section>
         )
-      )}
-      {started && (
-        <Card quiet title={started.title} class="readback-done">
-          <p>{started.said}</p>
-          <p>
-            <a href={started.href}>Open it</a>
-          </p>
-        </Card>
       )}
     </div>
   );
