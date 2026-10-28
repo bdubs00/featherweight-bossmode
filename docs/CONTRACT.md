@@ -1590,13 +1590,13 @@ The page treats an archived run as a run that ended:
 ## 19. The door and the board of the Tasks place (prototype of 2026-10-27)
 
 The page chose these shapes, and `fake/routes-door.mjs` serves them. No
-workbench serves them yet. `GET /v1/bossmode` carries `door: true` when the
-front serves both routes.
+workbench serves them yet. A front that serves both routes sends `door:
+true` in `GET /v1/bossmode`.
 
 | Route | What the page does with it |
 |---|---|
 | `POST /v1/tasks/plan` | `{"words", "agent"?, "tell"?}`, with the header `X-Time-Zone`. Read it back sends the words. A change of Someone else sends `agent`, and a change of You hear of it sends `tell`. The answer is the plan below. A 400 `{"problems": ["words: ..."]}` shows under the door. The route starts nothing and saves nothing. |
-| `GET /v1/tasks` | `{"tasks": [<card>]}`. The board reads it when the place opens, each minute, and after a start. |
+| `GET /v1/tasks` | `{"tasks": [<card>]}`. The board reads it at the open of the place, each minute, and after a start. |
 
 A plan:
 

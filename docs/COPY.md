@@ -1124,7 +1124,7 @@ The typing line takes the place of the status message of an answer that is on it
 
 ## 13. The Tasks place: the door and the board (prototype of 2026-10-27)
 
-The Tasks place shows only when `GET /v1/bossmode` carries `door: true`. It is the home of a person who has not asked for every place. A task is what a person asks of an agent, as section 2 says. The person never picks among a duty, a bridge, a run, or a chat: the readback says how the task runs.
+The Tasks place needs `door: true` in `GET /v1/bossmode`. It is the home of a person who has not asked for every place. A task is what a person asks of an agent, as section 2 says. The person never picks among a duty, a bridge, a run, or a chat: the readback says how the task runs.
 
 ### src/ui/Tasks.tsx
 
@@ -1141,10 +1141,12 @@ The Tasks place shows only when `GET /v1/bossmode` carries `door: true`. It is t
 | new | add | `Each result`, `Only when it finds something`, and `Only when it fails` | flow/door |
 | new | add | the errors `Say what you need done.`, `Say the most that one run can cost, such as 0.50.`, and `Say the most that the whole team can spend, such as 5.00.` | flow/door |
 | new | add | `Change the details` and `Start`, then `Set. <readback>` or `Started. <agents> work on it now.` with `Open it` | flow/door |
-| new | add | `Your tasks`, the columns `Needs you`, `Working`, `Coming up`, and `Done`, and for an empty column `Nothing waits for you.`, `Nothing works now.`, `Nothing is planned.`, and `Nothing done this week.` | flow/door |
+| new | add | `Your tasks`, and the columns `Needs you`, `Working`, `Coming up`, and `Done` | flow/door |
+| new | add | for an empty column: `Nothing waits for you.`, `Nothing works now.`, `Nothing is planned.`, and `Nothing done this week.` | flow/door |
 
 ### src/ui/Shell.tsx
 
 | Now | Verdict | New text | Who |
 |---|---|---|---|
-| nine places | change | with the door: `Tasks`, `Activity`, `Chat`, and `Wiki`, the place of the screen that shows, and the key `More`, which shows every place and then says `Fewer` | flow/door |
+| nine places | change | with the door: `Tasks`, `Activity`, `Chat`, `Wiki`, and the place of the screen that shows | flow/door |
+| new | add | the key `More`, which shows every place, and then `Fewer` | flow/door |
