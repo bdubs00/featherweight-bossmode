@@ -1283,6 +1283,7 @@ Work and of Results. The column Who says round 2 for each row.
 | a composer in the conversation of an agent that the person only views | change | no composer, and `You can follow <agent>. Only an owner or an operator of it can talk to it.` | round 2 |
 | `New agent`, `New`, `Open a team`, `New duty`, and `Run now` for a person whom the server refuses | remove | the server refuses each of them for that person | round 2 |
 | What people liked on a profile, for a person who views every agent | remove | the wiki refuses that person, so the profile reads no page | round 2 |
+| `No team is open. Open one, or ask the manager to open one.` for a person who can start no run | change | `No team is open.` | round 2 |
 
 ### The place Teams
 

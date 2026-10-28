@@ -140,7 +140,8 @@ function Home() {
     <EmptyPane back={{ href: '#', label: 'Teams' }}>
       {loaded && !first ? (
         <>
-          <p>No team is open. Open one, or ask the manager to open one.</p>
+          {/* A person who can start no run reads no invitation to open one. */}
+          <p>{start ? 'No team is open. Open one, or ask the manager to open one.' : 'No team is open.'}</p>
           {start && (
             <Button href="#new" kind="primary">
               Open a team
