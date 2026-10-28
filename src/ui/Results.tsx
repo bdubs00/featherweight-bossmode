@@ -238,7 +238,7 @@ function Figures({ v, unit, toCheck, mine, measured, onSaved }: { v: Value; unit
           help="A done task needed nobody when no person decided for it or wrote to it after the ask. A decision that the manager or a timeout made is no action of a person. A thumb on the result afterwards does not count either."
         >
           <p class="t-meta">
-            {v.people.actions.toLocaleString()} actions of people, {v.people.reworked} sent back with a message
+            {v.people.actions === 1 ? '1 action of a person' : v.people.actions.toLocaleString() + ' actions of people'}, {v.people.reworked} sent back with a message
             {(v.people.handled || 0) > 0 && <>, {v.people.handled} {v.people.handled === 1 ? 'decision' : 'decisions'} without a named person</>}
           </p>
           {mine.length > 0 ? (
@@ -277,7 +277,7 @@ function Figures({ v, unit, toCheck, mine, measured, onSaved }: { v: Value; unit
         >
           {v.estimated && (
             <p class="t-meta">
-              {v.estimated.pieces} tasks of {v.estimated.lines} {v.estimated.lines === 1 ? 'line' : 'lines'}, {v.work.done - v.estimated.pieces} without an estimate
+              {v.estimated.pieces === 1 ? '1 task' : v.estimated.pieces + ' tasks'} of {v.estimated.lines} {v.estimated.lines === 1 ? 'line' : 'lines'}, {v.work.done - v.estimated.pieces} without an estimate
             </p>
           )}
         </Tile>

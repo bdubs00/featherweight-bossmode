@@ -227,4 +227,11 @@ describe('Results', () => {
     const done = box.querySelector('tbody td.num')!;
     expect(done.textContent).toBe('3 1 failed 1 stopped 1 lost');
   });
+
+  it('says one action of a person in the singular', async () => {
+    over = { people: { actions: 1, noPerson: 9, reworked: 1, waitSeconds: 0, waitingNow: 0, handled: 0 } };
+    const box = mount(<Results />);
+    await flush();
+    expect(box.textContent).toContain('1 action of a person, 1 sent back with a message');
+  });
 });
