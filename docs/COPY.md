@@ -1194,6 +1194,7 @@ The page never shows pool, member, job, run id, or Task in these places.
 | a wall of zeros for a window without work | change | `No work in the last 30 days.` and the key `Start a task`, which opens Work | drive/ux-results |
 | `Partial: 393 without a record` | change | `Partial: 393 tasks without a record of people`, with the tooltip `An older server kept no record of the checks and the actions of people for these tasks.` | drive/ux-results |
 | `$0.00 a done task` when no task is done | remove | the line shows only with a done task | drive/ux-results |
+| new | add | `About Needed nobody`: a decision of the manager or a timeout, and a thumb on the result, are no actions of a person. The meta adds `3 decisions without a named person`. | drive/ux-results |
 | new | add | `About Done`: what a task is. `About Spend`: what coordination is and why the spend says at least. `About Time to done` also says what the median and the bar count. | drive/ux-results |
 
 ### src/ui/Duties.tsx, src/ui/DutyEditor.tsx, src/lib/duties.ts
