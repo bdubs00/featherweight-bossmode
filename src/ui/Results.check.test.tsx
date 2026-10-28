@@ -169,7 +169,7 @@ describe('More on a phone', () => {
     api = fakeApi({ 'GET /v1/inbox': { items: [] }, 'GET /v1/fleet/runs': { runs: [] } });
     const conv = (state: 'running' | 'completed', seq: number) => run('run-mgr', 'manager', state, { seq, principal: 'alice@example.com', input: 'How is the fleet?' });
     act(() => {
-      store.dispatch({ type: 'config', config: { manager: { agent: 'manager', member: 'default/boss-0' }, placement: 'queue', maxMembers: 16, routines: true, work: true } });
+      store.dispatch({ type: 'config', config: { manager: { agent: 'manager', member: 'default/boss-0', run: '' }, placement: 'queue', maxMembers: 16, routines: true, work: true } });
       store.dispatch({ type: 'run', run: conv('running', 2) });
     });
     const el = mount(<AppBar route={{ place: 'work' }} onSignOut={() => {}} onReach={() => {}} />);

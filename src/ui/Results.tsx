@@ -157,10 +157,36 @@ function Body({ v, onSaved }: { v: Value; onSaved: () => void }) {
         {v.partial && (
           <>
             {' '}
-            <Led tone="grey" word={'Partial: ' + v.unknown + ' without a record'} />
+            <Led
+              tone="grey"
+              word={'Partial: ' + (v.unknown || 0) + ((v.unknown || 0) === 1 ? ' task' : ' tasks') + ' without a record of people'}
+              label="An older server kept no record of the checks and the actions of people for these tasks."
+            />
           </>
         )}
       </p>
+      {v.work.pieces === 0 ? (
+        <Nothing days={v.days} />
+      ) : (
+        <Figures v={v} unit={unit} toCheck={toCheck} measured={measured} onSaved={onSaved} />
+      )}
+    </div>
+  );
+}
+
+/** Nothing is a window without work: it says so once, and the key starts a task, in place of a wall of zeros. */
+function Nothing({ days }: { days: number }) {
+  return (
+    <div class="empty rs-nothing">
+      <p>No work in the last {days} days.</p>
+      <Button href="#work">Start a task</Button>
+    </div>
+  );
+}
+
+function Figures({ v, unit, toCheck, measured, onSaved }: { v: Value; unit: 'day' | 'week'; toCheck: { key: string }[]; measured: boolean; onSaved: () => void }) {
+  return (
+    <>
       <div class="rs-tiles">
         <Tile
           label="Done"
@@ -191,9 +217,11 @@ function Body({ v, onSaved }: { v: Value; onSaved: () => void }) {
           figure={costText(v.spend.usd)}
           help="What the models of the agents cost in the window, for all the work, also the work that failed. Coordination is the manager and the quick chat. The spend says at least when some runs used a model without a price."
         >
-          <p class="t-meta">
-            <b class="rs-ink">{costText(v.spend.perDone)}</b> a done task
-          </p>
+          {v.work.done > 0 && (
+            <p class="t-meta">
+              <b class="rs-ink">{costText(v.spend.perDone)}</b> a done task
+            </p>
+          )}
           <p class="t-meta">
             {costText(v.spend.failedUSD)} on failed work, {costText(v.spend.coordinationUSD)} on coordination
           </p>
@@ -256,7 +284,7 @@ function Body({ v, onSaved }: { v: Value; onSaved: () => void }) {
         </div>
         <Lines lines={v.lines} onSaved={onSaved} />
       </section>
-    </div>
+    </>
   );
 }
 

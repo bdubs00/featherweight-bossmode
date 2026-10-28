@@ -1191,6 +1191,9 @@ The page never shows pool, member, job, run id, or Task in these places.
 | `0 min median` for a window that measured no time to done | change | `None yet` | drive/ux-results |
 | the date of the start of each column of the chart | change | a day says the date that most of it covers; a week says its first day; a period shorter than its unit also says its length, such as `2 days` | drive/ux-results |
 | `The front measures no time that people spend.` (About Hours of a person) | change | `Nothing measures the time that people spend.` (rule 9) | drive/ux-results |
+| a wall of zeros for a window without work | change | `No work in the last 30 days.` and the key `Start a task`, which opens Work | drive/ux-results |
+| `Partial: 393 without a record` | change | `Partial: 393 tasks without a record of people`, with the tooltip `An older server kept no record of the checks and the actions of people for these tasks.` | drive/ux-results |
+| `$0.00 a done task` when no task is done | remove | the line shows only with a done task | drive/ux-results |
 | new | add | `About Done`: what a task is. `About Spend`: what coordination is and why the spend says at least. `About Time to done` also says what the median and the bar count. | drive/ux-results |
 
 ### src/ui/Duties.tsx, src/ui/DutyEditor.tsx, src/lib/duties.ts

@@ -171,13 +171,14 @@ describe('Results', () => {
   });
 
   it('says None yet for a time to done that nothing measured, and its definitions never name the server', async () => {
-    over = { work: { pieces: 0, done: 0, failed: 0, stopped: 0, open: 0 }, lead: { measured: 0, medianSeconds: 0, waitShare: 0 }, lines: [], periods: [] };
+    over = { work: { pieces: 2, done: 0, failed: 2, stopped: 0, open: 0 }, lead: { measured: 0, medianSeconds: 0, waitShare: 0 }, lines: [], periods: [] };
     const box = mount(<Results />);
     await flush();
     const tile = [...box.querySelectorAll('.rs-tile')].find((t) => t.querySelector('h2')!.textContent === 'Time to done')!;
     expect(tile.querySelector('.rs-figure')!.textContent).toBe('None yet');
     expect(tile.querySelector('.rs-bar')).toBeNull();
-    expect(box.textContent).toContain('No work');
+    // Failed work and no done task: no spend of a done task.
+    expect(box.textContent).not.toContain('a done task');
     for (const key of [...box.querySelectorAll<HTMLButtonElement>('.help-key')]) {
       act(() => key.click());
       const said = key.parentElement!.textContent || '';
@@ -185,5 +186,14 @@ describe('Results', () => {
       expect(said).not.toMatch(/\bfront\b/);
       act(() => key.click());
     }
+  });
+
+  it('says once that a window holds no work, with the key that starts a task, in place of a wall of zeros', async () => {
+    over = { work: { pieces: 0, done: 0, failed: 0, stopped: 0, open: 0 }, lead: { measured: 0, medianSeconds: 0, waitShare: 0 }, lines: [], periods: [] };
+    const box = mount(<Results />);
+    await flush();
+    expect(box.querySelector('.rs-tiles')).toBeNull();
+    expect(box.querySelector('.rs-nothing')!.textContent).toBe('No work in the last 30 days.Start a task');
+    expect(box.querySelector('.rs-nothing a')!.getAttribute('href')).toBe('#work');
   });
 });

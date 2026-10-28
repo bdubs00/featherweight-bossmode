@@ -17,6 +17,10 @@
 .rs-ink {
   color: var(--ink);
 }
+/* A window without work: one line and the key that starts a task, at the left edge as the figures. */
+.rs-nothing {
+  padding: var(--s-5) 0;
+}
 .rs-error {
   display: flex;
   flex-wrap: wrap;
