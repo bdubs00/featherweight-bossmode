@@ -1010,9 +1010,9 @@ The work:
 - Steps. A routine that needs you opens on the card of its sign-off. The
   card has the amber light, three figures, the Note field of the decision
   card, and two keys: Not yet and Sign off. The first figure gives the
-  share with the tickets that it counts, such as `97.6% of 1,432`, so the
+  share with the runs that it counts, such as `97.6% of 1,432`, so the
   person sees the size of the sample beside the share. A proposed routine opens on a
-  card with the number of tickets that it comes from, and the keys Retire
+  card with the number of runs that it comes from, and the keys Retire
   and Rehearse. After a sign-off, the card turns quiet and says Signed off,
   with who and when. Not yet sends nothing. The card turns into the quiet
   line Kept for later for this visit of the routine, and the row keeps
@@ -1031,7 +1031,7 @@ The work:
   per day out of placed elements: agreed in ink, disagreed in a hatch of
   `--muted` on `--paper`, and handed to the agent in `--led-grey`. A gap of
   paper parts the fills. The legend gives the three totals, and a table
-  gives each day to a screen reader. Then Past tickets, How sure it was in
+  gives each day to a screen reader. Then Past runs, How sure it was in
   words, Where it disagreed with what happened afterward, Sent back, and
   Made from. Made from lives on this tab only. How sure it was joins the
   bands under the mark of a question in one row, handed to the agent.
@@ -1041,7 +1041,7 @@ The work:
   way, under the line `Not yet signed off`.
 - The details pane. The agent with its chip and the key Profile, its mark,
   its tagline, and its week. This week is a bar of the runs by routines, by
-  the agent, and with a person, with the three counts. Per ticket gives the
+  the agent, and with a person, with the three counts. Per run gives the
   cost of a run by a routine and by the agent. Sent back counts the week.
   The pane never repeats a figure of the routine, and never says who signed
   it off.
@@ -1061,7 +1061,7 @@ The rules of the owner for this screen, and how the screen keeps them:
 | The person has little time | A routine that needs you opens on its card, and the card has two keys. |
 | No explanation in the chrome | The card has no sentence. The definitions sit behind the question marks of What it decides and How sure it was. |
 | One name through the flow | The key says Sign off, the quiet card says Signed off, and the row says live. |
-| No word matched | Past tickets reads `212 of 212 past tickets, handled the same way`. |
+| No word matched | Past runs reads `212 of 212 past runs, handled the same way`. |
 | Attractive scrollbars | Section 4.7, for every pane of the page. |
 
 Left out, and why:
@@ -1072,9 +1072,9 @@ Left out, and why:
   alone.
 - A sign-off before a routine is ready. The moves allow it, but the page
   offers Sign off only on the card of a routine that needs you.
-- Open the tickets. The replay of the workbench keeps no list of the past
-  tickets, so the line of Past tickets has no key until a later change
-  adds the list.
+- Open the runs. The replay of the workbench keeps no list of the past
+  runs, so the line of Past runs has no key until a later change adds the
+  list.
 - New routine. A routine comes from `fw routine propose` or from an agent,
   and the page has no editor of its body. An empty place says `No routine
   yet.` with no key.

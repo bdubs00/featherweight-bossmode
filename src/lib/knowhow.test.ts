@@ -43,8 +43,8 @@ describe('the words of a note', () => {
     expect(isMine('agent', ME)).toBe(false);
   });
 
-  it('says each kind of source, with the address that opens it', () => {
-    expect(sourceOf('run:01K9')).toEqual({ kind: 'run', words: 'a run', href: '/ui#run/01K9' });
+  it('says each kind of source, with the address that opens it on this page', () => {
+    expect(sourceOf('run:01K9')).toEqual({ kind: 'run', words: 'a run', href: '#chat/01K9' });
     expect(sourceOf('page:agents/triage/labels.md')).toEqual({ kind: 'page', words: 'the page agents/triage/labels.md', href: '#pages/agents/triage/labels.md' });
     expect(sourceOf('item:gitea/issue/42')).toEqual({ kind: 'item', words: 'Gitea issue 42', href: '' });
   });

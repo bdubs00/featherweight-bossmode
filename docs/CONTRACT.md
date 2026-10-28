@@ -1102,8 +1102,9 @@ for the lab and the manager.
 
 Reading needs the right to view the agent, else 404. A move needs the
 right to edit it, else 403. The page offers the moves where `roles` of
-`GET /v1/whoami` names the person `owner` of the agent. A ticket links to
-its run on the page at `/ui`, as `/ui#run/<id>`, as a heart does.
+`GET /v1/whoami` names the person `owner` of the agent. A run of a
+disagreement links to its chat on this page, `#chat/<id>`, as a card of
+Work opens a run.
 
 A record. Only a routine that was signed off has `signedOff`. `source` and
 `routine.canary` show only with a value. The routine never carries a
@@ -1209,8 +1210,9 @@ The summary:
 
 The page keys a routine by `agent` and `routine.name`, and gives it the
 title of its name: `acknowledge-a-new-ticket` is `Acknowledge a new
-ticket`. It calls a run of a routine a ticket, as the words of section 5
-of `docs/ROUTINES.md` do. A field for a title can give a routine the words
+ticket`. It calls a run of a routine a run, because a routine belongs to
+a duty of any kind of work, and the word of one kind, such as ticket, is
+wrong for the others. A field for a title can give a routine the words
 that its name cannot hold. A field for the noun of the work of an agent
 can give each agent its own word.
 

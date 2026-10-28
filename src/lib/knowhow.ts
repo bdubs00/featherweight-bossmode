@@ -118,13 +118,20 @@ export interface SourceWords {
   href: string;
 }
 
-/** sourceOf says a source: a run, a page of the wiki, or an item of a source such as an issue. */
-export function sourceOf(ref: string): SourceWords {
+/** runHref is the address of a run on this page: its chat, as a card of Work opens it. */
+export const runHref = (run: string): string => hrefOf({ place: 'chat', run });
+
+/**
+ * sourceOf says a source: a run, a page of the wiki, or an item of a
+ * source such as an issue. A page is a link only for a person who may
+ * read the wiki (wiki), because a link that refuses the person is no link.
+ */
+export function sourceOf(ref: string, opts: { wiki?: boolean } = {}): SourceWords {
   const r = (ref || '').trim();
-  if (r.startsWith('run:')) return { kind: 'run', words: 'a run', href: '/ui#run/' + encodeURIComponent(r.slice(4)) };
+  if (r.startsWith('run:')) return { kind: 'run', words: 'a run', href: runHref(r.slice(4)) };
   if (r.startsWith('page:')) {
     const path = r.slice(5);
-    return { kind: 'page', words: 'the page ' + path, href: hrefOf({ place: 'pages', path, mode: 'read' }) };
+    return { kind: 'page', words: 'the page ' + path, href: opts.wiki === false ? '' : hrefOf({ place: 'pages', path, mode: 'read' }) };
   }
   if (r.startsWith('item:')) {
     const [source, ...key] = r.slice(5).split('/');

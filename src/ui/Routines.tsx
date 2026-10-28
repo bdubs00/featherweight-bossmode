@@ -559,7 +559,7 @@ function StepsTab(p: CardProps) {
         <section class="rt-sec" aria-labelledby="rt-decides">
           <h2 class="t-sub rt-sec-head" id="rt-decides">
             What it decides
-            <Help label="When it is not sure">When an answer is under its mark, the agent handles the ticket, with the answers of the routine in hand.</Help>
+            <Help label="When it is not sure">When an answer is under its mark, the agent does the run, with the answers of the routine in hand.</Help>
           </h2>
           <table class="rt-table rt-decides">
             <thead>
@@ -720,7 +720,7 @@ export function RoutineAgent({ agent, name }: { agent: string; name: string }) {
   );
 }
 
-/** Week is This week, Per ticket, and Sent back of an agent. */
+/** Week is This week, Per run, and Sent back of an agent. */
 function Week({ w }: { w: RoutineSummary }) {
   const parts = [
     { key: 'ink', words: 'by routines', n: w.byRoutine || 0 },
@@ -757,7 +757,7 @@ function Week({ w }: { w: RoutineSummary }) {
       {(perRoutine !== null || perAgent !== null) && (
         <section class="rt-dsec" aria-labelledby="rt-per">
           <h3 class="t-sub rt-sec-head" id="rt-per">
-            Per ticket
+            Per run
           </h3>
           <dl class="rt-per">
             {perRoutine !== null && (
