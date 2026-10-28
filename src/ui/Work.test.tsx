@@ -319,12 +319,13 @@ describe('the board of the work', () => {
 
   it('offers Looks right and Needs work only on a result whose check is the move of the person', async () => {
     const other = card('o', 'review', { next: 'person', from: { kind: 'person', name: 'bob', via: 'page' }, links: { run: 'run-o' } });
-    const f = fakeFetch([['GET', /^\/v1\/work/, () => ({ ...BOARD, cards: [...BOARD.cards, other] })]]);
+    const team = card('t', 'review', { kind: 'bridge', next: 'you', reason: 'The seats ended their turns.', links: { bridge: 'br-2', run: 'run-seat' }, parts: { review: 2, total: 2 } });
+    const f = fakeFetch([['GET', /^\/v1\/work/, () => ({ ...BOARD, cards: [...BOARD.cards, other, team] })]]);
     try {
       const el = mount(<Work />);
       await settle();
       const cards = [...el.querySelectorAll('.lane-review .work-card')];
-      expect(cards.map((c) => !!c.querySelector('.result-keys'))).toEqual([true, false]);
+      expect(cards.map((c) => !!c.querySelector('.result-keys'))).toEqual([true, false, false]);
     } finally {
       f.restore();
     }

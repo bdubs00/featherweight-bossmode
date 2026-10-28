@@ -205,8 +205,9 @@ function CardView({ c, now, onDecided }: { c: WorkCard; now: number; onDecided: 
         <span class="clip">{whoWords(c, duty || fromWords(c, [subject, signin]), faces)}</span>
         {total > 0 && <span>{total + (c.kind === 'bridge' ? ' agents' : ' parts')}</span>}
       </span>
-      {/* Only the person whose move it is checks a result: another person, or a viewer under Everyone, reads it only. */}
-      {c.stage === 'review' && c.next === 'you' && run && <ResultKeys run={run} title={c.title} size="s" onDone={onDecided} />}
+      {/* Only the person whose move it is checks a result: another person, or a viewer under Everyone, reads it only.
+          A bridge to check has no one result: its operator reads the channel, then closes it or gives a new task (as a4ce6cb of drive/flow). */}
+      {c.stage === 'review' && c.next === 'you' && run && c.kind !== 'bridge' && <ResultKeys run={run} title={c.title} size="s" onDone={onDecided} />}
     </div>
   );
 }
