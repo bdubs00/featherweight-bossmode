@@ -57,7 +57,8 @@ const COORDINATION = [
  * livePieces gives the runs of the fake whose owner asked to check each
  * result, as pieces of the line of their duty. A thumb up or a heart
  * accepts a result, a thumb down sends it back, and a run that works again
- * after Needs work is open.
+ * after Needs work is open. A thumb is a verdict, and the note of Needs
+ * work is an action of a person, as value.Fold counts them.
  */
 function livePieces(runs) {
   const out = [];
@@ -72,7 +73,7 @@ function livePieces(runs) {
     const verdict = !done ? '' : re.down > 0 ? 'rejected' : re.up > 0 || re.heart > 0 ? 'accepted' : '';
     const created = Date.parse(r.createdAt);
     out.push({
-      line, created, state: done ? 'completed' : r.state === 'failed' ? 'failed' : 'running', acts: (re.up || 0) + (re.down || 0) + (re.heart || 0), verdict,
+      line, created, state: done ? 'completed' : r.state === 'failed' ? 'failed' : 'running', acts: r.reworks || 0, verdict,
       rework: r.reworks ? 1 : 0, waitMs: 0, leadMs: done ? Math.max(0, Date.parse(r.updatedAt) - created) : 0,
       usd: (r.usage && r.usage.costUSD) || 0.03, unpriced: false, facts: true,
     });

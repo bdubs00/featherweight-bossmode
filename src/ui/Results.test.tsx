@@ -196,4 +196,12 @@ describe('Results', () => {
     expect(box.querySelector('.rs-nothing')!.textContent).toBe('No work in the last 30 days.Start a task');
     expect(box.querySelector('.rs-nothing a')!.getAttribute('href')).toBe('#work');
   });
+
+  it('counts the decisions that no named person made beside the actions of people', async () => {
+    over = { people: { actions: 5, noPerson: 9, reworked: 1, waitSeconds: 7200, waitingNow: 0, handled: 3 } };
+    const box = mount(<Results />);
+    await flush();
+    expect(box.textContent).toContain('5 actions of people, 1 sent back with a message, 3 decisions without a named person');
+    expect(box.textContent).not.toContain('waiting for you');
+  });
 });

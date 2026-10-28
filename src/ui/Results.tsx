@@ -227,9 +227,15 @@ function Figures({ v, unit, toCheck, measured, onSaved }: { v: Value; unit: 'day
           </p>
           {v.spend.unpriced > 0 && <Led tone="grey" word={v.spend.unpriced + (v.spend.unpriced === 1 ? ' run without a price' : ' runs without a price')} />}
         </Tile>
-        <Tile label="Needed nobody" figure={v.people.noPerson.toLocaleString()} unit={'of ' + v.work.done.toLocaleString()}>
+        <Tile
+          label="Needed nobody"
+          figure={v.people.noPerson.toLocaleString()}
+          unit={'of ' + v.work.done.toLocaleString()}
+          help="A done task needed nobody when no person decided for it or wrote to it after the ask. A decision that the manager or a timeout made is no action of a person. A thumb on the result afterwards does not count either."
+        >
           <p class="t-meta">
             {v.people.actions.toLocaleString()} actions of people, {v.people.reworked} sent back with a message
+            {(v.people.handled || 0) > 0 && <>, {v.people.handled} {v.people.handled === 1 ? 'decision' : 'decisions'} without a named person</>}
           </p>
           {v.people.waitingNow > 0 && (
             <a class="rs-now" href="#activity">
