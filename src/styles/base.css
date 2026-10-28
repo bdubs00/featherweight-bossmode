@@ -196,7 +196,9 @@ h2[tabindex='-1']:focus {
 .md h1,
 .md h2,
 .md h3,
-.md h4 {
+.md h4,
+.md h5,
+.md h6 {
   margin: var(--s-4) 0 var(--s-2);
   font-weight: 800;
   line-height: 1.25;
@@ -212,7 +214,9 @@ h2[tabindex='-1']:focus {
   letter-spacing: -0.02em;
 }
 .md h3,
-.md h4 {
+.md h4,
+.md h5,
+.md h6 {
   font-size: 15px;
   font-weight: 700;
 }

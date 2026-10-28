@@ -30,6 +30,10 @@
 // form stays as a draft in the tab until Save or Cancel, so a move to
 // another screen loses nothing. Make this a duty reads the schedule and the
 // cost that its message names, and Cancel goes back to the conversation.
+// Change the details of the door opens the whole plan of the door: the
+// schedule, the cost that the person typed, who hears of a result, and the
+// check of each result. The form then says From the door, and Cancel goes
+// back to Work.
 
 import type { RefObject } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
@@ -114,6 +118,7 @@ import { useSelect } from '../state/store';
 import { membersOf } from '../state/reducer';
 import { loadBridge } from '../state/actions';
 import { FALLBACK, loadDuties, loadDutyOptions, loadDuty, loadSharedChannels, saveDuty, useDuties } from '../state/duties';
+import { doorDuty, dropDoorDuty } from '../state/doorplan';
 import { usePlaybooks } from '../state/playbooks';
 import { showError } from './notice';
 import { Confirm } from './common';
@@ -229,6 +234,8 @@ function backTo(hash: string): string {
       return 'the conversation';
     case 'activity':
       return 'Activity';
+    case 'work':
+      return 'Work';
   }
   return 'the last screen';
 }
@@ -623,7 +630,9 @@ function EditorForm({ name, seed, base: read, heading, back: home }: FormProps) 
   // A draft of this form that the person left without Save or Cancel comes back.
   const key = draftKey(name, seed);
   const [kept] = useState(() => readDraft(key));
-  const [initial] = useState<DutyForm>(() => (base ? formOf(base, zone) : seededForm(seed, zone)));
+  // The plan that the door kept, for a new duty from Change the details.
+  const [door] = useState(() => (!base && seed && seed.from === 'door' ? doorDuty() : null));
+  const [initial] = useState<DutyForm>(() => (base ? formOf(base, zone) : door ? { ...formOf(door as Duty, zone), nameOwn: !!door.title } : seededForm(seed, zone)));
   const [f, setF] = useState<DutyForm>(() => (kept ? { ...initial, ...kept.form } : initial));
   const [keptLine, setKeptLine] = useState(!!kept);
   const keptStale = !!(kept && base && typeof kept.revision === 'number' && typeof base.revision === 'number' && kept.revision !== base.revision);
@@ -789,8 +798,9 @@ function EditorForm({ name, seed, base: read, heading, back: home }: FormProps) 
   };
 
   // Make this a duty brings a message that can name when and what a run may cost, such as every Monday at 8am and at most $0.05. The page reads both into the form once.
+  // The plan of the door holds both already.
   useEffect(() => {
-    if (!fresh || !seed || !seed.message || kept) return;
+    if (!fresh || !seed || !seed.message || kept || door) return;
     const cost = moneyIn(seed.message);
     if (cost && (f.act === 'ask' || f.act === 'manager') && !f.cost) setF((x) => ({ ...x, cost }));
     const said = scheduleWordsIn(seed.message);
@@ -866,6 +876,7 @@ function EditorForm({ name, seed, base: read, heading, back: home }: FormProps) 
     try {
       await saveDuty(pathName, record());
       writeDraft(key, null);
+      if (door) dropDoorDuty();
       setReview(null);
       setBusy(false);
       go({ place: 'duties', name: pathName });
@@ -905,6 +916,12 @@ function EditorForm({ name, seed, base: read, heading, back: home }: FormProps) 
               <Button size="s" kind="quiet" onClick={discard}>
                 Discard them
               </Button>
+            </p>
+          )}
+          {/* The plan of the door fills the form: the line says where it came from. */}
+          {door && !keptLine && (
+            <p class="duty-said duty-door" role="status">
+              From the door
             </p>
           )}
           {importedOf(base) && <p class="duty-said duty-origin">{ORIGIN_LINE}</p>}

@@ -17,12 +17,13 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
 import { ApiError } from '../api/client';
 import type { ComponentChildren } from 'preact';
-import type { TaskPlan, TaskTell, Whoami } from '../api/types';
+import type { DutyRecord, TaskPlan, TaskTell, Whoami } from '../api/types';
 import { hrefOf } from '../lib/route';
 import { nextWords, timeOf, titleOfName } from '../lib/duties';
 import { list } from '../lib/words';
 import { loadDuties } from '../state/duties';
 import { loadBridges } from '../state/actions';
+import { keepDoorDuty } from '../state/doorplan';
 import { showError } from './notice';
 import { Button, Card, Choices, Field, Input, LineLed, Mark, TextArea } from './primitives';
 
@@ -76,6 +77,33 @@ export function costOf(text: string): number | null {
 
 /** money says dollars with two decimals. */
 const money = (n: number) => '$' + n.toFixed(2);
+
+/** cents rounds a price up to the next cent, so 0.141 reads $0.15 and 0.14 stays $0.14. */
+const cents = (n: number) => Math.ceil(Math.round(n * 1e6) / 1e4) / 100;
+
+/**
+ * lowWords warns that the cost that the person typed is below the cheapest
+ * run of the agents, so the task stops at the limit. cost.low is in dollars
+ * for the whole task: one run, or every seat of a team.
+ */
+export function lowWords(plan: Pick<TaskPlan, 'kind' | 'cost'>, cost: number | null): string {
+  const low = plan.cost.low;
+  if (cost === null || typeof low !== 'number' || !(low > 0)) return '';
+  const floor = cents(low);
+  if (cost >= floor) return '';
+  return (plan.kind === 'team' ? 'The whole team can cost ' : 'One run can cost ') + money(floor) + '. The task stops at your limit.';
+}
+
+/**
+ * dutyOfPlan is the record of a duty that Change the details hands to the
+ * editor: the plan of the door, with the cost that the person typed.
+ */
+export function dutyOfPlan(plan: TaskPlan, cost: number | null): DutyRecord | null {
+  const d = plan.start.duty;
+  if (!d) return null;
+  if (cost === null) return d;
+  return { ...d, limits: { ...d.limits, budget: { ...(d.limits && d.limits.budget), maxCostUSD: cost } } };
+}
 
 /** monthWords says the most a task can cost in a month, from the cost of one run and the runs of a month. */
 export function monthWords(plan: Pick<TaskPlan, 'kind' | 'cost'>, cost: number | null): string {
@@ -151,8 +179,9 @@ function Readback({ plan, onPlan, onStarted, busy }: { plan: TaskPlan; onPlan: (
     }
     setGoing(false);
   };
+  // A duty opens the editor on the whole plan: the schedule, the cost, who hears of a result, and the check of each result.
   const change = plan.start.duty
-    ? hrefOf({ place: 'duties', fresh: true, seed: { agent: plan.start.duty.agent, act: 'ask', message: plan.words } })
+    ? hrefOf({ place: 'duties', fresh: true, seed: { agent: plan.start.duty.agent, act: 'ask', from: 'door', message: plan.words } })
     : plan.start.bridge
       ? hrefOf({ place: 'new' })
       : hrefOf({ place: 'chat', fresh: true });
@@ -163,15 +192,33 @@ function Readback({ plan, onPlan, onStarted, busy }: { plan: TaskPlan; onPlan: (
       label="What happens when you start"
       actions={
         <>
-          <Button href={change} kind="quiet">
+          <Button
+            href={change}
+            kind="quiet"
+            onClick={() => {
+              const d = dutyOfPlan(plan, n);
+              if (d) keepDoorDuty(d);
+            }}
+          >
             Change the details
           </Button>
+          {/* A duty of the person that does the same work opens beside Start, so the person keeps one duty. */}
+          {plan.same && (
+            <Button href={hrefOf({ place: 'duties', name: plan.same.duty })} aria-label={'Open it: ' + plan.same.title}>
+              Open it
+            </Button>
+          )}
           <Button kind="primary" onClick={start} aria-disabled={going || busy || !!agentProblem || undefined}>
             Start
           </Button>
         </>
       }
     >
+      {plan.same && (
+        <p class="rb-same">
+          <LineLed tone="grey" /> Your duty <a href={hrefOf({ place: 'duties', name: plan.same.duty })}>{plan.same.title}</a> does this already.
+        </p>
+      )}
       <dl class="rb">
         <div class="rb-row">
           <dt>Who</dt>
@@ -288,6 +335,14 @@ function Readback({ plan, onPlan, onStarted, busy }: { plan: TaskPlan; onPlan: (
               </span>
             </Field>
             {plan.cost.basis && <p class="t-meta">{plan.cost.basis}</p>}
+            {/* A cost below the cheapest run says so as the person types, before Start. */}
+            <p class="rb-low" role="status">
+              {lowWords(plan, n) && (
+                <>
+                  <LineLed tone="amber" /> {lowWords(plan, n)}
+                </>
+              )}
+            </p>
             {monthWords(plan, n) && <p class="t-meta">{monthWords(plan, n)}</p>}
           </dd>
         </div>

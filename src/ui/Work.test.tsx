@@ -341,10 +341,82 @@ describe('the board of the work', () => {
       const el = mount(<Work />);
       await settle();
       const cards = [...el.querySelectorAll('.lane-review .work-card')];
-      expect(cards.map((c) => !!c.querySelector('.result-keys'))).toEqual([true, false, false]);
+      // A team of the person has keys too: its check goes to its bridge.
+      expect(cards.map((c) => !!c.querySelector('.result-keys'))).toEqual([true, false, true]);
     } finally {
       f.restore();
     }
+  });
+
+  it('checks a team through its bridge: Looks right closes it, and Needs work sends the note to every seat', async () => {
+    const team = card('t', 'review', { kind: 'bridge', title: 'Write the launch email', next: 'you', reason: 'Each agent finished its part. Check the result.', links: { bridge: 'br-2', run: 'run-seat' }, parts: { review: 2, total: 2 } });
+    const f = fakeFetch([
+      ['GET', /^\/v1\/work/, () => ({ ...BOARD, cards: [team] })],
+      ['POST', /^\/v1\/work\/review$/, () => ({ bridge: 'br-2' })],
+    ]);
+    try {
+      const el = mount(<Work />);
+      await settle();
+      const box = el.querySelector('.lane-review .work-card')!;
+      const key = (t: string) => [...box.querySelectorAll('button')].find((b) => b.textContent === t)!;
+      await act(async () => key('Looks right').click());
+      await settle();
+      await act(async () => key('Needs work').click());
+      const note = box.querySelector('textarea')!;
+      await act(async () => {
+        note.value = 'Say the date that the prices change.';
+        note.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      await act(async () => key('Send back').click());
+      await settle();
+      const posts = f.calls.filter((c) => c.method === 'POST').map((c) => [c.path, c.body]);
+      expect(posts).toEqual([
+        ['/v1/work/review', { bridge: 'br-2', verdict: 'up' }],
+        ['/v1/work/review', { bridge: 'br-2', verdict: 'down', note: 'Say the date that the prices change.' }],
+      ]);
+      // A team never reacts on one seat run.
+      expect(f.calls.some((c) => c.path.includes('/reactions'))).toBe(false);
+    } finally {
+      f.restore();
+    }
+  });
+
+  it('offers Let it go on a stopped card of the person and of an agent that the person owns, and ends it in Done', async () => {
+    const mine = card('m', 'stopped', { title: 'Draft a reply', next: 'you', reason: 'Stopped at its turn limit.' });
+    const owned = card('w', 'stopped', { title: 'Lint the roles', next: 'person', agents: ['tester'], from: { kind: 'person', name: 'bob', via: 'page' } });
+    const other = card('x', 'stopped', { title: 'Plan the move', next: 'person', agents: ['writer'], from: { kind: 'person', name: 'bob', via: 'page' } });
+    const gone = card('g', 'done', { title: 'An old chat', verdict: 'let-go', reason: 'Let go by Alice.' });
+    const f = fakeFetch([
+      ['GET', /^\/v1\/work/, () => ({ ...BOARD, cards: [mine, owned, other, gone] })],
+      ['POST', /^\/v1\/work\/letgo$/, () => ({ ...mine, stage: 'done', verdict: 'let-go' })],
+    ]);
+    store.dispatch({ type: 'me', me: { principal: { subject: 'alice@example.com' }, roles: { tester: 'owner', writer: 'operator' }, admin: false, canCreate: true } as never });
+    try {
+      const el = mount(<Work />);
+      await settle();
+      const cards = [...el.querySelectorAll('.lane-stopped .work-card')];
+      const keyOf = (c: Element) => [...c.querySelectorAll('button')].find((b) => b.textContent === 'Let it go');
+      expect(cards.map((c) => !!keyOf(c))).toEqual([true, true, false]);
+      expect(keyOf(cards[0])!.getAttribute('aria-label')).toBe('Let it go: Draft a reply');
+      await act(async () => keyOf(cards[0])!.click());
+      await settle();
+      expect(f.calls.filter((c) => c.method === 'POST').map((c) => [c.path, c.body])).toEqual([['/v1/work/letgo', { card: 'm' }]]);
+      // A card that a person let go says so in Done, with a grey light.
+      const done = el.querySelector('.lane-done .work-card')!;
+      expect(done.querySelector('.status-word')!.textContent).toBe('let go');
+      expect(done.querySelector('.led-grey')).toBeTruthy();
+    } finally {
+      store.dispatch({ type: 'me', me: null });
+      f.restore();
+    }
+  });
+
+  it('names a person by the name beside the subject, never by an id', () => {
+    const c = card('d', 'done', { from: { kind: 'person', name: 'fd1e8a14-ac12-5a00-b4d6-bb6e50d15c10', via: 'manager', display: 'Dana Reyes' } });
+    expect(fromWords(c, ['alice@example.com'])).toBe('Manager for Dana Reyes');
+    expect(fromWords({ ...c, from: { kind: 'person', name: 'fd1e8a14-ac12-5a00-b4d6-bb6e50d15c10', via: 'page', display: 'Dana Reyes' } }, ['alice@example.com'])).toBe('Dana Reyes');
+    // The person who reads the board stays You, whatever the name beside the subject.
+    expect(fromWords({ ...c, from: { kind: 'person', name: 'alice@example.com', via: 'page', display: 'Alice' } }, ['alice@example.com'])).toBe('You');
   });
 
   it('finds the card of what Start made: its run, its bridge, or the open card of its duty', () => {

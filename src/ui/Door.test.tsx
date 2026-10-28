@@ -4,7 +4,8 @@ import { act } from 'preact/test-utils';
 import type { TaskPlan } from '../api/types';
 import { fakeFetch } from './testkit-b';
 import { morePlaces, placesOf } from './Shell';
-import { Door, costOf, monthWords, startPlan } from './Door';
+import { Door, costOf, dutyOfPlan, lowWords, monthWords, startPlan } from './Door';
+import { doorDuty } from '../state/doorplan';
 
 let box: HTMLElement | null = null;
 let restore: (() => void) | null = null;
@@ -61,6 +62,26 @@ describe('the words of the door', () => {
     expect(monthWords(plan(), 0.5)).toBe('At most $2.00 a month: about 4 runs at most $0.50 each.');
     expect(monthWords(plan(), null)).toBe('');
     expect(monthWords(plan({ kind: 'once' }), 0.5)).toBe('');
+  });
+});
+
+describe('the cost of a plan', () => {
+  it('warns of a cost below the cheapest run of the task, up to the next cent, and says nothing above it', () => {
+    const p = plan({ cost: { basis: '', per: 'run', runsPerMonth: 4, low: 0.14, high: 1.8 } });
+    expect(lowWords(p, 0.1)).toBe('One run can cost $0.14. The task stops at your limit.');
+    expect(lowWords(p, 0.14)).toBe('');
+    expect(lowWords(p, null)).toBe('');
+    expect(lowWords(plan({ cost: { basis: '', per: 'run', runsPerMonth: 4, low: 0.141 } }), 0.14)).toBe('One run can cost $0.15. The task stops at your limit.');
+    expect(lowWords(plan({ kind: 'team', cost: { basis: '', per: 'bridge', runsPerMonth: 1, low: 0.5 } }), 0.1)).toBe('The whole team can cost $0.50. The task stops at your limit.');
+    // No run with a price: no low, and no warning.
+    expect(lowWords(plan(), 0.01)).toBe('');
+  });
+  it('hands the editor the whole duty of a plan, with the cost that the person typed', () => {
+    const d = dutyOfPlan(plan(), 0.3)!;
+    expect(d.limits.budget!.maxCostUSD).toBe(0.3);
+    expect(d.when).toEqual(plan().start.duty!.when);
+    expect(dutyOfPlan(plan(), null)!.limits.budget!.maxCostUSD).toBeUndefined();
+    expect(dutyOfPlan(plan({ start: { bridge: { title: 'T', goal: 'G', members: [] } } }), 1)).toBeNull();
   });
 });
 
@@ -153,6 +174,62 @@ describe('Door', () => {
     await settle();
     const again = f.calls.filter((c) => c.method === 'POST').pop()!;
     expect((again.body as { agent: string }).agent).toBe('ops');
+  });
+
+  it('says under the cost that a run can cost more than the typed limit, as the person types', async () => {
+    const f = fakeFetch([['POST', /\/v1\/work\/plan$/, () => plan({ cost: { basis: 'Runs of Writer cost $0.14 to $0.22 in the last 30 days.', per: 'run', runsPerMonth: 4, low: 0.14, high: 0.22 } })]]);
+    restore = f.restore;
+    const el = mount(<Door />);
+    act(() => [...el.querySelectorAll('button')].find((b) => b.textContent === 'A weekly summary of competitors')!.click());
+    act(() => [...el.querySelectorAll('button')].find((b) => b.textContent === 'Read it back')!.click());
+    await settle();
+    const cost = el.querySelector('.rb-money input') as HTMLInputElement;
+    const type = (v: string) =>
+      act(() => {
+        cost.value = v;
+        cost.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+    type('0.10');
+    expect(el.querySelector('.rb-low')!.textContent).toBe(' One run can cost $0.14. The task stops at your limit.');
+    expect(el.querySelector('.rb-low')!.getAttribute('role')).toBe('status');
+    type('0.50');
+    expect(el.querySelector('.rb-low')!.textContent).toBe('');
+  });
+
+  it('offers Open it beside Start for a duty of the person that does the same work', async () => {
+    const f = fakeFetch([['POST', /\/v1\/work\/plan$/, () => plan({ same: { duty: 'weekly-competitor-summary', title: 'Weekly competitor summary' } })]]);
+    restore = f.restore;
+    const el = mount(<Door />);
+    act(() => [...el.querySelectorAll('button')].find((b) => b.textContent === 'A weekly summary of competitors')!.click());
+    act(() => [...el.querySelectorAll('button')].find((b) => b.textContent === 'Read it back')!.click());
+    await settle();
+    expect(el.querySelector('.rb-same')!.textContent).toContain('Your duty Weekly competitor summary does this already.');
+    const keys = [...el.querySelectorAll('.card-actions a, .card-actions button')].map((k) => k.textContent);
+    expect(keys).toEqual(['Change the details', 'Open it', 'Start']);
+    const open = [...el.querySelectorAll('.card-actions a')].find((a) => a.textContent === 'Open it')!;
+    expect(open.getAttribute('href')).toBe('#duties/weekly-competitor-summary');
+    expect(open.getAttribute('aria-label')).toBe('Open it: Weekly competitor summary');
+  });
+
+  it('opens the editor from Change the details with the whole plan and the typed cost', async () => {
+    const f = fakeFetch([['POST', /\/v1\/work\/plan$/, () => plan()]]);
+    restore = f.restore;
+    const el = mount(<Door />);
+    act(() => [...el.querySelectorAll('button')].find((b) => b.textContent === 'A weekly summary of competitors')!.click());
+    act(() => [...el.querySelectorAll('button')].find((b) => b.textContent === 'Read it back')!.click());
+    await settle();
+    const cost = el.querySelector('.rb-money input') as HTMLInputElement;
+    act(() => {
+      cost.value = '0.25';
+      cost.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    const change = [...el.querySelectorAll('a')].find((a) => a.textContent === 'Change the details')!;
+    expect(change.getAttribute('href')).toMatch(/^#duties\/new\?agent=writer&do=ask&from=door&message=/);
+    change.addEventListener('click', (e) => e.preventDefault());
+    act(() => change.click());
+    const kept = doorDuty()!;
+    expect(kept.when).toEqual(plan().start.duty!.when);
+    expect(kept.limits.budget!.maxCostUSD).toBe(0.25);
   });
 
   it('puts the cost last, beside Start, and says the next starts apart', async () => {

@@ -24,6 +24,10 @@
 //   FAKE_ASK=<tool>    the manager waits for a decision on one call: bridge_open, pages_write, spawn_task, create_issue, or env
 //   FAKE_PACKAGES=0    the settings say that the deployment has no package mirror, so no profile shows Packages
 //   FAKE_WORK=0        the settings name no work, so the page shows no Work and no Results, and every place of the app bar
+//
+// The token fake-erin signs in erin, a sponsor who views every agent: her
+// roles are viewer, she can create no agent, and the wiki refuses her, as
+// a real front does.
 
 import http from 'node:http';
 import fs from 'node:fs';
@@ -34,6 +38,7 @@ import { checkSvg, identicon } from './faces.mjs';
 import { TEMPLATES } from './routes-c.mjs';
 import { TOOLS_OF, allowlistOf, givesTool } from './skills.mjs';
 import { ARCHIVED_REFUSAL } from './archive.mjs';
+import { foundLine } from './routes-work.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const DIST = path.resolve(here, '..', 'dist');
@@ -76,6 +81,10 @@ function personOf(req) {
   const subject = name + '@example.com';
   return { subject, name: name[0].toUpperCase() + name.slice(1), kind: 'user' };
 }
+
+/** viewerOf reports whether a person only views the agents: erin, the sponsor. */
+const viewerOf = (person) => !!person && person.subject === 'erin@example.com';
+
 
 /* ---------- answers ---------- */
 
@@ -822,7 +831,11 @@ function stamp(f, person) {
 const routes = [];
 const on = (method, pattern, h, open = false) => routes.push({ method, re: new RegExp('^' + pattern + '$'), h, open });
 
-on('GET', '/v1/whoami', (c) => ({ principal: c.person, roles: Object.fromEntries(AGENTS.map((a) => [a.name, a.role])), admin: ADMIN, canCreate: true, teams: ['team-platform'], fleet: 'front-0' }));
+on('GET', '/v1/whoami', (c) =>
+  viewerOf(c.person)
+    ? { principal: c.person, roles: Object.fromEntries(AGENTS.map((a) => [a.name, 'viewer'])), admin: false, canCreate: false, teams: [], fleet: 'front-0' }
+    : { principal: c.person, roles: Object.fromEntries(AGENTS.map((a) => [a.name, a.role])), admin: ADMIN, canCreate: true, teams: ['team-platform'], fleet: 'front-0' },
+);
 // The settings in the order of the keys of the backend. The backend sends
 // every key of the theme, with "" for a key that the deployment leaves out.
 on('GET', '/v1/bossmode', (c) => {
@@ -1250,7 +1263,13 @@ on('POST', '/v1/runs/([^/]+)/messages', async (c, id) => {
   if (!content && !files.length) refuse(400, 'a message needs content');
   // A run of the archive is read-only: its worker was replaced.
   if (run.archived) refuse(409, ARCHIVED_REFUSAL);
-  if (run.state === 'failed' || run.state === 'canceled') refuse(409, `the run ${id} ${run.state === 'failed' ? 'failed' : 'was canceled'}, so it takes no message`);
+  // A run that stopped at a limit takes a follow-up once a person gave it more room (PATCH /v1/runs/{id}/budget).
+  const roomy = run.state === 'failed' && /^budget exceeded\b/.test(run.error || '') && run.moreRoom;
+  if ((run.state === 'failed' && !roomy) || run.state === 'canceled') refuse(409, `the run ${id} ${run.state === 'failed' ? 'failed' : 'was canceled'}, so it takes no message`);
+  if (roomy) {
+    delete run.error;
+    delete run.moreRoom;
+  }
   const items = S.transcripts.get(id);
   const seq = items[items.length - 1].seq + 1;
   items.push({ seq, time: now(), kind: 'user', text: content, who: c.person.subject, ...(files.length ? { files: attachedOf(files) } : {}) });
@@ -1259,6 +1278,21 @@ on('POST', '/v1/runs/([^/]+)/messages', async (c, id) => {
   if (!run.metadata || !run.metadata['fw.bridge.member']) managerTurn(run, false);
   c.status = 202;
   return { run: id, seq };
+});
+// The budget of a run: each field that the body sets replaces the same limit for the work that follows. A finished run stays finished until a follow-up.
+const LIMITS = ['maxTurns', 'maxTokens', 'maxCostUSD', 'maxToolCalls', 'maxCallsPerTurn', 'maxRepeats', 'deadline'];
+on('PATCH', '/v1/runs/([^/]+)/budget', async (c, id) => {
+  const run = runOr404(id);
+  if (run.archived) refuse(409, ARCHIVED_REFUSAL);
+  const body = await readJson(c.req);
+  for (const k of Object.keys(body)) if (!LIMITS.includes(k)) refuse(400, `json: unknown field "${k}" of the budget`);
+  for (const k of Object.keys(body)) if (k !== 'deadline' && !(Number(body[k]) > 0)) refuse(400, `the budget: ${k} must be above 0`);
+  run.budget = { ...(run.budget || {}), ...body };
+  if (run.state === 'failed' && /^budget exceeded\b/.test(run.error || '')) run.moreRoom = true;
+  run.seq += 1;
+  run.updatedAt = now();
+  publish('run', run);
+  return { budget: run.budget, run };
 });
 on('POST', '/v1/runs/([^/]+)/approvals/([^/]+)', async (c, id, ap) => decide(id, decodeURIComponent(ap), await readJson(c.req), c.person));
 on('POST', '/v1/runs/([^/]+)/approvals/([^/]+)/rule', async (c, id, ap) => {
@@ -1299,7 +1333,10 @@ on('POST', '/v1/runs/([^/]+)/reactions', async (c, id) => {
   run.updatedAt = now();
   // Needs work on a result to check: the front sends the note to the agent
   // as a follow-up, so the run works on it again, and ends a few seconds later.
-  const review = run.metadata && run.metadata['workbench.review'] === '1';
+  const md = run.metadata || {};
+  const duty = S.duties && md['workbench.duty'] ? S.duties.get(md['workbench.duty']) : null;
+  // A result to check: the owner asked to check each result, or a duty that tells of what it found found something.
+  const review = md['workbench.review'] === '1' || !!(duty && duty.notify && duty.notify.resultWhen === 'found' && foundLine(run));
   if (review && body.reaction === 'down' && body.note && run.state === 'completed') {
     const note = String(body.note);
     items.push({ seq: items.length + 1, time: now(), kind: 'user', text: 'Needs work: ' + note, who: c.person.subject });
@@ -1359,6 +1396,7 @@ on('GET', '/v1/pages/(.+)/history', (c, p) => {
   };
 });
 on('GET', '/v1/pages/(.+)', (c, p) => {
+  if (viewerOf(c.person)) refuse(403, 'Reading the wiki needs the operator role');
   const path = decodeURIComponent(p);
   checkPath(path);
   const page = S.pages.get(path);
@@ -1604,7 +1642,7 @@ function tick() {
 // routes-door.mjs the door of the Work place.
 for (const name of ['skills.mjs', 'routes-a.mjs', 'routes-b.mjs', 'routes-c.mjs', 'routes-chat.mjs', 'routes-d.mjs', 'routes-e.mjs', 'packages.mjs', 'archive.mjs', 'routes-value.mjs', 'routes-work.mjs', 'routes-door.mjs']) {
   const mod = await import('./' + name);
-  mod.register({ on, refuse, readJson, readBody, publish, S, now, AGENTS, FLEET, admin: () => ADMIN, writePage, port: PORT });
+  mod.register({ on, refuse, readJson, readBody, publish, S, now, AGENTS, FLEET, admin: () => ADMIN, viewerOf, writePage, post, system, moveSeat, port: PORT });
 }
 
 server.listen(PORT, '127.0.0.1', () => {

@@ -23,7 +23,9 @@
 // row, #activity/<key>, so a narrow window opens it and a link reaches it.
 // A run of a duty shows the name of its duty as a chip that opens the
 // duty. GET /v1/inbox adds the failed runs and the paused duties, and the
-// questions of the runs of duties that sit on no bridge.
+// questions of the runs of duties that sit on no bridge. Such a decision
+// reads its run, so its card names the call, as the board does. A result
+// of a duty that tells only of what it finds says that it found something.
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { go, hrefOf, parseRoute } from '../lib/route';
@@ -391,6 +393,15 @@ export function useInbox(): InboxView {
   useEffect(() => {
     if (waiting) ensureResults(waiting.split(','));
   }, [waiting, runs]);
+  // A decision of a run on no bridge, such as a run of a duty, knows no call until the page reads its run.
+  // The read of a run comes from the view of the fleet and wakes no worker.
+  const bare = rows
+    .filter((r) => r.decision && !r.bridge && !r.decision.tool && r.run)
+    .map((r) => r.run!)
+    .join(',');
+  useEffect(() => {
+    if (bare) ensureRuns(bare.split(','));
+  }, [bare]);
   return inbox;
 }
 
@@ -527,12 +538,16 @@ function InboxItem({ r, on, rows }: { r: InboxRow; on: boolean; rows: InboxRow[]
   );
 }
 
+/** FOUND ends the text of the item of a result that found something, from a duty that tells only of what it finds. */
+export const FOUND = ': it found something.';
+
 /**
  * ResultCard is the card of a result to check: what the run was asked, its
  * whole answer, a link to the run, and Looks right and Needs work. A person
- * judges a result against its task, and never on a part of it. After either
- * key, the main pane moves to the next item that needs you, as after a
- * decision.
+ * judges a result against its task, and never on a part of it. A result of
+ * a duty that tells only of what it finds says so. After either key, the
+ * main pane moves to the next item that needs you, as after a decision.
+ * The headings of the answer start below the title of the card.
  */
 function ResultCard({ r, name, rows }: { r: InboxRow; name: string; rows: InboxRow[] }) {
   const run = useSelect((s) => (r.run ? s.runs[r.run] : undefined));
@@ -541,14 +556,16 @@ function ResultCard({ r, name, rows }: { r: InboxRow; name: string; rows: InboxR
   }, [r.run]);
   const title = (run && run.title) || r.reason || 'The result';
   const open = r.duty && r.run ? hrefOf({ place: 'duties', name: r.duty, run: r.run }) : r.run ? hrefOf({ place: 'chat', run: r.run }) : '';
+  const found = !!r.reason && r.reason.endsWith(FOUND);
   return (
-    <Card title={title} tone="amber" label={'A result of ' + name + ' to check'} actions={<ResultKeys run={r.run!} title={title} primary onDone={() => afterResult(r, rows)} />}>
+    <Card title={title} tone="amber" label={'A result of ' + name + (found ? ' that found something' : '') + ' to check'} actions={<ResultKeys run={r.run!} title={title} primary onDone={() => afterResult(r, rows)} />}>
+      {found && <p class="result-found">It found something.</p>}
       {run && run.input && sameWords(run.input, title) === false && (
         <p class="result-ask">
           <span class="result-ask-label">The task</span> {excerpt(plainText(run.input), 400)}
         </p>
       )}
-      {run && run.output ? <Markdown text={run.output} refs /> : <p class="inbox-said">{run ? 'The run gave no text.' : 'Loading the result.'}</p>}
+      {run && run.output ? <Markdown text={run.output} refs headings={4} /> : <p class="inbox-said">{run ? 'The run gave no text.' : 'Loading the result.'}</p>}
       {open && (
         <p>
           <a href={open}>Open the run</a>
@@ -756,7 +773,7 @@ export function ActivityMain({ item }: { item?: string }) {
       ) : asked ? (
         // A question of a seat shows as its card in the channel does: its words, a key per choice, and Your answer.
         <div class="scroll pad">
-          {asked.entry ? <AskCard key={r.key} bridge={r.bridge} e={asked.entry} who={asked.handle} body={<Markdown text={asked.entry.text} refs />} /> : <Empty>Loading the channel.</Empty>}
+          {asked.entry ? <AskCard key={r.key} bridge={r.bridge} e={asked.entry} who={asked.handle} body={<Markdown text={asked.entry.text} refs headings={4} />} /> : <Empty>Loading the channel.</Empty>}
         </div>
       ) : (
         <div class="scroll pad">

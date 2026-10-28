@@ -101,11 +101,13 @@ function useRefs(text: string): { refs?: Refs; key: string } {
 /**
  * Markdown shows a text of an agent or of the wiki, sanitized. With refs,
  * the text of a message links the bridges and the pages that it names.
+ * headings is the level of the top heading of the text, such as 4 for an
+ * answer inside a card, whose title is an h3.
  */
-export function Markdown({ text, base, handles, class: cls, refs }: { text: string; base?: string; handles?: string[]; class?: string; refs?: boolean }) {
+export function Markdown({ text, base, handles, class: cls, refs, headings }: { text: string; base?: string; handles?: string[]; class?: string; refs?: boolean; headings?: number }) {
   const r = useRefs(refs ? text : '');
   const key = (handles ? handles.join(',') : '') + '\n' + r.key;
-  const html = useMemo(() => renderMarkdown(text, { base, handles, refs: r.refs }), [text, base, key]);
+  const html = useMemo(() => renderMarkdown(text, { base, handles, refs: r.refs, headings }), [text, base, key, headings]);
   return <div class={'md' + (cls ? ' ' + cls : '')} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 

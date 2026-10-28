@@ -51,6 +51,13 @@ export interface RenderOptions {
   handles?: string[];
   /** The bridges and the pages that the page knows, so the text links their ids and paths. */
   refs?: Refs;
+  /**
+   * The level of the top heading of the text, such as 4 for an answer in a
+   * card whose title is an h3. Every heading moves down by the same steps,
+   * so the outline of a screen reader stays whole. A heading never moves
+   * up, and none goes below h6.
+   */
+  headings?: number;
 }
 
 export interface SafeLink {
@@ -160,6 +167,7 @@ export function sanitize(html: string, opts: RenderOptions = {}): string {
       KEEP_CONTENT: true,
       RETURN_DOM_FRAGMENT: true,
     }) as DocumentFragment;
+    if (opts.headings) shiftHeadings(frag, opts.headings);
     if (opts.handles && opts.handles.length) markMentions(frag, opts.handles);
     if (opts.refs) linkRefs(frag, opts.refs);
     const box = document.createElement('div');
@@ -167,6 +175,21 @@ export function sanitize(html: string, opts: RenderOptions = {}): string {
     return box.innerHTML;
   } finally {
     current = {};
+  }
+}
+
+/** shiftHeadings moves every heading of a text down, so its top heading takes the level top. */
+export function shiftHeadings(root: DocumentFragment | Element, top: number): void {
+  const heads = [...root.querySelectorAll('h1, h2, h3, h4, h5, h6')];
+  if (!heads.length) return;
+  const least = Math.min(...heads.map((h) => Number(h.tagName[1])));
+  const by = Math.max(0, Math.min(6, top) - least);
+  if (!by) return;
+  for (const h of heads) {
+    const to = document.createElement('h' + Math.min(6, Number(h.tagName[1]) + by));
+    for (const a of [...h.attributes]) to.setAttribute(a.name, a.value);
+    while (h.firstChild) to.appendChild(h.firstChild);
+    h.replaceWith(to);
   }
 }
 

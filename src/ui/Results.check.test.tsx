@@ -46,7 +46,10 @@ describe('a result to check in Activity', () => {
     expect(row.querySelector('b')!.textContent).toBe('scribe');
     expect(row.querySelector('.status-word')!.textContent).toBe('to check');
     const main = el.querySelector('.inbox-main-pane')!;
-    expect(main.querySelector('h2')!.textContent).toBe('For people who run the fleet');
+    // The heading of the answer starts below the title of its card, an h3 (F18).
+    expect(main.querySelector('.card h3')!.textContent).toBe('Release notes of yesterday');
+    expect(main.querySelector('.card .md h4')!.textContent).toBe('For people who run the fleet');
+    expect(main.querySelector('.card .md h2')).toBeNull();
     expect(main.querySelector('a[href="#duties/daily-notes/run/run-notes"]')!.textContent).toBe('Open the run');
     const key = (t: string) => [...main.querySelectorAll('button')].find((b) => b.textContent === t)!;
     await act(async () => key('Needs work').click());
