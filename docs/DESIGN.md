@@ -1229,7 +1229,9 @@ door and the lanes above it.
   green for accepted and checked, red for sent back, and grey for
   unchecked.
 - A card To check holds Needs work and Looks right as secondary keys, so
-  the board keeps no orange key. In Activity, the card of a result is the
+  the board keeps no orange key. Only a card whose check is the move of the
+  person holds them. Under Everyone, the result of another person reads
+  only. In Activity, the card of a result is the
   decision of its pane: an amber light, and Looks right as the primary key.
 - Needs work opens the note in place, with Cancel and Send back.
 

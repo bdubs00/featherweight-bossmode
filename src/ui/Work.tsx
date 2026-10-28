@@ -205,7 +205,8 @@ function CardView({ c, now, onDecided }: { c: WorkCard; now: number; onDecided: 
         <span class="clip">{whoWords(c, duty || fromWords(c, [subject, signin]), faces)}</span>
         {total > 0 && <span>{total + (c.kind === 'bridge' ? ' agents' : ' parts')}</span>}
       </span>
-      {c.stage === 'review' && run && <ResultKeys run={run} title={c.title} size="s" onDone={onDecided} />}
+      {/* Only the person whose move it is checks a result: another person, or a viewer under Everyone, reads it only. */}
+      {c.stage === 'review' && c.next === 'you' && run && <ResultKeys run={run} title={c.title} size="s" onDone={onDecided} />}
     </div>
   );
 }

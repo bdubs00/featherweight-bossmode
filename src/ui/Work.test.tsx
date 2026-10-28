@@ -317,6 +317,19 @@ describe('the board of the work', () => {
     }
   });
 
+  it('offers Looks right and Needs work only on a result whose check is the move of the person', async () => {
+    const other = card('o', 'review', { next: 'person', from: { kind: 'person', name: 'bob', via: 'page' }, links: { run: 'run-o' } });
+    const f = fakeFetch([['GET', /^\/v1\/work/, () => ({ ...BOARD, cards: [...BOARD.cards, other] })]]);
+    try {
+      const el = mount(<Work />);
+      await settle();
+      const cards = [...el.querySelectorAll('.lane-review .work-card')];
+      expect(cards.map((c) => !!c.querySelector('.result-keys'))).toEqual([true, false]);
+    } finally {
+      f.restore();
+    }
+  });
+
   it('finds the card of what Start made: its run, its bridge, or the open card of its duty', () => {
     const b: WorkBoard = { ...BOARD, cards: [...BOARD.cards, card('n', 'waiting', { kind: 'duty', links: { duty: 'notes' } })] };
     expect(cardOfMade(b, { run: 'run-w' })!.id).toBe('w');
