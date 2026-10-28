@@ -148,7 +148,8 @@ function CardView({ c, now, onDecided }: { c: WorkCard; now: number; onDecided: 
         <span class="clip">{duty || fromWords(c)}</span>
         {total > 0 && <span>{total + (c.kind === 'bridge' ? ' agents' : ' parts')}</span>}
       </span>
-      {c.stage === 'review' && run && <ResultKeys run={run} title={c.title} size="s" onDone={onDecided} />}
+      {/* A bridge to check has no one result: its operator reads the channel, then closes it or gives a new task. */}
+      {c.stage === 'review' && run && c.kind !== 'bridge' && <ResultKeys run={run} title={c.title} size="s" onDone={onDecided} />}
     </div>
   );
 }

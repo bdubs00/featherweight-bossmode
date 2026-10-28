@@ -122,6 +122,21 @@ describe('the board of the work', () => {
     expect(post.body).toEqual({ seq: 0, reaction: 'up' });
   });
 
+  it('offers no result keys on a bridge to check, whose operator closes it or gives a new task', async () => {
+    restore();
+    const bridge = card('t', 'review', { kind: 'bridge', reason: 'The seats ended their turns.', links: { bridge: 'br-2', run: 'run-seat' }, parts: { review: 2, total: 2 } });
+    const f = fakeFetch([['GET', /^\/v1\/work/, () => ({ ...BOARD, cards: [bridge] })]]);
+    calls = f.calls;
+    restore = f.restore;
+    const el = mount(<Work />);
+    await settle();
+    const lane = el.querySelector('.lane-review') as HTMLElement;
+    expect(lane.textContent).toContain('The seats ended their turns.');
+    const words = [...lane.querySelectorAll('button')].map((b) => b.textContent);
+    expect(words).not.toContain('Looks right');
+    expect(words).not.toContain('Needs work');
+  });
+
   it('lives at #work, a place of its own, and #tasks opens it too', () => {
     const r = parseRoute('#work');
     expect(r).toEqual({ place: 'work' });
