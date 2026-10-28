@@ -1596,7 +1596,7 @@ types in `src/api/value.ts`.
 | Route | Answer |
 |---|---|
 | `GET /v1/value?days=7` | The value of the window. `days` is 7, 30, or 90, and 30 without it. Another number answers 400. |
-| `PUT /v1/value/estimates` | Body `{"line", "minutes"}`. It answers the line with its `estimate`. Zero minutes removes the estimate. 404 for a line that the person does not see in 90 days, 403 for a person who does not own the agent of the line, 400 for minutes past 2400. |
+| `PUT /v1/value/estimates` | Body `{"line", "minutes"}`. It answers the line with its `estimate`. Zero minutes removes the estimate. A line that the person does not see in 90 days answers 404. A person who does not own the agent of the line gets 403. Minutes past 2400 answer 400. |
 
 The value:
 
@@ -1620,7 +1620,7 @@ The value:
   run, and no run of the manager or of the quick chat.
 - `checks` splits the done pieces by the first thumb, heart, or receipt.
   A grade of a model is no verdict.
-- `spend.atLeast` is true when runs have tokens without a price. The page
+- If runs have tokens without a price, `spend.atLeast` is true. The page
   then says at least.
-- `estimated` and `estimate` exist only when a person set the minutes of a
-  piece of a line. The page shows Not set otherwise.
+- If a person set the minutes of a piece of a line, `estimated` and
+  `estimate` exist. Otherwise the page shows Not set.
