@@ -59,7 +59,7 @@ export function Icon({ name, class: cls }: { name: IconName; class?: string }) {
 }
 
 export type GlyphName =
-  | 'tasks' | 'results' | 'activity' | 'chat' | 'bridges' | 'fleet' | 'skills' | 'routines' | 'wiki' | 'manager' | 'thumb-up' | 'thumb-down' | 'heart'
+  | 'tasks' | 'results' | 'activity' | 'chat' | 'bridges' | 'fleet' | 'skills' | 'routines' | 'knowhow' | 'wiki' | 'manager' | 'thumb-up' | 'thumb-down' | 'heart'
   | 'search' | 'close' | 'more' | 'plus' | 'back' | 'reply' | 'question' | 'check' | 'gear' | 'board' | 'clip' | 'duties' | 'history';
 
 const G: Record<GlyphName, JSX.Element> = {
@@ -75,6 +75,8 @@ const G: Record<GlyphName, JSX.Element> = {
   skills: <><path d="M12 3l9 5-9 5-9-5z" /><path d="M3 12.5l9 5 9-5" /><path d="M3 17l9 5 9-5" /></>,
   // Two arrows that turn back into each other, for the routines: work that comes round again.
   routines: <><path d="M17 3l3 3-3 3" /><path d="M4 11V9a3 3 0 0 1 3-3h13" /><path d="M7 21l-3-3 3-3" /><path d="M20 13v2a3 3 0 0 1-3 3H4" /></>,
+  // A light bulb, for Know-how: what an agent learns on the job, kept where a person can read it.
+  knowhow: <><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.5 1.1 1.3 1.1 2.2v.5h5V16c0-.9.4-1.7 1.1-2.2A6 6 0 0 0 12 3z" /><path d="M9.5 19h5" /><path d="M10.5 21.5h3" /></>,
   // A clock, for the duties: work that an agent starts on its own, on time.
   duties: <><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></>,
   // A clock with an arrow that turns back, for the past conversations.

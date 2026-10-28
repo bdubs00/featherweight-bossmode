@@ -89,7 +89,7 @@ const PLACES: PlaceItem[] = [
   { id: 'fleet', label: 'Fleet', glyph: 'fleet', href: '#fleet' },
   { id: 'duties', label: 'Duties', glyph: 'duties', href: '#duties' },
   { id: 'skills', label: 'Skills', glyph: 'skills', href: '#skills' },
-  { id: 'routines', label: 'Routines', glyph: 'routines', href: '#routines' },
+  { id: 'knowhow', label: 'Know-how', glyph: 'knowhow', href: '#knowhow' },
   { id: 'wiki', label: 'Wiki', glyph: 'wiki', href: '#pages' },
   { id: 'manager', label: 'Manager', glyph: 'manager', href: '#manager' },
 ];
@@ -110,7 +110,7 @@ const PLACE_NAMES: Record<Place, string> = {
   fleet: 'Fleet',
   duties: 'Duties',
   skills: 'Skills',
-  routines: 'Routines',
+  knowhow: 'Know-how',
   wiki: 'Wiki',
   manager: 'Manager',
   account: 'Appearance',
@@ -245,9 +245,9 @@ function AccountMenu({ onSignOut, onReach }: { onSignOut: () => void; onReach: (
 
 /**
  * placesOf gives the places of the app bar for the settings of the front.
- * Routines shows once the settings say that the front keeps routines, and
- * an older front that leaves the key out keeps the place. Work and Results
- * show once the settings say work. With work, the bar shows five places:
+ * Know-how always shows: an agent keeps notes on a front without routines,
+ * and the place hides only its tab Routines there. Work and Results show
+ * once the settings say work. With work, the bar shows five places:
  * Work, Results, Activity, Chat, and Wiki. The other places wait behind
  * More, unless the person asked for every place. The place of the screen
  * that shows stays in the bar, so the bar always lights the place you are
@@ -255,7 +255,7 @@ function AccountMenu({ onSignOut, onReach }: { onSignOut: () => void; onReach: (
  */
 export function placesOf(config: BossConfig | null, every = true, current?: Place): PlaceItem[] {
   const work = !!(config && config.work);
-  const all = PLACES.filter((it) => (it.id !== 'routines' || (config && config.routines !== false)) && ((it.id !== 'work' && it.id !== 'results') || work));
+  const all = PLACES.filter((it) => (it.id !== 'work' && it.id !== 'results') || work);
   if (!work) return all;
   const main = all.filter((it) => MAIN_PLACES.includes(it.id));
   const more = all.filter((it) => !MAIN_PLACES.includes(it.id));

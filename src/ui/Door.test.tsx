@@ -98,8 +98,8 @@ describe('placesOf with work', () => {
     expect(ids({ ...base, work: true }, false)).toEqual(['work', 'results', 'activity', 'chat', 'wiki']);
     expect(ids({ ...base, work: true }, false, 'duties')).toEqual(['work', 'results', 'activity', 'chat', 'wiki', 'duties']);
     expect(ids({ ...base, work: true }, true)).toHaveLength(11);
-    expect(morePlaces({ ...base, work: true }).map((p) => p.id)).toEqual(['bridges', 'fleet', 'duties', 'skills', 'routines', 'manager']);
-    expect(morePlaces({ ...base, work: true }, 'duties').map((p) => p.id)).toEqual(['bridges', 'fleet', 'skills', 'routines', 'manager']);
+    expect(morePlaces({ ...base, work: true }).map((p) => p.id)).toEqual(['bridges', 'fleet', 'duties', 'skills', 'knowhow', 'manager']);
+    expect(morePlaces({ ...base, work: true }, 'duties').map((p) => p.id)).toEqual(['bridges', 'fleet', 'skills', 'knowhow', 'manager']);
   });
 });
 

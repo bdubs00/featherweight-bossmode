@@ -1,0 +1,319 @@
+/* The Know-how place: the agents, the header of an agent with its numbers
+   and its switch, the cards of the changes that wait, the journal, and the
+   notes. docs/DESIGN.md, section 11.13. The screen lays out the primitives
+   and adds no color, radius, shadow, type size, or motion: every value is
+   a token. */
+
+/* ---------- the agents ---------- */
+.kh-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  padding: var(--s-1) var(--s-2) 0;
+}
+.kh-agents .scroll {
+  padding-bottom: var(--s-4);
+}
+.kh-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  min-height: var(--h-row);
+  padding: var(--s-2);
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  color: var(--ink);
+  text-decoration: none;
+}
+/* An agent that needs you sits on the wash of what needs you. */
+.kh-row.need {
+  background: var(--wash-need);
+}
+.kh-row:hover {
+  background: var(--raised);
+}
+.kh-row.sel {
+  background: var(--raised);
+  border-color: var(--raised-line);
+  box-shadow: var(--e-row);
+}
+.kh-row:focus-visible {
+  outline-offset: -2px;
+}
+.kh-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+/* A long name wraps, and the status follows its last word. */
+.kh-row-top {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.kh-row-title {
+  font-weight: 700;
+  margin-right: var(--s-2);
+}
+.kh-row-top .status {
+  vertical-align: 1px;
+  font-size: var(--t-caption);
+}
+.kh-row-meta {
+  overflow-wrap: anywhere;
+}
+
+/* ---------- the header of an agent ---------- */
+.knowhow .pane-head > h1 {
+  flex: 0 1 auto;
+}
+.kh-tabs {
+  display: flex;
+  align-self: stretch;
+}
+.kh-tabs-head {
+  height: 100%;
+}
+/* Where the header lacks the room for the tabs, they take a strip under it. */
+.kh-strip {
+  flex: none;
+  display: none;
+  align-items: stretch;
+  height: var(--h-row);
+  padding: 0 var(--s-5);
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+  overflow-x: auto;
+}
+@media (max-width: 1099px) {
+  .kh-tabs-head {
+    display: none;
+  }
+  .kh-strip {
+    display: flex;
+  }
+}
+@media (max-width: 799px) {
+  .kh-strip {
+    padding: 0 var(--s-4);
+  }
+}
+
+/* ---------- the body ---------- */
+.kh-body > * {
+  max-width: 760px;
+}
+.kh-sec-head {
+  margin-bottom: var(--s-2);
+}
+.kh-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding-bottom: var(--s-4);
+  border-bottom: 1px solid var(--line-soft);
+}
+.kh-head .kh-sec-head {
+  margin-bottom: 0;
+}
+.kh-figs {
+  gap: var(--s-2) var(--s-6);
+}
+.kh-held {
+  overflow-wrap: anywhere;
+}
+.kh-switch .check {
+  padding: var(--s-1) 0;
+}
+.kh-waiting {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  margin-top: var(--s-5);
+}
+.kh-waiting .rt-changed {
+  margin-bottom: 0;
+}
+.kh-sec {
+  margin-top: var(--s-5);
+}
+
+/* The words of a change and of an entry. */
+.kh-what {
+  overflow-wrap: anywhere;
+}
+.kh-why {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+/* The text of a note sits below the surface, as a quote of what the agent keeps. */
+.kh-text {
+  margin: 0;
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--recess);
+  box-shadow: var(--e-recess);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.kh-meta,
+.kh-runs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--s-3);
+  min-width: 0;
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+  color: var(--muted);
+}
+.kh-meta a,
+.kh-runs a {
+  color: var(--ink);
+}
+
+/* The routines of the tab line up with the header of the pane, as the notes do. */
+.kh-sec .rt-list .list-find {
+  padding: 0 0 var(--s-2);
+}
+.kh-sec .rt-group-head {
+  margin-left: 0;
+  margin-right: 0;
+}
+.kh-sec .rt-rows {
+  padding: var(--s-1) 0 0;
+}
+.kh-sec .rt-toggle {
+  width: 100%;
+  margin-left: 0;
+  margin-right: 0;
+  padding-left: 0;
+}
+
+/* ---------- What it learned ---------- */
+.kh-day + .kh-day {
+  margin-top: var(--s-4);
+}
+.kh-day-head {
+  margin-bottom: var(--s-1);
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+  font-weight: 700;
+  color: var(--muted);
+}
+.kh-entries {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kh-entry {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  gap: var(--s-1) var(--s-3);
+  align-items: start;
+  padding: var(--s-3) 0;
+  border-top: 1px solid var(--line-soft);
+}
+.kh-entry:first-child {
+  border-top: 0;
+}
+.kh-time {
+  padding-top: 2px;
+  white-space: nowrap;
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.kh-entry-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.kh-refused {
+  margin: var(--s-1) 0 0;
+}
+.kh-journal > .key {
+  margin-top: var(--s-3);
+}
+
+/* ---------- Notes ---------- */
+.kh-group + .kh-group {
+  margin-top: var(--s-3);
+}
+.kh-group-head {
+  margin-left: 0;
+}
+.kh-note-rows {
+  margin: var(--s-1) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.kh-note {
+  border-top: 1px solid var(--line-soft);
+}
+.kh-note:first-child {
+  border-top: 0;
+}
+.kh-note-head {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  min-height: var(--h-row);
+  padding: var(--s-2);
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.kh-note-head:hover {
+  background: var(--raised);
+}
+.kh-note.open > .kh-note-head {
+  background: var(--raised);
+  border-color: var(--raised-line);
+  box-shadow: var(--e-row);
+}
+.kh-note-head:focus-visible {
+  outline-offset: -2px;
+}
+.kh-note-top {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.kh-note-desc {
+  font-weight: 600;
+  margin-right: var(--s-2);
+}
+.kh-note-top .status {
+  vertical-align: 1px;
+  font-size: var(--t-caption);
+}
+.kh-note-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-2) var(--s-4);
+}
+.kh-note-body .rt-changed,
+.kh-note-body .rt-keys {
+  margin: 0;
+}
+.kh-ood {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  overflow-wrap: anywhere;
+}
+.kh-ood .led {
+  flex: none;
+  transform: translateY(-1px);
+}

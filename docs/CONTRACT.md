@@ -858,6 +858,7 @@ stream route takes the same `Authorization` header as every route.
 | `member` | `{"kind": "member", "member": "default/crew-2", "state": "live", "time"}`, or `"gone": true` in place of `state` for a member that left the view |
 | `task` | `{"kind": "task", "member": "default/crew-2", "phase": "Running", "time"}`, or `"gone": true` |
 | `routine` | `{"kind": "routine", "agent": "triage", "name": "acknowledge-a-new-ticket"}`, on every change of a routine or its evidence, at most one per routine in 2 seconds. Section 15. |
+| `knowhow` | `{"kind": "knowhow", "agent": "triage"}`, on each change of a note, the journal, the switch, or what waits, at most one per agent in 2 seconds. Section 19. |
 
 The `activity` of a `run` event carries `phrase`. The `activity` of
 `GET /v1/runs/{id}` has no `phrase`, so a screen takes the phrase from the
@@ -1840,3 +1841,94 @@ The page shows no key that the front refuses. It reads the roles of
 - A duty needs the owner role on its agent. A person who is no admin and
   owns no agent gets no New duty. A person who cannot change a duty gets
   no Run now, no Pause, and no Edit.
+
+## 24. Know-how
+
+The Know-how place reads the routes of section 5.3 of `docs/KNOWHOW.md` of
+the kernel, as the package `knowhow` of the workbench serves them
+(`routes.go`, `summary.go`, `journal.go`, and `access.go`). Those files
+are the authority for every shape below. `src/api/knowhow.ts` holds the
+calls and the types, and `fake/routes-k.mjs` serves the same shapes. The
+page never calls `GET /v1/knowhow/runs`, which is for the kernel.
+
+| Route | What the page does with it |
+|---|---|
+| `GET /v1/knowhow/notes?agent=<name>` | `{"agent", "notes": [<item>]}`. The page sends no scope and no principal, so the server lists every note that the person can read: the agent notes, the notes of the person, and, for an operator, the notes of the duties. An item is the note without its text, with `agent`, `scope` (`{"kind", "principal"}`), `revision`, and `sources` as a count. The list leaves out a note that was put away. |
+| `GET /v1/knowhow/notes/{agent}/{scope}/{name}?principal=` | The note with `text`, `sources`, and `outOfDate`. `{scope}` is `agent` or `principal`, and the name keeps its slashes. The page sends `principal` with every principal note. |
+| `PUT /v1/knowhow/notes/{agent}/{scope}/{name}?principal=` | `{"text", "ifHash", "sources"}`, with the sources of the note that the page read. The server takes `by` from the person. The answer is `{"note", "waiting"}`. A write that waits for a person answers 202 with `waiting`. A write by the access token of the fleet waits under the switch. The page then says `The change waits for a decision in What it learned.` A 412 reads the note again. The page shows the newer text above the draft, and the next Save sends the newer hash. |
+| `DELETE /v1/knowhow/notes/{agent}/{scope}/{name}?principal=&ifHash=` | Put away. The answer is 200 with `{"note"}`, or 202 with `waiting`. A 412 reads the note again. |
+| `GET /v1/knowhow/journal?agent=<name>&limit=50&before=<id>` | `{"agent", "entries": [<entry>]}`, newest first. `before` is the public id of the oldest entry that the page holds. A full page of 50 entries offers Show older. |
+| `POST /v1/knowhow/journal/{id}/undo` | No body. The answer is `{"entry", "undone"}`. The page offers Undo on an entry with `undo` and without `undoneBy`. A 409 means that a later change touched the note or the routine, or that the entry was taken back already. The page says so under the entry. |
+| `GET` and `PUT /v1/knowhow/settings/{agent}` | `{"agent", "askFirst", "review": {"on", "agent", "every", "reason"}}`. The PUT sends `{"askFirst"}`. With `review.on` false, the header says the reason, such as `The after-work review is off: no agent is set.` |
+| `GET /v1/knowhow/waiting?agent=<name>` | `{"agent", "waiting": [<change>]}`. A change holds the fields of an entry without `undo`, with `text`, `sources`, and `pin`. |
+| `GET /v1/knowhow/waiting` | **Added to the workbench** for the page: without `agent`, `{"waiting": [<change>]}` lists the changes of every agent that the person can view and read. The list of agents reads it once to mark the agents that need you. |
+| `POST /v1/knowhow/waiting/{id}` | `{"keep": true}` for Keep and `{"keep": false}` for Not now. The answer is `{"kept", "entry"}`. Not now drops the change, and a new note that waited is put away. A 409 means that the note changed since. The change stays until a person drops it, and a quiet line says so above the cards. |
+| `GET /v1/knowhow/summary?agent=<name>&days=7` | See below. |
+
+The summary of `summary.go`:
+
+- `costPerJob` holds `usd`, the mean cost of the finished runs, with
+  `runs`, `previousUsd` of the days before, and `trend`. The trend is
+  `down`, `up`, or `flat` within 5%. From 20 runs, the page adds the
+  change in percent, such as `down 9%`, and it says `about the same` for
+  `flat`.
+- `doneByRoutines` holds `runs`, `byRoutine`, and `share`, over the normal
+  runs. The page shows the share from 20 runs, such as `2% of 1,817`, and
+  counts below that, such as `4 of 12`.
+- `normal` and `heldBack` hold `runs`, `doneWell`, `byRoutine`, and
+  `costPerJobUsd`.
+- `compare` holds `enough`, `heldBack`, `normal`, `oneIn`,
+  `doneWellWithout`, `doneWellWith`, and `line`. The server applies the
+  rule of 20 and words the line. The page shows `line`. With `enough`, it
+  adds `Cost per job: $0.021 without, $0.020 with.` from the two splits.
+
+Every id of an entry or of a change is public: the id of the bucket, a
+dash, and the agent in base64url. The page treats it as opaque.
+
+A subject is `{"note", "scope", "principal"}` for a note, where `scope`
+is `agent` or `principal`, or `{"routine"}`.
+
+The rights follow `access.go`, read from `roles` of `GET /v1/whoami`. A
+person changes the notes of their own principal with the operator role.
+The agent notes and the notes of a duty need the owner role, and so does
+a routine. The page offers Edit and Put away on the notes of the person:
+their own scope, and a note that they wrote in a scope that they can
+change. It offers Undo and Keep on a change of a note or a routine that
+the person can change. Only an owner sees the switch.
+
+A 404 whose detail starts with `Know-how is off` means that the server
+keeps no know-how. The place then says `Know-how is off on this server.`,
+with the reason of the server behind a question mark. Another 404, such
+as for an agent that the person cannot view, shows in place. The tab
+Routines still reads section 15.
+
+The page reads the agent again on each `knowhow` event while a pane of the
+place shows, and every agent again after a reset.
+
+An entry of the journal:
+
+```json
+{
+  "id": "01K8R2Q5W6ZJ3N7Y0D4F9H1C2B-dHJpYWdl", "at": "2026-10-26T02:27:00Z", "agent": "triage",
+  "what": "learned",
+  "subject": { "note": "gotchas/gitea-labels.md", "scope": "agent" },
+  "why": "Two runs failed on a label with a space and passed without it.",
+  "runs": ["01K8..."], "by": "review", "undo": { "revision": 0, "after": 1 }
+}
+```
+
+The summary of triage in the fake:
+
+```json
+{
+  "agent": "triage", "days": 7, "since": "2026-10-21T05:04:43Z",
+  "costPerJob": { "usd": 0.0197, "runs": 1912, "previousUsd": 0.0215, "trend": "down" },
+  "doneByRoutines": { "runs": 1817, "byRoutine": 41, "share": 0.0226 },
+  "notesCorrected": 3,
+  "normal": { "runs": 1817, "doneWell": 1653, "byRoutine": 41, "costPerJobUsd": 0.0196 },
+  "heldBack": { "runs": 95, "doneWell": 78, "byRoutine": 0, "costPerJobUsd": 0.021 },
+  "compare": { "enough": true, "heldBack": 95, "normal": 1311, "oneIn": 15, "doneWellWithout": 0.821, "doneWellWith": 0.91,
+    "line": "Held back 1 in 15 runs. Done well: 82% without what it learned, 91% with it." }
+}
+```
+

@@ -10,6 +10,7 @@ import { ApiError, type SigninNeeded } from '../api/client';
 import { noteDecided } from './done';
 import { holdsTask } from '../lib/agents';
 import { routineChanged } from './routines';
+import { knowhowChanged } from './knowhow';
 import { sawBuild } from '../lib/build';
 
 const loading = new Map<string, Promise<unknown>>();
@@ -624,6 +625,7 @@ async function onEvent(raw: StreamEvent): Promise<void> {
   if (missed) readMissed(missed, () => missedCard(store.get(), e) === missed);
   if (e.kind === 'reset') await reload();
   if (e.kind === 'routine') routineChanged(e.data);
+  if (e.kind === 'knowhow') knowhowChanged(e.data);
   // A Task that the fleet view does not list, such as a new worker after a
   // change of Keep, brings the fleet view again, so its worker shows.
   if (e.kind === 'task') {

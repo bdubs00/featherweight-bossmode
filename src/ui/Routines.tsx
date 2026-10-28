@@ -1,14 +1,15 @@
-// The Routines place. The list pane holds the routines of every agent in
-// the order of attention: Needs you, Live, Rehearsing, Proposed, Paused,
-// then Retired behind a toggle. The main pane holds one routine with the
-// tabs Steps, Evidence, and Runbook. A routine that needs you opens on the
-// card of its sign-off. The details pane holds the week of its agent.
-// docs/DESIGN.md, section 11.9, names the screen, and docs/ROUTINES.md of
-// the kernel holds the contract. A server without routines answers the
-// list with off and its reason: the list says so once, with the reason
-// behind its question mark, the main pane says what a routine is, and a
-// routine or the week of an agent asks the server nothing, since those
-// routes answer 404 while the routines are off.
+// The routines, inside the tab Routines of the Know-how place. The tab
+// holds the routines of its agent in the order of attention: Needs you,
+// Live, Rehearsing, Proposed, Paused, then Retired behind a toggle. A
+// routine takes the main pane, with the tabs Steps, Evidence, and Runbook,
+// and its Back goes to the tab. A routine that needs you opens on the card
+// of its sign-off. The details pane holds the week of its agent.
+// docs/DESIGN.md, sections 11.9 and 11.13, names the screens, and
+// docs/ROUTINES.md of the kernel holds the contract. A server without
+// routines answers the list with off and its reason: the tab says so once,
+// with the reason behind its question mark, and a routine or the week of
+// an agent asks the server nothing, since those routes answer 404 while
+// the routines are off.
 
 import { useEffect, useLayoutEffect, useMemo, useState } from 'preact/hooks';
 import type { RoutineRecord, RoutineSummary, Standing } from '../api/routines';
@@ -48,11 +49,8 @@ import { ApiError } from '../api/client';
 import { Confirm, Markdown, Menu, type MenuItem } from './common';
 import { Glyph } from './icons';
 import { Button, Card, Chip, Field, Find, Help, Input, Led, LineLed, Mark, PaneHeader, Tabs } from './primitives';
-import { EmptyPane } from './Shell';
 import { RoutineEvidence } from './RoutineEvidence';
 
-/** The width from which two panes show side by side, as App names it. */
-const TWO_PANES = '(min-width: 800px)';
 /** The widths that hide the details pane. */
 const COLLAPSED = '(max-width: 1199px)';
 const NARROW = '(max-width: 799px)';
@@ -86,16 +84,17 @@ const routineHref = (r: RoutineRecord, tab?: RoutineTab) => hrefOf({ place: 'rou
 
 /* ---------- the list ---------- */
 
-function RoutineRow({ r, on }: { r: RoutineRecord; on: boolean }) {
+function RoutineRow({ r }: { r: RoutineRecord }) {
   const s = statusOf(r);
   const light = STATUS[s];
+  const meta = metaOf(r, Date.now(), false);
   return (
-    <a class={'rt-row' + (on ? ' sel' : '') + (s === 'needs-you' ? ' need' : '')} href={routineHref(r)} data-item aria-current={on ? 'page' : undefined}>
+    <a class={'rt-row' + (s === 'needs-you' ? ' need' : '')} href={routineHref(r)} data-item>
       <span class="rt-row-top">
         <span class="rt-row-title">{titleOf(r.routine.name)}</span>
         <Led tone={light.tone} word={light.word} struck={light.struck} />
       </span>
-      <span class="t-meta clip">{metaOf(r)}</span>
+      {meta && <span class="t-meta clip">{meta}</span>}
     </a>
   );
 }
@@ -114,11 +113,12 @@ function OffWords() {
   );
 }
 
-/** ROUTINE_IS says what a routine is, in the main pane while routines are off, so the list alone says that they are off. */
-export const ROUTINE_IS = 'A routine does work that an agent repeats, in the same steps and without the model, once a person signs it off.';
-
-/** RoutineList is the list pane: the routines in the order of attention, with Find a routine and the retired ones behind a toggle. */
-export function RoutineList({ agent, name }: { agent?: string; name?: string }) {
+/**
+ * RoutineGroups is the body of the tab Routines of an agent: its routines
+ * in the order of attention, with Find a routine and the retired ones
+ * behind a toggle.
+ */
+export function RoutineGroups({ agent }: { agent: string }) {
   const order = useRoutines((s) => s.order);
   const byKey = useRoutines((s) => s.byKey);
   const error = useRoutines((s) => s.error);
@@ -130,42 +130,31 @@ export function RoutineList({ agent, name }: { agent?: string; name?: string }) 
   useEffect(() => {
     loadRoutines().catch(() => {});
   }, []);
-  const all = useMemo(() => (order || []).map((k) => byKey[k]).filter(Boolean), [order, byKey]);
-  const current = agent && name ? keyOf(agent, name) : '';
+  const all = useMemo(() => (order || []).map((k) => byKey[k]).filter((r) => r && r.agent === agent), [order, byKey, agent]);
   const words = q.trim();
   const groups = groupsOf(words ? all.filter((r) => matchesRoutine(r, words)) : all);
   const retired = groups.find((g) => g.status === 'retired');
-  const count = all.filter((r) => r.standing !== 'retired').length;
-  const live = all.filter((r) => r.standing === 'live').length;
-  // A retired routine that the address names, or that a search finds, shows its group.
-  const showRetired = retiredOpen || !!words || (!!retired && retired.items.some((r) => keyOf(r.agent, r.routine.name) === current));
+  // A retired routine that a search finds shows its group.
+  const showRetired = retiredOpen || !!words;
   if (off) {
     return (
-      <section class="screen rt-list" aria-labelledby="routines-title">
-        <PaneHeader id="routines-title" title="Routines" />
-        <div class="scroll">
-          <div class="empty">
-            <p>
-              <OffWords />
-            </p>
-          </div>
+      <div class="rt-list">
+        <div class="empty">
+          <p>
+            <OffWords />
+          </p>
         </div>
-      </section>
+      </div>
     );
   }
   return (
-    <section class="screen rt-list" aria-labelledby="routines-title">
-      <PaneHeader id="routines-title" title="Routines" count={order ? count : undefined} countLabel={count === 1 ? '1 routine' : count + ' routines'}>
-        {order && live > 0 && (
-          <Chip label={live === 1 ? '1 routine live' : live + ' routines live'}>
-            <Led tone="green" word={live + ' live'} />
-          </Chip>
-        )}
-      </PaneHeader>
-      <div class="list-find">
-        <Find label="Find a routine" value={q} onInput={setQ} />
-      </div>
-      <div class="scroll" ref={list}>
+    <div class="rt-list" aria-label="Routines">
+      {all.length > 0 && (
+        <div class="list-find">
+          <Find label="Find a routine" value={q} onInput={setQ} />
+        </div>
+      )}
+      <div ref={list}>
         {groups
           .filter((g) => g.status !== 'retired')
           .map((g) => (
@@ -177,7 +166,7 @@ export function RoutineList({ agent, name }: { agent?: string; name?: string }) 
               <div role="list" class="rt-rows">
                 {g.items.map((r) => (
                   <div role="listitem">
-                    <RoutineRow r={r} on={keyOf(r.agent, r.routine.name) === current} />
+                    <RoutineRow r={r} />
                   </div>
                 ))}
               </div>
@@ -194,7 +183,7 @@ export function RoutineList({ agent, name }: { agent?: string; name?: string }) 
               <div role="list" class="rt-rows">
                 {retired.items.map((r) => (
                   <div role="listitem">
-                    <RoutineRow r={r} on={keyOf(r.agent, r.routine.name) === current} />
+                    <RoutineRow r={r} />
                   </div>
                 ))}
               </div>
@@ -210,40 +199,15 @@ export function RoutineList({ agent, name }: { agent?: string; name?: string }) 
         {order && all.length === 0 && <p class="empty">No routine yet.</p>}
         {order && words && groups.length === 0 && <p class="empty">No routine holds those words.</p>}
       </div>
-    </section>
+    </div>
   );
 }
 
 /* ---------- the main pane ---------- */
 
-/**
- * RoutineMain is the main pane. With a routine in the address, it shows
- * the routine. Without one, where two panes show, it opens the first
- * routine of the list, so the pane is never empty.
- */
-export function RoutineMain({ agent, name, tab }: { agent?: string; name?: string; tab: RoutineTab }) {
-  if (agent && name) return <RoutineView agent={agent} name={name} tab={tab} />;
-  return <RoutineHome />;
-}
-
-function RoutineHome() {
-  const order = useRoutines((s) => s.order);
-  const byKey = useRoutines((s) => s.byKey);
-  const error = useRoutines((s) => s.error);
-  const off = useRoutines((s) => s.off);
-  const first = useMemo(() => {
-    const g = groupsOf((order || []).map((k) => byKey[k]).filter((r) => r && r.standing !== 'retired'));
-    return g.length ? g[0].items[0] : undefined;
-  }, [order, byKey]);
-  const href = first ? routineHref(first) : '';
-  useEffect(() => {
-    if (href && typeof window.matchMedia === 'function' && window.matchMedia(TWO_PANES).matches) go(href, true);
-  }, [href]);
-  return (
-    <EmptyPane back={{ href: '#routines', label: 'Routines' }}>
-      <p>{off ? ROUTINE_IS : error && !order ? error : !order ? 'Loading the routines.' : order.length === 0 ? 'No routine yet.' : 'Pick a routine.'}</p>
-    </EmptyPane>
-  );
+/** RoutineMain is the main pane of a routine. */
+export function RoutineMain({ agent, name, tab }: { agent: string; name: string; tab: RoutineTab }) {
+  return <RoutineView agent={agent} name={name} tab={tab} />;
 }
 
 /** The room of the header of a routine: cramped puts the tabs and the status in a strip, and tight sets the title in the heading role. */
@@ -319,7 +283,8 @@ function RoutineView({ agent, name, tab }: { agent: string; name: string; tab: R
     if (routines.get().off) return;
     loadRoutine(agent, name).catch((e) => setFailed(e instanceof Error ? e.message : 'The action failed. Try it again.'));
   }, [key]);
-  const back = { href: '#routines', label: 'Routines', to: 'list' as const };
+  // The routine goes back to the tab Routines of its agent, in the same pane.
+  const back = { href: hrefOf({ place: 'knowhow', agent, tab: 'routines' }), label: 'Routines', to: 'here' as const };
   if (!rec) {
     return (
       <section class="screen routine" aria-labelledby="routine-title">

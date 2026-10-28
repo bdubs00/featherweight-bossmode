@@ -38,11 +38,11 @@ describe('shownOf', () => {
 describe('placesOf', () => {
   const base = { manager: null, placement: 'queue' as const, maxMembers: 16 };
   const ids = (c: Parameters<typeof placesOf>[0]) => placesOf(c).map((p) => p.id);
-  it('leaves out Routines for a front that keeps no routines, and keeps it for an older front that does not say', () => {
-    expect(ids({ ...base, routines: false })).not.toContain('routines');
-    expect(ids({ ...base, routines: true })).toContain('routines');
-    expect(ids(base)).toContain('routines');
-    expect(ids(null)).not.toContain('routines');
+  it('keeps Know-how where Routines was, also for a front that keeps no routines', () => {
+    expect(ids({ ...base, routines: false })).toEqual(['activity', 'chat', 'bridges', 'fleet', 'duties', 'skills', 'knowhow', 'wiki', 'manager']);
+    expect(ids(base)).toContain('knowhow');
+    expect(ids(null)).toContain('knowhow');
+    expect(ids(base)).not.toContain('routines');
   });
 });
 
@@ -59,12 +59,12 @@ describe('Shell', () => {
     const current = el.querySelector('.place[aria-current="page"]')!;
     expect(current.textContent).toContain('Teams');
     const labels = () => [...el.querySelectorAll('.place-label')].map((x) => x.textContent);
-    // Routines shows once the settings say that the front keeps routines.
-    expect(labels()).toEqual(['Activity', 'Chat', 'Teams', 'Fleet', 'Duties', 'Skills', 'Wiki', 'Manager']);
-    act(() => store.dispatch({ type: 'config', config: { manager: null, placement: 'queue', maxMembers: 16, routines: true } }));
-    expect(labels()).toEqual(['Activity', 'Chat', 'Teams', 'Fleet', 'Duties', 'Skills', 'Routines', 'Wiki', 'Manager']);
+    // Know-how takes the place of Routines, and shows whatever the settings say of routines.
+    expect(labels()).toEqual(['Activity', 'Chat', 'Teams', 'Fleet', 'Duties', 'Skills', 'Know-how', 'Wiki', 'Manager']);
+    act(() => store.dispatch({ type: 'config', config: { manager: null, placement: 'queue', maxMembers: 16, routines: false } }));
+    expect(labels()).toEqual(['Activity', 'Chat', 'Teams', 'Fleet', 'Duties', 'Skills', 'Know-how', 'Wiki', 'Manager']);
     // With work, the bar shows five places, the place of the screen, and More.
-    act(() => store.dispatch({ type: 'config', config: { manager: null, placement: 'queue', maxMembers: 16, routines: true, work: true } }));
+    act(() => store.dispatch({ type: 'config', config: { manager: null, placement: 'queue', maxMembers: 16, routines: false, work: true } }));
     expect(labels()).toEqual(['Work', 'Results', 'Activity', 'Chat', 'Wiki', 'Teams', 'More']);
     act(() => store.dispatch({ type: 'config', config: null }));
     // The count of Activity counts what needs you. The page has not read the record of the bridge yet, so its needsYou counts.
@@ -264,7 +264,7 @@ describe('the places of a person who operates no agent', () => {
     act(() => render(null, el));
     el.remove();
     const all = mount(<Shell route={{ place: 'results' }} list={null} main={<p>main</p>} details={null} onSignOut={() => {}} />);
-    expect([...all.querySelectorAll('.place-label')].map((x) => x.textContent)).toEqual(['Work', 'Results', 'Activity', 'Teams', 'Fleet', 'Duties', 'Skills', 'Routines', 'Manager', 'Fewer']);
+    expect([...all.querySelectorAll('.place-label')].map((x) => x.textContent)).toEqual(['Work', 'Results', 'Activity', 'Teams', 'Fleet', 'Duties', 'Skills', 'Know-how', 'Manager', 'Fewer']);
     localStorage.removeItem('fw.bossmode.everyPlace');
     act(() => {
       store.dispatch({ type: 'me', me: null });

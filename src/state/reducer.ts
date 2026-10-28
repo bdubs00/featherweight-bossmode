@@ -480,9 +480,11 @@ export function applyStream(state: State, ev: StreamEvent): State {
       break;
     // An event that the page read and dropped, such as a partial entry that
     // it could not read again. Only its id moves. A routine event moves only
-    // its id too: src/state/routines.ts reads the routine again.
+    // its id too: src/state/routines.ts reads the routine again. So does a
+    // knowhow event: src/state/knowhow.ts reads the agent again.
     case 'skipped':
     case 'routine':
+    case 'knowhow':
       break;
     default:
       return state;

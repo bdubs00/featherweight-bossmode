@@ -159,7 +159,7 @@ describe('More on a phone', () => {
       ['Fleet', '#fleet'],
       ['Duties', '#duties'],
       ['Skills', '#skills'],
-      ['Routines', '#routines'],
+      ['Know-how', '#knowhow'],
       ['Manager', '#manager'],
     ]);
     act(() => store.dispatch({ type: 'config', config: null }));

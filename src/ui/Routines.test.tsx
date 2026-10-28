@@ -4,7 +4,7 @@ import type { EvidenceDay, RoutineRecord } from '../api/routines';
 import type { Whoami } from '../api/types';
 import { store } from '../state/store';
 import { forgetRoutines } from '../state/routines';
-import { ROUTINE_IS, RoutineAgent, RoutineList, RoutineMain } from './Routines';
+import { RoutineAgent, RoutineGroups, RoutineMain } from './Routines';
 import { clearNotice, currentNotice } from './notice';
 import { click, fakeApi, keyNamed, mount, settle, typeIn, unmountAll, type Call } from './testkit-c';
 
@@ -126,22 +126,21 @@ function text(el: Element | null): string {
     .replace(/ ([,.])/g, '$1');
 }
 
-describe('the list of routines', () => {
-  it('groups the routines in the order of attention, with the count, the live chip, and the retired ones behind a toggle', async () => {
+describe('the tab Routines of an agent', () => {
+  it('groups the routines of the agent in the order of attention, with the retired ones behind a toggle', async () => {
     api = fakeApi(routes() as never);
-    const el = mount(<RoutineList agent="triage" name="acknowledge-a-new-ticket" />);
+    const el = mount(<RoutineGroups agent="triage" />);
     await settle();
     expect([...el.querySelectorAll('.rt-group-head span:first-child')].map(text)).toEqual(['Needs you', 'Live', 'Rehearsing', 'Proposed', 'Paused']);
-    expect(text(el.querySelector('.pane-head .chip'))).toContain('6');
-    expect(text(el.querySelector('.pane-head'))).toContain('2 live');
-    // A routine that needs you sits on the wash, with an amber count and the breathing light.
+    // The routine of another agent stays out of the tab.
+    expect(el.querySelector('.rt-row[href$="renew-a-certificate"]')).toBeNull();
+    // A routine that needs you sits on the wash, with an amber count and the breathing light. The tab names the agent, so the row does not.
     const need = el.querySelector('.rt-row.need')!;
-    expect(text(need)).toBe('Acknowledge a new ticket needs you triage, rehearsed 1,480 tickets');
-    expect(need.getAttribute('aria-current')).toBe('page');
+    expect(text(need)).toBe('Acknowledge a new ticket needs you rehearsed 1,480 tickets');
     expect(need.getAttribute('href')).toBe('#routines/triage/acknowledge-a-new-ticket');
     expect(el.querySelector('.rt-group .chip-amber')).not.toBeNull();
     expect(need.querySelector('.led-amber.breathe')).not.toBeNull();
-    expect(text(el.querySelector('.rt-row[href$="reopen-a-ticket"]'))).toContain('triage, 84% agreed over 150 tickets');
+    expect(text(el.querySelector('.rt-row[href$="reopen-a-ticket"]'))).toContain('84% agreed over 150 tickets');
     // Retired stays behind its toggle until the person opens it.
     expect(el.textContent).not.toContain('Label a printer ticket');
     const toggle = el.querySelector('.rt-toggle')!;
@@ -153,7 +152,7 @@ describe('the list of routines', () => {
 
   it('narrows the list with Find a routine, also to a retired routine', async () => {
     api = fakeApi(routes() as never);
-    const el = mount(<RoutineList />);
+    const el = mount(<RoutineGroups agent="triage" />);
     await settle();
     typeIn(el.querySelector('.find input'), 'printer');
     expect([...el.querySelectorAll('.rt-row')].map((r) => r.getAttribute('href'))).toEqual(['#routines/triage/label-a-printer-ticket']);
@@ -163,28 +162,21 @@ describe('the list of routines', () => {
 
   it('says so in place when the list does not load', async () => {
     api = fakeApi({ 'GET /v1/routines': () => ({ status: 500, body: { detail: 'The store did not answer.' } }) });
-    const el = mount(<RoutineList />);
+    const el = mount(<RoutineGroups agent="triage" />);
     await settle();
     expect(el.querySelector('[role=alert]')!.textContent).toContain('The store did not answer.');
   });
 
   it('says once that routines are off on a server that keeps none, with its reason behind the question mark', async () => {
     api = fakeApi({ 'GET /v1/routines': { routines: [], off: true, reason: 'Routines are off on this server. An admin turns them on with the setting workbench.routines.enabled.' } });
-    const list = mount(<RoutineList />);
-    const main = mount(<RoutineMain tab="steps" />);
+    const list = mount(<RoutineGroups agent="triage" />);
     await settle();
     expect(list.textContent).toContain('Routines are off.');
     click(list.querySelector('[aria-label="Where routines are turned on"]'));
     expect(list.querySelector('.help-pop')!.textContent).toBe('Routines are off on this server. An admin turns them on with the setting workbench.routines.enabled.');
-    // The main pane says what a routine is, so the two panes never say the same.
-    expect(main.textContent).not.toContain('Routines are off.');
-    expect(main.textContent).toContain(ROUTINE_IS);
-    for (const el of [list, main]) {
-      expect(el.querySelector('[role=alert]')).toBeNull();
-      expect(el.textContent).not.toMatch(/not found|No routine yet|Loading|nats|bus/);
-    }
+    expect(list.querySelector('[role=alert]')).toBeNull();
+    expect(list.textContent).not.toMatch(/not found|No routine yet|Loading|nats|bus/);
     expect(list.querySelector('.find')).toBeNull();
-    expect(list.querySelector('.pane-head .chip')).toBeNull();
     // A routine and the week of an agent answer 404 while the routines are off, so the page asks for neither.
     unmountAll();
     mount(<RoutineMain tab="steps" agent="triage" name="acknowledge-a-new-ticket" />);
@@ -201,6 +193,10 @@ describe('a routine that needs you', () => {
     await settle();
     expect(text(el.querySelector('h1'))).toBe('Acknowledge a new ticket');
     expect(text(el.querySelector('.rt-status'))).toBe('needs you');
+    // A routine goes back to the tab Routines of its agent in Know-how, in the same pane.
+    const back = el.querySelector('.pane-head .back')!;
+    expect(back.getAttribute('href')).toBe('#knowhow/triage/routines');
+    expect(back.classList.contains('to-here')).toBe(true);
     const body = el.querySelector('.rt-body')!;
     const card = body.firstElementChild!;
     expect(card.classList.contains('card')).toBe(true);

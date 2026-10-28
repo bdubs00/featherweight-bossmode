@@ -61,6 +61,8 @@ function seedQuery(seed: DutySeed | undefined): string {
 }
 export type MemberTab = 'chat' | 'run' | 'files';
 export type RoutineTab = 'steps' | 'evidence' | 'runbook';
+/** The tabs of the Know-how place: What it learned, Notes, and Routines. */
+export type KnowhowTab = 'learned' | 'notes' | 'routines';
 
 /** A skill or a tool on the Skills place. The id of a tool can hold a slash, such as github/create_issue. */
 export interface SkillItem {
@@ -83,11 +85,12 @@ export type Route =
   | { place: 'results' }
   | { place: 'skills'; item?: SkillItem; add?: boolean }
   | { place: 'routines'; agent?: string; name?: string; tab?: RoutineTab; details?: boolean }
+  | { place: 'knowhow'; agent?: string; tab?: KnowhowTab }
   | { place: 'duties'; name?: string; edit?: boolean; fresh?: boolean; seed?: DutySeed; run?: string; tab?: 'playbooks'; playbook?: string }
   | { place: 'pages'; path?: string; mode: 'tree' | 'read' | 'history' | 'edit' | 'create'; version?: number };
 
 /** The places of the app bar. */
-export type Place = 'work' | 'results' | 'activity' | 'chat' | 'bridges' | 'fleet' | 'duties' | 'skills' | 'routines' | 'wiki' | 'manager' | 'account';
+export type Place = 'work' | 'results' | 'activity' | 'chat' | 'bridges' | 'fleet' | 'duties' | 'skills' | 'knowhow' | 'wiki' | 'manager' | 'account';
 
 /** The column that a narrow window shows for a route. */
 export type Column = 'list' | 'main' | 'details';
@@ -145,10 +148,19 @@ export function parseRoute(hash: string): Route {
       if (rest[0] === 'add' && rest.length === 1) return { place: 'skills', add: true };
       if ((rest[0] === 'skill' || rest[0] === 'tool') && rest.length > 1 && rest.slice(1).join('/')) return { place: 'skills', item: { kind: rest[0], id: rest.slice(1).map(dec).join('/') } };
       return { place: 'skills' };
+    // #knowhow is the place, #knowhow/<agent> what an agent learned, and
+    // /notes or /routines after it the other tabs.
+    case 'knowhow': {
+      if (!rest[0]) return { place: 'knowhow' };
+      const agent = dec(rest[0]);
+      return rest[1] === 'notes' || rest[1] === 'routines' ? { place: 'knowhow', agent, tab: rest[1] } : { place: 'knowhow', agent };
+    }
     // #routines/<agent>/<name> is a routine, with /evidence or /runbook for
-    // a tab, and /agent for the week of its agent in a narrow window.
+    // a tab, and /agent for the week of its agent in a narrow window. The
+    // routines live in the tab Routines of Know-how, so #routines alone
+    // opens that tab.
     case 'routines': {
-      if (!rest[0] || !rest[1]) return { place: 'routines' };
+      if (!rest[0] || !rest[1]) return { place: 'knowhow', tab: 'routines' };
       const base = { place: 'routines' as const, agent: dec(rest[0]), name: dec(rest[1]) };
       if (rest[2] === 'agent') return { ...base, details: true };
       if (rest[2] === 'evidence' || rest[2] === 'runbook') return { ...base, tab: rest[2] };
@@ -240,6 +252,11 @@ export function hrefOf(r: Route): string {
     case 'skills':
       if (r.add) return '#skills/add';
       return r.item ? '#skills/' + r.item.kind + '/' + encPath(r.item.id) : '#skills';
+    case 'knowhow': {
+      if (!r.agent) return r.tab === 'routines' ? '#routines' : '#knowhow';
+      const base = '#knowhow/' + encodeURIComponent(r.agent);
+      return r.tab === 'notes' || r.tab === 'routines' ? base + '/' + r.tab : base;
+    }
     case 'routines': {
       if (!r.agent || !r.name) return '#routines';
       const base = '#routines/' + encodeURIComponent(r.agent) + '/' + encodeURIComponent(r.name);
@@ -294,7 +311,8 @@ export function placeOf(r: Route): Place {
     case 'skills':
       return 'skills';
     case 'routines':
-      return 'routines';
+    case 'knowhow':
+      return 'knowhow';
     case 'duties':
       return 'duties';
     case 'appearance':
@@ -326,6 +344,8 @@ export function columnOf(r: Route): Column {
     case 'routines':
       if (r.name) return r.details ? 'details' : 'main';
       return 'list';
+    case 'knowhow':
+      return r.agent ? 'main' : 'list';
     case 'duties':
       if (r.tab === 'playbooks') return r.playbook ? 'main' : 'list';
       return r.name || r.fresh ? 'main' : 'list';
@@ -358,7 +378,10 @@ export function parentOf(r: Route): Route {
       return r.item || r.add ? { place: 'skills' } : { place: 'home' };
     case 'routines':
       if (r.agent && r.name && r.details) return { place: 'routines', agent: r.agent, name: r.name };
-      return r.name ? { place: 'routines' } : { place: 'home' };
+      // A routine goes back to the tab Routines of its agent.
+      return r.agent && r.name ? { place: 'knowhow', agent: r.agent, tab: 'routines' } : { place: 'home' };
+    case 'knowhow':
+      return r.agent ? { place: 'knowhow' } : { place: 'home' };
     case 'duties':
       if (r.tab === 'playbooks') return r.playbook ? { place: 'duties', tab: 'playbooks' } : { place: 'home' };
       if (r.name && (r.edit || r.run)) return { place: 'duties', name: r.name };

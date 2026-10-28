@@ -38,7 +38,11 @@ describe('routes', () => {
     ['#skills/add', { place: 'skills', add: true }],
     ['#skills/skill/ansible-style', { place: 'skills', item: { kind: 'skill', id: 'ansible-style' } }],
     ['#skills/tool/github/create_issue', { place: 'skills', item: { kind: 'tool', id: 'github/create_issue' } }],
-    ['#routines', { place: 'routines' }],
+    ['#knowhow', { place: 'knowhow' }],
+    ['#knowhow/triage', { place: 'knowhow', agent: 'triage' }],
+    ['#knowhow/identity%20desk/notes', { place: 'knowhow', agent: 'identity desk', tab: 'notes' }],
+    ['#knowhow/triage/routines', { place: 'knowhow', agent: 'triage', tab: 'routines' }],
+    ['#routines', { place: 'knowhow', tab: 'routines' }],
     ['#routines/triage/acknowledge-a-new-ticket', { place: 'routines', agent: 'triage', name: 'acknowledge-a-new-ticket' }],
     ['#routines/triage/acknowledge-a-new-ticket/evidence', { place: 'routines', agent: 'triage', name: 'acknowledge-a-new-ticket', tab: 'evidence' }],
     ['#routines/identity%20desk/reset/runbook', { place: 'routines', agent: 'identity desk', name: 'reset', tab: 'runbook' }],
@@ -115,18 +119,28 @@ describe('routes', () => {
     expect(parentOf({ place: 'chat', fresh: true })).toEqual({ place: 'chat' });
   });
 
-  it('gives the Routines place its columns: the list, a routine, and the week of its agent', () => {
+  it('gives a routine its columns inside Know-how: the agents, a routine, and the week of its agent', () => {
     const r = { place: 'routines' as const, agent: 'triage', name: 'ack' };
-    expect(placeOf({ place: 'routines' })).toBe('routines');
-    expect(columnOf({ place: 'routines' })).toBe('list');
+    expect(placeOf(r)).toBe('knowhow');
     expect(columnOf(r)).toBe('main');
     expect(columnOf({ ...r, tab: 'evidence' })).toBe('main');
     expect(columnOf({ ...r, details: true })).toBe('details');
     expect(parentOf({ ...r, details: true })).toEqual(r);
-    expect(parentOf({ ...r, tab: 'runbook' })).toEqual({ place: 'routines' });
-    expect(parentOf({ place: 'routines' })).toEqual({ place: 'home' });
-    expect(parseRoute('#routines/triage')).toEqual({ place: 'routines' });
+    // A routine goes back to the tab Routines of its agent.
+    expect(parentOf({ ...r, tab: 'runbook' })).toEqual({ place: 'knowhow', agent: 'triage', tab: 'routines' });
+    expect(parseRoute('#routines/triage')).toEqual({ place: 'knowhow', tab: 'routines' });
     expect(parseRoute('#routines/triage/ack/steps')).toEqual(r);
+  });
+
+  it('gives the Know-how place its columns: the agents, then an agent with its tabs', () => {
+    expect(placeOf({ place: 'knowhow' })).toBe('knowhow');
+    expect(columnOf({ place: 'knowhow' })).toBe('list');
+    expect(columnOf({ place: 'knowhow', agent: 'triage', tab: 'notes' })).toBe('main');
+    expect(parentOf({ place: 'knowhow', agent: 'triage', tab: 'notes' })).toEqual({ place: 'knowhow' });
+    expect(parentOf({ place: 'knowhow' })).toEqual({ place: 'home' });
+    // What it learned is the tab of the bare address of an agent.
+    expect(hrefOf({ place: 'knowhow', agent: 'triage', tab: 'learned' })).toBe('#knowhow/triage');
+    expect(parseRoute('#knowhow/triage/whatever')).toEqual({ place: 'knowhow', agent: 'triage' });
   });
 
   it('gives the Duties place its routes and columns: the list, a new duty, a duty, and its editor', () => {
