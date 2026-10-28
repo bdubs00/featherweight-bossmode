@@ -20,7 +20,7 @@ import { forgetProfiles, useProfile } from '../state/profiles';
 import { forgetQueued, useQueued } from '../state/queued';
 import { closed, loadAgentSkills, loadChats, loadSkills, rereadRun } from '../state/actions';
 import { slashCommands } from '../state/people';
-import { runStatus } from '../lib/presence';
+import { atLimit, runStatus } from '../lib/presence';
 import { go, hrefOf } from '../lib/route';
 import { parseSlash } from '../lib/mention';
 import { ago, since } from '../lib/words';
@@ -39,6 +39,7 @@ import { ContinuedFrom, Conversation, startRun, takeUpOf, usePoll, useTranscript
 import { useResult } from './RunPane';
 import { FollowBox, Msg, Quiet } from './Thread';
 import { useLiveAnswer } from './Live';
+import { MoreRoom } from './MoreRoom';
 import { Typing, typingPhrase } from './Typing';
 import { Avatar, Button, Chip, Find, Help, Led, Mark, PaneHeader } from './primitives';
 import { Menu } from './common';
@@ -533,7 +534,12 @@ function ChatRun({ chat, runId }: { chat: QuickChat; runId: string }) {
           <AttachedFiles files={sent.files} />
         </Msg>
       )}
-      {stopped && <Quiet tone="grey">{archived ? ARCHIVED_LINE : 'Stopped. Your next message starts a new chat.'}</Quiet>}
+      {/* A chat at a limit of its budget did nothing wrong: Continue with more room goes on with it. */}
+      {stopped && run && !archived && atLimit(run) ? (
+        <MoreRoom run={run} next="Your next message starts a new chat." />
+      ) : (
+        stopped && <Quiet tone="grey">{archived ? ARCHIVED_LINE : 'Stopped. Your next message starts a new chat.'}</Quiet>
+      )}
     </>
   );
   const title = run ? chatTitle(run) : sent ? chatTitle({ input: sent.text || sent.files.map((f) => f.name).join(', ') }) : 'Chat';

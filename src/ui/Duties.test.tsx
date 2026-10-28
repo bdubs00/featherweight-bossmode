@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { act } from 'preact/test-utils';
 import type { Duty, DutyRun, Whoami } from '../api/types';
 import { store } from '../state/store';
-import { forgetDuties } from '../state/duties';
+import { forgetDuties, loadInbox } from '../state/duties';
 import { nextShort, nextWords } from '../lib/duties';
 import { hrefOf } from '../lib/route';
 import { DUTY_IS, DutyList, DutyMain } from './Duties';
@@ -447,15 +447,77 @@ describe('the page of a duty', () => {
     expect(currentSaid()).toBe('Deleted the duty daily-report.');
   });
 
-  it('offers only Run now to a person who cannot change the duty', async () => {
+  it('offers no key to a person who cannot change the duty, such as a viewer, as the server refuses each (F32)', async () => {
     act(() => store.dispatch({ type: 'me', me: BOB }));
     api = fakeApi(one(REPORT));
-    let el = mount(<DutyMain name="daily-report" />);
+    const el = mount(<DutyMain name="daily-report" />);
     await settle();
-    expect(keyNamed(el, 'Run now')).toBeTruthy();
+    expect(keyNamed(el, 'Run now')).toBeUndefined();
     expect(keyNamed(el, 'Pause')).toBeUndefined();
     expect(keyNamed(el, 'Edit')).toBeUndefined();
     expect(el.querySelector('button[aria-label="More"]')).toBeNull();
+    expect(el.querySelector('.duty-keys')).toBeNull();
+  });
+
+  it('offers no New duty to a person who owns no agent, as a duty needs the owner of its agent (F32)', async () => {
+    act(() => store.dispatch({ type: 'me', me: BOB }));
+    api = fakeApi(listOf([REPORT]));
+    const el = mount(<DutyList />);
+    await settle();
+    expect(el.querySelector('a[href="#duties/new"]')).toBeNull();
+    unmountAll();
+    api.restore();
+    api = fakeApi(listOf([]));
+    const empty = mount(<DutyList />);
+    await settle();
+    expect(text(empty)).toContain(DUTY_IS);
+    expect(empty.querySelector('a[href="#duties/new"]')).toBeNull();
+  });
+
+  it('shows the verdict of each result of a duty that asks to check each one: to check, accepted, sent back, or unchecked (F20)', async () => {
+    const runs: DutyRun[] = [
+      { at: ago(10), slot: ago(10), run: '01KWAIT', state: 'completed', costUSD: 0.1 },
+      { at: ago(20), slot: ago(20), run: '01KUP', state: 'completed', costUSD: 0.1 },
+      { at: ago(30), slot: ago(30), run: '01KDOWN', state: 'completed', costUSD: 0.1 },
+      { at: ago(40), slot: ago(40), run: '01KNONE', state: 'completed', costUSD: 0.1 },
+      { at: ago(50), slot: ago(50), run: '01KFAIL', state: 'failed', reason: 'The run failed.' },
+    ];
+    const notes = { ...REPORT, review: true };
+    const runOf = (id: string, extra: object) => ({ id, agent: 'scribe', state: 'completed', seq: 3, createdAt: ago(60), updatedAt: ago(60), ...extra });
+    api = fakeApi({
+      ...one(notes, runs),
+      'GET /v1/inbox': { items: [{ kind: 'result', run: '01KWAIT', duty: 'daily-report', agent: 'scribe', text: 'The report is ready to check.', since: ago(10) }] },
+      'GET /v1/runs/01KWAIT': runOf('01KWAIT', { metadata: { 'workbench.review': '1' } }),
+      'GET /v1/runs/01KUP': runOf('01KUP', { reactions: { up: 1 } }),
+      'GET /v1/runs/01KDOWN': runOf('01KDOWN', { reactions: { down: 1 } }),
+      'GET /v1/runs/01KNONE': runOf('01KNONE', {}),
+      'GET /v1/runs/01KFAIL': runOf('01KFAIL', { state: 'failed' }),
+    });
+    await act(async () => {
+      await loadInbox();
+    });
+    const el = mount(<DutyMain name="daily-report" />);
+    await settle();
+    const words = [...el.querySelectorAll('.duty-run > .status .status-word')].map((w) => w.textContent);
+    expect(words).toEqual(['to check', 'accepted', 'sent back', 'unchecked', 'failed']);
+  });
+
+  it('brings the line of the run that the address opens to the top of the pane (L9)', async () => {
+    const seen: { el: Element; arg: unknown }[] = [];
+    const was = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (this: Element, arg?: unknown) {
+      seen.push({ el: this, arg });
+    } as typeof was;
+    try {
+      api = fakeApi({ ...one(REPORT, [{ at: ago(10), slot: ago(10), run: '01KOPEN', state: 'completed', costUSD: 0.1 }]), 'GET /v1/runs/01KOPEN': { id: '01KOPEN', agent: 'scribe', state: 'completed', seq: 3, createdAt: ago(20), updatedAt: ago(10) } });
+      mount(<DutyMain name="daily-report" run="01KOPEN" />);
+      await settle();
+      const line = seen.find((x) => x.el.classList.contains('duty-run'));
+      expect(line).toBeTruthy();
+      expect(line!.arg).toEqual({ block: 'start' });
+    } finally {
+      Element.prototype.scrollIntoView = was;
+    }
   });
 
   it('shows a duty that the server imported as any duty, with the line of its origin and every key', async () => {

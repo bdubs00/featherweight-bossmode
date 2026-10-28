@@ -38,7 +38,8 @@ import { askOfRun } from '../lib/duties';
 import { Button, Chip, Find, Help, IconButton, Led, Mark, PaneHeader } from './primitives';
 import { Glyph } from './icons';
 import { PastConversations } from './History';
-import type { Tone } from '../lib/presence';
+import { atLimit, type Tone } from '../lib/presence';
+import { MoreRoom } from './MoreRoom';
 
 /** The width from which two panes show side by side, as App names it. */
 const TWO_PANES = '(min-width: 800px)';
@@ -558,7 +559,7 @@ export function AgentChat({ agent }: { agent: string }) {
             t={t}
             agentLabel={agent}
             live={live}
-            tail={archived ? <Quiet tone="grey">{ARCHIVED_LINE}</Quiet> : undefined}
+            tail={archived ? <Quiet tone="grey">{ARCHIVED_LINE}</Quiet> : run && atLimit(run) ? <MoreRoom run={run} next="Your next message starts a new conversation." /> : undefined}
             head={<ContinuedFrom run={run} onOpen={(id) => open(id)} />}
           />
         ) : (

@@ -253,3 +253,19 @@ button.brow:focus-visible {
   margin: var(--s-2) auto var(--s-3);
   max-width: 560px;
 }
+
+/* A chat that stopped at a limit of its budget: the line of the limit, then
+   Continue with more room in the middle of the thread, as a system line. */
+.more-room-do {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  padding: 0 var(--s-5) var(--s-2);
+  text-align: center;
+}
+.more-room-do .field {
+  max-width: 220px;
+  text-align: left;
+}
