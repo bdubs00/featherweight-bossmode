@@ -1168,6 +1168,7 @@ The page never shows pool, member, job, run id, or Task in these places.
 | the name of the person on a card of the person, such as `alice` | change | `You`, and `Manager for you` | ux walk |
 | the name of a duty under a card whose title is that name | change | the agent that does it, such as `Scribe` | ux walk |
 | new | add | `Show all <n>` and `Show fewer` under Done, and `Try again` beside `The board did not load.` | ux walk |
+| new | add | on a board with no task, the sentence of the board, such as `No work in the last 7 days.`, and the key `Say what you need done` | ux walk |
 | new | add | the verdicts of a done card: `accepted`, `checked`, `sent back`, and `unchecked` | integration |
 | new | add | the parts of a card: `5 agents` for a team, `12 parts` for the rest | integration |
 | new | add | `Loading the board.` and `The board did not load.` | integration |

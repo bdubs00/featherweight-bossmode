@@ -1215,7 +1215,10 @@ door and the lanes above it.
   title is the link, in ink, underlined on hover, and the link covers the
   whole card. A lane is one stop of the Tab key, and the arrows move
   between its cards. Done shows its five newest cards and the quiet key
-  `Show all <n>`. A card that needs you takes `--wash-need`. A
+  `Show all <n>`. An empty lane has a still grey light, because a lit or
+  breathing light says that something is there. A board with no task says
+  its sentence above the lanes, with a key that takes the focus to the
+  door. A card that needs you takes `--wash-need`. A
   lost card has a dashed edge. A done card shows its verdict with a light:
   green for accepted and checked, red for sent back, and grey for
   unchecked.

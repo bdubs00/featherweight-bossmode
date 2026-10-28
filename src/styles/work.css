@@ -196,3 +196,7 @@
     min-height: var(--h-row);
   }
 }
+/* A board with no task says so above its empty lanes, with the key that goes to the door. */
+.work-none {
+  padding: 0 0 var(--s-4);
+}

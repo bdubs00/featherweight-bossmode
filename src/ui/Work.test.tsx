@@ -259,6 +259,22 @@ describe('the board of the work', () => {
     expect(document.activeElement).toBe(key('Needs work'));
   });
 
+  it('gives an empty lane a still grey light, and a board with no task the key to the door', async () => {
+    const empty: WorkBoard = { sentence: 'No work in the last 7 days.', days: 7, lanes: BOARD.lanes.map((l) => ({ stage: l.stage, count: 0, yours: 0 })), cards: [] };
+    const f = fakeFetch([['GET', /^\/v1\/work/, () => empty]]);
+    try {
+      const el = mount(<Work />);
+      await settle();
+      expect(el.querySelectorAll('.work-lane-head .led-grey').length).toBe(6);
+      expect(el.querySelector('.work-lane-head .breathe')).toBeNull();
+      expect(el.querySelector('.work-none')!.textContent).toContain('No work in the last 7 days.');
+      await act(async () => [...el.querySelectorAll('button')].find((b) => b.textContent === 'Say what you need done')!.click());
+      expect(document.activeElement).toBe(el.querySelector('#door-words'));
+    } finally {
+      f.restore();
+    }
+  });
+
   it('lives at #work, a place of its own, and #tasks opens it too', () => {
     const r = parseRoute('#work');
     expect(r).toEqual({ place: 'work' });

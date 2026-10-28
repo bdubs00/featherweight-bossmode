@@ -219,7 +219,8 @@ function LaneView({ stage, cards, count, oldest, now, onDecided }: { stage: Work
     <section class={'work-lane lane-' + stage} aria-labelledby={id}>
       <header class="work-lane-head">
         <h3 id={id} tabIndex={-1}>
-          <Led tone={lane.tone} word={lane.word} still={stage !== 'needs-you'} />
+          {/* An empty lane is a still grey light: a lit or breathing light says that something is there. */}
+          <Led tone={count > 0 ? lane.tone : 'grey'} word={lane.word} still={stage !== 'needs-you' || count === 0} />
         </h3>
         <Chip tone={stage === 'needs-you' && count > 0 ? 'amber' : 'plain'} label={count === 1 ? '1 task' : count + ' tasks'}>
           {count}
@@ -289,12 +290,30 @@ export function WorkBoardView({ board, failed, onDecided, onRetry }: { board: Wo
     );
   if (!board) return <p class="t-meta work-loading">Loading the board.</p>;
   return (
-    <div class="work-board">
-      {board.lanes.map((l) => (
-        <LaneView key={l.stage} stage={l.stage} count={l.count} oldest={l.oldest} cards={board.cards.filter((c) => c.stage === l.stage)} now={now} onDecided={onDecided} />
-      ))}
-    </div>
+    <>
+      {board.cards.length === 0 && (
+        <div class="empty work-none">
+          <p>{board.sentence || 'No tasks yet.'}</p>
+          <Button size="s" onClick={focusDoor}>
+            Say what you need done
+          </Button>
+        </div>
+      )}
+      <div class="work-board">
+        {board.lanes.map((l) => (
+          <LaneView key={l.stage} stage={l.stage} count={l.count} oldest={l.oldest} cards={board.cards.filter((c) => c.stage === l.stage)} now={now} onDecided={onDecided} />
+        ))}
+      </div>
+    </>
   );
+}
+
+/** focusDoor gives the focus to the field of the door, for a board with no task. */
+function focusDoor(): void {
+  const box = document.getElementById('door-words');
+  if (!box) return;
+  box.scrollIntoView({ block: 'center', behavior: smooth() });
+  box.focus({ preventScroll: true });
 }
 
 /** Work is the place Work: the line on top, the door, then the board. The header counts the open tasks. */
