@@ -1334,9 +1334,8 @@ on('POST', '/v1/runs/([^/]+)/reactions', async (c, id) => {
   // Needs work on a result to check: the front sends the note to the agent
   // as a follow-up, so the run works on it again, and ends a few seconds later.
   const md = run.metadata || {};
-  const duty = S.duties && md['workbench.duty'] ? S.duties.get(md['workbench.duty']) : null;
   // A result to check: the owner asked to check each result, or a duty that tells of what it found found something.
-  const review = md['workbench.review'] === '1' || !!(duty && duty.notify && duty.notify.resultWhen === 'found' && foundLine(run));
+  const review = md['workbench.review'] === '1' || (md['workbench.found'] === '1' && !!foundLine(run));
   if (review && body.reaction === 'down' && body.note && run.state === 'completed') {
     const note = String(body.note);
     items.push({ seq: items.length + 1, time: now(), kind: 'user', text: 'Needs work: ' + note, who: c.person.subject });

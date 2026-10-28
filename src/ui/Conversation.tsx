@@ -15,6 +15,7 @@ import type { Fleet, Item, NewRun, Result, Run } from '../api/types';
 import { store, useSelect } from '../state/store';
 import { stepOf, type Step } from '../state/thread';
 import { decisionOf } from '../lib/decision';
+import { atLimit } from '../lib/presence';
 import { whoName } from '../lib/lines';
 import { showError } from './notice';
 import { Markdown } from './common';
@@ -408,6 +409,8 @@ export function Conversation(props: ConversationProps) {
   // An archived run waits for nothing: its worker is gone, so it takes no decision.
   const pending = run && !run.archived ? decisionOf(run, props.result) : null;
   const blocks = blocksOf(t.items);
+  // The end of a run that stopped at a limit of its budget is no failure: the line of the limit below says what happened.
+  const limitEnd = run && atLimit(run) ? [...t.items].reverse().find((x) => x.kind === 'end') : undefined;
   const live = props.live;
   const face = <Mark agent={agent} size={32} />;
   let prev: Item | null = null;
@@ -491,7 +494,7 @@ export function Conversation(props: ConversationProps) {
             );
           case 'end':
             // The end of a turn says nothing that the answer above it does not, unless the turn failed.
-            if (!it.isError) return null;
+            if (!it.isError || it === limitEnd) return null;
             prev = null;
             return (
               <Quiet tone="red" at={it.time} err>

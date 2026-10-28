@@ -653,7 +653,7 @@ export function register({ on, refuse, readJson, now, AGENTS, admin, S, publish 
     S.runs.set(e.run, {
       id: e.run, agent: 'ops', title: 'Check the web hosts for drift', state: 'completed', seq: 5, origin: 'duty', principal: 'duty:check-the-web-hosts-for-drift',
       input: 'Check the web hosts for drift from their Ansible roles.', output,
-      metadata: { 'workbench.duty': 'check-the-web-hosts-for-drift', 'fw.title': 'Check the web hosts for drift' },
+      metadata: { 'workbench.duty': 'check-the-web-hosts-for-drift', 'workbench.found': '1', 'fw.title': 'Check the web hosts for drift' },
       createdAt: e.slot, updatedAt: e.at, member: 'default/ops-0', usage: { turns: 3, costUSD: e.costUSD },
     });
     S.transcripts.set(e.run, [{ seq: 1, time: e.slot, kind: 'user', text: 'Check the web hosts for drift from their Ansible roles.', who: 'duty:check-the-web-hosts-for-drift' }, { seq: 2, time: e.at, kind: 'assistant', text: output }]);
@@ -1104,7 +1104,7 @@ export function register({ on, refuse, readJson, now, AGENTS, admin, S, publish 
     for (const r of S.runs.values()) {
       const duty = (r.metadata || {})['workbench.duty'] || '';
       const d = duty ? D.get(duty) : null;
-      if (!inReview(r, d)) continue;
+      if (!inReview(r)) continue;
       const found = (r.metadata || {})['workbench.review'] !== '1' && !!foundLine(r);
       const title = r.title || (d && d.title) || 'A result';
       items.push({ kind: 'result', run: r.id, approval: '', duty, agent: r.agent, bridge: '', text: found ? title + ': it found something.' : title + ' is ready to check.', since: r.updatedAt });

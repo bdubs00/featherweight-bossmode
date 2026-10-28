@@ -791,12 +791,26 @@ function DutyRunPane({ runId, who }: { runId: string; who: string }) {
   const wakes = useSelect((s) => awakeFor(selectFacts(s), s.runs[runId]) === false) && !archived;
   const end = [...t.items].reverse().find((x) => x.kind === 'end');
   const box = useRef<HTMLElement>(null);
-  // The run opens in sight: its line comes to the top of the pane, and again once its result arrives and the pane grows.
+  // The run opens in sight: its line comes to the top of the pane, and
+  // again while the page around it settles, such as when its result
+  // arrives, until the person scrolls, types, or touches the pane.
   const arrived = !!res || t.items.length > 0;
   useEffect(() => {
     const el = box.current;
     const line = el && (el.closest('.duty-run') as HTMLElement | null);
-    if (line && typeof line.scrollIntoView === 'function') line.scrollIntoView({ block: 'start' });
+    if (!line || typeof line.scrollIntoView !== 'function') return;
+    const pane = line.closest('.scroll');
+    let moved = false;
+    const mine = () => (moved = true);
+    const events = ['wheel', 'touchstart', 'keydown', 'mousedown'];
+    for (const e of events) pane && pane.addEventListener(e, mine, { passive: true });
+    const align = () => !moved && line.isConnected && line.scrollIntoView({ block: 'start' });
+    align();
+    const timers = [300, 1000].map((ms) => setTimeout(align, ms));
+    return () => {
+      for (const t of timers) clearTimeout(t);
+      for (const e of events) pane && pane.removeEventListener(e, mine);
+    };
   }, [runId, arrived]);
   return (
     <section class="duty-runpane" id={'duty-run-' + runId} aria-label={'The run of ' + who} ref={box}>

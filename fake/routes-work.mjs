@@ -73,16 +73,16 @@ export function foundLine(r) {
 
 /**
  * inReview reports whether a run waits for a person to check its result: it
- * ended well and has no reaction, and its owner asked to check each result,
- * or its duty tells of a result only when it finds something and it found
- * something.
+ * ended well and has no reaction, and its owner asked to check each result
+ * (the metadata workbench.review), or its duty tells of a result only when
+ * it finds something (workbench.found) and it found something.
  */
-export function inReview(r, d) {
+export function inReview(r) {
   const md = r.metadata || {};
   const re = r.reactions || {};
   if (r.state !== 'completed' || re.up > 0 || re.down > 0 || re.heart > 0) return false;
   if (md['workbench.review'] === '1') return true;
-  return !!(d && d.notify && d.notify.resultWhen === 'found' && foundLine(r));
+  return md['workbench.found'] === '1' && !!foundLine(r);
 }
 
 /** verdictOf is the verdict of a run that ended well: a person first, then the done check of the agent. */
@@ -94,8 +94,8 @@ function verdictOf(r) {
   return 'unchecked';
 }
 
-/** runPart is the stage of one run, as the workbench words it. d is the duty of the run, if any. */
-function runPart(r, d) {
+/** runPart is the stage of one run, as the workbench words it. */
+function runPart(r) {
   const p = { run: r.id, since: r.updatedAt, approval: '', lost: false };
   const open = !['completed', 'failed', 'canceled'].includes(r.state);
   if (r.archived && open) return { ...p, stage: 'stopped', lost: true, reason: 'Its worker was replaced before it ended, so it cannot go on.' };
@@ -111,7 +111,7 @@ function runPart(r, d) {
     case 'suspended':
       return { ...p, stage: 'working', reason: r.activity && r.activity.tool ? 'Runs ' + r.activity.tool + '.' : 'Works.', since: r.createdAt };
     case 'completed': {
-      if (inReview(r, d)) return { ...p, stage: 'review', reason: foundLine(r) || 'A result to check.' };
+      if (inReview(r)) return { ...p, stage: 'review', reason: foundLine(r) || 'A result to check.' };
       const verdict = verdictOf(r);
       const reason = { accepted: 'Accepted.', checked: 'Its done check passed.', 'sent-back': 'Sent back.', unchecked: 'Answered.' }[verdict];
       return { ...p, stage: 'done', reason, verdict };
@@ -256,7 +256,7 @@ export function board(S, me, { days = 7, all = false } = {}) {
       }
       if (r) card.title = r.title || card.title;
       let p;
-      if (r && e.state !== 'failed') p = runPart(r, d);
+      if (r && e.state !== 'failed') p = runPart(r);
       else if (e.state === 'retrying') p = { stage: 'waiting', reason: 'Goes again soon.', since: e.at };
       else if (e.state === 'failed') p = { stage: 'stopped', reason: e.reason || 'Stopped.', since: e.at, run: e.run };
       else if (e.state === 'input-required') p = { stage: 'needs-you', reason: 'Waits for you.', since: e.at, run: e.run };
@@ -325,7 +325,7 @@ export function board(S, me, { days = 7, all = false } = {}) {
   for (const c of cards) {
     const g = S.letGo && S.letGo.get(c.id);
     if (!g || c.stage !== 'stopped') continue;
-    Object.assign(c, { stage: 'done', verdict: 'let-go', reason: 'Let go by ' + g.name + '.', since: g.at, ended: g.at, next: '' });
+    Object.assign(c, { stage: 'done', verdict: 'let-go', reason: 'Let go by ' + (g.by === me ? 'you' : g.name) + '.', since: g.at, ended: g.at, next: '' });
   }
 
   // The board keeps the cards of the person, a card that did not end however old, and a card that ended in the window.
@@ -375,7 +375,8 @@ export function register({ on, refuse, readJson, S, now, AGENTS, admin, viewerOf
   on('POST', '/v1/work/review', async (c) => {
     const body = await readJson(c.req);
     for (const k of Object.keys(body)) if (!['bridge', 'run', 'verdict', 'note'].includes(k)) refuse(400, `json: unknown field "${k}"`);
-    const verdict = body.verdict;
+    // The older words right and work still work.
+    const verdict = { right: 'up', work: 'down' }[body.verdict] || body.verdict;
     const note = String(body.note || '').trim();
     if (verdict !== 'up' && verdict !== 'down') refuse(400, `verdict is "${verdict}", not up or down`);
     if (verdict === 'down' && !note) refuse(400, 'Needs work needs a note that says what must change.');
@@ -390,16 +391,16 @@ export function register({ on, refuse, readJson, S, now, AGENTS, admin, viewerOf
     if (verdict === 'up') {
       Object.assign(b, { state: 'closed', closedAt: now(), verdict: 'accepted' });
       system(b.id, 'closed', `${who} checked the result and closed the bridge as accepted.`);
-      return { bridge: b.id, verdict: 'up', closed: true };
+      return { bridge: b.id, reaction: 'up', followUp: false, closed: true };
     }
     const seats = b.members.filter((m) => !m.fired);
-    post(b.id, { kind: 'person', name: c.person.subject, display: c.person.name }, note, { to: seats.map((m) => m.handle) });
+    post(b.id, { kind: 'person', name: c.person.subject, display: c.person.name }, 'Needs work: ' + note, { to: seats.map((m) => m.handle) });
     for (const m of seats) moveSeat(b.id, m, 'working', { turn: 1, tool: '', phrase: 'Reads the note of ' + c.person.name, since: now() });
     // The seats work on the note, then end their turns, and the team waits to be checked again.
     setTimeout(() => {
       for (const m of seats) if (m.presence === 'working') moveSeat(b.id, m, 'idle', null);
     }, 5000);
-    return { bridge: b.id, verdict: 'down', closed: false };
+    return { bridge: b.id, reaction: 'down', followUp: true, closed: false };
   });
 
   // Let a stopped card go: the person whose move it is, an admin, or an owner of an agent of the card.

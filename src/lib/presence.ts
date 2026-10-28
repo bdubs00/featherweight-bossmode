@@ -107,7 +107,7 @@ export function phaseOf(phase: string): Light {
  * cannot tell whether it answered. An archived run that had not finished
  * ended when its worker was replaced.
  */
-export function runStatus(r: Pick<Run, 'state' | 'output'> & Partial<Pick<Run, 'input' | 'title' | 'archived'>>): Light {
+export function runStatus(r: Pick<Run, 'state' | 'output'> & Partial<Pick<Run, 'input' | 'title' | 'archived' | 'error'>>): Light {
   if (r.archived && r.state !== 'completed' && r.state !== 'failed' && r.state !== 'canceled') return { word: 'ended', tone: 'grey', label: 'Its worker was replaced. You can read it.' };
   switch (r.state) {
     case 'input-required':
@@ -123,6 +123,8 @@ export function runStatus(r: Pick<Run, 'state' | 'output'> & Partial<Pick<Run, '
       if (r.input === '' && !r.title) return { word: 'finished', tone: 'grey', label: 'Finished. Its messages show once its worker answers.' };
       return { word: 'ended', tone: 'grey', label: 'Finished with no answer.' };
     case 'failed':
+      // A limit of the budget is no fault: the run says at its limit, with a grey light, as a seat does.
+      if (atLimit({ state: r.state, error: r.error })) return { word: 'at its limit', tone: 'grey', label: 'Stopped at a limit of its budget. Continue gives it more room.' };
       return { word: 'failed', tone: 'red', label: 'Stopped with an error.' };
     case 'canceled':
       return { word: 'stopped', tone: 'grey', label: 'A person stopped it.' };

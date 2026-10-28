@@ -429,12 +429,13 @@ export function AppBar({ route, place: placeProp, onSignOut, onReach }: { route:
   useEffect(() => {
     if (waiting) loadInbox().catch(() => {});
   }, [waiting]);
-  // A result that its owner asked to check comes back on the stream when
-  // its run ends, also after Needs work. The count and Activity read the
-  // inbox then, so the new result shows at once.
+  // A result that its owner asked to check, or a result of a duty that
+  // tells only of what it finds (workbench.found), comes back on the stream
+  // when its run ends, also after Needs work. The count and Activity read
+  // the inbox then, so the new result shows at once.
   const toCheck = useSelect((s) =>
     Object.keys(s.runs)
-      .filter((id) => s.runs[id].state === 'completed' && !!s.runs[id].metadata && s.runs[id].metadata!['workbench.review'] === '1')
+      .filter((id) => s.runs[id].state === 'completed' && !!s.runs[id].metadata && (s.runs[id].metadata!['workbench.review'] === '1' || s.runs[id].metadata!['workbench.found'] === '1'))
       .sort()
       .join(','),
   );
