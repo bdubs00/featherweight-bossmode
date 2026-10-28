@@ -63,11 +63,12 @@ export const NEXT: Record<string, string> = {
 };
 
 /** The parts of the line on top: the lanes where the next move is the person's, in the order of attention, then Working. */
-const GLANCE: { stage: WorkStage; words: (n: number) => string; mine: boolean }[] = [
-  { stage: 'needs-you', words: (n) => (n === 1 ? '1 task needs you' : n + ' tasks need you'), mine: true },
-  { stage: 'review', words: (n) => (n === 1 ? '1 result to check' : n + ' results to check'), mine: true },
-  { stage: 'stopped', words: (n) => n + ' stopped', mine: true },
-  { stage: 'working', words: (n) => n + ' working', mine: false },
+/** A result to check waits for the person, so its light is amber here, as in Activity and on the count of the app bar. */
+const GLANCE: { stage: WorkStage; words: (n: number) => string; mine: boolean; tone: Tone }[] = [
+  { stage: 'needs-you', words: (n) => (n === 1 ? '1 task needs you' : n + ' tasks need you'), mine: true, tone: 'amber' },
+  { stage: 'review', words: (n) => (n === 1 ? '1 result to check' : n + ' results to check'), mine: true, tone: 'amber' },
+  { stage: 'stopped', words: (n) => n + ' stopped', mine: true, tone: 'red' },
+  { stage: 'working', words: (n) => n + ' working', mine: false, tone: 'green' },
 ];
 
 /** How many done cards Done shows before Show all. */
@@ -265,7 +266,7 @@ export function Glance({ board }: { board: WorkBoard }) {
       {!waits && <p class="t-meta">Nothing waits for you.</p>}
       {parts.map((p) => (
         <Button key={p.stage} kind="quiet" size="s" onClick={() => jumpTo(p.stage)}>
-          <Led tone={LANES[p.stage].tone} word={p.words(p.n)} still />
+          <Led tone={p.tone} word={p.words(p.n)} still />
         </Button>
       ))}
     </div>
