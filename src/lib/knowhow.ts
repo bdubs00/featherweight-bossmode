@@ -269,7 +269,16 @@ export function heldBackLine(s: KnowhowSummary): string {
   const h = s.heldBack || { runs: 0, doneWell: 0, costPerJob: 0, byRoutines: 0 };
   if ((h.runs || 0) < HELD_BACK_MIN || (n.runs || 0) < HELD_BACK_MIN) return 'Not enough held-back runs yet.';
   const every = Math.round((n.runs + h.runs) / h.runs);
-  return `Held back 1 in ${every} runs. Done well: ${pct(h.doneWell / h.runs)} without what it learned, ${pct(n.doneWell / n.runs)} with it. Cost per job: ${money(h.costPerJob)} without, ${money(n.costPerJob)} with.`;
+  const [without, withIt] = moneyPair(h.costPerJob || 0, n.costPerJob || 0);
+  return `Held back 1 in ${every} runs. Done well: ${pct(h.doneWell / h.runs)} without what it learned, ${pct(n.doneWell / n.runs)} with it. Cost per job: ${without} without, ${withIt} with.`;
+}
+
+/** moneyPair writes two costs that the page compares. Where two decimals write two different costs the same, both take three. */
+export function moneyPair(a: number, b: number): [string, string] {
+  const x = money(a);
+  const y = money(b);
+  if (x !== y || a === b || a < 0.01 || b < 0.01) return [x, y];
+  return ['$' + a.toFixed(3), '$' + b.toFixed(3)];
 }
 
 /** usesWords says how often runs used a note, such as used 7 times. */

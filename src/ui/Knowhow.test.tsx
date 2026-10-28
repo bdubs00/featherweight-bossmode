@@ -129,9 +129,10 @@ describe('the header of an agent', () => {
     expect(text(el.querySelector('h1'))).toBe('Triage');
     const tabs = el.querySelector('.kh-tabs-head .tabs')!;
     expect([...tabs.querySelectorAll('.tab')].map((t) => t.firstChild!.textContent)).toEqual(['What it learned', 'Notes', 'Routines']);
-    expect(tabs.querySelector('.tab.on')!.textContent).toBe('What it learned');
-    // The tab Routines counts the routines that need a sign-off in amber.
-    expect(tabs.querySelector('.tab:last-child .chip-amber')!.textContent).toContain('1');
+    expect(tabs.querySelector('.tab.on')!.firstChild!.textContent).toBe('What it learned');
+    // What it learned counts the changes that wait in amber, and Routines the routines that need a sign-off.
+    expect(text(tabs.querySelector('.tab:first-child .chip-amber'))).toBe('1 1 change waits');
+    expect(text(tabs.querySelector('.tab:last-child .chip-amber'))).toBe('1 1 routine needs a sign-off');
     const head = el.querySelector('.kh-head')!;
     expect(text(head.querySelector('h2'))).toBe('Last 7 days');
     expect([...head.querySelectorAll('.kh-figs > div')].map((d) => [text(d.querySelector('dd')), text(d.querySelector('dt'))])).toEqual([
@@ -147,6 +148,15 @@ describe('the header of an agent', () => {
     await settle();
     expect(api.calls.find((c) => c.method === 'PUT')!.body).toEqual({ askFirst: false });
     expect((head.querySelector('input[role="switch"]') as HTMLInputElement).checked).toBe(false);
+  });
+
+  it('keeps the header on every tab, and the cards of what waits on What it learned only', async () => {
+    api = fakeApi(routes() as never);
+    const el = mount(<KnowhowMain agent="triage" tab="notes" />);
+    await settle();
+    expect(el.querySelector('.kh-head .kh-figs')).not.toBeNull();
+    expect(el.querySelector('.kh-waiting')).toBeNull();
+    expect(el.querySelector('.kh-notes')).not.toBeNull();
   });
 
   it('shows no percentage from fewer than 20 held-back runs', async () => {

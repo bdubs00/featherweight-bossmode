@@ -2,8 +2,10 @@
 // holds the agents, the picker of the place, with the agents that need
 // you first. The main pane holds one agent: the four numbers of its last
 // 7 days with the line of the held-back runs, the switch Ask me before it
-// keeps what it learns, the changes that wait for a person as cards, and
-// the tabs What it learned, Notes, and Routines. docs/DESIGN.md, section
+// keeps what it learns, and the tabs What it learned, Notes, and Routines.
+// The changes that wait for a person show as cards on top of What it
+// learned, as the routines that need a sign-off show in Routines, and
+// each of the two tabs counts them in amber. docs/DESIGN.md, section
 // 11.11, names the screen, and docs/KNOWHOW.md of the kernel holds the
 // contract. Its words of section 2 are the only words on the screen.
 
@@ -192,6 +194,7 @@ function KnowhowView({ agent, tab: asked }: { agent: string; tab: KnowhowTab }) 
   const off = useKnowhow((s) => s.off);
   const routinesOn = useRoutinesOn();
   const signOff = useRoutines((s) => (s.order || []).map((k) => s.byKey[k]).filter((r) => r && r.agent === agent && statusOf(r) === 'needs-you').length);
+  const waiting = useKnowhow((s) => (s.agents[agent] && s.agents[agent].waiting ? s.agents[agent].waiting!.length : 0));
   // A server without routines has no tab Routines, so its address shows What it learned.
   const tab: KnowhowTab = asked === 'routines' && !routinesOn ? 'learned' : asked;
   useKnowhowView();
@@ -204,7 +207,8 @@ function KnowhowView({ agent, tab: asked }: { agent: string; tab: KnowhowTab }) 
     if (routinesOn) loadRoutines().catch(() => {});
   }, [routinesOn]);
   const items = [
-    { id: 'learned', label: 'What it learned', href: hrefOf({ place: 'knowhow', agent }) },
+    // Each tab counts in amber what waits for a person inside it: the changes to keep, and the routines to sign off.
+    { id: 'learned', label: 'What it learned', href: hrefOf({ place: 'knowhow', agent }), count: waiting, countTone: 'amber' as const, countLabel: waiting === 1 ? '1 change waits' : waiting + ' changes wait' },
     { id: 'notes', label: 'Notes', href: hrefOf({ place: 'knowhow', agent, tab: 'notes' }) },
     ...(routinesOn
       ? [{ id: 'routines', label: 'Routines', href: hrefOf({ place: 'knowhow', agent, tab: 'routines' }), count: signOff, countTone: 'amber' as const, countLabel: signOff === 1 ? '1 routine needs a sign-off' : signOff + ' routines need a sign-off' }]
@@ -229,11 +233,9 @@ function KnowhowView({ agent, tab: asked }: { agent: string; tab: KnowhowTab }) 
         {off ? (
           tab !== 'routines' && <p class="t-meta">Know-how is off on this server.</p>
         ) : (
-          <>
-            <Head agent={agent} owner={owner} />
-            <Waiting agent={agent} owner={owner} name={name} />
-          </>
+          <Head agent={agent} owner={owner} />
         )}
+        {tab === 'learned' && !off && <Waiting agent={agent} owner={owner} name={name} />}
         {tab === 'learned' && !off && <Journal agent={agent} owner={owner} name={name} />}
         {tab === 'notes' && !off && <KnowhowNotes agent={agent} name={name} />}
         {tab === 'routines' && (

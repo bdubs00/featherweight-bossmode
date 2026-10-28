@@ -8,7 +8,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import { ApiError } from '../api/client';
 import type { NoteItem, NoteRecord } from '../api/knowhow';
-import { byWords, groupNotes, isMine, labelOf, noteKey, noteTitle, sourceOf, usesWords } from '../lib/knowhow';
+import { byWords, groupNotes, isMine, labelOf, noteKey, noteTitle, sourceOf, usesWords, type SourceWords } from '../lib/knowhow';
 import { dateWords } from '../lib/routines';
 import { since } from '../lib/words';
 import { loadNote, loadNotes, putAway, saveNote, useKnowhow } from '../state/knowhow';
@@ -188,14 +188,17 @@ function OutOfDate({ rec }: { rec: NoteRecord }) {
   );
 }
 
-/** Sources lists where a note came from: runs, pages, and items of a source. */
+/** Sources lists where a note came from: runs, pages, and items of a source. Several runs read run 1, run 2, and so on. */
 function Sources({ rec }: { rec: NoteRecord }) {
   const list = (rec.sources || []).map((s) => sourceOf(s.ref));
   if (!list.length) return null;
+  const runs = list.filter((s) => s.kind === 'run').length;
+  let n = 0;
+  const words = (s: SourceWords) => (s.kind === 'run' && runs > 1 ? 'run ' + ++n : s.words);
   return (
     <p class="kh-meta kh-sources">
       <span>Sources:</span>
-      {list.map((s) => (s.href ? <a href={s.href}>{s.words}</a> : <span>{s.words}</span>))}
+      {list.map((s) => (s.href ? <a href={s.href}>{words(s)}</a> : <span>{words(s)}</span>))}
     </p>
   );
 }

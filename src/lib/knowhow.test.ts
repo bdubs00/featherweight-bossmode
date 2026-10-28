@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { KnowhowSummary, NoteItem } from '../api/knowhow';
-import { byWords, conflictWords, entrySentence, figuresOf, groupNotes, heldBackLine, isMine, labelOf, noteTitle, runLinks, sourceOf, undoRefusal, usesWords, waitSentence } from './knowhow';
+import { byWords, conflictWords, entrySentence, figuresOf, groupNotes, heldBackLine, isMine, labelOf, moneyPair, noteTitle, runLinks, sourceOf, undoRefusal, usesWords, waitSentence } from './knowhow';
 
 const ME = { subject: 'alice@example.com', name: 'Alice' };
 
@@ -115,5 +115,12 @@ describe('the four numbers', () => {
     );
     expect(heldBackLine(summary({ runs: 380, doneWell: 346 }, { runs: 19, doneWell: 19 }))).toBe('Not enough held-back runs yet.');
     expect(heldBackLine(summary({ runs: 0 }, { runs: 0 }))).toBe('Not enough held-back runs yet.');
+  });
+
+  it('writes two costs that differ by less than a cent with three decimals, so the line never compares $0.02 with $0.02', () => {
+    expect(moneyPair(0.021, 0.0196)).toEqual(['$0.021', '$0.020']);
+    expect(moneyPair(0.04, 0.02)).toEqual(['$0.04', '$0.02']);
+    expect(moneyPair(0.02, 0.02)).toEqual(['$0.02', '$0.02']);
+    expect(moneyPair(0.004, 0.003)).toEqual(['$0.004', '$0.003']);
   });
 });
