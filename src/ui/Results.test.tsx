@@ -163,6 +163,8 @@ describe('Results', () => {
     const check = [...box.querySelectorAll('a.rs-now')].find((a) => a.textContent === '1 to check') as HTMLAnchorElement;
     expect(check).toBeTruthy();
     expect(check.getAttribute('href')).toBe('#activity/v%3Arun-notes');
+    // Without a decision in the inbox, "waiting for you" opens Activity.
+    expect((box.querySelector('a.rs-now[href="#activity"]') as HTMLElement).textContent).toBe('1 waiting for you');
     const names = [...box.querySelectorAll('tbody th a')].map((a) => [a.textContent, a.getAttribute('href')]);
     expect(names).toEqual([
       ['migrator', '#fleet/migrator/profile'],
@@ -203,5 +205,13 @@ describe('Results', () => {
     await flush();
     expect(box.textContent).toContain('5 actions of people, 1 sent back with a message, 3 decisions without a named person');
     expect(box.textContent).not.toContain('waiting for you');
+  });
+
+  it('leads "waiting for you" to the first decision that waits in Activity', async () => {
+    inbox = [{ kind: 'approval', run: 'run-restore', approval: 'ap-restore', duty: 'nightly', agent: 'backup', bridge: '', text: 'backup waits for your answer.', since: '2026-10-27T11:00:00Z' }];
+    const box = mount(<Results />);
+    await flush();
+    const wait = [...box.querySelectorAll('a.rs-now')].find((a) => a.textContent === '1 waiting for you')!;
+    expect(wait.getAttribute('href')).toBe('#activity/d%3Arun-restore/ap-restore');
   });
 });

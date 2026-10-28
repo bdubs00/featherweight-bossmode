@@ -146,6 +146,8 @@ function Body({ v, onSaved }: { v: Value; onSaved: () => void }) {
   // The results that wait for a check of the person, as Activity lists them.
   const { rows } = useInboxRows();
   const toCheck = rows.filter((r) => r.kind === 'result');
+  // The first decision or question that waits for the person, where "waiting for you" leads.
+  const waits = rows.find((r) => r.status === 'needs-you' && r.kind !== 'result');
   const measured = v.lead.measured > 0;
   return (
     <div class="rs">
@@ -168,7 +170,7 @@ function Body({ v, onSaved }: { v: Value; onSaved: () => void }) {
       {v.work.pieces === 0 ? (
         <Nothing days={v.days} />
       ) : (
-        <Figures v={v} unit={unit} toCheck={toCheck} measured={measured} onSaved={onSaved} />
+        <Figures v={v} unit={unit} toCheck={toCheck} waits={waits ? waits.key : ''} measured={measured} onSaved={onSaved} />
       )}
     </div>
   );
@@ -184,7 +186,8 @@ function Nothing({ days }: { days: number }) {
   );
 }
 
-function Figures({ v, unit, toCheck, measured, onSaved }: { v: Value; unit: 'day' | 'week'; toCheck: { key: string }[]; measured: boolean; onSaved: () => void }) {
+function Figures(p: { v: Value; unit: 'day' | 'week'; toCheck: { key: string }[]; waits: string; measured: boolean; onSaved: () => void }) {
+  const { v, unit, toCheck, measured, onSaved } = p;
   return (
     <>
       <div class="rs-tiles">
@@ -238,7 +241,7 @@ function Figures({ v, unit, toCheck, measured, onSaved }: { v: Value; unit: 'day
             {(v.people.handled || 0) > 0 && <>, {v.people.handled} {v.people.handled === 1 ? 'decision' : 'decisions'} without a named person</>}
           </p>
           {v.people.waitingNow > 0 && (
-            <a class="rs-now" href="#activity">
+            <a class="rs-now" href={hrefOf({ place: 'activity', item: p.waits || undefined })}>
               <Led tone="amber" word={v.people.waitingNow + ' waiting for you'} />
             </a>
           )}
