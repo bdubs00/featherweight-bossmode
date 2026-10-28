@@ -187,4 +187,28 @@ describe('More on a phone', () => {
     forgetSeen();
     act(() => store.dispatch({ type: 'config', config: null }));
   });
+
+  it('opens every place in a wide window as a disclosure, and Escape on More folds them back without leaving the screen', async () => {
+    window.matchMedia = ((q: string) => ({ matches: /min-width/.test(q), media: q, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
+    localStorage.removeItem('fw.bossmode.everyPlace');
+    api = fakeApi({ 'GET /v1/inbox': { items: [] } });
+    act(() => store.dispatch({ type: 'config', config: { manager: null, placement: 'queue', maxMembers: 16, routines: true, work: true } }));
+    const el = mount(<AppBar route={{ place: 'results' }} onSignOut={() => {}} onReach={() => {}} />);
+    await settle();
+    const more = el.querySelector('.place-more') as HTMLButtonElement;
+    expect(more.getAttribute('aria-expanded')).toBe('false');
+    await act(async () => more.click());
+    expect(more.getAttribute('aria-expanded')).toBe('true');
+    expect(more.textContent).toBe('Fewer');
+    expect(el.querySelectorAll('a.place').length).toBe(11);
+    const esc = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    await act(async () => {
+      more.dispatchEvent(esc);
+    });
+    expect(esc.defaultPrevented).toBe(true);
+    expect(more.getAttribute('aria-expanded')).toBe('false');
+    expect([...el.querySelectorAll('a.place .place-label')].map((x) => x.textContent)).toEqual(['Work', 'Results', 'Activity', 'Chat', 'Wiki']);
+    localStorage.removeItem('fw.bossmode.everyPlace');
+    act(() => store.dispatch({ type: 'config', config: null }));
+  });
 });

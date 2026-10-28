@@ -1183,7 +1183,12 @@ Left out, and why:
 
 With `work: true` in `GET /v1/bossmode`, the app bar shows Work, Results,
 Activity, Chat, and Wiki, then More. A wide window opens the other places
-in the bar, and the key says Fewer. A phone opens a menu of those places
+in the bar, and the key says Fewer. The key is a disclosure: it says
+whether it is open, and Escape on it folds the places back. Eleven places
+and More need about 900 pixels, so on a shorter window the places scroll
+between the logo well and the account, and the account stays in sight.
+Under 960 pixels of height each place takes less padding. While More hides
+Manager, the dot of an answer of the manager sits on More. A phone opens a menu of those places
 above the bar, as the menu of the account opens. The place of the screen
 that shows stays in the bar. Work and Results have no list pane, so a
 narrow window keeps the bar at the bottom of their main pane. The page

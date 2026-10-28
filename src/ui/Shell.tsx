@@ -374,7 +374,10 @@ function MoreMenu({ items, dot }: { items: PlaceItem[]; dot?: boolean }) {
 
 /**
  * AppBar is the column of places: the logo well, the places, and the
- * account. onReach opens Where to reach me. place is the place to light,
+ * account. With work, a wide window shows five places and the key More,
+ * which opens every place in the bar and then says Fewer. It is a
+ * disclosure: it says whether it is open, and Escape on it folds the
+ * places back. A phone opens More as a menu. onReach opens Where to reach me. place is the place to light,
  * when the route alone does not say it.
  */
 export function AppBar({ route, place: placeProp, onSignOut, onReach }: { route: Route; place?: Place; onSignOut: () => void; onReach: () => void }) {
@@ -445,7 +448,21 @@ export function AppBar({ route, place: placeProp, onSignOut, onReach }: { route:
         })}
         {work && phone && <MoreMenu items={morePlaces(config, place)} dot={managerHidden} />}
         {work && !phone && (
-          <button type="button" class="place place-more" aria-pressed={every} title={every ? 'Show five places' : 'Show every place'} onClick={() => setEvery(!every)}>
+          <button
+            type="button"
+            class="place place-more"
+            aria-expanded={every}
+            title={every ? 'Show five places' : 'Show every place'}
+            onClick={() => setEvery(!every)}
+            onKeyDown={(e) => {
+              // Escape folds the places back, and never leaves the screen.
+              if (e.key === 'Escape' && every) {
+                e.preventDefault();
+                e.stopPropagation();
+                setEvery(false);
+              }
+            }}
+          >
             <Glyph name="more" size={22} />
             <span class="place-label">{every ? 'Fewer' : 'More'}</span>
             {managerHidden && <ManagerDot />}
