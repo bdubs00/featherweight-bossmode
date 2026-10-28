@@ -53,7 +53,7 @@ const TEAM = /\b(split|across|in parallel|several agents|\d+ agents|team)\b/;
 const FOUND = /\b(drift\w*|only when|watch|alert|anything (?:new|changed)|something (?:changed|drifted))\b/;
 
 /** slug makes a name of a duty from words: a-z, 0-9, and hyphens, at most 40 characters, cut between two words. */
-const slug = (s) => {
+export const slug = (s) => {
   const all = s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   if (all.length <= 40) return all || 'task';
   const cut = all.slice(0, 41);
@@ -61,12 +61,13 @@ const slug = (s) => {
   return (end > 0 ? cut.slice(0, end) : all.slice(0, 40)).replace(/-+$/, '') || 'task';
 };
 
-/** titleOf makes a short title of the words: the first clause, without the schedule, with a capital. */
-function titleOf(words, said) {
+/** titleOf makes a short title of the words: the first clause, without the schedule, with a capital. A stop inside a word, as in 2.3, ends no clause. */
+export function titleOf(words, said) {
   let t = words.replace(/\s+/g, ' ').trim();
   if (said) t = t.replace(new RegExp(said.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), '');
   t = t.replace(/\b(every|each) (night|morning|evening|week|month)\b/i, '').replace(/\b(nightly|weekly|monthly|daily)\b/i, '');
-  t = t.replace(/^[\s,.;:-]+/, '').split(/[.;]|, (?:and )?(?:then|tell|and tell|show)\b/)[0].trim();
+  // A sentence ends at a stop before a space or the end, so 2.3 and example.com stay whole.
+  t = t.replace(/^[\s,.;:-]+/, '').split(/[.;](?=\s|$)|, (?:and )?(?:then|tell|and tell|show)\b/)[0].trim();
   t = t.replace(/[\s,]+$/, '');
   if (t.length > 64) t = t.slice(0, 64).replace(/\s+\S*$/, '').replace(/\s+(and|or|the|of|to|a|an|with|for|from)$/i, '');
   return t ? t[0].toUpperCase() + t.slice(1) : 'A task';
