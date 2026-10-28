@@ -1580,9 +1580,10 @@ function tick() {
 // skills.mjs serves the Skills place.
 // routes-d.mjs serves the Routines place, and writes the runbook of a
 // routine on a sign-off with writePage. routes-e.mjs serves the Duties place.
-// packages.mjs serves the packages of the pools, and archive.mjs adds the
-// conversations whose worker was replaced.
-for (const name of ['skills.mjs', 'routes-a.mjs', 'routes-b.mjs', 'routes-c.mjs', 'routes-chat.mjs', 'routes-d.mjs', 'routes-e.mjs', 'packages.mjs', 'archive.mjs']) {
+// packages.mjs serves the packages of the pools, archive.mjs adds the
+// conversations whose worker was replaced, and routes-work.mjs serves the
+// board of the work.
+for (const name of ['skills.mjs', 'routes-a.mjs', 'routes-b.mjs', 'routes-c.mjs', 'routes-chat.mjs', 'routes-d.mjs', 'routes-e.mjs', 'packages.mjs', 'archive.mjs', 'routes-work.mjs']) {
   const mod = await import('./' + name);
   mod.register({ on, refuse, readJson, readBody, publish, S, now, AGENTS, FLEET, admin: () => ADMIN, writePage });
 }

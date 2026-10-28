@@ -23,6 +23,7 @@ import type {
   FileView,
   Fleet,
   InboxItem,
+  WorkBoard,
   Marketplace,
   Member,
   MessagePage,
@@ -334,6 +335,8 @@ export const api = {
 
   /** inbox lists what needs the person: approvals, questions, failures, and paused duties. */
   inbox: () => call<{ items: InboxItem[] }>('/v1/inbox').then((r) => (r && r.items) || []),
+  /** work reads the board of the work: one card per piece of work, from the request to its end. */
+  work: (q: { days?: number; all?: boolean } = {}) => call<WorkBoard>('/v1/work' + query({ days: q.days, all: q.all ? 'true' : undefined })),
 
   /** The notification settings of the person who is signed in: the channels, the quiet hours, and what the front offers. */
   notifications: () => call<NotifyRead>('/v1/notifications'),

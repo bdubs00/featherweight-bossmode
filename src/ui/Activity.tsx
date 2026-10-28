@@ -44,7 +44,7 @@ import { markDone, madeOf, settledOf, useMade } from '../state/done';
 import { loadInbox, useDutyLabel } from '../state/duties';
 import { dutyLabel } from '../lib/duties';
 import { EmptyPane } from './Shell';
-import { Avatar, Button, Card, Led, Mark, PaneHeader } from './primitives';
+import { Avatar, Button, Card, IconButton, Led, Mark, PaneHeader } from './primitives';
 
 const TWO_PANES = '(min-width: 800px)';
 
@@ -524,7 +524,7 @@ function InboxItem({ r, on, rows }: { r: InboxRow; on: boolean; rows: InboxRow[]
   );
 }
 
-export function ActivityList({ item }: { item?: string }) {
+export function ActivityList({ item, board }: { item?: string; board?: boolean }) {
   const { rows, loaded, settled } = useInbox();
   const ready = useRef(settled);
   ready.current = settled;
@@ -601,7 +601,13 @@ export function ActivityList({ item }: { item?: string }) {
   return (
     <section class="screen activity" aria-labelledby="activity-title" data-focus-own>
       {/* The chip counts what the list shows. What needs you shows by its lights and by the count on the app bar, which counts the same rows less the new messages. */}
-      <PaneHeader id="activity-title" title="Activity" count={loaded ? rows.length : undefined} countLabel={rows.length === 1 ? '1 item' : rows.length + ' items'} />
+      <PaneHeader
+        id="activity-title"
+        title="Activity"
+        count={loaded ? rows.length : undefined}
+        countLabel={rows.length === 1 ? '1 item' : rows.length + ' items'}
+        actions={<IconButton icon="board" label="Work" aria-pressed={!!board} onClick={() => go(board ? { place: 'activity' } : { place: 'activity', board: true })} />}
+      />
       <div class="scroll" ref={list} onKeyDown={onKey}>
         <div class="inbox" role="list" aria-label="Activity">
           {/* Each row keeps its own element, so a row that leaves takes its focus with it, and a new row never inherits the focus of another. */}

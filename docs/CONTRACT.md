@@ -1586,3 +1586,34 @@ The page treats an archived run as a run that ended:
 - An archived run keeps no worker busy, takes no decision, and the page
   reads it once, with no poll and no live answer.
 
+
+## 19. The board of the work
+
+`GET /v1/work` answers the board of the work of the caller: one card per
+piece of work, from the request to its end. The MCP tool `work` calls the
+same Go function (the package `work` of the workbench, branch
+`flow/board`). The query takes `days`, 1 to 90 and 7 by default, and
+`all=true` for every card that the caller can view.
+
+```json
+{"sentence": "...", "days": 7,
+ "lanes": [{"stage": "needs-you", "count": 1, "yours": 1, "oldest": "..."}],
+ "cards": [{"id": "bridge:br-1", "kind": "bridge", "title": "...",
+            "from": {"kind": "person", "name": "...", "via": "bridge"},
+            "stage": "needs-you", "next": "you", "reason": "scribe asks: ...",
+            "opened": "...", "since": "...", "ended": null, "agents": ["scribe"],
+            "parts": {"needsYou": 1, "review": 1, "total": 2},
+            "links": {"bridge": "br-1", "run": "...", "approval": "", "runs": ["..."]},
+            "costUSD": 0.12, "lost": false}]}
+```
+
+The stages, in the order of the flow: `waiting`, `working`, `needs-you`,
+`stopped`, `review`, `done`. A kind is `conversation`, `bridge`, `duty`,
+`job`, or `event`. `next` is `worker`, `agent`, `you`, `person`, `manager`,
+or empty for a done card. A card that did not end stays on the board
+however old it is. `lost` is true when the pool replaced the worker of a
+part that had not ended.
+
+The page shows the board at `#work`, a view of the place Activity, with
+the key Work in the head of Activity. A click on a card opens its bridge,
+its duty, Activity for a card that needs the person, or its conversation.

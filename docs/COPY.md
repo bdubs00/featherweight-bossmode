@@ -1121,3 +1121,18 @@ The typing line takes the place of the status message of an answer that is on it
 | `Working: <tool>` (a quiet line of the thread) | change | the phrase `Working: <tool>` on the typing line, when the run gives no phrase of its step | done |
 | new | add | in a bridge: `<seat> is working`, `<seat> and <seat> are working`, or `<seat>, <seat>, and <n> more are working`, with `: <phrase>` when one seat works | done |
 | new | add | for a screen reader: `<name> is working.`, or `<name> is working: <phrase>`, without a second `Working` | done |
+
+## 13. The board of the work
+
+| Place | String |
+|---|---|
+| The key in the head of Activity | `Work` |
+| The title of the board | `Work`, with the count of the open cards |
+| The key for every card | `Everyone` |
+| The lanes | `Waiting`, `Working`, `Needs you`, `Stopped`, `To review`, `Done` |
+| The kinds | `Chat`, `Bridge`, `Duty`, `Job`, `Event` |
+| The next move of the person | `Yours` |
+| The next move of the manager | `Manager` |
+| A card whose worker was replaced | `Lost` |
+| The parts of a card | `5 seats`, `12 runs` |
+| A board that did not load | `The board did not load.` |

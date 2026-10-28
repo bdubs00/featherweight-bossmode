@@ -66,7 +66,7 @@ export interface SkillItem {
 
 export type Route =
   | { place: 'home' }
-  | { place: 'activity'; item?: string }
+  | { place: 'activity'; item?: string; board?: boolean }
   | { place: 'manager'; run?: string; fresh?: boolean }
   | { place: 'chat'; run?: string; fresh?: boolean; details?: boolean }
   | { place: 'new' }
@@ -110,6 +110,9 @@ export function parseRoute(hash: string): Route {
     case 'activity':
       // The item is the key of a row of the inbox, such as d:<run>/<approval>.
       return rest.length && rest.join('/') ? { place: 'activity', item: rest.map(dec).join('/') } : { place: 'activity' };
+    // #work is the board of the work, a view of the place Activity.
+    case 'work':
+      return { place: 'activity', board: true };
     // #manager is the newest conversation with the manager, #manager/new a
     // new one, and #manager/<run> a past one.
     case 'manager':
@@ -207,6 +210,7 @@ export function hrefOf(r: Route): string {
     case 'home':
       return '#';
     case 'activity':
+      if (r.board) return '#work';
       return r.item ? '#activity/' + encPath(r.item) : '#activity';
     case 'manager':
       if (r.run) return '#manager/' + encodeURIComponent(r.run);
@@ -290,7 +294,7 @@ export function columnOf(r: Route): Column {
     case 'home':
       return 'list';
     case 'activity':
-      return r.item ? 'main' : 'list';
+      return r.item || r.board ? 'main' : 'list';
     case 'bridge':
       return r.pane === 'none' ? 'main' : 'details';
     case 'member':
@@ -325,7 +329,7 @@ export function parentOf(r: Route): Route {
       if (r.pane === 'roster') return { place: 'bridge', id: r.id, pane: 'none' };
       return { place: 'home' };
     case 'activity':
-      return r.item ? { place: 'activity' } : { place: 'home' };
+      return r.item || r.board ? { place: 'activity' } : { place: 'home' };
     case 'member':
       return r.profile ? { place: 'member', bridge: r.bridge, handle: r.handle, tab: 'chat' } : { place: 'fleet' };
     case 'fleet':

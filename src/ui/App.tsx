@@ -37,6 +37,7 @@ import { ChatDetails, ChatList, ChatMain, NoChat } from './Chat';
 import { Fleet, AgentPane, FleetList } from './Fleet';
 import { MemberMain, MemberProfile, memberFrom, setMemberFrom } from './Member';
 import { Board } from './Board';
+import { Work } from './Work';
 import { ActivityList, ActivityMain } from './Activity';
 import { PageEditor, PageHistory, PageTree, PageView } from './Pages';
 import { NewBridge } from './NewBridge';
@@ -177,7 +178,7 @@ function panesOf(r: Route): Panes {
         details: r.pane === 'run' && r.run ? <RunPane bridge={r.id} runId={r.run} handle={r.handle} /> : <Roster bridge={r.id} current={r.handle} />,
       };
     case 'activity':
-      return { list: <ActivityList item={r.item} />, main: <ActivityMain item={r.item} />, details: null };
+      return { list: <ActivityList item={r.item} board={r.board} />, main: r.board ? <Work /> : <ActivityMain item={r.item} />, details: null };
     case 'fleet':
       return { list: <FleetList current={r.agent} />, main: r.board ? <Board /> : <Fleet agent={r.agent} />, details: r.agent ? <AgentPane agent={r.agent} /> : null };
     case 'member':

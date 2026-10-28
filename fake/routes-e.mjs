@@ -492,6 +492,8 @@ export function register({ on, refuse, readJson, now, AGENTS, admin, S, publish 
   const runsOf = (every, n, make) => Array.from({ length: n }, (_, i) => make(i, ago(i * every + 7)));
 
   const D = new Map();
+  // The board of the work (routes-work.mjs) reads the starts of the duties.
+  S.duties = D;
   const add = (d, history) => D.set(d.name, { source: 'store', revision: 1, paused: false, runAs: 'duty', owner: 'alice@example.com', whileAway: { decider: 'manager', timeout: '2h', then: 'deny' }, notify: { failure: ['owner'], needsYou: ['owner'] }, ...d, history });
   add(
     {
