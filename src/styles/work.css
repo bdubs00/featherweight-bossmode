@@ -30,12 +30,13 @@
   border-bottom: 2px solid var(--ink);
 }
 /* A long lane keeps its head in sight while the pane scrolls, on the ground
-   of the pane. The head sits over the cards that pass under it, so it takes
-   the first step of the stack, below every layer of section 4.6. */
+   of the pane. The head sits over the cards that pass under it, keys and
+   all: the keys of a card take step 1 to rise over the link of the card, so
+   the head takes step 2, still below every layer of section 4.6. */
 .work-lane > .work-lane-head {
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: 2;
   background: var(--paper);
 }
 .work-lane-head h3 {
