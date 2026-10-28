@@ -1611,8 +1611,8 @@ The stages, in the order of the flow: `waiting`, `working`, `needs-you`,
 `stopped`, `review`, `done`. A kind is `conversation`, `bridge`, `duty`,
 `job`, or `event`. `next` is `worker`, `agent`, `you`, `person`, `manager`,
 or empty for a done card. A card that did not end stays on the board
-however old it is. `lost` is true when the pool replaced the worker of a
-part that had not ended.
+however old it is. When the pool replaced the worker of a part that had
+not ended, `lost` is true.
 
 The page shows the board at `#work`, a view of the place Activity, with
 the key Work in the head of Activity. A click on a card opens its bridge,
