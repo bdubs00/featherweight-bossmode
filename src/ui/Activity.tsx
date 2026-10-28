@@ -6,7 +6,8 @@
 // action does, with Deny and the verb of the action. j and k move, Enter
 // opens, a allows, d denies, r replies, and s seats a stopped seat again.
 // c continues a seat at its limit, and e is Done on a message, which clears
-// it for you through the read mark of its bridge. A decision of a or d
+// it for you through the read mark of its bridge. On a result to check, a
+// goes to Looks right and d to Needs work in its card. A decision of a or d
 // waits HOLD_MS before it goes out: the notice says Allowed. or Denied.
 // with Undo, the row and its card say what it holds, the focus stays on the
 // row, and u on the row takes the decision back too. On a question of a
@@ -527,9 +528,11 @@ function InboxItem({ r, on, rows }: { r: InboxRow; on: boolean; rows: InboxRow[]
 }
 
 /**
- * ResultCard is the card of a result to check: the answer of the run, a
- * link to the run, and Looks right and Needs work. After either key, the
- * main pane moves to the next item that needs you, as after a decision.
+ * ResultCard is the card of a result to check: what the run was asked, its
+ * whole answer, a link to the run, and Looks right and Needs work. A person
+ * judges a result against its task, and never on a part of it. After either
+ * key, the main pane moves to the next item that needs you, as after a
+ * decision.
  */
 function ResultCard({ r, name, rows }: { r: InboxRow; name: string; rows: InboxRow[] }) {
   const run = useSelect((s) => (r.run ? s.runs[r.run] : undefined));
@@ -540,7 +543,12 @@ function ResultCard({ r, name, rows }: { r: InboxRow; name: string; rows: InboxR
   const open = r.duty && r.run ? hrefOf({ place: 'duties', name: r.duty, run: r.run }) : r.run ? hrefOf({ place: 'chat', run: r.run }) : '';
   return (
     <Card title={title} tone="amber" label={'A result of ' + name + ' to check'} actions={<ResultKeys run={r.run!} title={title} primary onDone={() => afterResult(r, rows)} />}>
-      {run && run.output ? <Markdown text={run.output.length > 1500 ? run.output.slice(0, 1500) + '…' : run.output} refs /> : <p class="inbox-said">{run ? 'The run gave no text.' : 'Loading the result.'}</p>}
+      {run && run.input && plainText(run.input).trim() !== title.trim() && (
+        <p class="result-ask">
+          <span class="result-ask-label">The task</span> {excerpt(plainText(run.input), 400)}
+        </p>
+      )}
+      {run && run.output ? <Markdown text={run.output} refs /> : <p class="inbox-said">{run ? 'The run gave no text.' : 'Loading the result.'}</p>}
       {open && (
         <p>
           <a href={open}>Open the run</a>
@@ -548,6 +556,19 @@ function ResultCard({ r, name, rows }: { r: InboxRow; name: string; rows: InboxR
       )}
     </Card>
   );
+}
+
+/**
+ * reachResult shows a result to check in the main pane and puts the focus on
+ * one of its keys. A narrow window opens the result first.
+ */
+export function reachResult(r: InboxRow, key: 'Looks right' | 'Needs work'): void {
+  pick(r.key);
+  if (!window.matchMedia(TWO_PANES).matches) go({ place: 'activity', item: r.key });
+  setTimeout(() => {
+    const b = [...document.querySelectorAll<HTMLButtonElement>('.inbox-main-pane .card .result-keys button')].find((x) => x.textContent === key);
+    if (b) b.focus();
+  }, 60);
 }
 
 /** afterResult reads the inbox again and moves to the next item that needs you. */
@@ -602,6 +623,12 @@ export function ActivityList({ item }: { item?: string }) {
     if (e.key === 'u' && held.has(r.key)) {
       e.preventDefault();
       undoHold(r.key);
+      return;
+    }
+    // A result to check: a goes to Looks right and d to Needs work in its card, so a key never judges a result unseen.
+    if (r.kind === 'result' && (e.key === 'a' || e.key === 'd')) {
+      e.preventDefault();
+      reachResult(r, e.key === 'a' ? 'Looks right' : 'Needs work');
       return;
     }
     const act = keyAction(e.key, r);
@@ -687,7 +714,7 @@ export function ActivityMain({ item }: { item?: string }) {
   // A decided card waits for nobody, so the head no longer says needs you.
   const waits = r.status === 'needs-you' && !(decision && decision.state !== 'pending');
   const tone = waits ? 'amber' : r.kind === 'stopped' || r.kind === 'limit' || r.kind === 'duty-paused' ? 'grey' : r.status === 'error' ? 'red' : undefined;
-  const word = waits ? 'needs you' : r.kind === 'stopped' ? 'stopped' : r.kind === 'limit' ? 'at its limit' : r.kind === 'duty-paused' ? 'paused' : r.kind === 'duty-failed' ? 'failed' : r.status === 'error' ? 'error' : '';
+  const word = waits ? (r.kind === 'result' ? 'to check' : 'needs you') : r.kind === 'stopped' ? 'stopped' : r.kind === 'limit' ? 'at its limit' : r.kind === 'duty-paused' ? 'paused' : r.kind === 'duty-failed' ? 'failed' : r.status === 'error' ? 'error' : '';
   const convo = r.bridge && r.handle && (r.kind !== 'message' || (r.entry && r.entry.from.kind === 'agent')) ? hrefOf({ place: 'member', bridge: r.bridge, handle: r.handle, tab: 'chat' }) : '';
   const asked = r.kind === 'asked' && r.handle ? { entry: r.entry, handle: r.handle } : null;
   // A row whose decision or answer waits to go out shows what it holds in place of its card.

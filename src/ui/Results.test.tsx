@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { act } from 'preact/test-utils';
 import type { Value } from '../api/value';
-import { Results, hours, pct, span } from './Results';
+import { Results, hours, lineHref, pct, periodWords, span } from './Results';
+import { forgetDuties } from '../state/duties';
 import { fakeFetch, mount, seedFleet, unmountAll, type Call } from './testkit-b';
 
 const flush = async () => {
@@ -36,23 +37,48 @@ describe('the words of the figures', () => {
     expect(hours(4525)).toBe('75 h');
     expect(pct(0.676)).toBe('68%');
   });
+
+  it('names a day by the date that most of it covers, a week by its first day, and a short period by its length', () => {
+    // A day of the window ends now, at 2 AM: most of it is the day before.
+    const d = periodWords({ start: '2026-10-26T02:00:00', end: '2026-10-27T02:00:00' }, 'day');
+    expect(d).toEqual({ label: 'Oct 26', short: '' });
+    const w = periodWords({ start: '2026-10-20T12:00:00', end: '2026-10-27T12:00:00' }, 'week');
+    expect(w).toEqual({ label: 'Oct 20', short: '' });
+    // The first week of a window of 30 days holds 2 days.
+    expect(periodWords({ start: '2026-09-27T12:00:00', end: '2026-09-29T12:00:00' }, 'week')).toEqual({ label: 'Sep 27', short: '2 days' });
+    expect(periodWords({ start: '2026-09-27T12:00:00', end: '2026-09-28T12:00:00' }, 'week').short).toBe('1 day');
+    expect(periodWords({ start: '2026-09-27T12:00:00', end: '2026-09-27T20:00:00' }, 'day').short).toBe('under a day');
+  });
+
+  it('opens the duty of a line and the profile of its agent, and no page for a source', () => {
+    expect(lineHref({ kind: 'duty', name: 'daily-release-notes', agent: 'scribe' })).toBe('#duties/daily-release-notes');
+    expect(lineHref({ kind: 'agent', name: 'migrator', agent: 'migrator' })).toBe('#fleet/migrator/profile');
+    expect(lineHref({ kind: 'source', name: 'hooks', agent: 'triage' })).toBe('');
+  });
 });
 
 describe('Results', () => {
   let calls: Call[] = [];
   let restore = () => {};
   let estimate: { minutes: number; by: string; at: string } | undefined;
+  let inbox: unknown[] = [];
+  let over: Partial<Value> = {};
+  const valueCalls = () => calls.filter((c) => c.path.startsWith('/v1/value'));
   beforeEach(() => {
     estimate = undefined;
+    inbox = [];
+    over = {};
+    forgetDuties();
     try {
       localStorage.clear();
     } catch {
       // No storage in this run.
     }
     const f = fakeFetch([
+      ['GET', /^\/v1\/inbox$/, () => ({ items: inbox })],
       ['GET', /^\/v1\/value\?days=(7|30|90)$/, () => {
-        const days = Number(/days=(\d+)/.exec(calls[calls.length - 1].path)![1]);
-        const v = value(days);
+        const days = Number(/days=(\d+)/.exec(valueCalls()[valueCalls().length - 1].path)![1]);
+        const v = value(days, over);
         if (estimate) {
           v.lines[0] = { ...v.lines[0], estimate, estimatedMinutes: estimate.minutes * 6 };
           v.estimated = { minutes: estimate.minutes * 6, lines: 1, pieces: 6 };
@@ -76,9 +102,9 @@ describe('Results', () => {
   it('shows the figures of the window and says what it cannot measure', async () => {
     const box = mount(<Results />);
     await flush();
-    expect(calls[0].path).toBe('/v1/value?days=30');
+    expect(valueCalls()[0].path).toBe('/v1/value?days=30');
     const text = box.textContent || '';
-    expect(text).toContain('Done12');
+    expect(box.querySelector('.rs-figure')!.textContent).toBe('12');
     expect(text).toContain('4 of 12');
     expect(text).toContain('8 unchecked');
     expect(text).toContain('at least $1.50');
@@ -96,7 +122,7 @@ describe('Results', () => {
     const tab = [...box.querySelectorAll('[role="tab"]')].find((t) => t.textContent === '7 days') as HTMLElement;
     act(() => tab.click());
     await flush();
-    expect(calls[calls.length - 1].path).toBe('/v1/value?days=7');
+    expect(valueCalls()[valueCalls().length - 1].path).toBe('/v1/value?days=7');
     expect(localStorage.getItem('fw.bossmode.results.days')).toBe('7');
     expect(box.textContent).toContain('Done by day');
   });
@@ -126,7 +152,38 @@ describe('Results', () => {
     act(() => (rows[0].querySelector('form') as HTMLFormElement).requestSubmit());
     await flush();
     expect(calls.find((c) => c.method === 'PUT')!.body).toEqual({ line: 'agent:migrator', minutes: 90 });
-    expect(box.textContent).toContain('90 min alice');
+    expect(box.textContent).toContain('90 min by alice');
     expect(box.textContent).toContain('9 h');
+  });
+
+  it('links a result to check and the name of each line to the work behind it', async () => {
+    inbox = [{ kind: 'result', run: 'run-notes', approval: '', duty: 'nightly', agent: 'reviewer', bridge: '', text: 'Notes are ready to check.', since: '2026-10-27T11:00:00Z' }];
+    const box = mount(<Results />);
+    await flush();
+    const check = [...box.querySelectorAll('a.rs-now')].find((a) => a.textContent === '1 to check') as HTMLAnchorElement;
+    expect(check).toBeTruthy();
+    expect(check.getAttribute('href')).toBe('#activity/v%3Arun-notes');
+    const names = [...box.querySelectorAll('tbody th a')].map((a) => [a.textContent, a.getAttribute('href')]);
+    expect(names).toEqual([
+      ['migrator', '#fleet/migrator/profile'],
+      ['nightly', '#duties/nightly'],
+    ]);
+  });
+
+  it('says None yet for a time to done that nothing measured, and its definitions never name the server', async () => {
+    over = { work: { pieces: 0, done: 0, failed: 0, stopped: 0, open: 0 }, lead: { measured: 0, medianSeconds: 0, waitShare: 0 }, lines: [], periods: [] };
+    const box = mount(<Results />);
+    await flush();
+    const tile = [...box.querySelectorAll('.rs-tile')].find((t) => t.querySelector('h2')!.textContent === 'Time to done')!;
+    expect(tile.querySelector('.rs-figure')!.textContent).toBe('None yet');
+    expect(tile.querySelector('.rs-bar')).toBeNull();
+    expect(box.textContent).toContain('No work');
+    for (const key of [...box.querySelectorAll<HTMLButtonElement>('.help-key')]) {
+      act(() => key.click());
+      const said = key.parentElement!.textContent || '';
+      expect(said.length).toBeGreaterThan(40);
+      expect(said).not.toMatch(/\bfront\b/);
+      act(() => key.click());
+    }
   });
 });

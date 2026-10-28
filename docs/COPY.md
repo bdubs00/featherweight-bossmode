@@ -1172,6 +1172,8 @@ The page never shows pool, member, job, run id, or Task in these places.
 | new | add | the errors of a note: `Say what must change.` and `Say it in at most 1,000 characters.` | integration |
 | new | add | the notices `Marked as right: <title>.` and `Sent back with your note: <title>.` | integration |
 | new | add | the light of a row `to check`, the card title of the run, `Open the run`, `The run gave no text.`, and `Loading the result.` | integration |
+| new | add | `The task` before the words that the run was asked, above its whole answer | drive/ux-results |
+| `needs you` (the halo of the head of a result) | change | `to check`, as the row says | drive/ux-results |
 
 ### src/ui/Results.tsx
 
@@ -1182,6 +1184,14 @@ The page never shows pool, member, job, run id, or Task in these places.
 | new | add | the verdicts `accepted`, `checked`, `sent back`, and `unchecked` under the bar of Checked and in the legend | integration |
 | `<n> failed or stopped · <n> open` and the other meta lines with a middle dot | change | a comma between the parts, such as `20 failed or stopped, 1 open` (rule 7) | integration |
 | new | add | `at least`, `a done task`, `Not set`, `est.`, `A task`, and `Minutes a task` | integration |
+| `A task` (the head of the spend of one task of a line) | change | `Per task`, because `Spend` and `A task` side by side read as one phrase | drive/ux-results |
+| `Loading` | change | `Loading the results.` | drive/ux-results |
+| `90 min alice` (the estimate of a line) | change | `90 min by alice` | drive/ux-results |
+| new | add | `1 to check` under the bar of Checked, a link to the first result to check in Activity | drive/ux-results |
+| `0 min median` for a window that measured no time to done | change | `None yet` | drive/ux-results |
+| the date of the start of each column of the chart | change | a day says the date that most of it covers; a week says its first day; a period shorter than its unit also says its length, such as `2 days` | drive/ux-results |
+| `The front measures no time that people spend.` (About Hours of a person) | change | `Nothing measures the time that people spend.` (rule 9) | drive/ux-results |
+| new | add | `About Done`: what a task is. `About Spend`: what coordination is and why the spend says at least. `About Time to done` also says what the median and the bar count. | drive/ux-results |
 
 ### src/ui/Duties.tsx, src/ui/DutyEditor.tsx, src/lib/duties.ts
 

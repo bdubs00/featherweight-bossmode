@@ -317,7 +317,7 @@ function usePhone(): boolean {
  * that the bar leaves out. ArrowUp and ArrowDown move, and Escape closes it
  * and gives the focus back to the key.
  */
-function MoreMenu({ items }: { items: PlaceItem[] }) {
+function MoreMenu({ items, dot }: { items: PlaceItem[]; dot?: boolean }) {
   const [open, setOpen] = useState(false);
   const btn = useRef<HTMLButtonElement>(null);
   const list = useRef<HTMLDivElement>(null);
@@ -355,6 +355,7 @@ function MoreMenu({ items }: { items: PlaceItem[] }) {
       <button ref={btn} type="button" class="place place-more" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
         <Glyph name="more" size={22} />
         <span class="place-label">More</span>
+        {dot && <ManagerDot />}
       </button>
       {open && (
         <div ref={list} class="menu menu-more" role="menu" aria-label="More places" onKeyDown={onKey}>
@@ -362,6 +363,7 @@ function MoreMenu({ items }: { items: PlaceItem[] }) {
             <a role="menuitem" href={lastOf[it.id] || it.href} onClick={() => setOpen(false)}>
               <Glyph name={it.glyph} size={20} />
               <span class="t">{it.label}</span>
+              {it.id === 'manager' && <ManagerDot />}
             </a>
           ))}
         </div>
@@ -397,6 +399,18 @@ export function AppBar({ route, place: placeProp, onSignOut, onReach }: { route:
   useEffect(() => {
     if (waiting) loadInbox().catch(() => {});
   }, [waiting]);
+  // A result that its owner asked to check comes back on the stream when
+  // its run ends, also after Needs work. The count and Activity read the
+  // inbox then, so the new result shows at once.
+  const toCheck = useSelect((s) =>
+    Object.keys(s.runs)
+      .filter((id) => s.runs[id].state === 'completed' && !!s.runs[id].metadata && s.runs[id].metadata!['workbench.review'] === '1')
+      .sort()
+      .join(','),
+  );
+  useEffect(() => {
+    if (toCheck) loadInbox().catch(() => {});
+  }, [toCheck]);
   useEffect(() => {
     document.title = tabTitle(place, attention, theme.name);
   }, [place, attention, theme.name]);
@@ -405,6 +419,10 @@ export function AppBar({ route, place: placeProp, onSignOut, onReach }: { route:
   const work = !!(config && config.work);
   // A phone keeps five places in the bar, and More opens a menu of the rest.
   const wide = every && !phone;
+  // The places that More hides. The dot of the manager moves to More while
+  // More hides the place Manager, so an answer of the manager never waits unseen.
+  const hidden = work && !wide ? morePlaces(config, place).map((it) => it.id) : [];
+  const managerHidden = hidden.includes('manager');
   return (
     <nav class="appbar" aria-label="Places">
       <LogoWell src={logo} name={theme.name} href={work ? '#work' : '#'} />
@@ -425,11 +443,12 @@ export function AppBar({ route, place: placeProp, onSignOut, onReach }: { route:
             </a>
           );
         })}
-        {work && phone && <MoreMenu items={morePlaces(config, place)} />}
+        {work && phone && <MoreMenu items={morePlaces(config, place)} dot={managerHidden} />}
         {work && !phone && (
           <button type="button" class="place place-more" aria-pressed={every} title={every ? 'Show five places' : 'Show every place'} onClick={() => setEvery(!every)}>
             <Glyph name="more" size={22} />
             <span class="place-label">{every ? 'Fewer' : 'More'}</span>
+            {managerHidden && <ManagerDot />}
           </button>
         )}
       </div>

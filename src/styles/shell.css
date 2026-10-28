@@ -91,6 +91,18 @@
   height: 18px;
   padding: 0 5px;
 }
+/* The key More is a button, and the reset of a button sets its font: it
+   takes the label of the other places, so the six labels read as one row. */
+.appbar .place.place-more {
+  font-size: var(--t-caption);
+  line-height: var(--t-control-lh);
+  font-weight: 600;
+}
+/* In the menu More of a phone, the dot of the manager follows its label. */
+.menu.menu-more .place-dot {
+  position: static;
+  margin-left: auto;
+}
 .account {
   margin: auto 6px var(--s-4);
   display: flex;

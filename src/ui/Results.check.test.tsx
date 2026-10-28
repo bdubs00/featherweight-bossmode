@@ -4,6 +4,7 @@ import { store } from '../state/store';
 import { forgetDuties } from '../state/duties';
 import { awayWords, tellWords, REVIEW_LINE } from '../lib/duties';
 import { ActivityList, ActivityMain, holdFor, pick } from './Activity';
+import { forgetSeen } from './Manager';
 import { AppBar } from './Shell';
 import { noteProblem } from './ResultKeys';
 import { at, run } from './testkit-b';
@@ -62,6 +63,56 @@ describe('a result to check in Activity', () => {
     expect(post.body).toEqual({ seq: 0, reaction: 'down', note: 'Name the version in the title.' });
   });
 
+  it('shows what the run was asked and its whole answer, and says to check in its head', async () => {
+    const long = '## Notes\n\n' + 'A line of the notes. '.repeat(120) + '\n\nThe last line.';
+    act(() => store.dispatch({ type: 'run', run: run('run-notes', 'scribe', 'completed', { title: 'Release notes of yesterday', input: 'Draft the release notes of yesterday.', output: long, metadata: { 'workbench.duty': 'daily-notes', 'workbench.review': '1' } }) }));
+    api = fakeApi({ 'GET /v1/inbox': { items: [ITEM] } });
+    const el = mount(<ActivityMain item="v:run-notes" />);
+    await settle();
+    const card = el.querySelector('.inbox-main-pane .card')!;
+    expect(card.querySelector('.result-ask')!.textContent).toBe('The task Draft the release notes of yesterday.');
+    // A person judges the whole result, never its first 1,500 characters.
+    expect(card.textContent).toContain('The last line.');
+    expect(card.textContent).not.toContain('…');
+    expect(el.querySelector('.pane-head [aria-label="scribe, to check"], .pane-head [title="scribe, to check"]')).not.toBeNull();
+  });
+
+  it('takes a to Looks right and d to Needs work from the row of a result, and judges nothing by a key alone', async () => {
+    api = fakeApi({ 'GET /v1/inbox': { items: [ITEM] } });
+    const el = mount(
+      <>
+        <ActivityList />
+        <ActivityMain item="v:run-notes" />
+      </>,
+    );
+    await settle();
+    const row = el.querySelector('.inbox-row') as HTMLElement;
+    const press = async (key: string) => {
+      row.focus();
+      await act(async () => {
+        row.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+        await new Promise((r) => setTimeout(r, 80));
+      });
+    };
+    await press('a');
+    expect(document.activeElement!.textContent).toBe('Looks right');
+    await press('d');
+    expect(document.activeElement!.textContent).toBe('Needs work');
+    expect(api.calls.some((c) => c.method === 'POST')).toBe(false);
+  });
+
+  it('reads the inbox again when a run whose owner checks each result ends, so a reworked result comes back at once', async () => {
+    api = fakeApi({ 'GET /v1/inbox': { items: [] } });
+    mount(<AppBar route={{ place: 'activity' }} onSignOut={() => {}} onReach={() => {}} />);
+    await settle();
+    act(() => store.dispatch({ type: 'run', run: run('run-notes', 'scribe', 'running', { metadata: { 'workbench.review': '1' } }) }));
+    await settle();
+    const before = api.calls.filter((c) => c.path === '/v1/inbox').length;
+    act(() => store.dispatch({ type: 'run', run: run('run-notes', 'scribe', 'completed', { seq: 4, metadata: { 'workbench.review': '1' } }) }));
+    await settle();
+    expect(api.calls.filter((c) => c.path === '/v1/inbox').length).toBeGreaterThan(before);
+  });
+
   it('counts a result to check on the app bar, as it needs a person', async () => {
     api = fakeApi({ 'GET /v1/inbox': { items: [ITEM] } });
     const el = mount(<AppBar route={{ place: 'activity' }} onSignOut={() => {}} onReach={() => {}} />);
@@ -108,6 +159,32 @@ describe('More on a phone', () => {
       ['Routines', '#routines'],
       ['Manager', '#manager'],
     ]);
+    act(() => store.dispatch({ type: 'config', config: null }));
+  });
+
+  it('gives More the dot of the manager while More hides the place Manager, and its label the size of the other places', async () => {
+    window.matchMedia = ((q: string) => ({ matches: /min-width/.test(q), media: q, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
+    forgetSeen();
+    localStorage.removeItem('fw.bossmode.everyPlace');
+    api = fakeApi({ 'GET /v1/inbox': { items: [] }, 'GET /v1/fleet/runs': { runs: [] } });
+    const conv = (state: 'running' | 'completed', seq: number) => run('run-mgr', 'manager', state, { seq, principal: 'alice@example.com', input: 'How is the fleet?' });
+    act(() => {
+      store.dispatch({ type: 'config', config: { manager: { agent: 'manager', member: 'default/boss-0' }, placement: 'queue', maxMembers: 16, routines: true, work: true } });
+      store.dispatch({ type: 'run', run: conv('running', 2) });
+    });
+    const el = mount(<AppBar route={{ place: 'work' }} onSignOut={() => {}} onReach={() => {}} />);
+    await settle();
+    const more = el.querySelector('.place-more') as HTMLButtonElement;
+    expect(more.querySelector('.place-dot')).toBeNull();
+    act(() => store.dispatch({ type: 'run', run: conv('completed', 5) }));
+    await settle();
+    expect(more.querySelector('.place-dot')!.textContent).toBe('The manager answered.');
+    // Every place in sight: the dot goes back to the place Manager.
+    await act(async () => more.click());
+    expect(el.querySelector('.place-more .place-dot')).toBeNull();
+    expect(el.querySelector('a.place[href="#manager"] .place-dot')).not.toBeNull();
+    localStorage.removeItem('fw.bossmode.everyPlace');
+    forgetSeen();
     act(() => store.dispatch({ type: 'config', config: null }));
   });
 });
