@@ -119,7 +119,8 @@ export function fromWords(c: WorkCard, me: string | string[] = []): string {
 /** labelOfCard is the name of the link of a card for a screen reader: the title, the stage or the verdict, whose move it is, lost, and why. */
 export function labelOfCard(c: WorkCard): string {
   const verdict = c.stage === 'done' && c.verdict ? VERDICTS[c.verdict].word : '';
-  const parts = [c.title, verdict || LANES[c.stage].word];
+  // A title that ends in a comma or a colon would read as two stops, as in reviewed,, To check.
+  const parts = [c.title.replace(/[\s,;:]+$/, ''), verdict || LANES[c.stage].word];
   if (c.next && NEXT[c.next]) parts.push(NEXT[c.next].toLowerCase());
   if (c.lost) parts.push('lost');
   if (c.reason) parts.push(c.reason);

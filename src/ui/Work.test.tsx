@@ -160,6 +160,7 @@ describe('the board of the work', () => {
   it('names a card for a screen reader with its stage, whose move it is, and lost', () => {
     expect(labelOfCard(BOARD.cards[2])).toBe('Title of l, Stopped, your move, lost, Its worker was replaced before it ended, so it cannot go on.');
     expect(labelOfCard(BOARD.cards[3])).toBe('Title of d, checked');
+    expect(labelOfCard(card('c', 'working', { title: 'Write the email, have it reviewed,' }))).toBe('Write the email, have it reviewed, Working');
   });
 
   it('says on top what waits for the person, and a part takes the focus to its lane', async () => {
