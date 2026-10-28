@@ -1297,7 +1297,8 @@ radius, a shadow, a type size, or a motion.
   look of the h4.
 - **The page of a duty.** The line of a run that the address opens comes
   to the top of the pane, and stays there while the page settles, until
-  the person scrolls, types, or touches the pane. A result says its
+  the person scrolls, types, or touches the pane. Only the pane scrolls,
+  so the header of the pane stays in sight. A result says its
   verdict with the light of the board: to check (amber, still), accepted
   (green), sent back (red), or unchecked (grey).
 - **A run at a limit of its budget.** A limit is no fault: the run says at

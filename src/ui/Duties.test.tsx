@@ -502,21 +502,21 @@ describe('the page of a duty', () => {
     expect(words).toEqual(['to check', 'accepted', 'sent back', 'unchecked', 'failed']);
   });
 
-  it('brings the line of the run that the address opens to the top of the pane (L9)', async () => {
-    const seen: { el: Element; arg: unknown }[] = [];
-    const was = Element.prototype.scrollIntoView;
-    Element.prototype.scrollIntoView = function (this: Element, arg?: unknown) {
-      seen.push({ el: this, arg });
-    } as typeof was;
+  it('brings the line of the run that the address opens to the top of its pane, and scrolls nothing else (L9)', async () => {
+    const was = Element.prototype.getBoundingClientRect;
+    // The line stands 600 pixels below the top of its pane.
+    Element.prototype.getBoundingClientRect = function (this: Element) {
+      const top = this.classList.contains('duty-run') && this.classList.contains('open') ? 700 - ((this.closest('.scroll') as HTMLElement).scrollTop || 0) : 100;
+      return { top, bottom: top, left: 0, right: 0, width: 0, height: 0, x: 0, y: top, toJSON() {} } as DOMRect;
+    };
     try {
       api = fakeApi({ ...one(REPORT, [{ at: ago(10), slot: ago(10), run: '01KOPEN', state: 'completed', costUSD: 0.1 }]), 'GET /v1/runs/01KOPEN': { id: '01KOPEN', agent: 'scribe', state: 'completed', seq: 3, createdAt: ago(20), updatedAt: ago(10) } });
-      mount(<DutyMain name="daily-report" run="01KOPEN" />);
+      const el = mount(<DutyMain name="daily-report" run="01KOPEN" />);
       await settle();
-      const line = seen.find((x) => x.el.classList.contains('duty-run'));
-      expect(line).toBeTruthy();
-      expect(line!.arg).toEqual({ block: 'start' });
+      expect((el.querySelector('.duty-body') as HTMLElement).scrollTop).toBe(600);
+      expect(document.documentElement.scrollTop).toBe(0);
     } finally {
-      Element.prototype.scrollIntoView = was;
+      Element.prototype.getBoundingClientRect = was;
     }
   });
 

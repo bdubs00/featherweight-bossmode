@@ -798,18 +798,22 @@ function DutyRunPane({ runId, who }: { runId: string; who: string }) {
   useEffect(() => {
     const el = box.current;
     const line = el && (el.closest('.duty-run') as HTMLElement | null);
-    if (!line || typeof line.scrollIntoView !== 'function') return;
-    const pane = line.closest('.scroll');
+    const pane = line && (line.closest('.scroll') as HTMLElement | null);
+    if (!line || !pane) return;
     let moved = false;
     const mine = () => (moved = true);
     const events = ['wheel', 'touchstart', 'keydown', 'mousedown'];
-    for (const e of events) pane && pane.addEventListener(e, mine, { passive: true });
-    const align = () => !moved && line.isConnected && line.scrollIntoView({ block: 'start' });
+    for (const e of events) pane.addEventListener(e, mine, { passive: true });
+    // Only the pane scrolls, never the page around it, so the header of the pane stays.
+    const align = () => {
+      if (moved || !line.isConnected) return;
+      pane.scrollTop += line.getBoundingClientRect().top - pane.getBoundingClientRect().top;
+    };
     align();
     const timers = [300, 1000].map((ms) => setTimeout(align, ms));
     return () => {
       for (const t of timers) clearTimeout(t);
-      for (const e of events) pane && pane.removeEventListener(e, mine);
+      for (const e of events) pane.removeEventListener(e, mine);
     };
   }, [runId, arrived]);
   return (
