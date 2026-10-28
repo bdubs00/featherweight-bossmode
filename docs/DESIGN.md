@@ -1178,3 +1178,12 @@ Left out, and why:
   editor shows none.
 - The approvals and questions of a duty that sit on a bridge show in their
   bridge, so the items of the inbox of those kinds add no row.
+
+### 11.11 The Tasks place (prototype of 2026-10-27)
+
+A person who has not read the docs says what they need done, reads the plan back, and starts it. The place has no list pane and no details pane. The main pane holds, top to bottom: the door (a heading, a recess of three lines, and Read it back), the templates or the readback, and the board.
+
+- The readback is a card, because it waits for a decision: the hard edge, the groove band, and the one orange key, Start. A definition list holds its rows, a muted label of 148 pixels beside each value, and one line under a narrow window.
+- The cost is a field with no value. Start refuses an empty field with the error under it. The page never fills a cost.
+- The board is a kanban board of four columns in the order of attention: Needs you, Working, Coming up, and Done. A column is a recess with its heading and its count chip, amber for Needs you once it holds a card. A card is a key on paper with a hard drop of one pixel, the mark of its agent at 20 pixels, its title, and its status light with its word. A card that needs you takes `--wash-need`. A medium window shows two columns, and a narrow one stacks them.
+- The app bar shows four places and More while the person has not asked for every place. The choice lives in the browser, `fw.bossmode.everyPlace`. A narrow window keeps the bar at the bottom of the Tasks place, because the place has no list.

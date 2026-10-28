@@ -479,6 +479,9 @@ function checkNow(c) {
   return { found, count: found.length, wakes };
 }
 
+// The door of the Tasks place (routes-door.mjs) reads words with the same grammar.
+export { parseSay, readbackOf, nextOf, zoneOk };
+
 export function register({ on, refuse, readJson, now, AGENTS, admin, S, publish }) {
   const T0 = Date.now();
   ctx.bridges = S.bridges;

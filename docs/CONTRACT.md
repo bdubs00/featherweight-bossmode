@@ -1586,3 +1586,53 @@ The page treats an archived run as a run that ended:
 - An archived run keeps no worker busy, takes no decision, and the page
   reads it once, with no poll and no live answer.
 
+
+## 19. The door and the board of the Tasks place (prototype of 2026-10-27)
+
+The page chose these shapes, and `fake/routes-door.mjs` serves them. No
+workbench serves them yet. `GET /v1/bossmode` carries `door: true` when the
+front serves both routes.
+
+| Route | What the page does with it |
+|---|---|
+| `POST /v1/tasks/plan` | `{"words", "agent"?, "tell"?}`, with the header `X-Time-Zone`. Read it back sends the words. A change of Someone else sends `agent`, and a change of You hear of it sends `tell`. The answer is the plan below. A 400 `{"problems": ["words: ..."]}` shows under the door. The route starts nothing and saves nothing. |
+| `GET /v1/tasks` | `{"tasks": [<card>]}`. The board reads it when the place opens, each minute, and after a start. |
+
+A plan:
+
+```json
+{
+  "words": "Every night, check the web hosts for drift. Tell me only when something drifted.",
+  "kind": "repeat",
+  "title": "Check the web hosts for drift",
+  "who": [{ "agent": "ops", "name": "Ops", "does": "does it" }],
+  "others": [{ "agent": "writer", "name": "Writer" }],
+  "when": { "said": "every night", "readback": "Every day at 2:00 AM, New York time.", "next": ["2026-10-28T06:00:00Z"] },
+  "cost": { "basis": "Runs of Ops cost $0.02 to $0.15 in the last 30 days.", "per": "run", "runsPerMonth": 30 },
+  "asks": ["Before it changes a host", "When it is not sure what you mean. The question waits for you"],
+  "quiet": ["While it works", "When it finds nothing: one line in Done, and no message"],
+  "tell": "found",
+  "result": "A page in the wiki for each run, and a card in Done",
+  "gaps": [],
+  "problems": [],
+  "start": { "duty": { "name": "check-the-web-hosts-for-drift", "agent": "ops", "when": { "schedule": { "repeat": "daily", "times": ["02:00"] } }, "do": { "ask": { "message": "..." } }, "limits": { "budget": {}, "overlap": "skip", "catchUp": "6h" }, "whileAway": { "decider": "nobody", "timeout": "24h", "then": "deny" }, "notify": { "failure": ["owner"], "needsYou": ["owner"], "result": ["owner"], "resultWhen": "found" } } },
+  "open": "#duties/check-the-web-hosts-for-drift"
+}
+```
+
+- `kind` is `once`, `repeat`, or `team`. `start` holds one of `duty` (the
+  record of `PUT /v1/duties/{name}`), `bridge` (the body of
+  `POST /v1/bridges`), or `run` (`member` and the body of
+  `POST /v1/runs?member=`). Start sends it to that route, with the cost of
+  the person: `limits.budget.maxCostUSD` of a duty, `caps.maxCostUSD` of a
+  bridge, and `budget.maxCostUSD` of a run.
+- The plan never names a cost. `cost.basis` says what runs of the agent
+  cost, and `runsPerMonth` lets the page say the most a month can cost.
+- **New for the workbench:** `notify.result` and `notify.resultWhen`
+  (`always` or `found`) of a duty, and `caps.maxCostUSD` of a bridge.
+  Neither exists yet.
+
+A card: `{"id", "kind", "column", "title", "agents", "status", "at", "open", "detail"?, "cost"?}`.
+`column` is `needs`, `working`, `next`, or `done`. `at` is the start of a
+wait, the start of work, the next start, or the end. `open` is the address
+of the page that holds the work.

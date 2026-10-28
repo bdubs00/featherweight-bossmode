@@ -66,6 +66,7 @@ export interface SkillItem {
 
 export type Route =
   | { place: 'home' }
+  | { place: 'tasks' }
   | { place: 'activity'; item?: string }
   | { place: 'manager'; run?: string; fresh?: boolean }
   | { place: 'chat'; run?: string; fresh?: boolean; details?: boolean }
@@ -81,7 +82,7 @@ export type Route =
   | { place: 'pages'; path?: string; mode: 'tree' | 'read' | 'history' | 'edit' | 'create'; version?: number };
 
 /** The places of the app bar. */
-export type Place = 'activity' | 'chat' | 'bridges' | 'fleet' | 'duties' | 'skills' | 'routines' | 'wiki' | 'manager' | 'account';
+export type Place = 'tasks' | 'activity' | 'chat' | 'bridges' | 'fleet' | 'duties' | 'skills' | 'routines' | 'wiki' | 'manager' | 'account';
 
 /** The column that a narrow window shows for a route. */
 export type Column = 'list' | 'main' | 'details';
@@ -107,6 +108,9 @@ export function parseRoute(hash: string): Route {
   switch (head) {
     case 'bridges':
       return { place: 'home' };
+    // #tasks is the door and the board of the tasks of the person.
+    case 'tasks':
+      return { place: 'tasks' };
     case 'activity':
       // The item is the key of a row of the inbox, such as d:<run>/<approval>.
       return rest.length && rest.join('/') ? { place: 'activity', item: rest.map(dec).join('/') } : { place: 'activity' };
@@ -206,6 +210,8 @@ export function hrefOf(r: Route): string {
   switch (r.place) {
     case 'home':
       return '#';
+    case 'tasks':
+      return '#tasks';
     case 'activity':
       return r.item ? '#activity/' + encPath(r.item) : '#activity';
     case 'manager':
@@ -260,6 +266,8 @@ export function hrefOf(r: Route): string {
 /** placeOf names the place of the app bar that a route belongs to. */
 export function placeOf(r: Route): Place {
   switch (r.place) {
+    case 'tasks':
+      return 'tasks';
     case 'activity':
       return 'activity';
     case 'manager':

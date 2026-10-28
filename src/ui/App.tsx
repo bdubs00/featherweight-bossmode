@@ -27,7 +27,8 @@ import { applyTheme, themeOf } from '../lib/theme';
 import { canonicalPath, columnOf, go, parentOf, parseRoute, placeOf, type Place, type Route } from '../lib/route';
 import { isTyping } from './keys';
 import { clearNotice, clearSaid, currentSaidLink, holdSaid, showError, undoSaid, useNotice, useSaid, useUndo } from './notice';
-import { EmptyPane, Shell, shownOf } from './Shell';
+import { EmptyPane, Shell, everyPlace, shownOf } from './Shell';
+import { TasksMain } from './Tasks';
 import { BridgeList } from './BridgeList';
 import { Channel } from './Channel';
 import { Roster } from './Roster';
@@ -166,6 +167,8 @@ interface Panes {
 /** panesOf names the screen of each pane for a route. */
 function panesOf(r: Route): Panes {
   switch (r.place) {
+    case 'tasks':
+      return { list: null, main: <TasksMain />, details: null };
     case 'home':
       return { list: <BridgeList current="" />, main: <Home />, details: null };
     case 'new':
@@ -524,7 +527,9 @@ export function App() {
     );
   }
 
-  const panes = panesOf(route);
-  const place = placeIn(route);
-  return <Shell route={route} place={place} list={panes.list} main={panes.main} details={panes.details} notice={notice ? <Notice text={notice} /> : said ? <Said text={said} undo={undo} /> : fresh ? <NewBuild /> : null} onSignOut={signOut} />;
+  // With the door, the home of a person who has not asked for every place is Tasks, not Bridges.
+  const shown: Route = route.place === 'home' && config && config.door && !everyPlace() ? { place: 'tasks' } : route;
+  const panes = panesOf(shown);
+  const place = placeIn(shown);
+  return <Shell route={shown} place={place} list={panes.list} main={panes.main} details={panes.details} notice={notice ? <Notice text={notice} /> : said ? <Said text={said} undo={undo} /> : fresh ? <NewBuild /> : null} onSignOut={signOut} />;
 }

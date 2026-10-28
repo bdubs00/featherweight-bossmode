@@ -1121,3 +1121,30 @@ The typing line takes the place of the status message of an answer that is on it
 | `Working: <tool>` (a quiet line of the thread) | change | the phrase `Working: <tool>` on the typing line, when the run gives no phrase of its step | done |
 | new | add | in a bridge: `<seat> is working`, `<seat> and <seat> are working`, or `<seat>, <seat>, and <n> more are working`, with `: <phrase>` when one seat works | done |
 | new | add | for a screen reader: `<name> is working.`, or `<name> is working: <phrase>`, without a second `Working` | done |
+
+## 13. The Tasks place: the door and the board (prototype of 2026-10-27)
+
+The Tasks place shows only when `GET /v1/bossmode` carries `door: true`. It is the home of a person who has not asked for every place. A task is what a person asks of an agent, as section 2 says. The person never picks among a duty, a bridge, a run, or a chat: the readback says how the task runs.
+
+### src/ui/Tasks.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| new | add | `Tasks` (the place and the title of the pane) | flow/door |
+| new | add | `What do you need done?` (the label of the door) and the placeholder `Every Monday at 9am, sum up what our competitors shipped last week.` | flow/door |
+| new | add | `Read it back`, and `Read it back again` after the words changed | flow/door |
+| new | add | `Or start from`, and the templates `A weekly summary of competitors`, `A draft, reviewed before it goes out`, `A nightly check of hosts`, `A big job, split across agents`, `New tickets, sorted each morning`, and `A question, answered now` | flow/door |
+| new | add | the rows of the readback: `Who`, `When`, `What it can cost`, `It asks you`, `It stays quiet`, `You hear of it`, `The result`, and `It cannot` | flow/door |
+| new | add | `<agent> does it`, `checks it`, `takes a share`, `tests each part`, and `Someone else` with `Keep <agent>` | flow/door |
+| new | add | `The most one run can cost`, and for a team `The most the whole team can spend` | flow/door |
+| new | add | `At most $<n> a month: about <n> runs at most $<n> each.` | flow/door |
+| new | add | `Each result`, `Only when it finds something`, and `Only when it fails` | flow/door |
+| new | add | the errors `Say what you need done.`, `Say the most that one run can cost, such as 0.50.`, and `Say the most that the whole team can spend, such as 5.00.` | flow/door |
+| new | add | `Change the details` and `Start`, then `Set. <readback>` or `Started. <agents> work on it now.` with `Open it` | flow/door |
+| new | add | `Your tasks`, the columns `Needs you`, `Working`, `Coming up`, and `Done`, and for an empty column `Nothing waits for you.`, `Nothing works now.`, `Nothing is planned.`, and `Nothing done this week.` | flow/door |
+
+### src/ui/Shell.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| nine places | change | with the door: `Tasks`, `Activity`, `Chat`, and `Wiki`, the place of the screen that shows, and the key `More`, which shows every place and then says `Fewer` | flow/door |
