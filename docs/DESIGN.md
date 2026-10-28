@@ -1213,8 +1213,9 @@ door and the lanes above it.
   at the top of the pane while its lane scrolls under it, on the ground of
   the pane. A card is a surface of the card ground with a soft line. Its
   title is the link, in ink, underlined on hover, and the link covers the
-  whole card. A lane is one stop of the Tab key, and the arrows move
-  between its cards. Done shows its five newest cards and the quiet key
+  whole card. A lane is one stop of the Tab key. ArrowUp and ArrowDown
+  move between its cards, and ArrowLeft and ArrowRight move to the lane
+  before or after. Done shows its five newest cards and the quiet key
   `Show all <n>`. An empty lane has a still grey light, because a lit or
   breathing light says that something is there. A board with no task says
   its sentence above the lanes, with a key that takes the focus to the

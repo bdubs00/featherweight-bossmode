@@ -11,7 +11,8 @@
 // and the key Show all. A card To check offers Looks right and Needs work.
 // The card opens the place that holds the work: for a decision or a result
 // of the person, the card in Activity that ends it. Each lane is one stop
-// of the Tab key, and the arrows move between its cards. The board reads
+// of the Tab key: ArrowUp and ArrowDown move between its cards, and
+// ArrowLeft and ArrowRight move to the lane before or after. The board reads
 // GET /v1/work again every 30 seconds, after a stream event, and after a
 // start at the door, so a card moves without a reload.
 
@@ -299,13 +300,28 @@ export function WorkBoardView({ board, failed, onDecided, onRetry }: { board: Wo
           </Button>
         </div>
       )}
-      <div class="work-board">
+      <div class="work-board" onKeyDown={acrossLanes}>
         {board.lanes.map((l) => (
           <LaneView key={l.stage} stage={l.stage} count={l.count} oldest={l.oldest} cards={board.cards.filter((c) => c.stage === l.stage)} now={now} onDecided={onDecided} />
         ))}
       </div>
     </>
   );
+}
+
+/** acrossLanes moves the focus from a card to the card that holds the Tab stop of the lane before or after, with ArrowLeft and ArrowRight. A lane with no card is skipped. */
+function acrossLanes(e: KeyboardEvent): void {
+  if ((e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') || e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) return;
+  const t = e.target as HTMLElement;
+  if (!t.matches('[data-item]')) return;
+  const board = e.currentTarget as HTMLElement;
+  const lanes = [...board.querySelectorAll<HTMLElement>('.work-cards')].filter((l) => l.querySelector('[data-item]'));
+  const i = lanes.findIndex((l) => l.contains(t));
+  const to = lanes[i + (e.key === 'ArrowRight' ? 1 : -1)];
+  if (i < 0 || !to) return;
+  e.preventDefault();
+  const item = to.querySelector<HTMLElement>('[data-item][tabindex="0"]') || to.querySelector<HTMLElement>('[data-item]');
+  if (item) item.focus();
 }
 
 /** focusDoor gives the focus to the field of the door, for a board with no task. */

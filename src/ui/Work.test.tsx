@@ -196,6 +196,15 @@ describe('the board of the work', () => {
         links[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
       });
       expect(document.activeElement).toBe(links[1]);
+      // ArrowRight goes to the next lane with cards, and ArrowLeft comes back.
+      await act(async () => {
+        links[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
+      });
+      expect(document.activeElement && document.activeElement.textContent).toBe('Title of b');
+      await act(async () => {
+        document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true, cancelable: true }));
+      });
+      expect(document.activeElement).toBe(links[1]);
       // Every lane with cards holds exactly one stop.
       for (const lane of el.querySelectorAll('.work-cards')) {
         const stops = lane.querySelectorAll('.work-title[tabindex="0"]').length;
