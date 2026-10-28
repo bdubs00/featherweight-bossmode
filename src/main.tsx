@@ -14,6 +14,7 @@ import './styles/fleet.css';
 import './styles/wiki.css';
 import './styles/chat.css';
 import './styles/routines.css';
+import './styles/knowhow.css';
 import './styles/duties.css';
 
 applyChoice(readChoice());

@@ -129,17 +129,27 @@ export function lastMove(r: Pick<RoutineRecord, 'history'>): Move | undefined {
   return h.length ? h[h.length - 1] : undefined;
 }
 
-/** metaOf is the one meta line of a row: the agent and the figure of its status. */
-export function metaOf(r: RoutineRecord, now = Date.now()): string {
+/**
+ * metaOf is the one meta line of a row: the agent and the figure of its
+ * status. With withAgent false, as in the tab Routines of one agent, the
+ * line leaves the agent out.
+ */
+export function metaOf(r: RoutineRecord, now = Date.now(), withAgent = true): string {
+  const fig = figureOf(r, now);
+  if (!withAgent) return fig;
+  return fig ? `${r.agent}, ${fig}` : r.agent;
+}
+
+/** figureOf is the figure of the status of a routine for its meta line, or "". */
+function figureOf(r: RoutineRecord, now: number): string {
   const s = statusOf(r);
   const ev = r.evidence;
   const t = ev ? countsOf(ev) : null;
-  if (s === 'needs-you') return t ? `${r.agent}, rehearsed ${units(t.decided)}` : r.agent;
-  if (s === 'live') return ev ? `${r.agent}, ${num(weekOf(ev.days, now))} this week` : r.agent;
-  if (s === 'rehearsing') return t && t.acted > 0 ? `${r.agent}, ${pct(t.agreed / t.acted)} agreed over ${units(t.acted)}` : r.agent;
+  if (s === 'needs-you') return t ? `rehearsed ${units(t.decided)}` : '';
+  if (s === 'live') return ev ? `${num(weekOf(ev.days, now))} this week` : '';
+  if (s === 'rehearsing') return t && t.acted > 0 ? `${pct(t.agreed / t.acted)} agreed over ${units(t.acted)}` : '';
   const m = lastMove(r);
-  const when = m ? since(m.at, now) : '';
-  return when ? `${r.agent}, ${when}` : r.agent;
+  return m ? since(m.at, now) : '';
 }
 
 /** The three figures of the sign-off card. agreed gives the share with the tickets that it counts, such as 97.6% of 1,432. */

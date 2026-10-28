@@ -43,7 +43,8 @@ import { NewBridge } from './NewBridge';
 import { NewAgent } from './NewAgent';
 import { Appearance } from './Appearance';
 import { SkillActions, SkillList, SkillMain } from './Skills';
-import { RoutineAgent, RoutineList, RoutineMain } from './Routines';
+import { RoutineAgent, RoutineMain } from './Routines';
+import { KnowhowAgents, KnowhowMain } from './Knowhow';
 import { DutyList, DutyMain } from './Duties';
 import { PlaybookList, PlaybookMain } from './Playbooks';
 import { Signin } from './Signin';
@@ -186,11 +187,15 @@ function panesOf(r: Route): Panes {
       return { list: <FleetList />, main: <NewAgent />, details: null };
     case 'skills':
       return { list: <SkillList current={r.item} />, main: <SkillMain item={r.item} add={r.add} />, details: <SkillActions item={r.item} /> };
+    case 'knowhow':
+      return { list: <KnowhowAgents current={r.agent} tab={r.tab || 'learned'} />, main: <KnowhowMain agent={r.agent} tab={r.tab || 'learned'} />, details: null };
     case 'routines':
+      // A routine lives in the tab Routines of Know-how: the agents in the list, the routine, and the week of its agent.
+      if (!r.agent || !r.name) return { list: <KnowhowAgents tab="routines" />, main: <KnowhowMain tab="routines" />, details: null };
       return {
-        list: <RoutineList agent={r.agent} name={r.name} />,
+        list: <KnowhowAgents current={r.agent} tab="routines" />,
         main: <RoutineMain agent={r.agent} name={r.name} tab={r.tab || 'steps'} />,
-        details: r.agent && r.name ? <RoutineAgent agent={r.agent} name={r.name} /> : null,
+        details: <RoutineAgent agent={r.agent} name={r.name} />,
       };
     case 'duties':
       return r.tab === 'playbooks' ? { list: <PlaybookList current={r.playbook} />, main: <PlaybookMain name={r.playbook} />, details: null } : { list: <DutyList current={r.name} />, main: <DutyMain name={r.name} edit={r.edit} fresh={r.fresh} seed={r.seed} run={r.run} />, details: null };
@@ -466,7 +471,7 @@ export function App() {
         // goes back only from what the details pane or the main pane opened.
         const wide = window.matchMedia(THREE_PANES).matches;
         // A form stays too, as the editor of a duty does: a stray Escape never throws its work away.
-        if (wide && shown !== 'details' && (r.place === 'bridge' || r.place === 'home' || r.place === 'manager' || r.place === 'chat' || r.place === 'activity' || r.place === 'member' || r.place === 'routines' || r.place === 'duties' || r.place === 'new' || r.place === 'new-agent' || (r.place === 'fleet' && !r.board) || (r.place === 'skills' && !r.item))) return;
+        if (wide && shown !== 'details' && (r.place === 'bridge' || r.place === 'home' || r.place === 'manager' || r.place === 'chat' || r.place === 'activity' || r.place === 'member' || r.place === 'routines' || r.place === 'knowhow' || r.place === 'duties' || r.place === 'new' || r.place === 'new-agent' || (r.place === 'fleet' && !r.board) || (r.place === 'skills' && !r.item))) return;
         e.preventDefault();
         go(backOf(r));
       }

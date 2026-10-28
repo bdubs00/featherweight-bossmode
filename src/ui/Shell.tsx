@@ -87,7 +87,7 @@ const PLACES: PlaceItem[] = [
   { id: 'fleet', label: 'Fleet', glyph: 'fleet', href: '#fleet' },
   { id: 'duties', label: 'Duties', glyph: 'duties', href: '#duties' },
   { id: 'skills', label: 'Skills', glyph: 'skills', href: '#skills' },
-  { id: 'routines', label: 'Routines', glyph: 'routines', href: '#routines' },
+  { id: 'knowhow', label: 'Know-how', glyph: 'knowhow', href: '#knowhow' },
   { id: 'wiki', label: 'Wiki', glyph: 'wiki', href: '#pages' },
   { id: 'manager', label: 'Manager', glyph: 'manager', href: '#manager' },
 ];
@@ -106,7 +106,7 @@ const PLACE_NAMES: Record<Place, string> = {
   fleet: 'Fleet',
   duties: 'Duties',
   skills: 'Skills',
-  routines: 'Routines',
+  knowhow: 'Know-how',
   wiki: 'Wiki',
   manager: 'Manager',
   account: 'Appearance',
@@ -241,11 +241,11 @@ function AccountMenu({ onSignOut, onReach }: { onSignOut: () => void; onReach: (
 
 /**
  * placesOf gives the places of the app bar for the settings of the front.
- * Routines shows once the settings say that the front keeps routines, and
- * an older front that leaves the key out keeps the place.
+ * Know-how always shows: an agent keeps notes on a front without routines,
+ * and the place hides only its tab Routines there.
  */
-export function placesOf(config: BossConfig | null): PlaceItem[] {
-  return config && config.routines !== false ? PLACES : PLACES.filter((it) => it.id !== 'routines');
+export function placesOf(_config: BossConfig | null): PlaceItem[] {
+  return PLACES;
 }
 
 /**
