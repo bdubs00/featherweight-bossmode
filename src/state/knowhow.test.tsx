@@ -118,6 +118,28 @@ describe('the know-how of an agent', () => {
     expect(api.calls[0].path).toBe('/v1/knowhow/waiting');
     expect(knowhow.get().allWaiting!.map((w) => w.agent)).toEqual(['triage']);
   });
+
+  it('keeps the switch and what waits for an agent when the list of every agent answers last', async () => {
+    let release!: () => void;
+    const late = new Promise<void>((r) => (release = r));
+    api = fakeApi(
+      routes({
+        'GET /v1/knowhow/waiting?agent=triage': { waiting: [] },
+        'GET /v1/knowhow/waiting': async () => {
+          await late;
+          return { body: { waiting: [] } };
+        },
+      }) as never,
+    );
+    const all = loadAllWaiting();
+    await loadAgent('triage');
+    expect(knowhow.get().agents.triage.settings).toMatchObject({ askFirst: true });
+    release();
+    await all;
+    expect(knowhow.get().allWaiting).toEqual([]);
+    expect(knowhow.get().agents.triage.settings).toMatchObject({ askFirst: true });
+    expect(knowhow.get().agents.triage.waiting).toEqual([]);
+  });
 });
 
 describe('a note', () => {

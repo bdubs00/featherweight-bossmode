@@ -179,6 +179,35 @@ describe('the header of an agent', () => {
     expect((head.querySelector('input[role="switch"]') as HTMLInputElement).checked).toBe(false);
   });
 
+  it('keeps the switch and lets an answered card go when the list of every agent answers last', async () => {
+    let release!: () => void;
+    let kept = false;
+    api = fakeApi(
+      routes({
+        'GET /v1/knowhow/waiting?agent=triage': () => ({ body: { waiting: kept ? [] : [WAIT] } }),
+        'GET /v1/knowhow/waiting': async () => {
+          if (kept) await new Promise<void>((r) => (release = r));
+          return { body: { waiting: kept ? [] : [WAIT] } };
+        },
+        ['POST /v1/knowhow/waiting/' + WAIT.id]: () => {
+          kept = true;
+          return { body: { kept: true, entry: null } };
+        },
+      }) as never,
+    );
+    const list = mount(<KnowhowAgents current="triage" />);
+    const el = mount(<KnowhowMain agent="triage" tab="learned" />);
+    await settle();
+    expect(el.querySelector('.kh-waiting .card')).not.toBeNull();
+    click(keyNamed(el.querySelector('.kh-waiting .card')!, 'Keep'));
+    await settle();
+    release();
+    await settle();
+    expect(el.querySelector('.kh-waiting .card')).toBeNull();
+    expect(el.querySelector('.kh-head input[role="switch"]')).not.toBeNull();
+    expect(text(list.querySelector('.kh-row'))).not.toContain('1 change waits');
+  });
+
   it('keeps the header on every tab, and the cards of what waits on What it learned only', async () => {
     api = fakeApi(routes() as never);
     const el = mount(<KnowhowMain agent="triage" tab="notes" />);

@@ -151,11 +151,17 @@ export async function loadOlder(agent: string): Promise<void> {
   patch(agent, { journal: [...now, ...entries.filter((e) => !seen.has(e.id))], more: entries.length >= JOURNAL_PAGE });
 }
 
-/** loadAllWaiting reads the changes that wait for every agent, for the list of agents. */
+/**
+ * loadAllWaiting reads the changes that wait for every agent, for the list
+ * of agents. It copies the state after the answer, not before: a copy of
+ * before would put back what other reads stored meanwhile, such as the
+ * switch and the waiting list of an agent.
+ */
 export async function loadAllWaiting(): Promise<void> {
   watchStream();
   try {
-    set({ ...state, allWaiting: await knowhowApi.waiting() });
+    const allWaiting = await knowhowApi.waiting();
+    set({ ...state, allWaiting });
   } catch {
     // The list of agents works without it, with no agent marked.
     if (state.allWaiting === null) set({ ...state, allWaiting: [] });
