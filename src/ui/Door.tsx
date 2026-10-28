@@ -19,7 +19,7 @@ import { ApiError } from '../api/client';
 import type { ComponentChildren } from 'preact';
 import type { TaskPlan, TaskTell, Whoami } from '../api/types';
 import { hrefOf } from '../lib/route';
-import { nextWords, timeOf } from '../lib/duties';
+import { nextWords, timeOf, titleOfName } from '../lib/duties';
 import { list } from '../lib/words';
 import { loadDuties } from '../state/duties';
 import { loadBridges } from '../state/actions';
@@ -62,6 +62,9 @@ export function mayStartWork(me: Pick<Whoami, 'admin' | 'canCreate' | 'roles'> |
   return me.admin || me.canCreate || roles.length === 0 || roles.some((r) => r === 'owner' || r === 'operator');
 }
 
+/** agentWords names an agent as the rest of the page does: the name of its face, else its name with a capital, such as Writer for writer. */
+export const agentWords = (a: { agent: string; name?: string }): string => (a.name && a.name !== a.agent ? a.name : titleOfName(a.agent));
+
 /** costOf reads the cost that the person typed: a positive number of dollars, or null. */
 export function costOf(text: string): number | null {
   const t = text.trim().replace(/^\$/, '');
@@ -101,12 +104,12 @@ export async function startPlan(plan: TaskPlan, cost: number): Promise<Started> 
   if (s.bridge) {
     const b = await api.openBridge({ ...s.bridge, caps: { ...(s.bridge.caps || {}), maxCostUSD: cost } } as Parameters<typeof api.openBridge>[0]);
     loadBridges().catch(() => {});
-    return { title: plan.title, said: 'Started with ' + list(plan.who.map((w) => w.name)) + ' at ' + timeOf(new Date().toISOString()) + '.', href: hrefOf({ place: 'bridge', id: b.id, pane: 'none' }), made: { bridge: b.id } };
+    return { title: plan.title, said: 'Started with ' + list(plan.who.map(agentWords)) + ' at ' + timeOf(new Date().toISOString()) + '.', href: hrefOf({ place: 'bridge', id: b.id, pane: 'none' }), made: { bridge: b.id } };
   }
   if (s.run) {
     const r = await api.start(s.run.member, { ...s.run.body, budget: { maxCostUSD: cost } } as Parameters<typeof api.start>[1]);
     const chat = s.run.body.metadata && s.run.body.metadata['fw.view'] === 'quickchat';
-    return { title: plan.title, said: 'Started with ' + (plan.who[0] ? plan.who[0].name : 'the agent') + ' at ' + timeOf(new Date().toISOString()) + '.', href: chat ? hrefOf({ place: 'chat', run: r.id }) : hrefOf({ place: 'fleet', agent: s.run.body.agent }), made: { run: r.id } };
+    return { title: plan.title, said: 'Started with ' + (plan.who[0] ? agentWords(plan.who[0]) : 'the agent') + ' at ' + timeOf(new Date().toISOString()) + '.', href: chat ? hrefOf({ place: 'chat', run: r.id }) : hrefOf({ place: 'fleet', agent: s.run.body.agent }), made: { run: r.id } };
   }
   throw new Error('The plan names nothing to start.');
 }
@@ -177,21 +180,22 @@ function Readback({ plan, onPlan, onStarted, busy }: { plan: TaskPlan; onPlan: (
                 <li>
                   <Mark agent={w.agent} size={20} />
                   <span>
-                    <strong>{w.name}</strong> {w.count && w.count > 1 ? '(' + w.count + ') ' : ''}
+                    <strong>{agentWords(w)}</strong> {w.count && w.count > 1 ? '(' + w.count + ') ' : ''}
                     {w.does}
                   </span>
                 </li>
               ))}
             </ul>
-            {(!team || agentProblem) && plan.others.length > 0 && (
+            {/* A team can get another agent too: the plan then gives the shares to that agent. */}
+            {plan.others.length > 0 && (
               <label class="rb-other">
                 <span class="t-meta">{first ? 'Someone else' : 'Pick an agent'}</span>
                 <select class="recess" value="" onChange={(e) => onPlan((e.target as HTMLSelectElement).value || undefined)} disabled={busy}>
-                  <option value="">{first ? 'Keep ' + first.name : 'Pick one'}</option>
+                  <option value="">{first ? 'Keep ' + agentWords(first) : 'Pick one'}</option>
                   {plan.others
                     .filter((o) => !first || o.agent !== first.agent)
                     .map((o) => (
-                      <option value={o.agent}>{o.name}</option>
+                      <option value={o.agent}>{agentWords(o)}</option>
                     ))}
                 </select>
               </label>

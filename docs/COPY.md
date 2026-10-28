@@ -1154,6 +1154,8 @@ The page never shows pool, member, job, run id, or Task in these places.
 | `What it can cost` as the third row | change | the last row, beside Start, after `It cannot` | ux walk |
 | `Started. <agents> work on it now.` | change | `Started with <agents> at <time>.`, which stays true after the task ends, and under it `Now:` with the light and the word of its lane or its verdict and the reason of its card, from the board | ux walk |
 | the door for a person who can start no task, such as a viewer of every agent | change | no door, and the line `You can follow the work here. Only an owner or an operator of an agent can start a task.` | ux walk |
+| the name of an agent without a face in the readback, such as `writer does it` | change | the name with a capital, `Writer does it`, as the rest of the page names an agent | ux walk |
+| `Someone else` only for a task of one agent | change | also for a team: the plan then gives the shares to the agent that the person picks | ux walk |
 | `Next: <time>, <time>` | change | `Next: <time>; <time>`, because each time holds a comma | ux walk |
 
 ### src/ui/Work.tsx

@@ -129,6 +129,32 @@ describe('Door', () => {
     expect(f.calls.some((c) => c.method === 'PUT')).toBe(false);
   });
 
+  it('lets the person pick another agent for a team, and names an agent with a capital', async () => {
+    const team = plan({
+      kind: 'team',
+      who: [{ agent: 'reviewer', name: 'reviewer', does: 'takes a share', count: 3 }],
+      others: [{ agent: 'ops', name: 'ops' }, { agent: 'writer', name: 'Writer' }],
+      when: { readback: 'Now, once.', next: [] },
+      start: { bridge: { title: 'T', goal: 'G', members: [] } },
+    });
+    const f = fakeFetch([['POST', /\/v1\/work\/plan$/, () => team]]);
+    restore = f.restore;
+    const el = mount(<Door />);
+    act(() => [...el.querySelectorAll('button')].find((b) => b.textContent === 'A big job, split across agents')!.click());
+    act(() => [...el.querySelectorAll('button')].find((b) => b.textContent === 'Read it back')!.click());
+    await settle();
+    expect(el.querySelector('.rb-who strong')!.textContent).toBe('Reviewer');
+    const pick = el.querySelector('.rb-other select') as HTMLSelectElement;
+    expect([...pick.options].map((o) => o.textContent)).toEqual(['Keep Reviewer', 'Ops', 'Writer']);
+    act(() => {
+      pick.value = 'ops';
+      pick.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await settle();
+    const again = f.calls.filter((c) => c.method === 'POST').pop()!;
+    expect((again.body as { agent: string }).agent).toBe('ops');
+  });
+
   it('puts the cost last, beside Start, and says the next starts apart', async () => {
     const f = fakeFetch([['POST', /\/v1\/work\/plan$/, () => plan({ when: { said: 'every monday', readback: 'Every Monday at 9:00 AM, New York time.', next: ['2026-11-02T14:00:00Z', '2026-11-09T14:00:00Z'] }, gaps: ['No agent here can send email.'] })]]);
     restore = f.restore;
