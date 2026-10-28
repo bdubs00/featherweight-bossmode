@@ -1411,3 +1411,45 @@ export interface PackagesBody {
   python: string[];
   tools: string[];
 }
+
+/** A stage of a card of the board of the work, in the order of the flow. */
+export type WorkStage = 'waiting' | 'working' | 'needs-you' | 'stopped' | 'review' | 'done';
+
+/** One piece of work on the board, from GET /v1/work (docs/CONTRACT.md, section 19). */
+export interface WorkCard {
+  id: string;
+  /** conversation, bridge, duty, job, or event. */
+  kind: 'conversation' | 'bridge' | 'duty' | 'job' | 'event';
+  title: string;
+  /** Who asked: kind person, duty, app, manager, or agent; via page, mcp, queue, bridge, schedule, event, call, now, or manager. */
+  from: { kind: string; name?: string; via?: string };
+  stage: WorkStage;
+  /** Who moves it next: worker, agent, you, person, manager, or "" when it is done. */
+  next?: string;
+  reason?: string;
+  opened: string;
+  since: string;
+  ended?: string | null;
+  agents: string[];
+  parts: { waiting?: number; working?: number; needsYou?: number; stopped?: number; review?: number; done?: number; total: number };
+  links: { run?: string; approval?: string; bridge?: string; duty?: string; batch?: string; source?: string; runs?: string[] };
+  costUSD: number;
+  /** True when the pool replaced the worker of a part that had not ended. */
+  lost?: boolean;
+}
+
+/** One lane of the board: the cards of a stage, the cards whose next move is the person's, and the oldest wait. */
+export interface WorkLane {
+  stage: WorkStage;
+  count: number;
+  yours: number;
+  oldest?: string;
+}
+
+/** GET /v1/work: the board of the work of the person. */
+export interface WorkBoard {
+  sentence: string;
+  lanes: WorkLane[];
+  cards: WorkCard[];
+  days: number;
+}
