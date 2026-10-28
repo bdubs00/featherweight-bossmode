@@ -126,6 +126,7 @@ function Body({ v, onSaved }: { v: Value; onSaved: () => void }) {
         <Tile label="Done" figure={v.work.done.toLocaleString()}>
           <p class="t-meta">
             {v.work.failed + v.work.stopped} failed or stopped · {v.work.open} open
+            {(v.work.lost || 0) > 0 && <> · {v.work.lost} lost</>}
           </p>
         </Tile>
         <Tile

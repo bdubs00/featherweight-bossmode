@@ -16,6 +16,8 @@ export interface ValueCounts {
   failed: number;
   stopped: number;
   open: number;
+  /** Never ended: a pool replaced the worker while the piece worked or waited. */
+  lost?: number;
 }
 
 export interface ValueChecks {
