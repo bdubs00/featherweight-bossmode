@@ -4,7 +4,7 @@ import type { JournalEntry, NoteItem, NoteRecord, WaitingChange } from '../api/k
 import type { RoutineRecord } from '../api/routines';
 import type { Whoami } from '../api/types';
 import { forgetAgents } from '../state/agents';
-import { forgetKnowhow } from '../state/knowhow';
+import { forgetKnowhow, knowhowChanged } from '../state/knowhow';
 import { forgetRoutines } from '../state/routines';
 import { store } from '../state/store';
 import { dateWords } from '../lib/routines';
@@ -214,6 +214,19 @@ describe('the changes that wait', () => {
     expect(api.calls.find((c) => c.method === 'POST')!.body).toEqual({ keep: false });
     expect(text(el.querySelector('.kh-waiting .rt-changed'))).toBe('This note changed since. Read it again.');
     expect(currentNotice()).toBe('');
+  });
+
+  it('never moves a card of the first read, and settles once a card that arrives on the stream', async () => {
+    let n = 0;
+    const later: WaitingChange = { ...WAIT, id: 'w2', subject: { note: 'gotchas/printer.md' } };
+    api = fakeApi(routes({ 'GET /v1/knowhow/waiting?agent=triage': () => ({ body: { waiting: ++n > 1 ? [later, WAIT] : [WAIT] } }) }) as never);
+    const el = mount(<KnowhowMain agent="triage" tab="learned" />);
+    await settle();
+    expect(el.querySelector('.kh-waiting .card')!.classList.contains('settle')).toBe(false);
+    knowhowChanged({ kind: 'knowhow', agent: 'triage' });
+    await settle();
+    const cards = [...el.querySelectorAll('.kh-waiting .card')];
+    expect(cards.map((c) => c.classList.contains('settle'))).toEqual([true, false]);
   });
 
   it('shows a person who does not own the agent the change in a quiet card with no key, and no switch', async () => {

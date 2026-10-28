@@ -235,7 +235,7 @@ function KnowhowView({ agent, tab: asked }: { agent: string; tab: KnowhowTab }) 
         ) : (
           <Head agent={agent} owner={owner} />
         )}
-        {tab === 'learned' && !off && <Waiting agent={agent} owner={owner} name={name} />}
+        {tab === 'learned' && !off && <Waiting key={agent} agent={agent} owner={owner} name={name} />}
         {tab === 'learned' && !off && <Journal agent={agent} owner={owner} name={name} />}
         {tab === 'notes' && !off && <KnowhowNotes agent={agent} name={name} />}
         {tab === 'routines' && (
@@ -348,11 +348,8 @@ function Runs({ runs }: { runs?: string[] }) {
 function Waiting({ agent, owner, name }: { agent: string; owner: boolean; name: string }) {
   const list = useKnowhow((s) => s.agents[agent] && s.agents[agent].waiting);
   const [said, setSaid] = useState('');
+  // The changes of the first read never move. The pane draws a new Waiting for each agent, so a change of agent starts again.
   const seen = useRef<Set<string> | null>(null);
-  useEffect(() => {
-    setSaid('');
-    seen.current = null;
-  }, [agent]);
   if (list && !seen.current) seen.current = new Set(list.map((c) => c.id));
   if (!list || (list.length === 0 && !said)) return null;
   return (
