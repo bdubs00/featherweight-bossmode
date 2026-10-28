@@ -1135,6 +1135,7 @@ The page never shows pool, member, job, run id, or Task in these places.
 | nine places | change | with work: `Work`, `Results`, `Activity`, `Chat`, `Wiki`, and the place of the screen that shows | integration |
 | new | add | the key `More`, which shows every place in a wide window and then says `Fewer` | integration |
 | new | add | on a phone, the menu `More places` of More: `Bridges`, `Fleet`, `Duties`, `Skills`, `Routines`, and `Manager` | integration |
+| every place for every person | change | a person who operates no agent, such as a sponsor, gets no `Chat` and no `Wiki`, and the page opens on `Results` | drive/ux-results |
 
 ### src/ui/Door.tsx
 
@@ -1195,6 +1196,10 @@ The page never shows pool, member, job, run id, or Task in these places.
 | `Partial: 393 without a record` | change | `Partial: 393 tasks without a record of people`, with the tooltip `An older server kept no record of the checks and the actions of people for these tasks.` | drive/ux-results |
 | `$0.00 a done task` when no task is done | remove | the line shows only with a done task | drive/ux-results |
 | new | add | `About Needed nobody`: a decision of the manager or a timeout, and a thumb on the result, are no actions of a person. The meta adds `3 decisions without a named person`. | drive/ux-results |
+| `<n> waiting for you` from the open waits of the value | change | `<n> waiting for you` counts only the decisions and questions in the inbox of the person, with a link to the first. Other open waits say `<n> waiting for a person`, in grey, with no link. | drive/ux-results |
+| `48 min waiting on people, 0% of all the time to done` | change | `0% of the time to done waited on people`, then `1 h 3 min of waits on people in all, 3 still open` | drive/ux-results |
+| `<n> failed` for the failed and stopped tasks of a line | change | `<n> failed`, `<n> stopped`, and `<n> lost`, each on its own | drive/ux-results |
+| `1 actions of people` | change | `1 action of a person` | drive/ux-results |
 | new | add | `About Done`: what a task is. `About Spend`: what coordination is and why the spend says at least. `About Time to done` also says what the median and the bar count. | drive/ux-results |
 
 ### src/ui/Duties.tsx, src/ui/DutyEditor.tsx, src/lib/duties.ts
