@@ -97,7 +97,9 @@ a note that changed since, which answers 409. Its journal holds a routine
 that stepped back and a note that went out of date after a change to its
 page. The undo of the entry that learned that note answers 409. Triage
 held back 95 runs and Identity desk 6, so the two show both sides of the
-rule of 20. alice wrote one note of her own. The Duties place has
+rule of 20. alice keeps a note of her own with triage, which she owns, and
+with ops, which she runs as an operator. The fake answers in the shapes
+of the package knowhow of the workbench. The Duties place has
 five duties, and three duties that the server imported from its
 configuration: one with a message from the setup, one with a message of
 its own, and one that the setup locks. One duty reports

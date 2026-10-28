@@ -1164,6 +1164,10 @@ calibration, receipt, and template. A test reads every tab for them.
 | new | add | `Ask me before it keeps what it learns`, the switch of an owner | done |
 | new | add | `It asks an owner before it keeps what it learns.`, for a person who does not own the agent | done |
 | new | add | `Loading the figures.`, `Know-how is off on this server.` | done |
+| new | add | the question mark `Why Know-how is off`, with the reason of the server | done |
+| new | add | the reason of the server while the after-work review is off, such as `The after-work review is off: no agent is set.` | done |
+| `cost per job, down 16%` | change | the trend of the server: `down` or `up` with the change in percent from 20 runs, and `about the same` for flat | done |
+| `Held back 1 in 20 runs. Done well: …` | change | the line of the server, and from 20 held-back runs the page adds `Cost per job: $0.021 without, $0.020 with.` | done |
 
 ### src/ui/Knowhow.tsx: the changes that wait
 
@@ -1183,6 +1187,7 @@ calibration, receipt, and template. A test reads every tab for them.
 | new | add | the heads of the days: `Today`, `Yesterday`, or the date | done |
 | new | add | the sentence of an entry: `Learned the note <title>.`, `Changed the note <title>.`, `The note <title> went out of date.`, `The note <title> is resting.`, `Put away the note <title>.`, `Took back a change to the note <title>.` | done |
 | new | add | the sentence of a routine: `Proposed the routine <title>.`, `The routine <title> started rehearsing.`, `The routine <title> went live.`, `The routine <title> stepped back to rehearsing.`, `Retired the routine <title>.` | done |
+| new | add | `Paused the routine <title>.` and `The proposal of the routine <title> stayed out.`, two moves of the workbench that the contract does not name | done |
 | new | add | `By the after-work review`, `By you`, `By <agent>`, or `By <person>`. The server itself names no actor. | done |
 | new | add | `The run` for one run, else `Run 1`, `Run 2`, and so on | done |
 | new | add | `Undo` | done |
@@ -1202,4 +1207,5 @@ calibration, receipt, and template. A test reads every tab for them.
 | new | add | `Edit`, `Put away`, the field `Text`, `Cancel`, and `Save` | done |
 | new | add | `This note changed since. Read it again.`, after a 412 | done |
 | new | add | `Put away the note <title>.`, the notice | done |
+| new | add | `The change waits for a decision in What it learned.`, the notice of a write that waits (202) | done |
 | new | add | `Loading the notes.`, `Loading the note.`, `No note yet.` | done |

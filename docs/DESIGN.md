@@ -1240,24 +1240,29 @@ The work:
   comes the switch `Ask me before it keeps what it learns`. A person who
   does not own the agent gets no switch. For that person, a line says `It
   asks an owner before it keeps what it learns.` while the switch is on.
-- The rule of 20. With fewer than 20 held-back runs, the line says `Not
-  enough held-back runs yet.` No percentage of the place comes from fewer
-  than 20 runs. The share done by routines then gives counts, such as `4
-  of 12`, and the trend goes. Two costs that two decimals write the same
+  While the after-work review is off, a line gives the reason of the
+  server, such as `The after-work review is off: no agent is set.`
+- The rule of 20. The server applies it to the held-back runs and words
+  the line. Under 20, the line says `Not enough held-back runs yet.` The
+  page keeps the rule for its own figures. Under 20 runs, the share done
+  by routines gives counts, such as `4 of 12`, and the trend keeps only
+  its word, such as `down`. Two costs that two decimals write the same
   take three, so the line never compares $0.02 with $0.02.
 - The changes that wait. Each change is a card on top of What it learned,
   as a sign-off card sits on top of Steps: `Keep this?` with the amber
   light, the change in a sentence, the text of a note, its reason, and its
   runs. The keys are Not now and Keep, and Keep is the primary key. A
-  person who does not own the agent sees a quiet card with no key, which
-  says who decides. A 409 reads the changes again, and a quiet line above
-  the cards says `This note changed since. Read it again.` A card that
-  arrives on the stream settles once.
+  person who cannot decide the change sees a quiet card with no key, which
+  says who decides. A 409 reads the changes again. A quiet line above the
+  cards then says `This note changed since. Read it again.`, and the
+  change stays until a person drops it with Not now. A card that arrives
+  on the stream settles once.
 - What it learned. The journal, newest first, under a quiet heading per
   day. An entry holds its clock time and its sentence, with the name of
   its note or routine in bold. Under them come its reason, who made it,
   and links to its runs.
-  An entry that the server can take back has Undo, for an owner. A 409
+  An entry that the server can take back has Undo, once. Undo shows to a
+  person who can change its note or routine. A 409
   says under the entry `A later change touched this note. Take that one
   back first.` An undo that works puts `Undone:` and the sentence in the
   notice of the page. `Show older` reads the next 50 entries.
@@ -1267,8 +1272,11 @@ The work:
   of date` in amber that holds still, or `resting` in grey. The meta line
   holds its title, who wrote it, its time, and how often runs used it. A
   row opens in place: the text, the source that put it out of date with
-  its link, and the sources. A note that the person wrote has Edit and Put
-  away. A 412 reads the note again and shows its newer text above the
+  its link, and the sources. The notes of the person have Edit and Put
+  away: an operator changes the notes of their own scope, and an owner
+  also a note that they wrote for the agent. A change that waits for a
+  decision (202) says so in the notice of the page. A 412 reads the note
+  again and shows its newer text above the
   draft, which stays. A quiet line says `This note changed since. Read it
   again.` The next Save writes over the newer version.
 - Routines. The groups of the Routines place for this agent, with Find a
@@ -1277,9 +1285,10 @@ The work:
   tab. The week of its agent stays in the details pane.
 - The stream. A knowhow event reads again what the page holds of that
   agent while a pane of the place shows. A reset reads every agent again.
-- Know-how off. A server that answers 404 to the journal or to the
-  numbers keeps no know-how. The main pane then says `Know-how is off on
-  this server.`, and the tab Routines still works.
+- Know-how off. A server whose 404 says that Know-how is off keeps no
+  know-how. The main pane then says `Know-how is off on this server.`,
+  with the reason of the server behind a question mark. The tab Routines
+  still works.
 
 The words of section 2 of the contract are the only words of the place.
 The words that it forbids never show, and a test reads every tab for them.
