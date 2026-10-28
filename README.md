@@ -45,7 +45,7 @@ The code of the look:
 | `src/styles/fonts.css`, `base.css` | The typeface and the base styles |
 | `src/ui/primitives/` | The primitives, with `primitives.css` and their tests |
 | `src/ui/Shell.tsx`, `src/styles/shell.css` | The app bar and the three panes |
-| `src/styles/channel.css`, `fleet.css`, `wiki.css`, `chat.css`, `routines.css`, `duties.css` | The styles of the screens: the bridges, the fleet and the people, what you make, the quick chat, the routines, and the duties |
+| `src/styles/channel.css`, `fleet.css`, `wiki.css`, `chat.css`, `routines.css`, `knowhow.css`, `duties.css` | The styles of the screens: the bridges, the fleet and the people, what you make, the quick chat, the routines, Know-how, and the duties |
 
 ## Build
 
@@ -67,8 +67,12 @@ hostile input. They test the live answer of a run, the quick chat, and the
 agents of the fleet. They test the statuses of the workers and the seats,
 and the reads of a worker that sleeps. They test the words and the folds of
 a system line, and the links of every screen of the page. They test the
-Routines place: the groups, the sign-off card and its moves, the evidence,
-the runbook, and the week of an agent. They test the Duties place: the list,
+Know-how place: the agents, the four numbers with the rule of 20, the
+switch, the cards Keep this? with a 409, the journal with Undo and a 409,
+the notes with their labels, and an edit with a 412. They test that no
+forbidden word shows. They test the routines of the tab Routines: the
+groups, the sign-off card and its moves, the evidence, the runbook, and the
+week of an agent. They test the Duties place: the list,
 the page of a duty with the decisions of its history, the editor with its
 readback, its events, its actions, its tools, secrets, and filters of a
 check, Write the check for me with Cancel, the problems of the front beside
@@ -84,9 +88,16 @@ real workbench checks. It serves every route of `docs/CONTRACT.md` with
 sample data. The data holds two bridges, a channel of forty entries, an
 approval card, and a question card. It also holds a manager conversation
 and a quick chat with a history of six chats. Last come a fleet with two
-pools, a wiki of eight pages, and a face for every agent. The Routines place
-has nine routines of three agents: one needs your sign-off, four are live,
-one rehearses, one is proposed, and two are retired. The Duties place has
+pools, a wiki of eight pages, and a face for every agent. The tab Routines
+of Know-how has nine routines of three agents: one needs your sign-off,
+four are live, one rehearses, one is proposed, and two are retired.
+Know-how also holds the notes, the journal, and the numbers of three agents.
+Triage asks first, and two changes of it wait: a new note, and a change to
+a note that changed since, which answers 409. Its journal holds a routine
+that stepped back and a note that went out of date after a change to its
+page. The undo of the entry that learned that note answers 409. Triage
+held back 95 runs and Identity desk 6, so the two show both sides of the
+rule of 20. alice wrote one note of her own. The Duties place has
 five duties, and three duties that the server imported from its
 configuration: one with a message from the setup, one with a message of
 its own, and one that the setup locks. One duty reports

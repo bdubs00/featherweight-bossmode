@@ -858,6 +858,7 @@ stream route takes the same `Authorization` header as every route.
 | `member` | `{"kind": "member", "member": "default/crew-2", "state": "live", "time"}`, or `"gone": true` in place of `state` for a member that left the view |
 | `task` | `{"kind": "task", "member": "default/crew-2", "phase": "Running", "time"}`, or `"gone": true` |
 | `routine` | `{"kind": "routine", "agent": "triage", "name": "acknowledge-a-new-ticket"}`, on every change of a routine or its evidence, at most one per routine in 2 seconds. Section 15. |
+| `knowhow` | `{"kind": "knowhow", "agent": "triage"}`, on each change of a note, the journal, the switch, or what waits, at most one per agent in 2 seconds. Section 19. |
 
 The `activity` of a `run` event carries `phrase`. The `activity` of
 `GET /v1/runs/{id}` has no `phrase`, so a screen takes the phrase from the
@@ -1585,4 +1586,59 @@ The page treats an archived run as a run that ended:
   archived, failed, or canceled, the message starts a new run.
 - An archived run keeps no worker busy, takes no decision, and the page
   reads it once, with no poll and no live answer.
+
+## 19. Know-how
+
+The Know-how place reads the routes of section 5.3 of `docs/KNOWHOW.md` of
+the kernel. `src/api/knowhow.ts` holds the calls and the types, and
+`fake/routes-k.mjs` serves the same shapes. Where the contract gives no
+JSON, the page chose the simplest shape, and the table names each one.
+The page never calls `GET /v1/knowhow/runs`, which is for the kernel.
+
+| Route | What the page does with it |
+|---|---|
+| `GET /v1/knowhow/notes?agent=<name>` | `{"notes": [<item>]}`. The page sends no scope and no principal. It reads every note of the agent that the person can read: the agent notes, the notes of the person, and the notes of the duties of the agent. **Assumed:** each item carries `agent` and `scope`, as the record does, because the page needs the scope to open the note. An item without a scope counts as an agent note. `sources` of an item is the count of its sources. |
+| `GET /v1/knowhow/notes/{agent}/{scope}/{name}?principal=` | One record with `text`, `sources`, and `outOfDate`. `{scope}` is `agent` or `principal`, and the name keeps its slashes. `principal` goes only with a principal note. |
+| `PUT /v1/knowhow/notes/{agent}/{scope}/{name}?principal=` | `{"text", "ifHash", "sources"}`. **Assumed:** the page sends the sources of the record that it read, so an edit keeps them, and sends no `by` and no `run`. The front takes `by` from the person. A 412 reads the note again. The page then shows the newer text above the draft, and the next Save sends the newer hash. |
+| `DELETE /v1/knowhow/notes/{agent}/{scope}/{name}?principal=&ifHash=` | Put away. A 412 reads the note again. The page offers Edit and Put away only on a note whose `by` is `person:<subject>` of the person. |
+| `GET /v1/knowhow/journal?agent=<name>&limit=50&before=<time>` | `{"entries": [<entry>]}`, newest first. **Assumed:** `before` is the `at` of the oldest entry that the page holds, and a full page of 50 entries offers Show older. |
+| `POST /v1/knowhow/journal/{id}/undo` | No body. The page offers Undo only on an entry whose `undo` is not null, and only for an owner of the agent. A 409 shows under the entry in words. Any other answer reads the agent again. |
+| `GET` and `PUT /v1/knowhow/settings/{agent}` | `{"askFirst": false}`. The PUT sends the same shape. The page keeps an answer that holds `askFirst`. Only an owner sees the switch. |
+| `GET /v1/knowhow/waiting?agent=<name>` | `{"waiting": [<change>]}`. **Assumed:** a change is an entry of the journal that has not happened yet, with `text` for a note change. **Assumed:** without `agent`, the route answers the changes of every agent that the person can view, as `GET /v1/routines` does. The list of agents reads it once to mark the agents that need you. |
+| `POST /v1/knowhow/waiting/{id}` | `{"keep": true}` for Keep and `{"keep": false}` for Not now. A 409 reads the changes again and says so above the cards. **Assumed:** Not now sends `keep: false`, so the change leaves the list. |
+| `GET /v1/knowhow/summary?agent=<name>&days=7` | **Assumed** shape: `{"agent", "days", "normal": <figures>, "heldBack": <figures>, "costPerJobBefore", "notesCorrected"}`. The figures are `{"runs", "doneWell", "costPerJob", "byRoutines"}`, where `costPerJob` is a mean in dollars. `costPerJobBefore` is the mean of the days before, for the trend, or null. |
+
+A 404 of the journal or of the summary means that the server keeps no
+know-how. The place then says `Know-how is off on this server.` The tab
+Routines still reads section 15.
+
+The page reads the agent again on each `knowhow` event while a pane of the
+place shows, and every agent again after a reset. Reading needs the right
+to view the agent. A change needs the right to edit it, and the page
+offers a change where `roles` of `GET /v1/whoami` names the person
+`owner` of the agent.
+
+An entry of the journal:
+
+```json
+{
+  "id": "kh-04", "at": "2026-10-26T02:27:00Z", "agent": "triage",
+  "what": "learned",
+  "subject": { "note": "gotchas/gitea-labels.md", "scope": { "kind": "agent" } },
+  "why": "Two runs failed on a label with a space and passed without it.",
+  "runs": ["01K8..."], "by": "review", "undo": { "revision": 1 }
+}
+```
+
+A change that waits carries the same fields without `undo`, and `text`
+for a note. The summary of triage in the fake:
+
+```json
+{
+  "agent": "triage", "days": 7,
+  "normal": { "runs": 1817, "doneWell": 1653, "costPerJob": 0.0196, "byRoutines": 41 },
+  "heldBack": { "runs": 95, "doneWell": 78, "costPerJob": 0.021, "byRoutines": 0 },
+  "costPerJobBefore": 0.0215, "notesCorrected": 3
+}
+```
 

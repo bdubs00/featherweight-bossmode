@@ -343,7 +343,7 @@ centered, because they are not anyone's voice. Numbers in chips are centered
 in the chip. Nothing is justified.
 
 The places of the app bar, top to bottom: the logo well, Activity, Chat,
-Bridges, Fleet, Duties, Skills, Routines, Wiki, Manager, and the account at the foot. Each place has a 22-pixel
+Bridges, Fleet, Duties, Skills, Know-how, Wiki, Manager, and the account at the foot. Each place has a 22-pixel
 icon over a 12-pixel label. A narrow window puts the places in a bar at the
 bottom. There each place takes the width of its label, and the account key
 is 44 pixels wide. Under 440 pixels the labels take the condensed width of
@@ -361,7 +361,7 @@ at the top right of the icon.
 | Fleet | People: the seats grouped by bridge, then Not on a bridge | A direct conversation with a member, with the tabs Chat, Run, and Files, or the board | The profile of the agent |
 | Duties | The duties, what needs you first, with New duty and, for an admin, the switch that pauses every duty | A duty with its history, or the editor of New duty and Edit | none |
 | Skills | The skills by origin (Imported, Local, one group per server), then the tools (Built in, one group per server) | The text of a skill or the description of a tool, and the agents that can load it | Add skill, and the actions on the item |
-| Routines | The routines in the order of attention: Needs you, Live, Rehearsing, Proposed, Paused, then Retired behind a toggle | A routine with the tabs Steps, Evidence, and Runbook | The agent of the routine and its week |
+| Know-how | The agents, the agents that need you first | An agent: its numbers, its switch, and the tabs What it learned, Notes, and Routines. A routine takes the pane, with the tabs Steps, Evidence, and Runbook | The agent of a routine and its week, while a routine shows |
 | Wiki | The tree and the search | A page, its history, or the editor | none |
 | Manager | none at first | The conversation | none at first |
 
@@ -371,9 +371,11 @@ the mark at the head of a conversation links there. `#chat/<run>` focuses
 a chat, `#chat/new` a new chat, and `/details` after a chat its details:
 the mark at the head of a chat links there. `#activity/<key>` names
 the item of the inbox that the main pane shows, so a narrow window opens it.
-`#skills/add` opens the chooser of Add skill. `#routines/<agent>/<name>`
-focuses a routine, `/evidence` and `/runbook` after it focus a tab, and
-`/agent` focuses the week of its agent. `#duties/<name>` focuses a duty,
+`#skills/add` opens the chooser of Add skill. `#knowhow/<agent>` focuses
+what an agent learned, and `/notes` or `/routines` after it focuses the
+other tabs. `#routines/<agent>/<name>` focuses a routine, `/evidence` and
+`/runbook` after it focus a tab, and `/agent` focuses the week of its
+agent. `#routines` alone opens the tab Routines. `#duties/<name>` focuses a duty,
 `/edit` after it focuses its editor, and `#duties/new` focuses New duty. A
 short query after it, such as `#duties/new?agent=scribe&do=ask&message=...`,
 holds what Make this a duty brought, so a reload keeps it.
@@ -867,6 +869,16 @@ the page before the walk.
 | `routines` | The first board of the routines: a routine that needs your sign-off, the list, and the week of triage | 1440 in both themes, 800 in graphite, and 390 in light |
 | `routines-evidence` | The second board: the evidence of that routine | 1440, both |
 | `routines-signed` | The third board: the routine after Sign off, on the tab Runbook | 1440, light |
+| `knowhow` | Know-how of triage: the agents, the four numbers, the held-back line, the switch, two cards Keep this?, and the journal | 1440 in both themes, and 390 in light |
+| `knowhow-waiting` | The two cards Keep this? alone | 1440, both |
+| `knowhow-notes` | The tab Notes with the note that is out of date open | 1440, both |
+| `knowhow-routines` | The tab Routines of triage | 1440, both |
+| `knowhow-few` | Identity desk, which held back too few runs for a percentage | 1440, light |
+| `knowhow-changed` | The quiet line after Keep met a note that changed since | 1440, light |
+
+The shots of Know-how keep `FAKE_ADMIN=1 FAKE_A=1 FAKE_QUIET=1`. A headless
+Chrome took them through its DevTools protocol, with the theme of the
+account menu.
 
 ### 11.7 The shared files of the lead
 
@@ -948,6 +960,11 @@ sleep line and a wake line of one seat with nothing between them fold into
 one quiet line, as section 11.2 says.
 
 ### 11.9 The Routines place
+
+The routines now live in the tab Routines of the Know-how place (section
+11.11). A routine keeps every behavior below. The list of this section
+holds the routines of one agent, in the main pane, and a routine goes back
+to that tab.
 
 A routine is a vetted sequence of tool calls that the kernel can run again
 without a model. The place shows the routines of every agent, the evidence
@@ -1178,3 +1195,106 @@ Left out, and why:
   editor shows none.
 - The approvals and questions of a duty that sit on a bridge show in their
   bridge, so the items of the inbox of those kinds add no row.
+
+### 11.11 The Know-how place
+
+Know-how is what an agent learns on the job: its notes, the journal of
+what it learned, and its routines. `docs/KNOWHOW.md` of the kernel holds
+the contract. Its section 2 gives the only words of the screen. Section 19
+of `docs/CONTRACT.md` names the routes and the shapes that the page
+assumed.
+
+Files: `src/ui/Knowhow.tsx`, `src/ui/KnowhowNotes.tsx`,
+`src/lib/knowhow.ts`, `src/state/knowhow.ts`, `src/api/knowhow.ts`,
+`src/styles/knowhow.css`, and `fake/routes-k.mjs`, each with its tests.
+The shell takes small edits. `src/lib/route.ts` gains the routes,
+`src/ui/App.tsx` the panes, `src/ui/Shell.tsx` the place, and
+`src/ui/icons.tsx` the glyph. `src/state/reducer.ts` moves the id of a
+knowhow event, and `src/state/actions.ts` hands the event on.
+
+The work:
+
+- The place. Know-how takes the position of Routines in the app bar, with
+  a light bulb as its glyph. It shows on every server. A server without
+  routines hides only the tab Routines. The routes are `#knowhow`,
+  `#knowhow/<agent>`, and `/notes` or `/routines` after it. `#routines`
+  alone opens the tab Routines, and the address of a routine stays as it
+  was.
+- The list pane. `Know-how` with the count chip of the agents, and `Find
+  an agent` past ten agents. The agents that need you come first, under
+  `Needs you` with an amber count, on `--wash-need`. An agent needs you
+  while a change of it waits or a routine of it needs a sign-off. Its row
+  says what needs you, such as `2 changes wait, 1 routine needs a
+  sign-off`. Every other row shows the tagline. A row keeps the tab that
+  shows.
+- The main pane. The header holds the mark of the agent, its name, and the
+  tabs What it learned, Notes, and Routines. What it learned counts in
+  amber the changes that wait, and Routines the routines that need a
+  sign-off. Below 1100 pixels, the tabs take a strip under the header.
+  Without an agent in the address, where two panes show, the pane opens
+  the first agent of the list.
+- The header of the place. It sits on top of every tab: `Last 7 days`,
+  then three figures and one line. The figures are cost per job with its
+  trend, done by routines with the runs that it counts, and notes
+  corrected. The line compares the held-back runs with the others. Then
+  comes the switch `Ask me before it keeps what it learns`. A person who
+  does not own the agent gets no switch. For that person, a line says `It
+  asks an owner before it keeps what it learns.` while the switch is on.
+- The rule of 20. With fewer than 20 held-back runs, the line says `Not
+  enough held-back runs yet.` No percentage of the place comes from fewer
+  than 20 runs. The share done by routines then gives counts, such as `4
+  of 12`, and the trend goes. Two costs that two decimals write the same
+  take three, so the line never compares $0.02 with $0.02.
+- The changes that wait. Each change is a card on top of What it learned,
+  as a sign-off card sits on top of Steps: `Keep this?` with the amber
+  light, the change in a sentence, the text of a note, its reason, and its
+  runs. The keys are Not now and Keep, and Keep is the primary key. A
+  person who does not own the agent sees a quiet card with no key, which
+  says who decides. A 409 reads the changes again, and a quiet line above
+  the cards says `This note changed since. Read it again.` A card that
+  arrives on the stream settles once.
+- What it learned. The journal, newest first, under a quiet heading per
+  day. An entry holds its clock time and its sentence, with the name of
+  its note or routine in bold. Under them come its reason, who made it,
+  and links to its runs.
+  An entry that the server can take back has Undo, for an owner. A 409
+  says under the entry `A later change touched this note. Take that one
+  back first.` An undo that works puts `Undone:` and the sentence in the
+  notice of the page. `Show older` reads the next 50 entries.
+- Notes. The notes in groups by scope: `Your notes`, `Agent notes`, then
+  each duty. Inside a group, a note that is out of date comes first. A row
+  holds the first line of the note and its label: `checked` in green, `out
+  of date` in amber that holds still, or `resting` in grey. The meta line
+  holds its title, who wrote it, its time, and how often runs used it. A
+  row opens in place: the text, the source that put it out of date with
+  its link, and the sources. A note that the person wrote has Edit and Put
+  away. A 412 reads the note again and shows its newer text above the
+  draft, which stays. A quiet line says `This note changed since. Read it
+  again.` The next Save writes over the newer version.
+- Routines. The groups of the Routines place for this agent, with Find a
+  routine, in the main pane. The rows leave out the name of the agent. A
+  routine takes the main pane with its tabs, and its Back goes to this
+  tab. The week of its agent stays in the details pane.
+- The stream. A knowhow event reads again what the page holds of that
+  agent while a pane of the place shows. A reset reads every agent again.
+- Know-how off. A server that answers 404 to the journal or to the
+  numbers keeps no know-how. The main pane then says `Know-how is off on
+  this server.`, and the tab Routines still works.
+
+The words of section 2 of the contract are the only words of the place.
+The words that it forbids never show, and a test reads every tab for them.
+
+Left out, and why:
+
+- A new note from the page. The contract lets a person edit and put away
+  their own notes, and names no key that writes a new one.
+- The notes that were put away. They leave the list, and an undo of their
+  entry in What it learned brings one back.
+- Undo of a routine move in the fake. The fake keeps the routines in
+  another file, so its routine entries carry no undo. The page shows Undo
+  on any entry that carries one.
+- The changes that wait in Activity. The contract names the cards of the
+  place only. The list of agents and the counts of the tabs show what
+  waits.
+- A label for an unchecked note. The contract names three labels, so a
+  note without a source that can go out of date has none.

@@ -1121,3 +1121,85 @@ The typing line takes the place of the status message of an answer that is on it
 | `Working: <tool>` (a quiet line of the thread) | change | the phrase `Working: <tool>` on the typing line, when the run gives no phrase of its step | done |
 | new | add | in a bridge: `<seat> is working`, `<seat> and <seat> are working`, or `<seat>, <seat>, and <n> more are working`, with `: <phrase>` when one seat works | done |
 | new | add | for a screen reader: `<name> is working.`, or `<name> is working: <phrase>`, without a second `Working` | done |
+
+## 13. The Know-how place
+
+The words of section 2 of `docs/KNOWHOW.md` of the kernel hold here. A
+note is checked, out of date, resting, or put away, and it names its
+sources. The journal is What it learned, and undo takes back one entry.
+The others are the switch, waiting, after-work review, held back, and
+stepped back. These words never show: memory, ledger,
+cache, compile, guard, provenance, pointer, taint, librarian, holdout,
+ablation, manifest, CAS, hash, procedure, rung, shadow, decider,
+calibration, receipt, and template. A test reads every tab for them.
+
+### src/ui/Shell.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `Routines` (the place of the app bar) | change | `Know-how`, at the same position, with a light bulb. It shows on every server. | done |
+
+### src/ui/Knowhow.tsx: the agents
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| new | add | `Know-how` with the count chip of the agents, and `1 agent` or `N agents` for a screen reader | done |
+| new | add | `Find an agent`, the field above the list past ten agents | done |
+| new | add | the heads `Needs you` with an amber count and `Agents`, once an agent needs you | done |
+| new | add | the status `needs you` (amber, breathes) after the name, and the meta line `2 changes wait, 1 routine needs a sign-off`. Another row shows the tagline. | done |
+| new | add | `Loading the agents.`, `No agent yet.`, `No agent holds those words.`, `Pick an agent.` | done |
+
+### src/ui/Knowhow.tsx: the header of an agent
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| new | add | `What it learned`, `Notes`, `Routines`, the tabs, with `Know-how of <agent>` as the name of the tab list | done |
+| new | add | the amber count of `What it learned`, with `1 change waits` or `N changes wait` for a screen reader | done |
+| new | add | the amber count of `Routines`, with `1 routine needs a sign-off` or `N routines need a sign-off` for a screen reader | done |
+| new | add | `Last 7 days` | done |
+| new | add | the figures `$0.02` with `cost per job, down 9%`, `2% of 1,912` with `done by routines`, and `3` with `notes corrected` | done |
+| new | add | `Held back 1 in 20 runs. Done well: 82% without what it learned, 91% with it. Cost per job: $0.021 without, $0.020 with.` | done |
+| new | add | `Not enough held-back runs yet.`, under 20 held-back runs | done |
+| new | add | `No runs in the last 7 days.` | done |
+| new | add | `Ask me before it keeps what it learns`, the switch of an owner | done |
+| new | add | `It asks an owner before it keeps what it learns.`, for a person who does not own the agent | done |
+| new | add | `Loading the figures.`, `Know-how is off on this server.` | done |
+
+### src/ui/Knowhow.tsx: the changes that wait
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| new | add | `Keep this?`, the title of the card, with the amber light | done |
+| new | add | the change in a sentence: `A new note: <title>`, `A change to the note <title>`, `Put away the note <title>`, `Rehearse the routine <title>`, `Let the routine <title> go live`, and the like | done |
+| new | add | `Not now` and `Keep`. Keep is the primary key. | done |
+| new | add | `Waits for a decision of an owner of <agent>.`, on the quiet card of a person who does not own the agent | done |
+| new | add | `This note changed since. Read it again.` or `This routine changed since. Read it again.`, a quiet line above the cards after a 409 | done |
+| new | add | `Changes that wait for you`, the name of the section for a screen reader | done |
+
+### src/ui/Knowhow.tsx: What it learned
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| new | add | the heads of the days: `Today`, `Yesterday`, or the date | done |
+| new | add | the sentence of an entry: `Learned the note <title>.`, `Changed the note <title>.`, `The note <title> went out of date.`, `The note <title> is resting.`, `Put away the note <title>.`, `Took back a change to the note <title>.` | done |
+| new | add | the sentence of a routine: `Proposed the routine <title>.`, `The routine <title> started rehearsing.`, `The routine <title> went live.`, `The routine <title> stepped back to rehearsing.`, `Retired the routine <title>.` | done |
+| new | add | `By the after-work review`, `By you`, `By <agent>`, or `By <person>`. The server itself names no actor. | done |
+| new | add | `The run` for one run, else `Run 1`, `Run 2`, and so on | done |
+| new | add | `Undo` | done |
+| new | add | `A later change touched this note. Take that one back first.`, under the entry after a 409 | done |
+| new | add | `Undone: <sentence>`, the notice of an undo that worked | done |
+| new | add | `Show older`, `Loading what it learned.`, `Nothing learned yet.` | done |
+
+### src/ui/KnowhowNotes.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| new | add | the heads `Your notes`, `Agent notes`, and `The duty <name>`, each with its count chip | done |
+| new | add | the labels `checked` (green), `out of date` (amber, holds still), and `resting` (grey) | done |
+| new | add | the meta line: the title of the note, `By <who>`, its time, and `used once`, `used N times`, or `not used yet` | done |
+| new | add | `Out of date since <day>: the page <path> changed.`, with the page as a link | done |
+| new | add | `Sources:` with `a run`, or `run 1` and `run 2`, `the page <path>`, and an item such as `Gitea issue 42` | done |
+| new | add | `Edit`, `Put away`, the field `Text`, `Cancel`, and `Save` | done |
+| new | add | `This note changed since. Read it again.`, after a 412 | done |
+| new | add | `Put away the note <title>.`, the notice | done |
+| new | add | `Loading the notes.`, `Loading the note.`, `No note yet.` | done |
