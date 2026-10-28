@@ -3,7 +3,7 @@ import { act } from 'preact/test-utils';
 import { store } from '../state/store';
 import { forgetDuties } from '../state/duties';
 import { awayWords, tellWords, REVIEW_LINE } from '../lib/duties';
-import { ActivityList, ActivityMain, holdFor, pick } from './Activity';
+import { ActivityList, ActivityMain, holdFor, pick, sameWords } from './Activity';
 import { forgetSeen } from './Manager';
 import { AppBar } from './Shell';
 import { noteProblem } from './ResultKeys';
@@ -212,3 +212,11 @@ describe('More on a phone', () => {
     act(() => store.dispatch({ type: 'config', config: null }));
   });
 });
+
+describe('the task of a result', () => {
+  it('stays out when it only repeats the title of the run', () => {
+    expect(sameWords('Name one thing to check on a homelab today, in one line.', 'Name one thing to check on a homelab today, in one line')).toBe(true);
+    expect(sameWords('Draft the release notes of yesterday.', 'Release notes of yesterday')).toBe(false);
+  });
+});
+

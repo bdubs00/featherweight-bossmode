@@ -233,8 +233,9 @@ function Figures({ v, unit, toCheck, mine, measured, onSaved }: { v: Value; unit
           figure={costText(v.spend.usd)}
           help="What the models of the agents cost in the window, for all the work, also the work that failed. Coordination is the manager and the quick chat. The spend says at least when some runs used a model without a price."
         >
-          {v.work.done > 0 && (
+          {v.work.done > 0 && (!v.spend.atLeast || v.spend.perDone >= 0.01) && (
             <p class="t-meta">
+              {v.spend.atLeast && 'at least '}
               <b class="rs-ink">{costText(v.spend.perDone)}</b> a done task
             </p>
           )}

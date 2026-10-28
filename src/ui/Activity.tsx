@@ -543,7 +543,7 @@ function ResultCard({ r, name, rows }: { r: InboxRow; name: string; rows: InboxR
   const open = r.duty && r.run ? hrefOf({ place: 'duties', name: r.duty, run: r.run }) : r.run ? hrefOf({ place: 'chat', run: r.run }) : '';
   return (
     <Card title={title} tone="amber" label={'A result of ' + name + ' to check'} actions={<ResultKeys run={r.run!} title={title} primary onDone={() => afterResult(r, rows)} />}>
-      {run && run.input && plainText(run.input).trim() !== title.trim() && (
+      {run && run.input && sameWords(run.input, title) === false && (
         <p class="result-ask">
           <span class="result-ask-label">The task</span> {excerpt(plainText(run.input), 400)}
         </p>
@@ -556,6 +556,12 @@ function ResultCard({ r, name, rows }: { r: InboxRow; name: string; rows: InboxR
       )}
     </Card>
   );
+}
+
+/** sameWords reports whether the task of a run only repeats its title, with case, spaces, and an end mark aside. */
+export function sameWords(input: string, title: string): boolean {
+  const norm = (x: string) => plainText(x).toLowerCase().replace(/\s+/g, ' ').trim().replace(/[.!?:]+$/, '');
+  return norm(input) === norm(title);
 }
 
 /**

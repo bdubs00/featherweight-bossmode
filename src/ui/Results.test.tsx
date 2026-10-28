@@ -255,4 +255,16 @@ describe('Results', () => {
     expect(firstWork({ periods: [full, empty], work })).toBe('');
     expect(firstWork({ periods: [empty, empty], work: { ...work, pieces: 0 } })).toBe('');
   });
+
+  it('says at least for the spend of a done task when runs have no price, and leaves out a bound under a cent', async () => {
+    over = { spend: { usd: 1.31, perDone: 0.0033, failedUSD: 0.11, coordinationUSD: 0.25, unpriced: 245, atLeast: true } };
+    let box = mount(<Results />);
+    await flush();
+    expect(box.textContent).not.toContain('a done task');
+    unmountAll();
+    over = { spend: { usd: 1.5, perDone: 0.125, failedUSD: 0.1, coordinationUSD: 0.2, unpriced: 2, atLeast: true } };
+    box = mount(<Results />);
+    await flush();
+    expect(box.textContent).toContain('at least $0.13 a done task');
+  });
 });
