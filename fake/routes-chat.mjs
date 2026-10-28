@@ -51,7 +51,7 @@ export function register({ on, S }) {
     }
     const failed = c.state === 'failed';
     if (c.a) items.push({ seq: items.length + 1, time: c.when, kind: 'assistant', text: c.a });
-    items.push({ seq: items.length + 1, time: c.when, kind: 'end', text: failed ? 'failed' : 'completed', isError: failed });
+    items.push({ seq: items.length + 1, time: c.when, kind: 'end', text: failed ? 'failed' : 'completed', isError: failed, ...(c.error ? { detail: c.error } : {}) });
     const run = {
       id, agent: 'chat', title: c.q.replace(/[.?!]$/, ''), state: failed ? 'failed' : 'completed', input: c.q, output: c.a || undefined, error: c.error, seq: items.length,
       // alice gave the summary of 2.3 a thumb up, so its card is done and accepted.

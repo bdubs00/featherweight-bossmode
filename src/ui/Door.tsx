@@ -216,7 +216,10 @@ function Readback({ plan, onPlan, onStarted, busy }: { plan: TaskPlan; onPlan: (
     >
       {plan.same && (
         <p class="rb-same">
-          <LineLed tone="grey" /> Your duty <a href={hrefOf({ place: 'duties', name: plan.same.duty })}>{plan.same.title}</a> does this already.
+          <LineLed tone="grey" />
+          <span>
+            Your duty <a href={hrefOf({ place: 'duties', name: plan.same.duty })}>{plan.same.title}</a> does this already.
+          </span>
         </p>
       )}
       <dl class="rb">

@@ -5,6 +5,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { Run } from '../api/types';
 import { GO_ON, MoreRoom, roomOf } from './MoreRoom';
+import { Conversation } from './Conversation';
 import { click, fakeApi, keyNamed, mount, settle, typeIn, unmountAll } from './testkit-c';
 
 const T = '2026-10-28T09:00:00Z';
@@ -79,5 +80,22 @@ describe('MoreRoom', () => {
     const el = mount(<MoreRoom run={limited('budget exceeded: deadline')} next="Your next message starts a new chat." />);
     expect(el.querySelector('button')).toBeNull();
     expect(el.textContent).toBe('Stopped at its time limit. Your next message starts a new chat.');
+  });
+});
+
+describe('the end of a turn at a limit', () => {
+  const items = [
+    { seq: 1, time: T, kind: 'user' as const, text: 'Draft a reply.', who: 'alice@example.com' },
+    { seq: 2, time: T, kind: 'end' as const, text: 'failed', isError: true, detail: 'budget exceeded: maxTurns' },
+  ];
+  const t = { items, prev: 0, loading: false, gone: false, problem: '', earlier: async () => {} };
+  it('leaves the line to MoreRoom while the run stays at its limit, and says the limit in grey after it goes on', () => {
+    const at = mount(<Conversation run={limited('budget exceeded: maxTurns', { turns: 8 })} t={t} agentLabel="chat" />);
+    expect(at.textContent).not.toContain('The turn failed');
+    expect(at.querySelector('.tline.err')).toBeNull();
+    const on = mount(<Conversation run={{ ...limited('', { turns: 9 }), state: 'running', error: undefined }} t={t} agentLabel="chat" />);
+    expect(on.querySelector('.tline-text')!.textContent).toBe('Stopped at its turn limit');
+    expect(on.querySelector('.tline.err')).toBeNull();
+    expect(on.textContent).not.toContain('The turn failed');
   });
 });

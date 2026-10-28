@@ -16,6 +16,7 @@ import { store, useSelect } from '../state/store';
 import { stepOf, type Step } from '../state/thread';
 import { decisionOf } from '../lib/decision';
 import { atLimit } from '../lib/presence';
+import { plainError } from '../lib/runerror';
 import { whoName } from '../lib/lines';
 import { showError } from './notice';
 import { Markdown } from './common';
@@ -496,6 +497,13 @@ export function Conversation(props: ConversationProps) {
             // The end of a turn says nothing that the answer above it does not, unless the turn failed.
             if (!it.isError || it === limitEnd) return null;
             prev = null;
+            // A turn that stopped at a limit of its budget did nothing wrong, also after Continue gave it more room.
+            if (/^budget exceeded\b/.test(it.detail || ''))
+              return (
+                <Quiet tone="grey" at={it.time}>
+                  {plainError(it.detail)}
+                </Quiet>
+              );
             return (
               <Quiet tone="red" at={it.time} err>
                 The turn failed

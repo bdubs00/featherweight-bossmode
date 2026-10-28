@@ -862,7 +862,8 @@ on('GET', '/v1/bossmode/stream', (c) => {
   return undefined;
 });
 
-on('GET', '/v1/bridges', (c) => ({ bridges: [...S.bridges.values()].map((b) => listItem(b, c.person.subject)) }));
+// A bridge needs its operator or the operator role on every agent of its seats, so erin, who views every agent, sees none.
+on('GET', '/v1/bridges', (c) => ({ bridges: [...S.bridges.values()].filter((b) => !viewerOf(c.person) || b.operator === c.person.subject).map((b) => listItem(b, c.person.subject)) }));
 /** openBridge opens a bridge from a plan of title, goal, placement, and members, as a person, and seats its members. */
 function openBridge(body, person) {
   const title = String(body.title || '').trim();
@@ -1120,7 +1121,8 @@ on('PATCH', '/v1/bridges/([^/]+)/members/([^/]+)', async (c, id, handle) => {
   return m;
 });
 
-on('GET', '/v1/fleet', () => FLEET);
+// The fleet names the role of the person on each agent of a member: erin views every agent.
+on('GET', '/v1/fleet', (c) => (viewerOf(c.person) ? { ...FLEET, members: FLEET.members.map((m) => ({ ...m, agents: m.agents.map((a) => ({ ...a, role: 'viewer' })) })) } : FLEET));
 // An agent of the view carries the parts of its profile that the page shows: the tools, the skills that it allows, and its rules.
 const agentView = ({ name, description, role }) => ({ name, description, role, tools: TOOLS_OF[name] || [], skills: allowlistOf(name), policy: name === 'migrator' ? { ask: ['bash: git push*', 'ansible.playbook: check=false', 'ansible.adhoc: check=false'] } : name === 'reviewer' ? { ask: ['destructive'] } : undefined });
 // The front names only its own profile in GET /v1/agents, as the real
@@ -1128,14 +1130,16 @@ const agentView = ({ name, description, role }) => ({ name, description, role, t
 // GET /v1/agents/{name}, with the pool and with no abilities, and the page
 // reads the agents of the fleet from GET /v1/fleet.
 const FRONT_AGENTS = [{ name: 'default', description: 'The profile of the front itself.', role: 'owner' }];
-on('GET', '/v1/agents', () => ({ agents: FRONT_AGENTS.map(agentView) }));
+// The role of an agent is the role of the person who asks: erin views every agent.
+const roleFor = (c, a) => (viewerOf(c.person) ? { ...a, role: 'viewer' } : a);
+on('GET', '/v1/agents', (c) => ({ agents: FRONT_AGENTS.map((a) => agentView(roleFor(c, a))) }));
 on('GET', '/v1/agents/([^/]+)', (c, raw) => {
   const name = decodeURIComponent(raw);
   const own = FRONT_AGENTS.find((x) => x.name === name);
-  if (own) return agentView(own);
+  if (own) return agentView(roleFor(c, own));
   const a = AGENTS.find((x) => x.name === name);
   if (!a) refuse(404, `no agent ${name}`);
-  return { ...agentView(a), pool: poolOfAgent(name) };
+  return { ...agentView(roleFor(c, a)), pool: poolOfAgent(name) };
 });
 /** poolOfAgent names the pool whose workers run an agent: the pool of the agent, else the pool of a worker that holds it. */
 function poolOfAgent(name) {
