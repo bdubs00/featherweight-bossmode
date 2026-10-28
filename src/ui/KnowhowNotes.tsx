@@ -8,13 +8,16 @@
 import { useEffect, useState } from 'preact/hooks';
 import { ApiError } from '../api/client';
 import type { NoteItem, NoteRecord } from '../api/knowhow';
-import { byWords, groupNotes, isMine, labelOf, noteKey, noteTitle, sourceOf, usesWords, type SourceWords } from '../lib/knowhow';
+import { byWords, canEditNote, groupNotes, labelOf, noteKey, noteTitle, sourceOf, usesWords, type SourceWords } from '../lib/knowhow';
 import { dateWords } from '../lib/routines';
 import { since } from '../lib/words';
 import { loadNote, loadNotes, putAway, saveNote, useKnowhow } from '../state/knowhow';
 import { useSelect } from '../state/store';
 import { showError, showSaid } from './notice';
 import { Button, Chip, Field, Led, LineLed, TextArea } from './primitives';
+
+/** WAITS says that a change waits for a person, as a write by the access token of the fleet does under the switch (202). */
+const WAITS = 'The change waits for a decision in What it learned.';
 
 /** KnowhowNotes lists the notes of an agent by scope: the notes of the person, the agent notes, and the notes of each duty. */
 export function KnowhowNotes({ agent, name }: { agent: string; name: string }) {
@@ -78,6 +81,7 @@ function NoteBody({ n, id }: { n: NoteItem; id: string }) {
   const key = noteKey(n);
   const rec = useKnowhow((s) => s.notes[key]);
   const me = useSelect((s) => (s.me ? s.me.principal : null));
+  const role = useSelect((s) => (s.me && s.me.roles ? s.me.roles[n.agent] : undefined));
   const [failed, setFailed] = useState('');
   const [draft, setDraft] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -93,7 +97,8 @@ function NoteBody({ n, id }: { n: NoteItem; id: string }) {
       </div>
     );
   }
-  const mine = isMine(rec.by, me);
+  // The own notes of the person, as the server lets them change: their own scope with the operator role, and a note that they wrote where they may change its scope.
+  const mine = canEditNote(rec, me, role);
   const editing = draft !== null;
   const conflict = (e: unknown): boolean => {
     if (e instanceof ApiError && e.status === 412) {
@@ -108,8 +113,9 @@ function NoteBody({ n, id }: { n: NoteItem; id: string }) {
     setBusy(true);
     setChanged(false);
     try {
-      await saveNote(rec, draft);
+      const waits = await saveNote(rec, draft);
       setDraft(null);
+      if (waits) showSaid(WAITS);
     } catch (e) {
       conflict(e);
     }
@@ -119,8 +125,7 @@ function NoteBody({ n, id }: { n: NoteItem; id: string }) {
     setBusy(true);
     setChanged(false);
     try {
-      await putAway(rec);
-      showSaid('Put away the note ' + noteTitle(rec.name) + '.');
+      showSaid((await putAway(rec)) ? WAITS : 'Put away the note ' + noteTitle(rec.name) + '.');
     } catch (e) {
       conflict(e);
     }

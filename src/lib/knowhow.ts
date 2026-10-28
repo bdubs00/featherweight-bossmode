@@ -5,13 +5,13 @@
 // The words of section 2 of docs/KNOWHOW.md of the kernel are the only
 // words on the screen.
 
-import type { JournalEntry, JournalWhat, KnowhowSummary, NoteItem, NoteScope, NoteState, WaitingChange } from '../api/knowhow';
+import type { JournalEntry, JournalSubject, JournalWhat, KnowhowSummary, NoteItem, NoteScope, NoteState, WaitingChange } from '../api/knowhow';
 import type { Tone } from './presence';
 import { isMe, whoName, type Me } from './lines';
 import { hrefOf } from './route';
 import { money, num, titleOf } from './routines';
 
-/** The fewest held-back runs from which the page shows a percentage. */
+/** The fewest runs from which the page shows a share or a change in percent. The server keeps the same rule for the held-back runs. */
 export const HELD_BACK_MIN = 20;
 
 /** noteTitle is the title of a note from its name: gotchas/gitea-labels.md is Gitea labels. */
@@ -47,10 +47,51 @@ export function authorOf(by: string): string {
   return b.startsWith('person:') ? b.slice(7) : '';
 }
 
-/** isMine reports whether the person wrote a note. Only such a note can be changed or put away from the page. */
+/** isMine reports whether the person wrote a note. */
 export function isMine(by: string, me: Me): boolean {
   const who = authorOf(by);
   return !!who && isMe(who, me);
+}
+
+/* ---------- who may change what ---------- */
+
+// The rights of access.go of the workbench, read from the role of the
+// person on the agent in GET /v1/whoami: an owner may edit the agent, and
+// an owner or an operator may run it.
+
+/** The role of the person on an agent, as GET /v1/whoami names it. */
+export type Role = string | undefined;
+
+const runs = (role: Role) => role === 'owner' || role === 'operator';
+
+/** isOwnScope reports whether a scope holds the notes of the person: their own principal. */
+export const isOwnScope = (sc: NoteScope, me: Me): boolean => sc.kind === 'principal' && !!me && !!me.subject && sc.principal === me.subject;
+
+/**
+ * canChangeScope reports whether the person may change the notes of a
+ * scope: their own notes with the operator role, and the notes of the
+ * agent or of a duty with the owner role.
+ */
+export function canChangeScope(sc: NoteScope, me: Me, role: Role): boolean {
+  return isOwnScope(sc, me) ? runs(role) : role === 'owner';
+}
+
+/**
+ * canEditNote reports whether the page offers Edit and Put away on a
+ * note: a note of the own scope of the person, or a note that the person
+ * wrote, where the server lets them change it.
+ */
+export function canEditNote(n: Pick<NoteItem, 'scope' | 'by'>, me: Me, role: Role): boolean {
+  if (isOwnScope(n.scope, me)) return runs(role);
+  return isMine(n.by, me) && canChangeScope(n.scope, me, role);
+}
+
+/** subjectScope is the scope of the note of an entry or of a change. */
+export const subjectScope = (s: JournalSubject): NoteScope => (s.scope === 'principal' ? { kind: 'principal', principal: s.principal } : { kind: 'agent' });
+
+/** canDecide reports whether the person may undo an entry or decide a change: a note of a scope that they may change, or a routine with the owner role. */
+export function canDecide(s: JournalSubject, me: Me, role: Role): boolean {
+  return s && s.note ? canChangeScope(subjectScope(s), me, role) : role === 'owner';
 }
 
 /**
@@ -168,6 +209,8 @@ const ROUTINE_DONE: Partial<Record<JournalWhat, [string, string]>> = {
   live: ['The routine ', ' went live.'],
   'stepped-back': ['The routine ', ' stepped back to rehearsing.'],
   retired: ['Retired the routine ', '.'],
+  paused: ['Paused the routine ', '.'],
+  'stays-out': ['The proposal of the routine ', ' stayed out.'],
   undone: ['Took back a change to the routine ', '.'],
 };
 
@@ -225,52 +268,60 @@ export function runLinks(runs: string[] | undefined): { label: string; href: str
 
 /** The figures of the header of the place: cost per job with its trend, done by routines, and notes corrected. */
 export interface Figures {
-  /** The runs of the days of the summary, of both kinds. */
+  /** The finished runs of the days of the summary, of both kinds. */
   runs: number;
   cost: string;
   /** The trend of the cost against the days before, such as down 12%, or "". */
   trend: string;
-  /** The share of the runs that routines did, with the runs that it counts, such as 34% of 433, or a count under the rule of 20. */
+  /** The share of the normal runs that routines did, with the runs that it counts, such as 34% of 433, or a count under the rule of 20. */
   routines: string;
   corrected: string;
 }
 
 const pct = (x: number): string => Math.round(x * 100) + '%';
 
-/** figuresOf gives the figures of a summary. A share or a trend needs at least 20 runs, else the figure gives counts. */
+/**
+ * figuresOf gives the figures of a summary. The server gives the trend as
+ * a word: down, up, or flat within 5%. From 20 runs, the page adds the
+ * change in percent. A share also needs 20 runs, else the figure gives
+ * counts.
+ */
 export function figuresOf(s: KnowhowSummary): Figures {
-  const n = s.normal || { runs: 0, doneWell: 0, costPerJob: 0, byRoutines: 0 };
-  const h = s.heldBack || { runs: 0, doneWell: 0, costPerJob: 0, byRoutines: 0 };
-  const runs = (n.runs || 0) + (h.runs || 0);
-  const cost = runs ? ((n.costPerJob || 0) * (n.runs || 0) + (h.costPerJob || 0) * (h.runs || 0)) / runs : 0;
-  const by = (n.byRoutines || 0) + (h.byRoutines || 0);
+  const c = s.costPerJob || { usd: 0, runs: 0 };
+  const d = s.doneByRoutines || { runs: 0, byRoutine: 0, share: 0 };
   let trend = '';
-  const before = s.costPerJobBefore;
-  if (runs >= HELD_BACK_MIN && typeof before === 'number' && before > 0) {
-    const change = (cost - before) / before;
-    if (Math.round(Math.abs(change) * 100) >= 1) trend = (change < 0 ? 'down ' : 'up ') + pct(Math.abs(change));
+  if (c.trend === 'flat') trend = 'about the same';
+  else if (c.trend === 'down' || c.trend === 'up') {
+    const before = c.previousUsd;
+    trend = c.trend;
+    if (c.runs >= HELD_BACK_MIN && typeof before === 'number' && before > 0) trend += ' ' + pct(Math.abs(c.usd - before) / before);
   }
   return {
-    runs,
-    cost: money(cost),
+    runs: c.runs || 0,
+    cost: money(c.usd || 0),
     trend,
-    routines: runs >= HELD_BACK_MIN ? pct(by / runs) + ' of ' + num(runs) : num(by) + ' of ' + num(runs),
+    routines: d.runs >= HELD_BACK_MIN ? pct(d.share) + ' of ' + num(d.runs) : num(d.byRoutine || 0) + ' of ' + num(d.runs || 0),
     corrected: num(s.notesCorrected || 0),
   };
 }
 
 /**
  * heldBackLine compares the runs that got none of what the agent learned
- * with the others. With fewer than 20 held-back runs, or 20 normal runs,
- * it says that there are not enough yet, and shows no percentage.
+ * with the others. The server says whether there are enough held-back
+ * runs (the rule of 20) and words the line. With enough, the page adds the
+ * cost per job of each kind.
  */
 export function heldBackLine(s: KnowhowSummary): string {
-  const n = s.normal || { runs: 0, doneWell: 0, costPerJob: 0, byRoutines: 0 };
-  const h = s.heldBack || { runs: 0, doneWell: 0, costPerJob: 0, byRoutines: 0 };
-  if ((h.runs || 0) < HELD_BACK_MIN || (n.runs || 0) < HELD_BACK_MIN) return 'Not enough held-back runs yet.';
-  const every = Math.round((n.runs + h.runs) / h.runs);
-  const [without, withIt] = moneyPair(h.costPerJob || 0, n.costPerJob || 0);
-  return `Held back 1 in ${every} runs. Done well: ${pct(h.doneWell / h.runs)} without what it learned, ${pct(n.doneWell / n.runs)} with it. Cost per job: ${without} without, ${withIt} with.`;
+  const c = s.compare;
+  if (!c || !c.enough) return (c && c.line) || 'Not enough held-back runs yet.';
+  const line =
+    c.line ||
+    `Held back 1 in ${c.oneIn} runs. Done well: ${pct(c.doneWellWithout || 0)} without what it learned, ${pct(c.doneWellWith || 0)} with it.`;
+  const h = s.heldBack;
+  const n = s.normal;
+  if (!h || !n || !h.runs || !n.runs) return line;
+  const [without, withIt] = moneyPair(h.costPerJobUsd || 0, n.costPerJobUsd || 0);
+  return `${line} Cost per job: ${without} without, ${withIt} with.`;
 }
 
 /** moneyPair writes two costs that the page compares. Where two decimals write two different costs the same, both take three. */

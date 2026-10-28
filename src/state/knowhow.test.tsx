@@ -8,15 +8,26 @@ const flush = async () => {
   for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
 };
 
-const SUMMARY = { agent: 'triage', days: 7, normal: { runs: 380, doneWell: 346, costPerJob: 0.02, byRoutines: 140 }, heldBack: { runs: 20, doneWell: 16, costPerJob: 0.04, byRoutines: 0 }, notesCorrected: 3 };
-const entry = (id: string, at: string): JournalEntry => ({ id, at, agent: 'triage', what: 'learned', subject: { note: id + '.md' }, why: 'Two runs failed.', runs: ['r1'], by: 'review', undo: { revision: 1 } });
-const WAIT: WaitingChange = { id: 'w1', at: '2026-10-27T09:00:00Z', agent: 'triage', what: 'learned', subject: { note: 'gotchas/vpn.md' }, why: 'Three runs passed with it.', by: 'review', text: 'The VPN portal needs the full domain.' };
+const SUMMARY = {
+  agent: 'triage',
+  days: 7,
+  costPerJob: { usd: 0.021, runs: 400, previousUsd: 0.025, trend: 'down' },
+  doneByRoutines: { runs: 380, byRoutine: 140, share: 0.37 },
+  notesCorrected: 3,
+  normal: { runs: 380, doneWell: 346, byRoutine: 140, costPerJobUsd: 0.02 },
+  heldBack: { runs: 20, doneWell: 16, byRoutine: 0, costPerJobUsd: 0.04 },
+  compare: { enough: true, heldBack: 20, normal: 300, oneIn: 16, doneWellWithout: 0.8, doneWellWith: 0.91, line: 'Held back 1 in 16 runs.' },
+};
+/** A public id of the workbench: an id that starts with its time, and the agent in base64url. */
+const pid = (n: number) => '01K8' + String(n).padStart(22, '0') + '-dHJpYWdl';
+const entry = (id: string, at: string): JournalEntry => ({ id, at, agent: 'triage', what: 'learned', subject: { note: id + '.md', scope: 'agent' }, why: 'Two runs failed.', runs: ['r1'], by: 'review', undo: { revision: 1 } });
+const WAIT: WaitingChange = { id: pid(1), at: '2026-10-27T09:00:00Z', agent: 'triage', what: 'learned', subject: { note: 'gotchas/vpn.md', scope: 'agent' }, why: 'Three runs passed with it.', by: 'review', text: 'The VPN portal needs the full domain.' };
 const NOTE: NoteRecord = { agent: 'triage', scope: { kind: 'agent' }, name: 'mine.md', hash: 'h1', state: 'unchecked', description: 'Mine', by: 'person:alice@example.com', at: '2026-10-20T10:00:00Z', uses: 0, text: 'Old text.', sources: [{ ref: 'run:r9' }] };
 
 /** routes answers the header of triage. */
 const routes = (more: Record<string, unknown> = {}) => ({
   'GET /v1/knowhow/summary': SUMMARY,
-  'GET /v1/knowhow/settings/triage': { askFirst: true },
+  'GET /v1/knowhow/settings/triage': { agent: 'triage', askFirst: true, review: { on: true, agent: 'review', every: '24h0m0s' } },
   'GET /v1/knowhow/waiting': { waiting: [WAIT] },
   'GET /v1/knowhow/journal': { entries: [entry('a', '2026-10-27T10:00:00Z')] },
   ...more,
@@ -43,32 +54,39 @@ describe('the know-how of an agent', () => {
     expect(api.calls.map((c) => c.path).sort()).toEqual(['/v1/knowhow/journal?agent=triage&limit=50', '/v1/knowhow/settings/triage', '/v1/knowhow/summary?agent=triage&days=7', '/v1/knowhow/waiting?agent=triage']);
     const a = knowhow.get().agents.triage;
     expect(a.summary!.notesCorrected).toBe(3);
-    expect(a.settings).toEqual({ askFirst: true });
-    expect(a.waiting!.map((w) => w.id)).toEqual(['w1']);
+    expect(a.settings).toMatchObject({ askFirst: true, review: { on: true } });
+    expect(a.waiting!.map((w) => w.id)).toEqual([WAIT.id]);
     expect(a.journal!.map((e) => e.id)).toEqual(['a']);
     expect(a.more).toBe(false);
   });
 
-  it('keeps the reason of a read that failed, and marks the place off when the server keeps no know-how', async () => {
+  it('keeps the reason of a read that failed, and marks the place off only on the 404 that says Know-how is off', async () => {
     api = fakeApi({ ...routes(), 'GET /v1/knowhow/waiting': () => ({ status: 500, body: { detail: 'The store did not answer.' } }) } as never);
     await loadAgent('triage');
     expect(knowhow.get().agents.triage.errors.waiting).toBe('The store did not answer.');
     expect(knowhow.get().off).toBe(false);
     api.restore();
+    // A 404 for an agent that the person cannot view is no reason to say that Know-how is off.
     api = fakeApi({});
     forgetKnowhow();
     await loadAgent('triage');
-    expect(knowhow.get().off).toBe(true);
+    expect(knowhow.get().off).toBe(false);
+    api.restore();
+    const off = 'Know-how is off on this server, because its bus keeps no store for it. An admin runs the server with the bus nats or mem.';
+    api = fakeApi({ 'GET /v1/knowhow/journal': () => ({ status: 404, body: { detail: off } }), 'GET /v1/knowhow/summary': () => ({ status: 404, body: { detail: off } }) } as never);
+    forgetKnowhow();
+    await loadAgent('triage');
+    expect(knowhow.get()).toMatchObject({ off: true, offReason: off });
   });
 
-  it('reads older entries before the oldest one, and adds them at the end', async () => {
-    const page = Array.from({ length: JOURNAL_PAGE }, (_, i) => entry('n' + i, new Date(Date.UTC(2026, 9, 27, 10) - i * 60000).toISOString()));
+  it('reads older entries before the oldest one, by its id, and adds them at the end', async () => {
+    const page = Array.from({ length: JOURNAL_PAGE }, (_, i) => entry(pid(100 - i), new Date(Date.UTC(2026, 9, 27, 10) - i * 60000).toISOString()));
     api = fakeApi(routes({ 'GET /v1/knowhow/journal': (c: { path: string }) => ({ body: { entries: c.path.includes('before=') ? [entry('old', '2026-10-01T10:00:00Z')] : page } }) }) as never);
     await loadAgent('triage');
     expect(knowhow.get().agents.triage.more).toBe(true);
     await loadOlder('triage');
     const last = api.calls[api.calls.length - 1];
-    expect(last.path).toBe('/v1/knowhow/journal?agent=triage&limit=50&before=' + encodeURIComponent(page[page.length - 1].at));
+    expect(last.path).toBe('/v1/knowhow/journal?agent=triage&limit=50&before=' + page[page.length - 1].id);
     const j = knowhow.get().agents.triage.journal!;
     expect(j).toHaveLength(JOURNAL_PAGE + 1);
     expect(j[j.length - 1].id).toBe('old');
@@ -76,21 +94,21 @@ describe('the know-how of an agent', () => {
   });
 
   it('turns the switch and keeps what the server answers', async () => {
-    api = fakeApi(routes({ 'PUT /v1/knowhow/settings/triage': { askFirst: false } }) as never);
+    api = fakeApi(routes({ 'PUT /v1/knowhow/settings/triage': { agent: 'triage', askFirst: false, review: { on: true } } }) as never);
     await setAskFirst('triage', false);
     expect(api.calls[0].body).toEqual({ askFirst: false });
-    expect(knowhow.get().agents.triage.settings).toEqual({ askFirst: false });
+    expect(knowhow.get().agents.triage.settings).toMatchObject({ askFirst: false });
   });
 
   it('keeps a waiting change, then reads the agent again; a 409 reads it again too and goes on to the screen', async () => {
-    api = fakeApi(routes({ 'POST /v1/knowhow/waiting/w1': { ok: true } }) as never);
+    api = fakeApi(routes({ ['POST /v1/knowhow/waiting/' + WAIT.id]: { kept: true, entry: null } }) as never);
     await loadAgent('triage');
-    await decide('triage', 'w1', true);
+    await decide('triage', WAIT.id, true);
     expect(api.calls.find((c) => c.method === 'POST')!.body).toEqual({ keep: true });
     expect(api.calls.filter((c) => c.path.startsWith('/v1/knowhow/waiting?'))).toHaveLength(2);
     api.restore();
-    api = fakeApi(routes({ 'POST /v1/knowhow/waiting/w1': () => ({ status: 409, body: { detail: 'the note changed' } }) }) as never);
-    await expect(decide('triage', 'w1', false)).rejects.toMatchObject({ status: 409 });
+    api = fakeApi(routes({ ['POST /v1/knowhow/waiting/' + WAIT.id]: () => ({ status: 409, body: { detail: 'a later change touched it' } }) }) as never);
+    await expect(decide('triage', WAIT.id, true)).rejects.toMatchObject({ status: 409 });
     expect(api.calls.some((c) => c.path.startsWith('/v1/knowhow/waiting?'))).toBe(true);
   });
 
@@ -103,14 +121,21 @@ describe('the know-how of an agent', () => {
 });
 
 describe('a note', () => {
-  it('saves the text for the version that the person read, with its sources', async () => {
+  it('saves the text for the version that the person read, with its sources, and says whether the change waits (202)', async () => {
     let n = 0;
-    api = fakeApi(routes({ 'GET /v1/knowhow/notes/triage/agent/mine.md': () => ({ body: ++n > 1 ? { ...NOTE, text: 'New text.', hash: 'h2' } : NOTE }), 'PUT /v1/knowhow/notes/triage/agent/mine.md': { ok: true } }) as never);
+    let puts = 0;
+    api = fakeApi(
+      routes({
+        'GET /v1/knowhow/notes/triage/agent/mine.md': () => ({ body: ++n > 1 ? { ...NOTE, text: 'New text.', hash: 'h2' } : NOTE }),
+        'PUT /v1/knowhow/notes/triage/agent/mine.md': () => (++puts === 1 ? { body: { note: { ...NOTE, text: undefined, hash: 'h2' } } } : { status: 202, body: { note: NOTE, waiting: { ...WAIT, what: 'updated' } } }),
+      }) as never,
+    );
     const rec = await loadNote(NOTE);
-    await saveNote(rec, 'New text.');
+    expect(await saveNote(rec, 'New text.')).toBe(false);
     const put = api.calls.find((c) => c.method === 'PUT')!;
     expect(put.body).toEqual({ text: 'New text.', ifHash: 'h1', sources: [{ ref: 'run:r9' }] });
     expect(knowhow.get().notes['triage|agent||mine.md'].hash).toBe('h2');
+    expect(await saveNote(knowhow.get().notes['triage|agent||mine.md'], 'Newer text.')).toBe(true);
   });
 
   it('reads a note again on a 412, keeps the error for the screen, and names the principal of a principal note', async () => {

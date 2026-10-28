@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { ApiError } from '../api/client';
 import type { JournalEntry, WaitingChange } from '../api/knowhow';
 import type { Agent } from '../api/types';
-import { byWords, conflictWords, entrySentence, figuresOf, heldBackLine, runLinks, undoRefusal, waitSentence, type Sentence } from '../lib/knowhow';
+import { byWords, canDecide, conflictWords, entrySentence, figuresOf, heldBackLine, runLinks, undoRefusal, waitSentence, type Role, type Sentence } from '../lib/knowhow';
 import { go, hrefOf, type KnowhowTab } from '../lib/route';
 import { statusOf } from '../lib/routines';
 import { clock, dayWords } from '../lib/words';
@@ -25,7 +25,7 @@ import { Switch } from './ChannelDialog';
 import { KnowhowNotes } from './KnowhowNotes';
 import { useRoving } from './keys';
 import { showError, showSaid } from './notice';
-import { Button, Card, Chip, Find, Led, LineLed, Mark, PaneHeader, Tabs } from './primitives';
+import { Button, Card, Chip, Find, Help, Led, LineLed, Mark, PaneHeader, Tabs } from './primitives';
 import { RoutineGroups } from './Routines';
 import { EmptyPane } from './Shell';
 
@@ -39,9 +39,14 @@ export function useAgentName(agent: string): string {
   return useSelect((s) => (s.faces[agent] && s.faces[agent].displayName) || agent);
 }
 
-/** useOwner reports whether the person may change the know-how of an agent: an owner of the agent. */
-export function useOwner(agent: string): boolean {
-  return useSelect((s) => !!(s.me && s.me.roles && s.me.roles[agent] === 'owner'));
+/** useRole is the role of the person on an agent, as GET /v1/whoami names it: owner, operator, or another. */
+export function useRole(agent: string): Role {
+  return useSelect((s) => (s.me && s.me.roles ? s.me.roles[agent] : undefined));
+}
+
+/** useMe is the principal of the person. */
+function useMe() {
+  return useSelect((s) => (s.me ? s.me.principal : null));
 }
 
 /** useRoutinesOn reports whether the server keeps routines. An older server that does not say keeps them. */
@@ -190,8 +195,10 @@ function KnowhowHome({ tab }: { tab: KnowhowTab }) {
 
 function KnowhowView({ agent, tab: asked }: { agent: string; tab: KnowhowTab }) {
   const name = useAgentName(agent);
-  const owner = useOwner(agent);
+  const role = useRole(agent);
+  const owner = role === 'owner';
   const off = useKnowhow((s) => s.off);
+  const offReason = useKnowhow((s) => s.offReason);
   const routinesOn = useRoutinesOn();
   const signOff = useRoutines((s) => (s.order || []).map((k) => s.byKey[k]).filter((r) => r && r.agent === agent && statusOf(r) === 'needs-you').length);
   const waiting = useKnowhow((s) => (s.agents[agent] && s.agents[agent].waiting ? s.agents[agent].waiting!.length : 0));
@@ -231,12 +238,16 @@ function KnowhowView({ agent, tab: asked }: { agent: string; tab: KnowhowTab }) 
       </div>
       <div class="scroll pad kh-body">
         {off ? (
-          tab !== 'routines' && <p class="t-meta">Know-how is off on this server.</p>
+          tab !== 'routines' && (
+            <p class="t-meta">
+              Know-how is off on this server. <Help label="Why Know-how is off">{offReason}</Help>
+            </p>
+          )
         ) : (
           <Head agent={agent} owner={owner} />
         )}
-        {tab === 'learned' && !off && <Waiting key={agent} agent={agent} owner={owner} name={name} />}
-        {tab === 'learned' && !off && <Journal agent={agent} owner={owner} name={name} />}
+        {tab === 'learned' && !off && <Waiting key={agent} agent={agent} role={role} name={name} />}
+        {tab === 'learned' && !off && <Journal agent={agent} role={role} name={name} />}
         {tab === 'notes' && !off && <KnowhowNotes agent={agent} name={name} />}
         {tab === 'routines' && (
           <section class="kh-sec" aria-label="Routines">
@@ -259,6 +270,7 @@ function KnowhowView({ agent, tab: asked }: { agent: string; tab: KnowhowTab }) 
 function Head({ agent, owner }: { agent: string; owner: boolean }) {
   const summary = useKnowhow((s) => s.agents[agent] && s.agents[agent].summary);
   const settings = useKnowhow((s) => s.agents[agent] && s.agents[agent].settings);
+  const review = settings && settings.review;
   const error = useKnowhow((s) => (s.agents[agent] && s.agents[agent].errors.summary) || '');
   const [busy, setBusy] = useState(false);
   const f = summary ? figuresOf(summary) : null;
@@ -306,6 +318,7 @@ function Head({ agent, owner }: { agent: string; owner: boolean }) {
         </div>
       )}
       {!owner && settings && settings.askFirst && <p class="t-meta kh-asks">It asks an owner before it keeps what it learns.</p>}
+      {review && !review.on && <p class="t-meta kh-review">{review.reason || 'The after-work review is off: no agent is set.'}</p>}
     </section>
   );
 }
@@ -345,7 +358,7 @@ function Runs({ runs }: { runs?: string[] }) {
  * changed since: the page reads the changes again, and a quiet line says
  * so above the cards.
  */
-function Waiting({ agent, owner, name }: { agent: string; owner: boolean; name: string }) {
+function Waiting({ agent, role, name }: { agent: string; role: Role; name: string }) {
   const list = useKnowhow((s) => s.agents[agent] && s.agents[agent].waiting);
   const [said, setSaid] = useState('');
   // The changes of the first read never move. The pane draws a new Waiting for each agent, so a change of agent starts again.
@@ -361,13 +374,16 @@ function Waiting({ agent, owner, name }: { agent: string; owner: boolean; name: 
         </p>
       )}
       {list.map((c) => (
-        <KeepCard key={c.id} c={c} agent={agent} owner={owner} name={name} settle={!!seen.current && !seen.current.has(c.id)} onSaid={setSaid} />
+        <KeepCard key={c.id} c={c} agent={agent} role={role} name={name} settle={!!seen.current && !seen.current.has(c.id)} onSaid={setSaid} />
       ))}
     </section>
   );
 }
 
-function KeepCard({ c, agent, owner, name, settle, onSaid }: { c: WaitingChange; agent: string; owner: boolean; name: string; settle: boolean; onSaid: (s: string) => void }) {
+function KeepCard({ c, agent, role, name, settle, onSaid }: { c: WaitingChange; agent: string; role: Role; name: string; settle: boolean; onSaid: (s: string) => void }) {
+  const me = useMe();
+  // A change of the own notes of the person needs the operator role, any other change the owner role.
+  const owner = canDecide(c.subject, me, role);
   const [busy, setBusy] = useState(false);
   const act = async (keep: boolean) => {
     setBusy(true);
@@ -415,7 +431,7 @@ function KeepCard({ c, agent, owner, name, settle, onSaid }: { c: WaitingChange;
 /* ---------- What it learned ---------- */
 
 /** Journal is the tab What it learned: the entries of the journal by day, newest first, each with its time, its sentence, its runs, and Undo. */
-function Journal({ agent, owner, name }: { agent: string; owner: boolean; name: string }) {
+function Journal({ agent, role, name }: { agent: string; role: Role; name: string }) {
   const entries = useKnowhow((s) => s.agents[agent] && s.agents[agent].journal);
   const more = useKnowhow((s) => !!(s.agents[agent] && s.agents[agent].more));
   const error = useKnowhow((s) => (s.agents[agent] && s.agents[agent].errors.journal) || '');
@@ -445,7 +461,7 @@ function Journal({ agent, owner, name }: { agent: string; owner: boolean; name: 
           <h3 class="kh-day-head">{d.day}</h3>
           <ol class="kh-entries">
             {d.items.map((e) => (
-              <EntryRow key={e.id} e={e} agent={agent} owner={owner} name={name} />
+              <EntryRow key={e.id} e={e} agent={agent} role={role} name={name} />
             ))}
           </ol>
         </div>
@@ -461,8 +477,10 @@ function Journal({ agent, owner, name }: { agent: string; owner: boolean; name: 
   );
 }
 
-function EntryRow({ e, agent, owner, name }: { e: JournalEntry; agent: string; owner: boolean; name: string }) {
-  const me = useSelect((s) => (s.me ? s.me.principal : null));
+function EntryRow({ e, agent, role, name }: { e: JournalEntry; agent: string; role: Role; name: string }) {
+  const me = useMe();
+  // An entry can be taken back once, by a person who may change its note or its routine.
+  const may = !!e.undo && !e.undoneBy && canDecide(e.subject, me, role);
   const [busy, setBusy] = useState(false);
   const [refused, setRefused] = useState(false);
   const s = entrySentence(e);
@@ -503,7 +521,7 @@ function EntryRow({ e, agent, owner, name }: { e: JournalEntry; agent: string; o
           </p>
         )}
       </div>
-      {owner && e.undo && (
+      {may && (
         <Button kind="quiet" size="s" class="kh-undo" disabled={busy} onClick={take}>
           Undo
         </Button>

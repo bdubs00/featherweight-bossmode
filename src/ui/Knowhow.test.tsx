@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { act } from 'preact/test-utils';
-import type { JournalEntry, NoteItem, NoteRecord, WaitingChange } from '../api/knowhow';
+import type { JournalEntry, KnowhowSummary, NoteItem, NoteRecord, WaitingChange } from '../api/knowhow';
 import type { RoutineRecord } from '../api/routines';
 import type { Whoami } from '../api/types';
 import { forgetAgents } from '../state/agents';
@@ -20,16 +20,43 @@ const face = (agent: string, displayName: string, tagline: string) => ({ agent, 
 
 const at = (minutesAgo: number) => new Date(Date.now() - minutesAgo * 60000).toISOString();
 
-const SUMMARY = { agent: 'triage', days: 7, normal: { runs: 380, doneWell: 346, costPerJob: 0.02, byRoutines: 140 }, heldBack: { runs: 20, doneWell: 16, costPerJob: 0.04, byRoutines: 0 }, costPerJobBefore: 0.025, notesCorrected: 3 };
-const FEW = { ...SUMMARY, agent: 'identity-desk', normal: { runs: 60, doneWell: 50, costPerJob: 0.03, byRoutines: 12 }, heldBack: { runs: 4, doneWell: 3, costPerJob: 0.05, byRoutines: 0 }, notesCorrected: 0 };
+/** The answer of summary.go of the workbench for triage: 400 runs, 20 held back, and the line of the server. */
+const SUMMARY: KnowhowSummary = {
+  agent: 'triage',
+  days: 7,
+  costPerJob: { usd: 0.021, runs: 400, previousUsd: 0.025, trend: 'down' },
+  doneByRoutines: { runs: 380, byRoutine: 140, share: 140 / 380 },
+  notesCorrected: 3,
+  normal: { runs: 380, doneWell: 346, byRoutine: 140, costPerJobUsd: 0.02 },
+  heldBack: { runs: 20, doneWell: 16, byRoutine: 0, costPerJobUsd: 0.04 },
+  compare: { enough: true, heldBack: 20, normal: 300, oneIn: 16, doneWellWithout: 0.8, doneWellWith: 0.91, line: 'Held back 1 in 16 runs. Done well: 80% without what it learned, 91% with it.' },
+};
+/** Identity desk held back 4 runs, so the server says that there are not enough. */
+const FEW: KnowhowSummary = {
+  ...SUMMARY,
+  agent: 'identity-desk',
+  costPerJob: { usd: 0.031, runs: 64, previousUsd: 0.03, trend: 'flat' },
+  doneByRoutines: { runs: 60, byRoutine: 12, share: 0.2 },
+  normal: { runs: 60, doneWell: 50, byRoutine: 12, costPerJobUsd: 0.03 },
+  heldBack: { runs: 4, doneWell: 3, byRoutine: 0, costPerJobUsd: 0.05 },
+  compare: { enough: false, heldBack: 4, normal: 30, line: 'Not enough held-back runs yet.' },
+  notesCorrected: 0,
+};
 
-const WAIT: WaitingChange = { id: 'w1', at: at(30), agent: 'triage', what: 'learned', subject: { note: 'gotchas/vpn-portal.md' }, why: 'Three runs failed on the short name of the portal and passed with the full one.', runs: ['r1', 'r2'], by: 'review', text: 'The VPN portal answers only on its full domain, vpn.corp.example.com.' };
+/** pid is a public id of the workbench: an id that starts with its time, and the agent in base64url. */
+const pid = (n: number) => '01K8' + String(n).padStart(22, '0') + '-dHJpYWdl';
+const SETTINGS = { agent: 'triage', askFirst: true, review: { on: true, agent: 'review', every: '24h0m0s' } };
+
+const WAIT: WaitingChange = { id: pid(1), at: at(30), agent: 'triage', what: 'learned', subject: { note: 'gotchas/vpn-portal.md', scope: 'agent' }, why: 'Three runs failed on the short name of the portal and passed with the full one.', runs: ['r1', 'r2'], by: 'review', text: 'The VPN portal answers only on its full domain, vpn.corp.example.com.' };
 
 const JOURNAL: JournalEntry[] = [
-  { id: 'j1', at: at(20), agent: 'triage', what: 'stepped-back', subject: { routine: 'acknowledge-a-new-ticket' }, why: 'A canary run disagreed with the agent on the team.', runs: ['r7'], by: 'front', undo: null },
-  { id: 'j2', at: at(40), agent: 'triage', what: 'out-of-date', subject: { note: 'gotchas/gitea-labels.md' }, why: 'The page agents/triage/labels.md changed.', by: 'front', undo: null },
-  { id: 'j3', at: at(60 * 30), agent: 'triage', what: 'learned', subject: { note: 'gotchas/gitea-labels.md' }, why: 'Two runs failed on a label with a space and passed without it.', runs: ['r3', 'r4'], by: 'review', undo: { revision: 3 } },
+  { id: pid(11), at: at(20), agent: 'triage', what: 'stepped-back', subject: { routine: 'acknowledge-a-new-ticket' }, why: 'A canary run disagreed with the agent on the team.', runs: ['r7'], by: '' },
+  { id: pid(12), at: at(40), agent: 'triage', what: 'out-of-date', subject: { note: 'gotchas/gitea-labels.md', scope: 'agent' }, why: 'The page agents/triage/labels.md changed.', by: '' },
+  { id: pid(13), at: at(60 * 30), agent: 'triage', what: 'learned', subject: { note: 'gotchas/gitea-labels.md', scope: 'agent' }, why: 'Two runs failed on a label with a space and passed without it.', runs: ['r3', 'r4'], by: 'review', undo: { revision: 0, after: 3 } },
+  // An entry that was taken back already offers no second undo.
+  { id: pid(14), at: at(60 * 31), agent: 'triage', what: 'learned', subject: { note: 'gotchas/old.md', scope: 'agent' }, why: 'One run passed.', by: 'review', undo: { revision: 0, after: 1 }, undoneBy: pid(15) },
 ];
+const J3 = JOURNAL[2].id;
 
 const item = (name: string, more: Partial<NoteItem> = {}): NoteItem => ({ agent: 'triage', scope: { kind: 'agent' }, name, hash: 'h-' + name, state: 'checked', description: name, by: 'review', at: at(90), uses: 7, sources: 2, ...more });
 const NOTES: NoteItem[] = [
@@ -53,8 +80,8 @@ function routes(more: Record<string, unknown> = {}): Record<string, unknown> {
     'GET /v1/knowhow/waiting?agent=identity-desk': { waiting: [] },
     'GET /v1/knowhow/summary?agent=triage&days=7': SUMMARY,
     'GET /v1/knowhow/summary?agent=identity-desk&days=7': FEW,
-    'GET /v1/knowhow/settings/triage': { askFirst: true },
-    'GET /v1/knowhow/settings/identity-desk': { askFirst: false },
+    'GET /v1/knowhow/settings/triage': SETTINGS,
+    'GET /v1/knowhow/settings/identity-desk': { ...SETTINGS, agent: 'identity-desk', askFirst: false },
     'GET /v1/knowhow/journal?agent=triage&limit=50': { entries: JOURNAL },
     'GET /v1/knowhow/journal?agent=identity-desk&limit=50': { entries: [] },
     'GET /v1/knowhow/notes?agent=triage': { notes: NOTES },
@@ -123,7 +150,7 @@ describe('the agents', () => {
 
 describe('the header of an agent', () => {
   it('shows the four numbers of the last 7 days, the held-back line, and the switch, under three tabs', async () => {
-    api = fakeApi(routes({ 'PUT /v1/knowhow/settings/triage': { askFirst: false } }) as never);
+    api = fakeApi(routes({ 'PUT /v1/knowhow/settings/triage': { ...SETTINGS, askFirst: false } }) as never);
     const el = mount(<KnowhowMain agent="triage" tab="learned" />);
     await settle();
     expect(text(el.querySelector('h1'))).toBe('Triage');
@@ -137,10 +164,12 @@ describe('the header of an agent', () => {
     expect(text(head.querySelector('h2'))).toBe('Last 7 days');
     expect([...head.querySelectorAll('.kh-figs > div')].map((d) => [text(d.querySelector('dd')), text(d.querySelector('dt'))])).toEqual([
       ['$0.02', 'cost per job, down 16%'],
-      ['35% of 400', 'done by routines'],
+      ['37% of 380', 'done by routines'],
       ['3', 'notes corrected'],
     ]);
-    expect(text(head.querySelector('.kh-held'))).toBe('Held back 1 in 20 runs. Done well: 80% without what it learned, 91% with it. Cost per job: $0.04 without, $0.02 with.');
+    expect(text(head.querySelector('.kh-held'))).toBe('Held back 1 in 16 runs. Done well: 80% without what it learned, 91% with it. Cost per job: $0.04 without, $0.02 with.');
+    // The after-work review runs, so no line says otherwise.
+    expect(head.querySelector('.kh-review')).toBeNull();
     const sw = head.querySelector('input[role="switch"]') as HTMLInputElement;
     expect(text(sw.closest('label'))).toBe('Ask me before it keeps what it learns');
     expect(sw.checked).toBe(true);
@@ -159,20 +188,26 @@ describe('the header of an agent', () => {
     expect(el.querySelector('.kh-notes')).not.toBeNull();
   });
 
-  it('shows no percentage from fewer than 20 held-back runs', async () => {
-    api = fakeApi(routes() as never);
+  it('shows no percentage while the server says that too few runs were held back, and says when the after-work review is off', async () => {
+    api = fakeApi(routes({ 'GET /v1/knowhow/settings/identity-desk': { agent: 'identity-desk', askFirst: false, review: { on: false, reason: 'The after-work review is off: no agent is set.' } } }) as never);
     const el = mount(<KnowhowMain agent="identity-desk" tab="learned" />);
     await settle();
     expect(text(el.querySelector('.kh-held'))).toBe('Not enough held-back runs yet.');
+    expect(text(el.querySelector('.kh-figs > div'))).toBe('cost per job, about the same $0.03');
+    expect(text(el.querySelector('.kh-review'))).toBe('The after-work review is off: no agent is set.');
     expect(el.querySelector('.kh-waiting')).toBeNull();
     expect(text(el.querySelector('.kh-journal'))).toBe('Nothing learned yet.');
   });
 
-  it('says so in place on a server that keeps no know-how, and keeps the tab Routines', async () => {
-    api = fakeApi({ 'GET /v1/routines': { routines: ROUTINES } } as never);
+  it('says so in place on a server that keeps no know-how, with its reason behind the question mark, and keeps the tab Routines', async () => {
+    const off = 'Know-how is off on this server, because its bus keeps no store for it. An admin runs the server with the bus nats or mem.';
+    const no = () => ({ status: 404, body: { detail: off } });
+    api = fakeApi({ 'GET /v1/routines': { routines: ROUTINES }, 'GET /v1/knowhow/journal': no, 'GET /v1/knowhow/summary': no, 'GET /v1/knowhow/settings/triage': no, 'GET /v1/knowhow/waiting': no } as never);
     const el = mount(<KnowhowMain agent="triage" tab="learned" />);
     await settle();
-    expect(text(el.querySelector('.kh-body'))).toBe('Know-how is off on this server.');
+    expect(text(el.querySelector('.kh-body'))).toBe('Know-how is off on this server. ?');
+    click(el.querySelector('[aria-label="Why Know-how is off"]'));
+    expect(el.querySelector('.help-pop')!.textContent).toBe(off);
     unmountAll();
     const r = mount(<KnowhowMain agent="triage" tab="routines" />);
     await settle();
@@ -183,7 +218,7 @@ describe('the header of an agent', () => {
 
 describe('the changes that wait', () => {
   it('shows each one as the card Keep this?, with Not now and Keep, and keeps it with Keep', async () => {
-    api = fakeApi(routes({ 'POST /v1/knowhow/waiting/w1': { ok: true } }) as never);
+    api = fakeApi(routes({ ['POST /v1/knowhow/waiting/' + WAIT.id]: { kept: true, entry: null } }) as never);
     const el = mount(<KnowhowMain agent="triage" tab="learned" />);
     await settle();
     const card = el.querySelector('.kh-waiting .card')!;
@@ -201,12 +236,12 @@ describe('the changes that wait', () => {
     click(keyNamed(card, 'Keep'));
     await settle();
     const post = api.calls.find((c) => c.method === 'POST')!;
-    expect(post.path).toBe('/v1/knowhow/waiting/w1');
+    expect(post.path).toBe('/v1/knowhow/waiting/' + WAIT.id);
     expect(post.body).toEqual({ keep: true });
   });
 
   it('leaves a change with Not now, and says in a quiet line, not a notice, that its note changed since', async () => {
-    api = fakeApi(routes({ 'POST /v1/knowhow/waiting/w1': () => ({ status: 409, body: { detail: 'the note changed' } }) }) as never);
+    api = fakeApi(routes({ ['POST /v1/knowhow/waiting/' + WAIT.id]: () => ({ status: 409, body: { detail: 'a later change touched it' } }) }) as never);
     const el = mount(<KnowhowMain agent="triage" tab="learned" />);
     await settle();
     click(keyNamed(el.querySelector('.kh-waiting .card')!, 'Not now'));
@@ -227,6 +262,17 @@ describe('the changes that wait', () => {
     await settle();
     const cards = [...el.querySelectorAll('.kh-waiting .card')];
     expect(cards.map((c) => c.classList.contains('settle'))).toEqual([true, false]);
+  });
+
+  it('lets an operator decide a change of their own notes, and not a change of the agent notes', async () => {
+    act(() => store.dispatch({ type: 'me', me: { ...OWNER, roles: { triage: 'operator' } } }));
+    const own: WaitingChange = { ...WAIT, id: pid(2), subject: { note: 'mine/vpn.md', scope: 'principal', principal: 'alice@example.com' } };
+    api = fakeApi(routes({ 'GET /v1/knowhow/waiting?agent=triage': { waiting: [own, WAIT] } }) as never);
+    const el = mount(<KnowhowMain agent="triage" tab="learned" />);
+    await settle();
+    const cards = [...el.querySelectorAll('.kh-waiting .card')];
+    expect(cards.map((c) => [...c.querySelectorAll('.card-actions button')].map(text))).toEqual([['Not now', 'Keep'], []]);
+    expect(cards[1].classList.contains('quiet')).toBe(true);
   });
 
   it('shows a person who does not own the agent the change in a quiet card with no key, and no switch', async () => {
@@ -252,7 +298,7 @@ describe('What it learned', () => {
     const j = el.querySelector('.kh-journal')!;
     expect([...j.querySelectorAll('.kh-day-head')].map(text)[0]).toBe(dayWords(JOURNAL[0].at));
     const rows = [...j.querySelectorAll('.kh-entry')];
-    expect(rows).toHaveLength(3);
+    expect(rows).toHaveLength(4);
     expect(rows[0].querySelector('time')!.getAttribute('dateTime')).toBe(JOURNAL[0].at);
     expect(text(rows[0].querySelector('.kh-what'))).toBe('The routine Acknowledge a new ticket stepped back to rehearsing.');
     expect(text(rows[0].querySelector('.kh-why'))).toBe('A canary run disagreed with the agent on the team.');
@@ -260,12 +306,13 @@ describe('What it learned', () => {
     expect(text(rows[1].querySelector('.kh-what'))).toBe('The note Gitea labels went out of date.');
     expect(text(rows[2].querySelector('.kh-meta'))).toBe('By the after-work review Run 1 Run 2');
     // Only an entry that the server can undo has the key.
-    expect(rows.map((r) => !!keyNamed(r, 'Undo'))).toEqual([false, false, true]);
+    // Only an entry that the server can undo, and that nobody took back yet, has the key.
+    expect(rows.map((r) => !!keyNamed(r, 'Undo'))).toEqual([false, false, true, false]);
   });
 
   it('takes an entry back with Undo, and says in place when a later change touched its note', async () => {
     let n = 0;
-    api = fakeApi(routes({ 'POST /v1/knowhow/journal/j3/undo': () => (++n === 1 ? { status: 409, body: { detail: 'a later change' } } : { body: { ok: true } }) }) as never);
+    api = fakeApi(routes({ ['POST /v1/knowhow/journal/' + J3 + '/undo']: () => (++n === 1 ? { status: 409, body: { detail: 'a later change touched it' } } : { body: { entry: JOURNAL[2], undone: JOURNAL[2] } }) }) as never);
     const el = mount(<KnowhowMain agent="triage" tab="learned" />);
     await settle();
     const row = el.querySelectorAll('.kh-entry')[2];
@@ -275,7 +322,7 @@ describe('What it learned', () => {
     expect(currentNotice()).toBe('');
     click(keyNamed(row, 'Undo'));
     await settle();
-    expect(api.calls.filter((c) => c.path === '/v1/knowhow/journal/j3/undo')).toHaveLength(2);
+    expect(api.calls.filter((c) => c.path === '/v1/knowhow/journal/' + J3 + '/undo')).toHaveLength(2);
     expect(currentSaid()).toBe('Undone: Learned the note Gitea labels.');
     expect(api.calls.filter((c) => c.path === '/v1/knowhow/journal?agent=triage&limit=50')).toHaveLength(2);
   });
@@ -341,9 +388,38 @@ describe('Notes', () => {
     expect(el.querySelector('.kh-note-body textarea')).toBeNull();
   });
 
+  it('offers Edit to an operator on their own notes only, as the server lets them change those', async () => {
+    act(() => store.dispatch({ type: 'me', me: { ...OWNER, roles: { triage: 'operator' } } }));
+    api = fakeApi(routes() as never);
+    const el = mount(<KnowhowMain agent="triage" tab="notes" />);
+    await settle();
+    const groups = el.querySelectorAll('.kh-group');
+    click(groups[0].querySelector('.kh-note-head'));
+    await settle();
+    expect([...groups[0].querySelectorAll('.kh-note-body button')].map(text)).toEqual(['Edit', 'Put away']);
+    click(groups[1].querySelector('.kh-note-head'));
+    await settle();
+    expect(groups[1].querySelector('.kh-note-body button')).toBeNull();
+  });
+
+  it('says so when a change of a note waits for a decision (202)', async () => {
+    const path = '/v1/knowhow/notes/triage/principal/mine/escalation.md?principal=alice%40example.com';
+    api = fakeApi(routes({ ['PUT ' + path]: () => ({ status: 202, body: { note: MINE, waiting: { ...WAIT, what: 'updated' } } }) }) as never);
+    const el = mount(<KnowhowMain agent="triage" tab="notes" />);
+    await settle();
+    click(el.querySelector('.kh-group .kh-note-head'));
+    await settle();
+    const body = el.querySelector('.kh-note-body')!;
+    click(keyNamed(body, 'Edit'));
+    typeIn(body.querySelector('textarea'), 'By phone, and by chat.');
+    click(keyNamed(body, 'Save'));
+    await settle();
+    expect(currentSaid()).toBe('The change waits for a decision in What it learned.');
+  });
+
   it('puts away a note that the person wrote', async () => {
     const path = '/v1/knowhow/notes/triage/principal/mine/escalation.md';
-    api = fakeApi(routes({ ['DELETE ' + path + '?principal=alice%40example.com&ifHash=h-mine%2Fescalation.md']: () => ({ status: 204 }) }) as never);
+    api = fakeApi(routes({ ['DELETE ' + path + '?principal=alice%40example.com&ifHash=h-mine%2Fescalation.md']: { note: { ...MINE, text: undefined, state: 'put-away' } } }) as never);
     const el = mount(<KnowhowMain agent="triage" tab="notes" />);
     await settle();
     click(el.querySelector('.kh-group .kh-note-head'));

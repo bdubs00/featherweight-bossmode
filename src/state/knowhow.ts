@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { ApiError } from '../api/client';
-import { knowhowApi, type JournalEntry, type KnowhowSettings, type KnowhowSummary, type NoteItem, type NoteRecord, type WaitingChange } from '../api/knowhow';
+import { knowhowApi, type JournalEntry, type KnowhowSettings, type KnowhowSummary, type NoteItem, type NoteRecord, type WaitingChange, type WriteAnswer } from '../api/knowhow';
 import { noteKey } from '../lib/knowhow';
 import { store } from './store';
 
@@ -33,11 +33,13 @@ export interface KnowhowState {
   allWaiting: WaitingChange[] | null;
   /** The notes that the person opened, by noteKey. */
   notes: Record<string, NoteRecord>;
-  /** True when the server answers 404 to the journal and the summary: it keeps no know-how. */
+  /** True when the server answers the journal or the summary with 404 and its reason: it keeps no know-how. */
   off: boolean;
+  /** Why Know-how is off, in the words of the server. */
+  offReason: string;
 }
 
-const initial: KnowhowState = { agents: {}, allWaiting: null, notes: {}, off: false };
+const initial: KnowhowState = { agents: {}, allWaiting: null, notes: {}, off: false, offReason: '' };
 
 let state: KnowhowState = initial;
 const listeners = new Set<() => void>();
@@ -103,17 +105,24 @@ function patch(agent: string, p: Partial<AgentKnowhow>, error?: { part: keyof Ag
 }
 
 const reason = (e: unknown): string => (e instanceof Error && e.message ? e.message : 'The action failed. Try it again.');
-const is404 = (e: unknown): boolean => e instanceof ApiError && e.status === 404;
 
-/** read runs one read of a part and keeps its answer, or its reason in words. A 404 of the journal or the summary marks the place off. */
+/** offOf is the reason of a server that keeps no know-how: its 404 says Know-how is off. A 404 for an agent that the person cannot view is not one. */
+function offOf(e: unknown): string {
+  if (!(e instanceof ApiError) || e.status !== 404) return '';
+  const detail = (e.problem && e.problem.detail) || '';
+  return /^Know-how is off/i.test(detail) ? detail : '';
+}
+
+/** read runs one read of a part and keeps its answer, or its reason in words. The off answer of the journal or the summary marks the place off. */
 async function read<K extends keyof AgentKnowhow['errors']>(agent: string, part: K, f: () => Promise<Partial<AgentKnowhow>>): Promise<void> {
   try {
     const p = await f();
     patch(agent, p);
-    if (state.off && (part === 'journal' || part === 'summary')) set({ ...state, off: false });
+    if (state.off && (part === 'journal' || part === 'summary')) set({ ...state, off: false, offReason: '' });
   } catch (e) {
-    if (is404(e) && (part === 'journal' || part === 'summary')) {
-      set({ ...state, off: true });
+    const off = offOf(e);
+    if (off && (part === 'journal' || part === 'summary')) {
+      set({ ...state, off: true, offReason: off });
       return;
     }
     patch(agent, {}, { part, text: reason(e) });
@@ -132,11 +141,11 @@ export const loadJournal = (agent: string) =>
     return { journal: entries, more: entries.length >= JOURNAL_PAGE };
   });
 
-/** loadOlder reads the entries before the oldest one that the page holds, and adds them at the end. */
+/** loadOlder reads the entries before the oldest one that the page holds, by its id, and adds them at the end. */
 export async function loadOlder(agent: string): Promise<void> {
   const old = (state.agents[agent] && state.agents[agent].journal) || [];
   if (!old.length) return loadJournal(agent);
-  const entries = await knowhowApi.journal(agent, JOURNAL_PAGE, old[old.length - 1].at);
+  const entries = await knowhowApi.journal(agent, JOURNAL_PAGE, old[old.length - 1].id);
   const seen = new Set(old.map((e) => e.id));
   const now = (state.agents[agent] && state.agents[agent].journal) || old;
   patch(agent, { journal: [...now, ...entries.filter((e) => !seen.has(e.id))], more: entries.length >= JOURNAL_PAGE });
@@ -205,9 +214,10 @@ export async function setAskFirst(agent: string, askFirst: boolean): Promise<voi
 }
 
 /**
- * decide keeps a waiting change, or leaves it. Either way the page reads
- * the agent again. A 409 means that the target changed since: the page
- * reads the changes again, and the error goes on to the screen.
+ * decide keeps a waiting change, or drops it. Either way the page reads
+ * the agent again. A 409 means that the target changed since: the change
+ * stays until a person drops it, the page reads the changes again, and
+ * the error goes on to the screen.
  */
 export async function decide(agent: string, id: string, keep: boolean): Promise<void> {
   try {
@@ -226,33 +236,42 @@ export async function undo(agent: string, id: string): Promise<void> {
 }
 
 /**
- * saveNote changes the text of a note that the person wrote, for the
- * version that the person read. A 412 means that the note changed since:
- * the page reads it again, and the error goes on to the screen.
+ * saveNote changes the text of a note, for the version that the person
+ * read. A 412 means that the note changed since: the page reads it again,
+ * and the error goes on to the screen. It answers true when the change
+ * waits for a person (202), as a write by the token of the fleet does
+ * under the switch.
  */
-export async function saveNote(rec: NoteRecord, text: string): Promise<void> {
+export async function saveNote(rec: NoteRecord, text: string): Promise<boolean> {
+  let answer: WriteAnswer | null = null;
   try {
-    await knowhowApi.saveNote(rec, { text, ifHash: rec.hash, sources: rec.sources || [] });
+    answer = await knowhowApi.saveNote(rec, { text, ifHash: rec.hash, sources: rec.sources || [] });
   } catch (e) {
     if (e instanceof ApiError && e.status === 412) await loadNote(rec).catch(() => {});
     throw e;
   }
   await loadNote(rec).catch(() => {});
   await refresh(rec.agent);
+  return !!(answer && answer.waiting);
 }
 
-/** putAway puts a note away for the version that the person read. A 412 reads it again. */
-export async function putAway(rec: NoteRecord): Promise<void> {
+/** putAway puts a note away for the version that the person read. A 412 reads it again. It answers true when the change waits for a person. */
+export async function putAway(rec: NoteRecord): Promise<boolean> {
+  let answer: WriteAnswer | null = null;
   try {
-    await knowhowApi.putAway(rec, rec.hash);
+    answer = await knowhowApi.putAway(rec, rec.hash);
   } catch (e) {
     if (e instanceof ApiError && e.status === 412) await loadNote(rec).catch(() => {});
     throw e;
   }
-  const notes = { ...state.notes };
-  delete notes[noteKey(rec)];
-  set({ ...state, notes });
+  const waits = !!(answer && answer.waiting);
+  if (!waits) {
+    const notes = { ...state.notes };
+    delete notes[noteKey(rec)];
+    set({ ...state, notes });
+  }
   await refresh(rec.agent);
+  return waits;
 }
 
 /* ---------- the stream ---------- */

@@ -1,19 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import type { KnowhowSummary, NoteItem } from '../api/knowhow';
-import { byWords, conflictWords, entrySentence, figuresOf, groupNotes, heldBackLine, isMine, labelOf, moneyPair, noteTitle, runLinks, sourceOf, undoRefusal, usesWords, waitSentence } from './knowhow';
+import { byWords, canDecide, canEditNote, conflictWords, entrySentence, figuresOf, groupNotes, heldBackLine, isMine, labelOf, moneyPair, noteTitle, runLinks, sourceOf, undoRefusal, usesWords, waitSentence } from './knowhow';
 
 const ME = { subject: 'alice@example.com', name: 'Alice' };
 
 const sentence = (s: { head: string; name: string; tail: string }) => s.head + s.name + s.tail;
 
-const summary = (normal: Partial<KnowhowSummary['normal']>, heldBack: Partial<KnowhowSummary['heldBack']>, more: Partial<KnowhowSummary> = {}): KnowhowSummary => ({
+/** SUMMARY is the answer of summary.go of the workbench for triage: 400 runs, 20 of them held back, and the line of the server. */
+const SUMMARY: KnowhowSummary = {
   agent: 'triage',
   days: 7,
-  normal: { runs: 0, doneWell: 0, costPerJob: 0, byRoutines: 0, ...normal },
-  heldBack: { runs: 0, doneWell: 0, costPerJob: 0, byRoutines: 0, ...heldBack },
+  costPerJob: { usd: 0.021, runs: 400, previousUsd: 0.025, trend: 'down' },
+  doneByRoutines: { runs: 380, byRoutine: 140, share: 140 / 380 },
   notesCorrected: 3,
-  ...more,
-});
+  normal: { runs: 380, doneWell: 346, byRoutine: 140, costPerJobUsd: 0.0196 },
+  heldBack: { runs: 20, doneWell: 16, byRoutine: 0, costPerJobUsd: 0.035 },
+  compare: { enough: true, heldBack: 20, normal: 300, oneIn: 16, doneWellWithout: 0.8, doneWellWith: 0.91, line: 'Held back 1 in 16 runs. Done well: 80% without what it learned, 91% with it.' },
+};
 
 describe('the words of a note', () => {
   it('titles a note from its name', () => {
@@ -69,6 +72,26 @@ describe('the words of a note', () => {
   });
 });
 
+describe('who may change what, as access.go of the workbench decides', () => {
+  const own = { kind: 'principal' as const, principal: 'alice@example.com' };
+  it('lets a person change their own notes with the operator role, and the agent notes and the notes of a duty with the owner role', () => {
+    expect(canEditNote({ scope: own, by: 'review' }, ME, 'operator')).toBe(true);
+    expect(canEditNote({ scope: own, by: 'review' }, ME, 'viewer')).toBe(false);
+    expect(canEditNote({ scope: { kind: 'agent' }, by: 'person:alice@example.com' }, ME, 'owner')).toBe(true);
+    expect(canEditNote({ scope: { kind: 'agent' }, by: 'person:alice@example.com' }, ME, 'operator')).toBe(false);
+    // The page offers no key on a note that the person did not write, outside their own scope.
+    expect(canEditNote({ scope: { kind: 'agent' }, by: 'review' }, ME, 'owner')).toBe(false);
+  });
+
+  it('lets an operator undo and decide a change of their own notes, and only an owner any other change', () => {
+    expect(canDecide({ note: 'a.md', scope: 'principal', principal: 'alice@example.com' }, ME, 'operator')).toBe(true);
+    expect(canDecide({ note: 'a.md', scope: 'agent' }, ME, 'operator')).toBe(false);
+    expect(canDecide({ note: 'a.md', scope: 'principal', principal: 'duty:sweep' }, ME, 'owner')).toBe(true);
+    expect(canDecide({ routine: 'ack' }, ME, 'operator')).toBe(false);
+    expect(canDecide({ routine: 'ack' }, ME, 'owner')).toBe(true);
+  });
+});
+
 describe('the sentences of the journal and of a change that waits', () => {
   it('says what an entry did, for a note and for a routine', () => {
     expect(sentence(entrySentence({ what: 'learned', subject: { note: 'gotchas/gitea-labels.md' } }))).toBe('Learned the note Gitea labels.');
@@ -77,6 +100,8 @@ describe('the sentences of the journal and of a change that waits', () => {
     expect(sentence(entrySentence({ what: 'stepped-back', subject: { routine: 'acknowledge-a-new-ticket' } }))).toBe('The routine Acknowledge a new ticket stepped back to rehearsing.');
     expect(sentence(entrySentence({ what: 'live', subject: { routine: 'reset-a-password' } }))).toBe('The routine Reset a password went live.');
     expect(sentence(entrySentence({ what: 'undone', subject: { routine: 'reset-a-password' } }))).toBe('Took back a change to the routine Reset a password.');
+    expect(sentence(entrySentence({ what: 'stays-out', subject: { routine: 'reset-a-password' } }))).toBe('The proposal of the routine Reset a password stayed out.');
+    expect(sentence(entrySentence({ what: 'paused', subject: { routine: 'reset-a-password' } }))).toBe('Paused the routine Reset a password.');
   });
 
   it('says what a waiting change would do', () => {
@@ -98,23 +123,26 @@ describe('the sentences of the journal and of a change that waits', () => {
 });
 
 describe('the four numbers', () => {
-  it('gives the cost per job of every run with its trend, the share done by routines with its runs, and the notes corrected', () => {
-    const f = figuresOf(summary({ runs: 380, doneWell: 346, costPerJob: 0.02, byRoutines: 140 }, { runs: 20, doneWell: 16, costPerJob: 0.04 }, { costPerJobBefore: 0.025 }));
-    expect(f).toEqual({ runs: 400, cost: '$0.02', trend: 'down 16%', routines: '35% of 400', corrected: '3' });
+  it('gives the cost per job of every run with the trend of the server, the share of the normal runs done by routines, and the notes corrected', () => {
+    expect(figuresOf(SUMMARY)).toEqual({ runs: 400, cost: '$0.02', trend: 'down 16%', routines: '37% of 380', corrected: '3' });
+    expect(figuresOf({ ...SUMMARY, costPerJob: { usd: 0.0251, runs: 400, previousUsd: 0.025, trend: 'flat' } }).trend).toBe('about the same');
+    expect(figuresOf({ ...SUMMARY, costPerJob: { usd: 0.02, runs: 0 } }).trend).toBe('');
   });
 
-  it('shows no percentage from fewer than 20 runs: the share turns to counts, and the trend goes', () => {
-    const f = figuresOf(summary({ runs: 12, doneWell: 10, costPerJob: 0.03, byRoutines: 4 }, {}, { costPerJobBefore: 0.06 }));
+  it('shows no percentage from fewer than 20 runs: the share turns to counts, and the trend keeps only its word', () => {
+    const f = figuresOf({ ...SUMMARY, costPerJob: { usd: 0.03, runs: 12, previousUsd: 0.06, trend: 'down' }, doneByRoutines: { runs: 12, byRoutine: 4, share: 1 / 3 } });
     expect(f.routines).toBe('4 of 12');
-    expect(f.trend).toBe('');
+    expect(f.trend).toBe('down');
   });
 
-  it('compares the held-back runs with the others only from 20 held-back runs', () => {
-    expect(heldBackLine(summary({ runs: 380, doneWell: 346, costPerJob: 0.021 }, { runs: 20, doneWell: 16, costPerJob: 0.035 }))).toBe(
-      'Held back 1 in 20 runs. Done well: 80% without what it learned, 91% with it. Cost per job: $0.04 without, $0.02 with.',
+  it('takes the rule of 20 and the line from the server, and adds the cost per job of each kind', () => {
+    expect(heldBackLine(SUMMARY)).toBe('Held back 1 in 16 runs. Done well: 80% without what it learned, 91% with it. Cost per job: $0.04 without, $0.02 with.');
+    // The server says not enough, whatever the page could count.
+    expect(heldBackLine({ ...SUMMARY, compare: { enough: false, heldBack: 25, normal: 0, line: 'Not enough held-back runs yet.' } })).toBe('Not enough held-back runs yet.');
+    // A line that the server leaves out is worded from its shares.
+    expect(heldBackLine({ ...SUMMARY, heldBack: { ...SUMMARY.heldBack, costPerJobUsd: 0.021 }, compare: { ...SUMMARY.compare, line: '' } })).toBe(
+      'Held back 1 in 16 runs. Done well: 80% without what it learned, 91% with it. Cost per job: $0.021 without, $0.020 with.',
     );
-    expect(heldBackLine(summary({ runs: 380, doneWell: 346 }, { runs: 19, doneWell: 19 }))).toBe('Not enough held-back runs yet.');
-    expect(heldBackLine(summary({ runs: 0 }, { runs: 0 }))).toBe('Not enough held-back runs yet.');
   });
 
   it('writes two costs that differ by less than a cent with three decimals, so the line never compares $0.02 with $0.02', () => {
