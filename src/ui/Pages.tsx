@@ -45,7 +45,7 @@ export interface Folder {
 }
 
 /** The headings over the work folders of the bridges and of the agents in the tree. */
-const KIND_HEADS: Record<string, string> = { bridge: 'Bridges', agent: 'Agents' };
+const KIND_HEADS: Record<string, string> = { bridge: 'Teams', agent: 'Agents' };
 
 /** The order of the kinds of folders: the pages that people keep first, the work folders of bridges and agents last. */
 const KIND_ORDER: Folder['kind'][] = ['root', 'people', 'bridge', 'agent'];

@@ -132,8 +132,8 @@ describe('Activity and the duties', () => {
   it('shows the card of a question of a duty on no bridge from the approval of its item, decides it, and reads the inbox again', async () => {
     let reads = 0;
     api = fakeApi({
-      'GET /v1/inbox': () => ({ body: ++reads === 1 ? { items: [{ kind: 'approval', run: 'run-ask', approval: 'ap-1', duty: 'restore-test', agent: 'backup', bridge: '', text: 'backup wants to run restic restore.', since: at(3) }] } : { items: [] } }),
-      'POST /v1/runs/run-ask/approvals/ap-1': {},
+      'GET /v1/inbox': () => ({ body: ++reads === 1 ? { items: [{ kind: 'approval', run: 'run-ask-0', approval: 'ap-1', duty: 'restore-test', agent: 'backup', bridge: '', text: 'backup wants to run restic restore.', since: at(3) }] } : { items: [] } }),
+      'POST /v1/runs/run-ask-0/approvals/ap-1': {},
     });
     const el = mount(
       <>
@@ -142,17 +142,39 @@ describe('Activity and the duties', () => {
       </>,
     );
     await settle(8);
+    // The run does not read, so the card stands on the words of the item.
     const row = rows(el).find((r) => r.querySelector('b')!.textContent === 'backup')!;
     expect(row.querySelector('.inbox-text')!.textContent).toBe('backup wants to run restic restore.');
     const main = el.querySelector('.inbox-main-pane')!;
     expect(main.querySelector('.inbox-said')!.textContent).toBe('backup wants to run restic restore.');
     expect(main.querySelector('.card')).toBeTruthy();
-    // The card needs no read of the run.
-    expect(api.calls.some((c) => c.path.startsWith('/v1/runs/run-ask') && c.method === 'GET')).toBe(false);
     act(() => (keyNamed(main, 'Allow') as HTMLButtonElement).click());
     await settle();
-    expect(api.calls.filter((c) => c.method === 'POST').map((c) => [c.path, c.body])).toEqual([['/v1/runs/run-ask/approvals/ap-1', { decision: 'allow' }]]);
+    expect(api.calls.filter((c) => c.method === 'POST').map((c) => [c.path, c.body])).toEqual([['/v1/runs/run-ask-0/approvals/ap-1', { decision: 'allow' }]]);
     expect(reads).toBe(2);
+  });
+
+  it('reads the run of a question of a duty on no bridge, so its card names the call, as the board does', async () => {
+    const asking = run('run-ask-1', 'backup', 'input-required', { pending: { id: 'ap-1', tool: 'bash', input: { command: 'restic restore latest --target /scratch' }, reason: 'rule: ask bash: restic restore*', requestedAt: at(3) }, metadata: { 'workbench.duty': 'restore-test' } });
+    api = fakeApi({
+      'GET /v1/inbox': { items: [{ kind: 'approval', run: 'run-ask-1', approval: 'ap-1', duty: 'restore-test', agent: 'backup', bridge: '', text: 'backup asks for your decision.', since: at(3) }] },
+      'GET /v1/runs/run-ask-1': asking,
+      'GET /v1/runs/run-ask-1/result': { runId: 'run-ask-1', status: 'needs-input' },
+    });
+    const el = mount(
+      <>
+        <ActivityList />
+        <ActivityMain />
+      </>,
+    );
+    await settle(8);
+    expect(api.calls.some((c) => c.method === 'GET' && c.path === '/v1/runs/run-ask-1')).toBe(true);
+    const row = rows(el).find((r) => r.querySelector('b')!.textContent === 'backup')!;
+    expect(row.querySelector('.inbox-text')!.textContent).not.toContain('asks for your decision');
+    const main = el.querySelector('.inbox-main-pane')!;
+    expect(main.querySelector('.inbox-said')).toBeNull();
+    expect(main.querySelector('.card')!.textContent).toContain('restic restore latest --target /scratch');
+    expect(keyNamed(main, 'Deny')).toBeTruthy();
   });
 
   it('reads the run of a question of a duty that names no approval, then shows its card and decides it', async () => {

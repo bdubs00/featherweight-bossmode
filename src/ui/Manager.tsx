@@ -220,7 +220,7 @@ async function continueManager(m: ManagerConfig, runId: string, text: string, fi
 function NoManager() {
   return (
     <section class="screen manager" aria-labelledby="manager-title">
-      <PaneHeader id="manager-title" title="Manager" size="title" level={1} back={{ href: '#', label: 'Bridges', to: 'list' }} />
+      <PaneHeader id="manager-title" title="Manager" size="title" level={1} back={{ href: '#', label: 'Teams', to: 'list' }} />
       <div class="empty center">
         <p>
           No manager is set up.{' '}
@@ -398,7 +398,7 @@ export function Manager({ run: routeRun, fresh }: { run?: string; fresh?: boolea
         }
       />
       <FollowBox end={end} foot={typing ? <Typing who={[{ agent, name: agent }]} phrase={waking ? 'Waking up' : typingPhrase(run, live)} /> : null}>
-        {!runId && !sent ? <p class="thread-empty">Ask about the fleet, or ask for a bridge.</p> : (
+        {!runId && !sent ? <p class="thread-empty">Ask about the fleet, or ask for a team.</p> : (
           <Conversation
             run={run}
             result={res}

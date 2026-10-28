@@ -5,7 +5,7 @@
 // of docs/CONTRACT.md, section 16. The front reads the schedule back and
 // computes the next times. The page only shows its answer.
 
-import type { CheckFirst, CheckFound, CheckWhere, Day, Duty, DutyDecided, DutyDo, DutyEvent, DutyProblem, DutyRecord, DutyRun, DutySecret, Repeat, Schedule, Tool } from '../api/types';
+import type { CheckFirst, CheckFound, CheckWhere, Day, Duty, DutyDecided, DutyDo, DutyEvent, DutyProblem, DutyRecord, DutyRun, DutySecret, Repeat, Run, Schedule, Tool } from '../api/types';
 import type { Light } from './presence';
 import { costText } from './cost';
 import { list, personName, plainText } from './words';
@@ -479,6 +479,27 @@ export function runLight(r: DutyRun | null | undefined): Light {
   return { word, tone: 'grey', label: why || 'The server reports ' + word + '.' };
 }
 
+/**
+ * resultLight is the verdict of a result of a duty, for a run that ended
+ * well: to check while it waits for a person (an item of the inbox, or a
+ * run that asks for a check and has no reaction yet), accepted after a
+ * thumb up or a heart, sent back after a thumb down, and unchecked for a
+ * duty that asks to check each result when nobody did. A run that a person
+ * sent back and accepted after its new answer reads accepted. It answers
+ * null where the page has no verdict to say, and the light of the run
+ * stands.
+ */
+export function resultLight(r: DutyRun, run: Pick<Run, 'reactions' | 'metadata' | 'state'> | undefined, toCheck: boolean, review: boolean): Light | null {
+  if (r.state !== 'completed' || !r.run) return null;
+  if (toCheck) return { word: 'to check', tone: 'amber', still: true, label: 'The result waits for a person to check it: Looks right or Needs work.' };
+  const re = (run && run.reactions) || {};
+  if ((re.up || 0) > 0 || (re.heart || 0) > 0) return { word: 'accepted', tone: 'green', label: 'A person said that the result looks right.' };
+  if ((re.down || 0) > 0) return { word: 'sent back', tone: 'red', label: 'A person sent the result back with a note.' };
+  if (run && run.state === 'completed' && run.metadata && run.metadata['workbench.review'] === '1') return { word: 'to check', tone: 'amber', still: true, label: 'The result waits for a person to check it: Looks right or Needs work.' };
+  if (review && run) return { word: 'unchecked', tone: 'grey', label: 'Nobody checked this result.' };
+  return null;
+}
+
 /** dutyLight is the light of a duty in the list: paused, else the light of its last run. */
 export function dutyLight(d: Duty, allPaused = false): Light {
   if (allPaused) return { word: 'paused', tone: 'grey', label: 'Every duty is paused.' };
@@ -511,9 +532,9 @@ const CALL_WORDS: Record<string, string> = {
   memory: 'a note in its memory',
   recall: 'a search of its memory',
   pages_write: 'a write to the wiki',
-  bridge_open: 'a new bridge',
-  bridge_post: 'a post in a bridge',
-  bridge_close: 'the close of a bridge',
+  bridge_open: 'a new team',
+  bridge_post: 'a post in a team',
+  bridge_close: 'the close of a team',
   spawn_task: 'a hand-off to another agent',
   send: 'a message on the bus',
   ask_user: 'a question to you',
@@ -531,7 +552,7 @@ export function callWords(tool: string | undefined, phrase?: (tool: string) => s
   const base = t.slice(Math.max(t.lastIndexOf('.'), t.lastIndexOf('/')) + 1);
   if (CALL_WORDS[base]) return CALL_WORDS[base];
   if (base.startsWith('pages_')) return 'a read of the wiki';
-  if (base.startsWith('bridge_')) return 'a use of a bridge';
+  if (base.startsWith('bridge_')) return 'a use of a team';
   const p = phrase ? phrase(t) : '';
   if (p && p !== t && p !== toolName(t) && p !== base) return 'a call to ' + lowerFirst(p);
   return 'the tool ' + toolName(t);
@@ -659,7 +680,7 @@ export function dutyWhat(d: Pick<DutyRecord, 'do'>): string {
   const x = d.do || {};
   const message = (x.ask && x.ask.message) || (x.post && x.post.message) || (x.manager && x.manager.message) || '';
   if (message.trim()) return firstLine(toWords(message));
-  if (x.open && x.open.playbook) return 'Open a bridge from the playbook ' + x.open.playbook;
+  if (x.open && x.open.playbook) return 'Open a team from the playbook ' + x.open.playbook;
   return '';
 }
 
@@ -678,7 +699,7 @@ export function dutyShape(light: Pick<Light, 'word'>): '' | 'hollow' | 'pause' {
 
 /** The words of each event of the fleet, as the choice of When says it. */
 export const EVENT_WORDS: Record<string, string> = {
-  'bridge.closed': 'When a bridge closes',
+  'bridge.closed': 'When a team closes',
   'run.failed': 'When a run of an agent fails',
   'question.waiting': 'When a question waits too long',
   'page.changed': 'When a page changes',
@@ -714,7 +735,7 @@ export function eventWords(e: DutyEvent, name: (agent: string) => string = (a) =
   const who = e.agent ? name(e.agent) : '';
   switch (e.kind) {
     case 'bridge.closed':
-      return who ? 'When a bridge of ' + who + ' closes' : 'When a bridge closes';
+      return who ? 'When a team of ' + who + ' closes' : 'When a team closes';
     case 'run.failed':
       return who ? 'When a run of ' + who + ' fails' : 'When a run of an agent fails';
     case 'question.waiting':
@@ -736,7 +757,7 @@ export function startWords(d: Pick<DutyRecord, 'when'>, name?: (agent: string) =
 }
 
 /** POST_SPENDS says why a duty that posts in a bridge has no budget. */
-export const POST_SPENDS = 'A post spends nothing of its own. The seats of the bridge spend from their own budgets.';
+export const POST_SPENDS = 'A post spends nothing of its own. The seats of the team spend from their own budgets.';
 
 /** turnsText says a number of turns, such as 1 turn or 40 turns. */
 const turnsText = (n: number) => n + (n === 1 ? ' turn' : ' turns');
@@ -756,7 +777,7 @@ export function limitWords(l: DutyRecord['limits'] | undefined, schedule = true,
   const b = l.budget || {};
   if (act === 'post') out.push(POST_SPENDS);
   else if (act === 'open') {
-    if (b.maxTurns) out.push('The bridge gets at most ' + turnsText(b.maxTurns) + '.');
+    if (b.maxTurns) out.push('The team gets at most ' + turnsText(b.maxTurns) + '.');
   } else {
     const run: string[] = [];
     if (!b.maxCostUSD) out.push('A run has no cost limit.');
@@ -1407,7 +1428,7 @@ export interface FormErrors {
 }
 
 /** OPEN_NEEDS_TURNS is the error of a duty that opens a bridge and gives no turns, in the words of the front. */
-export const OPEN_NEEDS_TURNS = 'A duty that opens a bridge needs the most turns of the whole bridge, such as 40.';
+export const OPEN_NEEDS_TURNS = 'A duty that opens a team needs the most turns of the whole team, such as 40.';
 
 /** formErrors says what is wrong with the form before a dry run. taken names the duties that exist, for a new one. */
 export function formErrors(f: DutyForm, opts: { fresh: boolean; name: string; taken: string[]; keepsWhen: boolean; templated?: boolean }): FormErrors {
@@ -1421,10 +1442,10 @@ export function formErrors(f: DutyForm, opts: { fresh: boolean; name: string; ta
     const d = datesError(f.when);
     if (d) e.dates = d;
   }
-  if (f.act === 'post' && !f.bridge) e.bridge = 'Pick the bridge.';
+  if (f.act === 'post' && !f.bridge) e.bridge = 'Pick the team.';
   if (f.act === 'open' && !f.playbook) e.playbook = 'Pick a playbook.';
   // A duty whose message comes from the setup of the server can ask its agent with no message of the person.
-  if (f.act !== 'open' && !f.message.trim() && !(opts.templated && f.act === 'ask')) e.message = f.act === 'post' ? 'Write the message for the bridge.' : f.act === 'manager' ? 'Write what the manager does.' : 'Write what the agent does.';
+  if (f.act !== 'open' && !f.message.trim() && !(opts.templated && f.act === 'ask')) e.message = f.act === 'post' ? 'Write the message for the team.' : f.act === 'manager' ? 'Write what the manager does.' : 'Write what the agent does.';
   // The budget follows the action. A post spends nothing of its own, so it needs no limit.
   const whole = (text: string) => Number.isInteger(Number(text)) && Number(text) > 0;
   if (f.act === 'open') {

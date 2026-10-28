@@ -69,9 +69,9 @@ const PLAIN: Record<string, string> = {
   disconnect: 'Disconnected a service',
   skills_list: 'Looked at the skills',
   skill_preview: 'Looked at a skill before an install',
-  bridge_patch: 'Changed the bridge',
+  bridge_patch: 'Changed the team',
   bridge_react: 'Reacted to a message',
-  bridge_mark_read: 'Marked the bridge as read',
+  bridge_mark_read: 'Marked the team as read',
   bridge_member_patch: 'Changed a seat',
   agent_builder: 'Started to build an agent',
   propose_agent: 'Proposed an agent',
@@ -150,14 +150,14 @@ export function stepWords(tool: string | undefined, input?: unknown, said?: stri
       // A post with ask is a question to the person: the step says what it asked.
       if (v.ask === true) return firstLine(str('text')) ? 'Asked you: ' + firstLine(str('text')) : 'Asked you';
       const to = Array.isArray(v.to) ? v.to.filter((x): x is string => typeof x === 'string' && !!x).map((x) => (x === 'operator' ? 'you' : x)) : [];
-      return to.length ? 'Posted to ' + list(to) : 'Posted to the bridge';
+      return to.length ? 'Posted to ' + list(to) : 'Posted to the team';
     }
     case 'bridge_read':
       return 'Read the channel';
     case 'bridge_list':
-      return 'Listed the bridges';
+      return 'Listed the teams';
     case 'bridge_open':
-      return str('title') ? 'Opened the bridge ' + str('title') : 'Opened a bridge';
+      return str('title') ? 'Opened the team ' + str('title') : 'Opened a team';
     case 'fleet':
       return 'Read the fleet';
     case 'spawn_task':
@@ -167,7 +167,7 @@ export function stepWords(tool: string | undefined, input?: unknown, said?: stri
     case 'bridge_remove_member':
       return str('handle') ? 'Fired ' + str('handle') : 'Fired a member';
     case 'bridge_close':
-      return 'Closed the bridge';
+      return 'Closed the team';
     case 'ask_user':
       return firstLine(str('question')) ? 'Asked you: ' + firstLine(str('question')) : 'Asked you';
     case 'env': {

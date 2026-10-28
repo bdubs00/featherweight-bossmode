@@ -71,7 +71,7 @@ describe('a seat at its limit', () => {
     const me = { subject: 'alice@example.com', name: 'Alice' };
     expect(lineWords({ event: 'task', text: 'alice@example.com continued reviewer' }, me)).toMatchObject({ text: 'You continued reviewer' });
     expect(lineWords({ event: 'task', text: 'bob@example.com continued reviewer' }, me)).toMatchObject({ text: 'bob continued reviewer' });
-    expect(lineWords({ event: 'cap', text: 'The bridge reached its cap of 1000 turns' }, me)).toMatchObject({ text: 'The bridge reached its cap of 1000 turns' });
+    expect(lineWords({ event: 'cap', text: 'The bridge reached its cap of 1000 turns' }, me)).toMatchObject({ text: 'The team reached its cap of 1000 turns' });
   });
 });
 

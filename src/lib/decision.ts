@@ -216,7 +216,7 @@ export function planOf(d: Pick<Decision, 'tool' | 'input'>): Plan {
  */
 export function verbOf(d: Pick<Decision | ResultDecision, 'tool' | 'label'>): string {
   const base = toolBase(d.tool);
-  if (base === 'bridge_open') return 'Open bridge';
+  if (base === 'bridge_open') return 'Open team';
   if (base === 'pages_write') return 'Write page';
   if (base === 'spawn_task') return 'Hand off';
   if (base === 'env') return 'Allow';

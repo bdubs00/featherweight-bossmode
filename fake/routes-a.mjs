@@ -246,7 +246,44 @@ function closedNotes(S) {
   S.reads.set(id + '|' + ALICE, 3);
 }
 
+/**
+ * launchEmail is a team of alice whose agents finished: the writer drafted
+ * the launch email, and the reviewer said it reads well. The team waits in
+ * To check until alice checks it: Looks right closes it as accepted, and
+ * Needs work posts her note to both seats.
+ */
+function launchEmail(S) {
+  const id = 'br-launch';
+  const seats = [
+    { handle: 'writer', agent: 'writer', task: 'Write the launch email for the new pricing' },
+    { handle: 'reviewer', agent: 'reviewer', task: 'Review the draft of writer, and say when it is ready' },
+  ];
+  const members = seats.map((s) => {
+    const run = addRun(S, { id: 'run-launch-' + s.handle, agentName: s.agent, handle: s.handle, bridge: id, task: s.task, state: 'completed', minutes: 95 });
+    return { handle: s.handle, agent: s.agent, pool: 'crew', task: s.task, runs: [run.id], fired: false, muted: false, presence: 'idle', activity: null };
+  });
+  S.bridges.set(id, {
+    id, title: 'Write the launch email for our new pricing', goal: 'Write the launch email for our new pricing, have it reviewed, and show me before it goes out.', operator: ALICE, state: 'open', placement: 'queue',
+    createdAt: ago(100), closedAt: null, manager: null,
+    delegation: { approve: false, budget: false, members: false, report: true },
+    caps: { maxMessages: 2000, maxFanoutPerMinute: 30, maxPairMessages: 6, maxCostUSD: 0.5 },
+    members,
+  });
+  S.channels.set(
+    id,
+    renumber([
+      entry(ago(100), system, 'alice opened the bridge with 2 members.', { event: 'opened' }),
+      entry(ago(80), agent('writer', 'run-launch-writer'), 'The draft is in the wiki: `launch/pricing-email.md`. It leads with the new free tier, then the two paid plans.'),
+      entry(ago(70), agent('reviewer', 'run-launch-reviewer'), '@writer the draft reads well. One fix: say the date that the prices change. With that, it is ready.', { to: ['writer'] }),
+      entry(ago(66), agent('writer', 'run-launch-writer'), 'Done: the prices change on November 15. The draft is ready for alice.'),
+    ]),
+  );
+  S.reads.set(id + '|' + ALICE, 4);
+}
+
 export function register({ S }) {
+  // A team that waits for alice to check its result, in every data set.
+  launchEmail(S);
   if (process.env.FAKE_A === '1') {
     puppet(S);
     logrotate(S);

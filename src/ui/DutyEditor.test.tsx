@@ -5,6 +5,7 @@ import { store } from '../state/store';
 import { forgetDuties } from '../state/duties';
 import { nextWords } from '../lib/duties';
 import { DutyEditor, timing } from './DutyEditor';
+import { doorDuty, keepDoorDuty } from '../state/doorplan';
 import { clearNotice } from './notice';
 import { click, fakeApi, keyNamed, mount, problem, settle, typeIn, unmountAll, type Call, type Route } from './testkit-c';
 
@@ -329,6 +330,54 @@ describe('New duty', () => {
     expect(saved.body).toEqual(record);
     expect(saved.headers['X-Time-Zone']).toBe(ZONE);
     expect(location.hash).toBe('#duties/draft-the-notes');
+  });
+
+  it('opens Change the details of the door on the whole plan: the schedule, the cost, You hear of it, and the check of each result', async () => {
+    const NIGHTLY = { repeat: 'daily', times: ['02:00'], timeZone: ZONE };
+    keepDoorDuty({
+      name: 'check-the-web-hosts-for-drift',
+      title: 'Check the web hosts for drift',
+      agent: 'migrator',
+      when: { schedule: NIGHTLY },
+      do: { ask: { message: 'Every night, check the web hosts for drift. Write the result to the wiki page ops/drift/{date}.md.' } },
+      limits: { budget: { maxCostUSD: 0.25 }, overlap: 'skip', catchUp: '6h' },
+      whileAway: { decider: 'nobody', timeout: '24h', then: 'deny' },
+      review: true,
+      notify: { failure: ['owner'], needsYou: ['owner'], result: ['owner'], resultWhen: 'found' },
+    } as DutyRecord);
+    api = fakeApi({
+      'GET /v1/duties': { duties: [], paused: false },
+      'PUT /v1/duties/check-the-web-hosts-for-drift?dryRun=true': dry({ readback: 'Every day at 2:00 AM, your time.' }),
+      'PUT /v1/duties/check-the-web-hosts-for-drift': (c: Call) => ({ status: 201, body: { ...(c.body as object), owner: 'alice@example.com', revision: 1 } }),
+      'GET /v1/duties/check-the-web-hosts-for-drift': { name: 'check-the-web-hosts-for-drift', agent: 'migrator', when: { schedule: NIGHTLY }, do: { ask: { message: 'x' } }, limits: { budget: { maxCostUSD: 0.25 } }, history: [] },
+    });
+    location.hash = '#work';
+    const el = mount(<DutyEditor seed={{ agent: 'migrator', act: 'ask', from: 'door', message: 'Every night, check the web hosts for drift.' }} />);
+    await settle();
+    expect(text(el.querySelector('.duty-door'))).toBe('From the door');
+    expect(el.querySelector('.duty-kept')).toBeNull();
+    expect(fieldOf(el, 'Name')!.value).toBe('Check the web hosts for drift');
+    expect(fieldOf(el, 'The most a run can cost')!.value).toBe('0.25');
+    expect(fieldOf(el, 'Catch up a missed time')!.value).toBe('6h');
+    expect((el.querySelector('input[name="duty-decider"][value="nobody"]') as HTMLInputElement).checked).toBe(true);
+    const box = (label: string) => [...el.querySelectorAll('label.check')].find((l) => text(l) === label)!.querySelector('input') as HTMLInputElement;
+    expect(box('Results').checked).toBe(true);
+    expect(box('Only a result that found something').checked).toBe(true);
+    expect(box('Ask me to check each result').checked).toBe(true);
+    // The schedule of the plan, not the words of the message, which say every night.
+    expect(scheduleSent()).toEqual(NIGHTLY);
+    click(keyNamed(el, 'Save duty'));
+    await settle();
+    const dialog = document.querySelector('dialog.confirm')!;
+    click(keyNamed(dialog, 'Save duty'));
+    await settle();
+    const saved = puts().find((c) => c.path === '/v1/duties/check-the-web-hosts-for-drift')!;
+    const body = saved.body as DutyRecord;
+    expect(body.limits.budget).toEqual({ maxCostUSD: 0.25 });
+    expect(body.review).toBe(true);
+    expect(body.notify).toEqual({ failure: ['owner'], needsYou: ['owner'], result: ['owner'], resultWhen: 'found' });
+    // A saved duty forgets the plan of the door.
+    expect(doorDuty()).toBeNull();
   });
 
   it('shows the problems of the front in words and saves nothing', async () => {

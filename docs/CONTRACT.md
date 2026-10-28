@@ -1678,6 +1678,45 @@ A plan:
   duty keeps all three, and the page of a duty shows them.
 - **New for the bridges:** `caps.maxCostUSD`.
 
+### 19.1 Round 2 (2026-10-28)
+
+The round 2 contract adds these shapes. The workbench serves them on
+`drive/r2-wb`, and the fake serves them too.
+
+| Shape | What the page does with it |
+|---|---|
+| `from.display` of a card | The name of the person beside the subject in `from.name`, which can be an id. The page shows it in place of the subject, such as `Manager for Dana Reyes`. The person who reads the board stays `You`. |
+| `verdict: "let-go"` of a done card | The word `let go` with a grey light. It is a word of the board only, and Results does not count it. |
+| `POST /v1/work/review` with `{"bridge", "verdict", "note"?}` | Looks right and Needs work on a team in To check whose next move is the person's. `verdict` is `up` or `down`. The answer is `{"bridge", "reaction", "followUp", "closed"}`. `up` closes the bridge with the verdict accepted. `down` needs a note, posts `Needs work: <note>` to every seat, and keeps the bridge open. The page never reacts on one seat run for a team. It reads the board again after either key. |
+| `POST /v1/work/letgo` with `{"card"}` | Let it go on a stopped card. The answer is the card. A second call answers the card as it is, and a card that is not stopped answers 409. The card moves to Done with `let-go` and the reason `Let go by you.` for the caller, or `Let go by <name>.` for another person. |
+| A found result | A run of a duty with `notify.resultWhen: found` carries the metadata `workbench.found` = `1`. An answer that starts with `Found:` found something. Its card then waits in To check with that line as its reason. The inbox gives an item of the kind `result` with the text `<title>: it found something.`. Looks right and Needs work go through the reaction route of section 21. |
+| `cost.low` and `cost.high` of a plan | Dollars for the whole task: one run of the agent, or every seat of a team. Both are absent while no run of the agents has a price. |
+| `same` of a plan, `{"duty", "title"}` | Only on a plan of the kind `repeat`: a duty of the person that does the same work. The readback says `Your duty <title> does this already.` and offers Open it beside Start, to `#duties/<duty>`. |
+
+The page chose these where the contract left a choice:
+
+- **Let it go.** The key shows on a stopped card whose `next` is `you`,
+  and on a stopped card of an agent whose role for the person is `owner`.
+  It shows to an admin too. The front decides: a 403 shows as a notice.
+  The key asks nothing first, because the card only moves to Done. The
+  runs keep their state.
+- **A cost below the cheapest run.** The page rounds `cost.low` up to the
+  next cent, and compares the typed cost with that amount. Under it, a
+  line with an amber light says `One run can cost $0.14. The task stops at
+  your limit.`, or for a team `The whole team can cost $0.50. The task
+  stops at your limit.`. The line is a warning. Start still works.
+- **A found result in Activity.** The page knows a found result by the
+  end of its item text, `: it found something.`. Its card then says `It
+  found something.` above the task.
+- **Change the details** of a plan of a duty keeps the record of
+  `plan.start.duty` in the storage of the tab, under
+  `fw.bossmode.duty.door`, with the cost that the person typed in
+  `limits.budget.maxCostUSD`. It opens `#duties/new?agent=<agent>&do=ask&from=door&message=<words>`.
+  The editor opens on that record: the schedule, the cost, `notify`
+  (You hear of it), `review`, and `whileAway`, and says `From the door`.
+  A save forgets the record. Without the record, the editor opens with the
+  agent and the words of the seed.
+
 ## 20. Results
 
 The Results place reads what the work of the agents gave and took over a
@@ -1746,3 +1785,58 @@ of the kind `result`:
   note to the agent as a follow-up message. The run then works again, and
   its new answer is a new result to check.
 - The item leaves the inbox on the first reaction.
+- **Round 2.** The history of a duty says the verdict of each result where
+  the page knows one, with these words:
+
+  | Word | Light | When |
+  |---|---|---|
+  | `to check` | amber, still | The run has an item of the kind `result`, or it carries `workbench.review` and has no reaction yet. |
+  | `accepted` | green | A thumb up or a heart. A run that a person sent back and accepted after its new answer reads accepted. |
+  | `sent back` | red | A thumb down. |
+  | `unchecked` | grey | The duty has `review`, and nobody checked the result. |
+ The page reads the runs of the 10 newest lines, from the
+  view of the fleet, which wakes no worker.
+
+## 22. A run at a limit of its budget
+
+A run whose error starts with `budget exceeded` stopped at a limit of its
+budget. That is no fault: the page says `at its limit` with a grey light,
+and the plain line names the limit, such as `Stopped at its turn limit`.
+
+| Route | What the page does with it |
+|---|---|
+| `PATCH /v1/runs/{id}/budget` | Continue with more room, at the end of a chat or a conversation with an agent at its limit. The body sets the limit that the run hit. The answer holds `budget` and `run`. |
+| `POST /v1/runs/{id}/messages` | After the change, one follow-up: `You stopped at a limit of your budget, and I gave you more room. Go on from where you stopped.` |
+
+- Each limit counts the whole run, so the same room again is twice what
+  the run used: `maxTurns` from `usage.turns`, `maxToolCalls` from
+  `usage.toolCalls`, and `maxTokens` from the input and the output tokens.
+  The line under the key says how much, such as `It gets 8 more turns and
+  goes on where it stopped.`.
+- A limit of cost is money, so the page fills no amount. The person types
+  the most that the run can cost in all, which must be more than
+  `usage.costUSD`, and the page sends it as `maxCostUSD`.
+- A limit that the page cannot measure, such as `deadline`, offers no key.
+  The next message starts a new chat, as before.
+
+## 23. Keys of a person who only views
+
+The page shows no key that the front refuses. It reads the roles of
+`GET /v1/whoami`.
+
+- A person whose roles name agents, none of them as owner or operator, and
+  who is no admin, views every agent and operates none, such as a sponsor.
+  The profile of an agent reads no page of the wiki for that person,
+  because the wiki refuses them.
+- A person whose role on an agent is `viewer` gets no composer and no menu
+  that starts a run in the conversation of that agent. The pane says
+  `You can follow <agent>. Only an owner or an operator of it can talk to
+  it.`.
+- `canCreate: false` gives no New agent.
+- A person who can start no run (section 19, `mayStart`) gets no New and
+  no Open a team in the place Teams. A bridge needs its operator or the
+  operator role on every agent of its seats, so such a person sees no
+  bridge either.
+- A duty needs the owner role on its agent. A person who is no admin and
+  owns no agent gets no New duty. A person who cannot change a duty gets
+  no Run now, no Pause, and no Edit.

@@ -20,3 +20,30 @@ describe('the fake door', () => {
     expect(slug('a'.repeat(60))).toHaveLength(40);
   });
 });
+
+// The fake serves the shapes of round 2 with the rules of the workbench: a
+// duty that does the same work, and a result that found something.
+const work = '../../fake/routes-work.mjs';
+
+describe('the fake of round 2', () => {
+  it('names a duty of the person with the same agent and two words of work in common', async () => {
+    const { sameOf } = await import(/* @vite-ignore */ path);
+    const duties = [
+      { name: 'weekly-competitor-summary', title: 'Weekly competitor summary', agent: 'writer', owner: 'alice@example.com', do: { ask: { message: 'Sum up what our competitors shipped last week.' } } },
+      { name: 'nightly-notes', agent: 'scribe', owner: 'alice@example.com', do: { ask: { message: 'Draft the notes.' } } },
+    ];
+    const words = 'Every Monday at 9am, sum up what our competitors shipped last week.';
+    expect(sameOf(duties, 'alice@example.com', 'writer', words)).toEqual({ duty: 'weekly-competitor-summary', title: 'Weekly competitor summary' });
+    expect(sameOf(duties, 'bob@example.com', 'writer', words)).toBeNull();
+    expect(sameOf(duties, 'alice@example.com', 'ops', words)).toBeNull();
+  });
+  it('puts a run of a duty in review when it asks for a check, or when it tells what it found and found something', async () => {
+    const { inReview, foundLine } = await import(/* @vite-ignore */ work);
+    const found = { state: 'completed', output: '\nFound: web-2 drifted.\n\nThe table.', metadata: { 'workbench.found': '1' } };
+    expect(foundLine(found)).toBe('Found: web-2 drifted.');
+    expect(inReview(found)).toBe(true);
+    expect(inReview({ ...found, output: 'Nothing drifted.' })).toBe(false);
+    expect(inReview({ ...found, reactions: { up: 1 } })).toBe(false);
+    expect(inReview({ state: 'completed', output: 'x', metadata: { 'workbench.review': '1' } })).toBe(true);
+  });
+});

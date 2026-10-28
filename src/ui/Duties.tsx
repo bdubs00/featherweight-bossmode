@@ -13,7 +13,11 @@
 // Each run of the history shows the first line of its answer, and Open the
 // run opens the run in a pane under its line, at #duties/<name>/run/<run>:
 // the result, the files, and the conversation, as the run pane of a seat
-// shows them. The tabs over the list lead to the playbooks.
+// shows them, and the line of that run comes to the top of the pane. A run
+// that a person checked, or that waits for a check, shows its verdict:
+// to check, accepted, or sent back. The tabs over the list lead to the
+// playbooks. A person who cannot change a duty, such as a viewer, sees no
+// key that the server refuses: no New duty, no Run now, and no Edit.
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { Duty, DutyRun } from '../api/types';
@@ -44,6 +48,7 @@ import {
   retryWords,
   nextShort,
   nextWords,
+  resultLight,
   runLight,
   startWords,
   tellWords,
@@ -197,6 +202,17 @@ function PauseAll({ paused }: { paused: boolean }) {
   );
 }
 
+/**
+ * mayMakeDuty reports whether the person can make a duty: an admin, an
+ * owner of an agent, and a person whose roles name no agent, because the
+ * server decides. A duty needs the owner role on its agent.
+ */
+export function mayMakeDuty(me: { admin?: boolean; roles?: Record<string, string> } | null | undefined): boolean {
+  if (!me) return true;
+  const roles = Object.values(me.roles || {});
+  return !!me.admin || roles.length === 0 || roles.includes('owner');
+}
+
 /** DutyList is the list pane: the duties in the order of attention, with Find a duty, New duty, and the switch of an admin. */
 export function DutyList({ current }: { current?: string }) {
   const list = useDuties((s) => s.list);
@@ -204,6 +220,7 @@ export function DutyList({ current }: { current?: string }) {
   const error = useDuties((s) => s.error);
   const off = useDuties((s) => s.off);
   const admin = useSelect((s) => !!(s.me && s.me.admin));
+  const make = useSelect((s) => mayMakeDuty(s.me));
   const [q, setQ] = useState('');
   const rows = useRoving<HTMLDivElement>();
   const heading = useRef<HTMLHeadingElement>(null);
@@ -234,7 +251,7 @@ export function DutyList({ current }: { current?: string }) {
         count={list && !off ? count : undefined}
         countLabel={count === 1 ? '1 duty' : count + ' duties'}
         actions={
-          !off ? (
+          !off && make ? (
             <Button href="#duties/new" size="s" icon="plus">
               New duty
             </Button>
@@ -277,9 +294,11 @@ export function DutyList({ current }: { current?: string }) {
         {list && !off && count === 0 && (
           <div class="empty">
             <p>{DUTY_IS}</p>
-            <Button href="#duties/new" kind="primary">
-              New duty
-            </Button>
+            {make && (
+              <Button href="#duties/new" kind="primary">
+                New duty
+              </Button>
+            )}
           </div>
         )}
         {list && words && count > 0 && shown.length === 0 && <p class="empty">No duty holds those words.</p>}
@@ -307,6 +326,7 @@ function DutyHome() {
   const list = useDuties((s) => s.list);
   const error = useDuties((s) => s.error);
   const off = useDuties((s) => s.off);
+  const make = useSelect((s) => mayMakeDuty(s.me));
   const first = useMemo(() => (list && list.length ? sortDuties(list)[0].name : ''), [list]);
   useEffect(() => {
     if (first && typeof window.matchMedia === 'function' && window.matchMedia(TWO_PANES).matches) go(dutyHref(first), true);
@@ -324,9 +344,11 @@ function DutyHome() {
       ) : list.length === 0 ? (
         <>
           <p>{DUTY_IS}</p>
-          <Button href="#duties/new" kind="primary">
-            New duty
-          </Button>
+          {make && (
+            <Button href="#duties/new" kind="primary">
+              New duty
+            </Button>
+          )}
         </>
       ) : (
         <p>Pick a duty.</p>
@@ -371,7 +393,9 @@ function DutyView({ name, open }: { name: string; open?: string }) {
   const allPaused = useDuties((s) => s.paused);
   // A locked duty takes no change, no pause, and no delete, whoever the person is.
   const locked = lockedOf(d);
-  const canChange = useCanChange(d) && !locked;
+  // Run now needs the same role as a change, also on a locked duty.
+  const canRun = useCanChange(d);
+  const canChange = canRun && !locked;
   const agentName = useAgentName(d ? d.agent : '');
   const faces = useSelect((s) => s.faces);
   const nameOfAgent = (a: string) => (faces[a] && faces[a].displayName) || titleOfName(a);
@@ -476,22 +500,24 @@ function DutyView({ name, open }: { name: string; open?: string }) {
             <LineLed tone="grey" /> {LOCKED_LINE}
           </p>
         )}
-        <div class="duty-keys">
-          <Button size="s" aria-disabled={busy || undefined} onClick={runNow}>
-            Run now
-          </Button>
-          {canChange && (
-            <>
-              <Button size="s" aria-disabled={busy || undefined} onClick={() => run(() => pauseDuty(name, !d.paused))}>
-                {d.paused ? 'Resume' : 'Pause'}
-              </Button>
-              <Button size="s" href={hrefOf({ place: 'duties', name, edit: true })}>
-                Edit
-              </Button>
-            </>
-          )}
-          {items.length > 0 && <Menu label="More" kind="secondary" items={items} />}
-        </div>
+        {canRun && (
+          <div class="duty-keys">
+            <Button size="s" aria-disabled={busy || undefined} onClick={runNow}>
+              Run now
+            </Button>
+            {canChange && (
+              <>
+                <Button size="s" aria-disabled={busy || undefined} onClick={() => run(() => pauseDuty(name, !d.paused))}>
+                  {d.paused ? 'Resume' : 'Pause'}
+                </Button>
+                <Button size="s" href={hrefOf({ place: 'duties', name, edit: true })}>
+                  Edit
+                </Button>
+              </>
+            )}
+            {items.length > 0 && <Menu label="More" kind="secondary" items={items} />}
+          </div>
+        )}
         {said && (
           <p class="duty-said" role="status">
             {'run' in said ? (
@@ -564,7 +590,7 @@ function DutyView({ name, open }: { name: string; open?: string }) {
           <h2 class="t-sub duty-sec-head" id="duty-history">
             History <Chip label={history.length === 1 ? '1 run' : history.length + ' runs'}>{history.length}</Chip>
           </h2>
-          {history.length === 0 ? <p class="t-meta">No run yet.</p> : <History name={name} runs={history} open={open} who={agentName} />}
+          {history.length === 0 ? <p class="t-meta">No run yet.</p> : <History name={name} runs={history} open={open} who={agentName} review={!!d.review} />}
         </section>
       </div>
       {asking && (
@@ -623,7 +649,7 @@ function DoWords({ d, agentName, title, locked }: { d: Duty; agentName: string; 
           <Mark agent={d.agent} size={24} />
           <span>
             {agent} posts in{' '}
-            {bridge ? <a href={hrefOf({ place: 'bridge', id: x.post.bridge, pane: 'none' })}>{bridge.title}</a> : 'a bridge that you cannot see'}
+            {bridge ? <a href={hrefOf({ place: 'bridge', id: x.post.bridge, pane: 'none' })}>{bridge.title}</a> : 'a team that you cannot see'}
             {x.post.to && x.post.to.length ? ' to ' + listWords(x.post.to) : ''}
           </span>
         </p>
@@ -637,7 +663,7 @@ function DoWords({ d, agentName, title, locked }: { d: Duty; agentName: string; 
         <p class="duty-who">
           <Mark agent={d.agent} size={24} />
           <span>
-            {agent} opens a bridge from the playbook {x.open.playbook}
+            {agent} opens a team from the playbook {x.open.playbook}
           </span>
         </p>
         {x.open.goal && <MessageWords text={x.open.goal} />}
@@ -682,8 +708,11 @@ function DoWords({ d, agentName, title, locked }: { d: Duty; agentName: string; 
  * decided while the person was away, and the run that the address opens.
  * The page reads the runs of the newest lines for their answers.
  */
-function History({ name, runs, open, who }: { name: string; runs: DutyRun[]; open?: string; who: string }) {
+function History({ name, runs, open, who, review }: { name: string; runs: DutyRun[]; open?: string; who: string; review: boolean }) {
   const me = useSelect((s) => (s.me && s.me.principal ? s.me.principal.subject : ''));
+  // The results that wait for the person to check them, from the inbox that the app bar follows.
+  const inbox = useDuties((s) => s.inbox);
+  const toCheck = useMemo(() => new Set((inbox || []).filter((it) => it.kind === 'result' && it.run).map((it) => it.run!)), [inbox]);
   const ids = runs
     .map((r) => r.run || '')
     .filter(Boolean)
@@ -695,15 +724,17 @@ function History({ name, runs, open, who }: { name: string; runs: DutyRun[]; ope
   return (
     <ol class="duty-runs">
       {runs.map((r) => (
-        <HistoryLine name={name} r={r} me={me} open={!!r.run && r.run === open} who={who} />
+        <HistoryLine name={name} r={r} me={me} open={!!r.run && r.run === open} who={who} toCheck={!!r.run && toCheck.has(r.run)} review={review} />
       ))}
     </ol>
   );
 }
 
 /** HistoryLine is one run of the history, with the first line of its answer, and its run pane when the address opens it. */
-function HistoryLine({ name, r, me, open, who }: { name: string; r: DutyRun; me: string; open: boolean; who: string }) {
-  const light = runLight(r);
+function HistoryLine({ name, r, me, open, who, toCheck, review }: { name: string; r: DutyRun; me: string; open: boolean; who: string; toCheck: boolean; review: boolean }) {
+  // A result says its verdict where the page knows one, else the light of the run.
+  const run = useSelect((s) => (r.run ? s.runs[r.run] : undefined));
+  const light = resultLight(r, run, toCheck, review) || runLight(r);
   const found = checkLine(r);
   const decided = r.decided || [];
   const answer = useSelect((s) => (r.run && s.runs[r.run] ? answerLine(s.runs[r.run].output || '') : ''));
@@ -760,11 +791,31 @@ function DutyRunPane({ runId, who }: { runId: string; who: string }) {
   const wakes = useSelect((s) => awakeFor(selectFacts(s), s.runs[runId]) === false) && !archived;
   const end = [...t.items].reverse().find((x) => x.kind === 'end');
   const box = useRef<HTMLElement>(null);
-  // The pane opens in sight, below its line.
+  // The run opens in sight: its line comes to the top of the pane, and
+  // again while the page around it settles, such as when its result
+  // arrives, until the person scrolls, types, or touches the pane.
+  const arrived = !!res || t.items.length > 0;
   useEffect(() => {
     const el = box.current;
-    if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'nearest' });
-  }, [runId]);
+    const line = el && (el.closest('.duty-run') as HTMLElement | null);
+    const pane = line && (line.closest('.scroll') as HTMLElement | null);
+    if (!line || !pane) return;
+    let moved = false;
+    const mine = () => (moved = true);
+    const events = ['wheel', 'touchstart', 'keydown', 'mousedown'];
+    for (const e of events) pane.addEventListener(e, mine, { passive: true });
+    // Only the pane scrolls, never the page around it, so the header of the pane stays.
+    const align = () => {
+      if (moved || !line.isConnected) return;
+      pane.scrollTop += line.getBoundingClientRect().top - pane.getBoundingClientRect().top;
+    };
+    align();
+    const timers = [300, 1000].map((ms) => setTimeout(align, ms));
+    return () => {
+      for (const t of timers) clearTimeout(t);
+      for (const e of events) pane.removeEventListener(e, mine);
+    };
+  }, [runId, arrived]);
   return (
     <section class="duty-runpane" id={'duty-run-' + runId} aria-label={'The run of ' + who} ref={box}>
       <RunView runId={runId} result={res} who={who} items={t.items} endSeq={end ? end.seq : undefined} gone={t.gone} archived={archived} wakes={wakes} />

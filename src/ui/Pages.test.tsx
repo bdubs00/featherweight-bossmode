@@ -56,7 +56,7 @@ describe('the tree of the wiki', () => {
     expect(heads.map((h) => h.querySelector('.clip')!.textContent)).toEqual(['Harden the lab hosts', 'docs-scribe']);
     expect(heads.map((h) => h.getAttribute('title'))).toEqual(['bridges/01m5h96ejx8yh5fqkg', 'agents/docs-scribe']);
     // The work folders of the bridges and of the agents each start under a heading.
-    expect([...el.querySelectorAll('h2.group-title')].map((h) => h.textContent)).toEqual(['Bridges', 'Agents']);
+    expect([...el.querySelectorAll('h2.group-title')].map((h) => h.textContent)).toEqual(['Teams', 'Agents']);
   });
 });
 

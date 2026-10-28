@@ -171,6 +171,20 @@ describe('the profile', () => {
     expect(el.textContent).not.toContain('What people liked');
   });
 
+  it('reads no page of the wiki for a person who views every agent, as the wiki refuses them, and still shows the profile (F31)', async () => {
+    act(() => store.dispatch({ type: 'me', me: { principal: { subject: 'erin@example.com', name: 'Erin' }, roles: { migrator: 'viewer', reviewer: 'viewer' }, admin: false, canCreate: false } }));
+    try {
+      const el = mount(<Profile agent="migrator" />);
+      await vi.waitFor(() => expect(el.querySelector('.workers')).not.toBeNull());
+      await new Promise((r) => setTimeout(r, 20));
+      expect(calls.some((c) => c.path.startsWith('/v1/pages/'))).toBe(false);
+      expect(el.textContent).not.toContain('What people liked');
+      expect(el.querySelector('.prof-sec h3')!.textContent).toBe('What it can do');
+    } finally {
+      act(() => store.dispatch({ type: 'me', me: null }));
+    }
+  });
+
   it('words each worker from the phase of the stream, never from the read of the pool', async () => {
     const el = mount(<Profile agent="migrator" />);
     await vi.waitFor(() => expect(calls.some((c) => c.path === '/v1/pools/crew')).toBe(true));
@@ -289,7 +303,7 @@ describe('the profile', () => {
     try {
       const el = mount(<Profile agent="migrator" />);
       await vi.waitFor(() => expect(el.querySelectorAll('.abilities li').length).toBe(2));
-      expect([...el.querySelectorAll('.abilities li')].map((c) => c.textContent)).toEqual(['Read and post in bridges', 'Asks before git push']);
+      expect([...el.querySelectorAll('.abilities li')].map((c) => c.textContent)).toEqual(['Read and post in teams', 'Asks before git push']);
     } finally {
       g.restore();
     }

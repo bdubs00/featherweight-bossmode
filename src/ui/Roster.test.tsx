@@ -123,7 +123,7 @@ describe('the members', () => {
     const el = mount(<Roster bridge={B} />);
     await settle();
     const foot = el.querySelector('.bridge-foot')!;
-    expect(foot.querySelector('.t-meta')!.textContent).toBe('This bridge');
+    expect(foot.querySelector('.t-meta')!.textContent).toBe('This team');
     expect([...foot.querySelectorAll('.nums > span')].map((x) => x.textContent)).toEqual(['41 turns', '$0.62 so far', '1 page']);
     expect(usageParts({ reported: 1, final: 0, missing: 0, partial: false, turns: 1 }, 2).map((p) => p.n + ' ' + p.word)).toEqual(['1 turn', '2 pages']);
     // A cost below one cent never reads $0.00.

@@ -18,6 +18,8 @@ export interface DutySeed {
   message?: string;
   bridge?: string;
   playbook?: string;
+  /** door when Change the details of the door opened the editor, which then opens on the whole plan that the door kept. */
+  from?: 'door';
 }
 
 /** The longest message that the address of a new duty carries. */
@@ -28,6 +30,7 @@ const SEED_KEYS: [keyof DutySeed, string][] = [
   ['act', 'do'],
   ['bridge', 'bridge'],
   ['playbook', 'playbook'],
+  ['from', 'from'],
   ['message', 'message'],
 ];
 
@@ -41,6 +44,7 @@ function seedOf(q: string): DutySeed | undefined {
     if (v) (out as Record<string, string>)[k] = v;
   }
   if (out.act && !['ask', 'post', 'open', 'manager'].includes(out.act)) delete out.act;
+  if (out.from && out.from !== 'door') delete out.from;
   return Object.keys(out).length ? out : undefined;
 }
 

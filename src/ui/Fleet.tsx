@@ -38,7 +38,9 @@ import { askOfRun } from '../lib/duties';
 import { Button, Chip, Find, Help, IconButton, Led, Mark, PaneHeader } from './primitives';
 import { Glyph } from './icons';
 import { PastConversations } from './History';
-import type { Tone } from '../lib/presence';
+import { atLimit, type Tone } from '../lib/presence';
+import { MoreRoom } from './MoreRoom';
+import { mayCreateAgent, viewsOnly } from '../lib/agents';
 
 /** The width from which two panes show side by side, as App names it. */
 const TWO_PANES = '(min-width: 800px)';
@@ -302,6 +304,8 @@ export function FleetList({ current, member }: { current?: string; member?: stri
   const list = useRoving<HTMLDivElement>();
   const count = peopleCount(groups);
   const matches = shown.reduce((n, g) => n + g.rows.length, 0);
+  // A person whom the server lets create no agent, such as a sponsor, gets no New agent.
+  const create = useSelect((s) => mayCreateAgent(s.me));
   const sel = member ? 'seat:' + member : current ? 'agent:' + current : '';
   // The choices of this browser about the groups. A search shows every match.
   const [choices, setChoices] = useState(readChoices);
@@ -328,7 +332,7 @@ export function FleetList({ current, member }: { current?: string; member?: stri
         actions={
           <>
             <IconButton icon="board" label="Lights" aria-pressed={board} onClick={() => go(board ? { place: 'fleet' } : { place: 'fleet', board: true })} />
-            <Button href="#new-agent" size="s" icon="plus" class="key-icon" aria-label="New agent" title="New agent" />
+            {create && <Button href="#new-agent" size="s" icon="plus" class="key-icon" aria-label="New agent" title="New agent" />}
           </>
         }
       >
@@ -363,9 +367,11 @@ export function FleetList({ current, member }: { current?: string; member?: stri
         {loaded && groups.length === 0 && (
           <div class="empty">
             <p>No agent yet.</p>
-            <Button href="#new-agent" kind="primary">
-              New agent
-            </Button>
+            {create && (
+              <Button href="#new-agent" kind="primary">
+                New agent
+              </Button>
+            )}
           </div>
         )}
       </div>
@@ -436,6 +442,8 @@ export function AgentChat({ agent }: { agent: string }) {
   const face = useSelect((s) => s.faces[agent]);
   const gone = useSelect((s) => agentGone(s, agent));
   const listed = useFleetAgent(agent);
+  // A viewer of the agent can follow it, and the server refuses a message of such a person, so the pane has no composer.
+  const viewer = useSelect((s) => viewsOnly(s.me, agent));
   useEffect(() => {
     loadAgentSkills(agent).catch(() => {});
   }, [agent]);
@@ -529,25 +537,27 @@ export function AgentChat({ agent }: { agent: string }) {
         lead={<ProfileLink href={hrefOf({ place: 'fleet', agent, profile: true })} agent={agent} label={name} light={light} />}
         actions={
           // The list pane of the Fleet place holds the members, so the past conversations open as a dialog from the menu.
-          <Menu
-            label="More"
-            items={[
-              ...(runId
-                ? [
-                    {
-                      label: 'New conversation',
-                      onSelect: () => {
-                        open('');
-                        focusComposer();
+          viewer ? undefined : (
+            <Menu
+              label="More"
+              items={[
+                ...(runId
+                  ? [
+                      {
+                        label: 'New conversation',
+                        onSelect: () => {
+                          open('');
+                          focusComposer();
+                        },
                       },
-                    },
-                  ]
-                : []),
-              { label: 'Past conversations', onSelect: () => setPast(true) },
-              // A conversation that did a job once becomes a duty of this agent that does it again.
-              ...(runId ? [{ label: 'Make this a duty', onSelect: () => go({ place: 'duties', fresh: true, seed: { agent, act: 'ask', message: askOfRun(run, t.items) } }) }] : []),
-            ]}
-          />
+                    ]
+                  : []),
+                { label: 'Past conversations', onSelect: () => setPast(true) },
+                // A conversation that did a job once becomes a duty of this agent that does it again.
+                ...(runId ? [{ label: 'Make this a duty', onSelect: () => go({ place: 'duties', fresh: true, seed: { agent, act: 'ask', message: askOfRun(run, t.items) } }) }] : []),
+              ]}
+            />
+          )
         }
       />
       <FollowBox end={end} foot={typing ? <Typing who={[{ agent, name }]} phrase={typingPhrase(run, live)} /> : null}>
@@ -558,18 +568,18 @@ export function AgentChat({ agent }: { agent: string }) {
             t={t}
             agentLabel={agent}
             live={live}
-            tail={archived ? <Quiet tone="grey">{ARCHIVED_LINE}</Quiet> : undefined}
+            tail={archived ? <Quiet tone="grey">{ARCHIVED_LINE}</Quiet> : run && atLimit(run) ? <MoreRoom run={run} next="Your next message starts a new conversation." /> : undefined}
             head={<ContinuedFrom run={run} onOpen={(id) => open(id)} />}
           />
         ) : (
           <div class="thread">
             <p class="thread-empty">
-              {about ? 'Start a conversation with ' + name + '. ' + about : 'Start a conversation with ' + name + '.'}
+              {viewer ? (about ? about + ' ' : '') + 'You can follow ' + name + '. Only an owner or an operator of it can talk to it.' : about ? 'Start a conversation with ' + name + '. ' + about : 'Start a conversation with ' + name + '.'}
             </p>
           </div>
         )}
       </FollowBox>
-      <Composer draft={'agent:' + agent} label={'Message to ' + agent} placeholder={'Message ' + agent} disabled={member ? '' : reach.why} commands={commands} attach onSend={(text, _to, files) => send(text, files)} />
+      {!viewer && <Composer draft={'agent:' + agent} label={'Message to ' + agent} placeholder={'Message ' + agent} disabled={member ? '' : reach.why} commands={commands} attach onSend={(text, _to, files) => send(text, files)} />}
       {past && (
         <PastConversations
           agent={agent}
@@ -601,6 +611,7 @@ export function Fleet({ agent }: { agent?: string }) {
   // Where two panes show, the main pane opens the conversation of before, or the first member.
   const again = lastOpen && groups.some((g) => g.rows.some((r) => r.href === lastOpen)) ? lastOpen : '';
   const first = !agent && loaded ? again || (firstPerson(groups) || { href: '' }).href : '';
+  const create = useSelect((s) => mayCreateAgent(s.me));
   useEffect(() => {
     if (first && window.matchMedia(TWO_PANES).matches) go(first, true);
   }, [first]);
@@ -610,9 +621,11 @@ export function Fleet({ agent }: { agent?: string }) {
       {loaded && groups.length === 0 ? (
         <>
           <p>No agent yet.</p>
-          <Button href="#new-agent" kind="primary">
-            New agent
-          </Button>
+          {create && (
+            <Button href="#new-agent" kind="primary">
+              New agent
+            </Button>
+          )}
         </>
       ) : (
         <p>Loading the members.</p>

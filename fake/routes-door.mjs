@@ -6,7 +6,10 @@
 //                         record that Start sends to a route that exists already:
 //                         PUT /v1/duties/{name}, POST /v1/bridges, or POST /v1/runs?member=.
 //                         The plan never names a cost. The page refuses Start until the
-//                         person types the most that a run can cost.
+//                         person types the most that a run can cost. cost.low and cost.high
+//                         are dollars for the whole task: one run of the agent, or every
+//                         seat of a team, absent while no run of the agents has a price.
+//                         same names a duty of the person that does the same work.
 //
 // The fake reads the words with rules, not with a model, so the same words
 // always give the same plan. A schedule comes from the grammar of the
@@ -33,11 +36,29 @@ const TOPICS = [
 /** A question for now: the quick chat answers it. */
 const QUESTION = /^(what|how|why|who|which|when|where|explain|is|are|can|does|do)\b|\?$/;
 
-/** What each agent costs a run, from the sample history of the fake: the least and the most in the last 30 days. */
+/** What each agent costs a run, from the sample history of the fake: the least and the most in the last 30 days. An agent that is not here has no run with a price. */
 const COSTS = {
-  writer: [0.04, 0.22], reviewer: [0.03, 0.12], ops: [0.02, 0.15], migrator: [0.3, 1.8], tester: [0.05, 0.2],
-  triage: [0.01, 0.05], scribe: [0.03, 0.14], backup: [0.05, 0.21], chat: [0.01, 0.08], 'identity-desk': [0.02, 0.09],
+  writer: [0.04, 0.22], reviewer: [0.03, 0.12], ops: [0.02, 0.15], migrator: [0.14, 1.8], tester: [0.05, 0.2],
+  triage: [0.01, 0.05], scribe: [0.03, 0.14], backup: [0.05, 0.21], chat: [0.01, 0.08],
 };
+
+/** Words that say when or how much, which no two duties share as their work. */
+const COMMON = new Set(['every', 'night', 'nightly', 'morning', 'evening', 'weekly', 'daily', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday', 'their', 'there', 'which', 'about', 'after', 'before', 'something', 'nothing', 'anything', 'answer', 'start', 'write', 'result', 'found', 'drift', 'drifted']);
+
+/** workWords are the words of a text that name its work: five letters or more, not a common word, without a plural s. */
+const workWords = (t) => new Set((String(t).toLowerCase().match(/[a-z]{5,}/g) || []).filter((w) => !COMMON.has(w)).map((w) => w.replace(/s$/, '')));
+
+/** sameOf finds a duty of the person whose agent and words do the same work as the words of a plan: two work words in common. */
+export function sameOf(duties, me, agent, words) {
+  const want = workWords(words);
+  for (const d of duties) {
+    if (d.owner !== me || d.agent !== agent) continue;
+    const msg = (d.do && d.do.ask && d.do.ask.message) || '';
+    const have = workWords((d.title || d.name.replace(/-/g, ' ')) + ' ' + msg);
+    if ([...want].filter((w) => have.has(w)).length >= 2) return { duty: d.name, title: d.title || d.name };
+  }
+  return null;
+}
 
 /** The rules of each agent that ask a person first, in the words of the readback. */
 const ASKS = {
@@ -144,11 +165,11 @@ export function register({ on, refuse, readJson, S, FLEET, port }) {
     const m = FLEET.members.find((x) => x.state === 'live' && x.agents.some((a) => a.name === agent)) || FLEET.members.find((x) => x.agents.some((a) => a.name === agent));
     return m ? m.name : '';
   };
-  /** basisOf says what the runs of an agent cost: the sample of the fake and its runs that report a cost. */
+  /** basisOf says what the runs of an agent cost: the sample of the fake and its runs that report a cost, or null when no run has a price. */
   const basisOf = (agent) => {
     const seen = [...S.runs.values()].filter((r) => r.agent === agent && r.usage && r.usage.costUSD > 0).map((r) => r.usage.costUSD);
-    const [lo, hi] = COSTS[agent] || [0.02, 0.2];
-    const all = [lo, hi, ...seen];
+    const all = [...(COSTS[agent] || []), ...seen];
+    if (!all.length) return null;
     return { lo: Math.min(...all), hi: Math.max(...all), n: 12 + seen.length };
   };
 
@@ -205,11 +226,19 @@ export function register({ on, refuse, readJson, S, FLEET, port }) {
     if (!agent) problems.push('agent: No agent fits these words. Pick one.');
 
     // What it costs: the plan never names a limit. It says what the runs cost, and the person types the limit.
+    // low and high are for the whole task: one run, or every seat of a team. Both stay out while an agent of it has no price.
     const basis = agent ? basisOf(agent) : null;
+    const seatAgents = kind === 'team' ? seats.map((x) => x.agent) : agent ? [agent] : [];
+    const bases = seatAgents.map(basisOf);
+    const priced = bases.length > 0 && bases.every(Boolean);
+    const round = (n) => Math.round(n * 100) / 100;
     const cost = {
-      basis: basis ? `Runs of ${nameOf(faces, agent)} cost ${money(basis.lo)} to ${money(basis.hi)} in the last 30 days.` + (kind === 'team' ? ' The team stops at your limit.' : '') : '',
+      basis: basis
+        ? `Runs of ${nameOf(faces, agent)} cost ${money(basis.lo)} to ${money(basis.hi)} in the last 30 days.` + (kind === 'team' ? ' The team stops at your limit.' : '')
+        : agent ? `No run of ${nameOf(faces, agent)} has a price yet.` : '',
       per: kind === 'team' ? 'bridge' : 'run',
       runsPerMonth: when ? perMonth(when.schedule) : 1,
+      ...(priced ? { low: round(bases.reduce((n, b) => n + b.lo, 0)), high: round(bases.reduce((n, b) => n + b.hi, 0)) } : {}),
     };
 
     // What it asks you, what it never bothers you with, and when you hear of it.
@@ -261,7 +290,10 @@ export function register({ on, refuse, readJson, S, FLEET, port }) {
     } else {
       start = { run: { member: agent === 'chat' ? 'default/manager-0' : memberOf(agent), body: { agent, input: words, title, metadata: { 'fw.view': agent === 'chat' ? 'quickchat' : 'task', ...(check ? { 'workbench.review': '1' } : {}) } } } };
     }
+    // A duty of the person that does the same work: the page offers Open it beside Start.
+    const same = kind === 'repeat' && agent ? sameOf([...(S.duties || new Map()).values()], c.person.subject, agent, words) : null;
     return {
+      ...(same ? { same } : {}),
       words, kind, title, who,
       others: [...faces.values()].filter((f) => known(f.agent) && f.agent !== 'chat').map((f) => ({ agent: f.agent, name: f.displayName })),
       when: when ? { said: when.said, readback: readbackOf(when.schedule), next: nextOf(when.schedule, 3) } : { readback: 'Now, once.', next: [] },

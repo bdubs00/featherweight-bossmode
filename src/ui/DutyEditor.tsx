@@ -30,6 +30,10 @@
 // form stays as a draft in the tab until Save or Cancel, so a move to
 // another screen loses nothing. Make this a duty reads the schedule and the
 // cost that its message names, and Cancel goes back to the conversation.
+// Change the details of the door opens the whole plan of the door: the
+// schedule, the cost that the person typed, who hears of a result, and the
+// check of each result. The form then says From the door, and Cancel goes
+// back to Work.
 
 import type { RefObject } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
@@ -114,6 +118,7 @@ import { useSelect } from '../state/store';
 import { membersOf } from '../state/reducer';
 import { loadBridge } from '../state/actions';
 import { FALLBACK, loadDuties, loadDutyOptions, loadDuty, loadSharedChannels, saveDuty, useDuties } from '../state/duties';
+import { doorDuty, dropDoorDuty } from '../state/doorplan';
 import { usePlaybooks } from '../state/playbooks';
 import { showError } from './notice';
 import { Confirm } from './common';
@@ -136,8 +141,8 @@ const DRAFT = 'new';
 /** The words of each action, as the choice of What says them. */
 const ACT_WORDS: Record<Act, string> = {
   ask: 'Ask the agent',
-  post: 'Post in a bridge',
-  open: 'Open a bridge from a playbook',
+  post: 'Post in a team',
+  open: 'Open a team from a playbook',
   manager: 'Ask the manager',
 };
 
@@ -223,12 +228,14 @@ function backTo(hash: string): string {
     case 'manager':
       return 'the manager';
     case 'bridge':
-      return 'the bridge';
+      return 'the team';
     case 'fleet':
     case 'member':
       return 'the conversation';
     case 'activity':
       return 'Activity';
+    case 'work':
+      return 'Work';
   }
   return 'the last screen';
 }
@@ -534,13 +541,13 @@ function BridgeFields({ bridge, to, onChange, error, toError }: { bridge: string
   const other = bridge && !open.some((b) => b.id === bridge) ? bridges.byId[bridge] : undefined;
   return (
     <>
-      <Field label="Bridge" error={error} class="duty-narrow">
+      <Field label="Team" error={error} class="duty-narrow">
         <select class="recess" value={bridge} aria-invalid={error ? true : undefined} onChange={(e) => onChange({ bridge: (e.target as HTMLSelectElement).value, to: [] })}>
-          <option value="">{open.length ? 'Pick a bridge' : 'No bridge is open'}</option>
+          <option value="">{open.length ? 'Pick a team' : 'No team is open'}</option>
           {open.map((b) => (
             <option value={b.id}>{b.title}</option>
           ))}
-          {bridge && !open.some((b) => b.id === bridge) && <option value={bridge}>{other ? other.title + ', closed' : 'A bridge that you cannot see'}</option>}
+          {bridge && !open.some((b) => b.id === bridge) && <option value={bridge}>{other ? other.title + ', closed' : 'A team that you cannot see'}</option>}
         </select>
       </Field>
       {bridge && members.length > 0 && (
@@ -554,7 +561,7 @@ function BridgeFields({ bridge, to, onChange, error, toError }: { bridge: string
               </label>
             ))}
           </div>
-          <p class="t-meta">{to.length ? (to.length === 1 ? '1 member reads it.' : to.length + ' members read it.') : 'Everyone on the bridge reads it.'}</p>
+          <p class="t-meta">{to.length ? (to.length === 1 ? '1 member reads it.' : to.length + ' members read it.') : 'Everyone on the team reads it.'}</p>
           {toError && (
             <span class="field-error" role="alert">
               {toError}
@@ -623,7 +630,9 @@ function EditorForm({ name, seed, base: read, heading, back: home }: FormProps) 
   // A draft of this form that the person left without Save or Cancel comes back.
   const key = draftKey(name, seed);
   const [kept] = useState(() => readDraft(key));
-  const [initial] = useState<DutyForm>(() => (base ? formOf(base, zone) : seededForm(seed, zone)));
+  // The plan that the door kept, for a new duty from Change the details.
+  const [door] = useState(() => (!base && seed && seed.from === 'door' ? doorDuty() : null));
+  const [initial] = useState<DutyForm>(() => (base ? formOf(base, zone) : door ? { ...formOf(door as Duty, zone), nameOwn: !!door.title } : seededForm(seed, zone)));
   const [f, setF] = useState<DutyForm>(() => (kept ? { ...initial, ...kept.form } : initial));
   const [keptLine, setKeptLine] = useState(!!kept);
   const keptStale = !!(kept && base && typeof kept.revision === 'number' && typeof base.revision === 'number' && kept.revision !== base.revision);
@@ -789,8 +798,9 @@ function EditorForm({ name, seed, base: read, heading, back: home }: FormProps) 
   };
 
   // Make this a duty brings a message that can name when and what a run may cost, such as every Monday at 8am and at most $0.05. The page reads both into the form once.
+  // The plan of the door holds both already.
   useEffect(() => {
-    if (!fresh || !seed || !seed.message || kept) return;
+    if (!fresh || !seed || !seed.message || kept || door) return;
     const cost = moneyIn(seed.message);
     if (cost && (f.act === 'ask' || f.act === 'manager') && !f.cost) setF((x) => ({ ...x, cost }));
     const said = scheduleWordsIn(seed.message);
@@ -866,6 +876,7 @@ function EditorForm({ name, seed, base: read, heading, back: home }: FormProps) 
     try {
       await saveDuty(pathName, record());
       writeDraft(key, null);
+      if (door) dropDoorDuty();
       setReview(null);
       setBusy(false);
       go({ place: 'duties', name: pathName });
@@ -905,6 +916,12 @@ function EditorForm({ name, seed, base: read, heading, back: home }: FormProps) 
               <Button size="s" kind="quiet" onClick={discard}>
                 Discard them
               </Button>
+            </p>
+          )}
+          {/* The plan of the door fills the form: the line says where it came from. */}
+          {door && !keptLine && (
+            <p class="duty-said duty-door" role="status">
+              From the door
             </p>
           )}
           {importedOf(base) && <p class="duty-said duty-origin">{ORIGIN_LINE}</p>}
@@ -1123,7 +1140,7 @@ function EditorForm({ name, seed, base: read, heading, back: home }: FormProps) 
             {f.act === 'post' ? (
               <p class="duty-spends">{POST_SPENDS}</p>
             ) : f.act === 'open' ? (
-              <Field label="The most turns of the bridge" error={joinError(err.turns, pr.turns)} class="duty-narrow">
+              <Field label="The most turns of the team" error={joinError(err.turns, pr.turns)} class="duty-narrow">
                 <Input type="number" min={1} inputMode="numeric" value={f.bridgeTurns} invalid={!!(err.turns || pr.turns)} placeholder="Required, such as 40" onInput={(e) => patch({ bridgeTurns: (e.target as HTMLInputElement).value })} />
               </Field>
             ) : (

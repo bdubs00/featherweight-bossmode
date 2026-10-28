@@ -3,9 +3,12 @@
 // reaction up on the run. Needs work opens a note, and Send back sends the
 // reaction down with the note. The front records the reaction on the end of
 // the run, so it counts as a verdict, and it sends the note to the agent as
-// a follow-up message (docs/CONTRACT.md, section 21). Escape or Cancel
-// closes the note and gives the focus back to Needs work. After a decision,
-// the focus goes to the nearest key that still stands, as holdFocus says.
+// a follow-up message (docs/CONTRACT.md, section 21). A team has no one
+// run: its keys go to POST /v1/work/review with its bridge. Looks right
+// closes the bridge as accepted, and Send back posts the note to every
+// seat, and the bridge stays open. Escape or Cancel closes the note and
+// gives the focus back to Needs work. After a decision, the focus goes to
+// the nearest key that still stands, as holdFocus says.
 
 import { useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
@@ -25,7 +28,14 @@ export function noteProblem(note: string): string {
   return '';
 }
 
-export function ResultKeys({ run, title, size = 'm', primary, onDone }: { run: string; title: string; size?: 's' | 'm'; primary?: boolean; onDone?: () => void }) {
+/** saidOf is the notice after a check: the verdict and the title, and for a team what the verdict did. */
+export function saidOf(reaction: 'up' | 'down', title: string, team: boolean): string {
+  if (reaction === 'up') return 'Marked as right: ' + title + '.' + (team ? ' The team closed.' : '');
+  return 'Sent back with your note: ' + title + '.' + (team ? ' Each agent of the team reads it.' : '');
+}
+
+/** ResultKeys check the result of a run, or with bridge the result of a team. */
+export function ResultKeys({ run, bridge, title, size = 'm', primary, onDone }: { run?: string; bridge?: string; title: string; size?: 's' | 'm'; primary?: boolean; onDone?: () => void }) {
   const [writing, setWriting] = useState(false);
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
@@ -51,8 +61,10 @@ export function ResultKeys({ run, title, size = 'm', primary, onDone }: { run: s
     setBusy(true);
     const after = holdFocus();
     try {
-      await api.reactRun(run, 0, reaction, reaction === 'down' ? note.trim() : undefined);
-      showSaid(reaction === 'up' ? 'Marked as right: ' + title + '.' : 'Sent back with your note: ' + title + '.');
+      const said = reaction === 'down' ? note.trim() : undefined;
+      if (bridge) await api.reviewTeam(bridge, reaction, said);
+      else await api.reactRun(run || '', 0, reaction, said);
+      showSaid(saidOf(reaction, title, !!bridge));
       setWriting(false);
       setNote('');
       if (onDone) onDone();
@@ -66,11 +78,11 @@ export function ResultKeys({ run, title, size = 'm', primary, onDone }: { run: s
   if (writing) {
     return (
       <div class="result-note">
-        <label class="field-label" for={'note-' + run}>
+        <label class="field-label" for={'note-' + (bridge || run)}>
           What must change?
         </label>
         <TextArea
-          id={'note-' + run}
+          id={'note-' + (bridge || run)}
           ref={box}
           rows={3}
           value={note}

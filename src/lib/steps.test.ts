@@ -9,7 +9,7 @@ describe('stepWords', () => {
     expect(stepWords('front.pages_search', { query: 'prometheus rules' })).toBe('Searched the wiki for "prometheus rules"');
     expect(stepWords('front.pages_list', {})).toBe('Listed the pages');
     expect(stepWords('front.pages_history', { path: 'a.md' })).toBe('Read the history of a.md');
-    expect(stepWords('front.bridge_post', { text: 'Done.' })).toBe('Posted to the bridge');
+    expect(stepWords('front.bridge_post', { text: 'Done.' })).toBe('Posted to the team');
     expect(stepWords('front.bridge_post', { text: 'Look.', to: ['reviewer', 'tester'] })).toBe('Posted to reviewer and tester');
     expect(stepWords('front.bridge_read', {})).toBe('Read the channel');
     expect(stepWords('front.bridge_add_member', { handle: 'tester-2' })).toBe('Seated tester-2');
@@ -22,7 +22,7 @@ describe('stepWords', () => {
     expect(stepWords('files', { command: 'create', path: 'a.yml' }, 'Wrote a.yml')).toBe('Wrote a.yml');
     expect(stepWords('github.create_issue', {}, 'github.create_issue')).toBe('Used github.create_issue');
     expect(stepWords('front.fleet', {})).toBe('Read the fleet');
-    expect(stepWords('front.bridge_open', { title: 'Release notes' })).toBe('Opened the bridge Release notes');
+    expect(stepWords('front.bridge_open', { title: 'Release notes' })).toBe('Opened the team Release notes');
     expect(stepWords('spawn_task', { agent: 'tester' })).toBe('Handed off a task to tester');
     expect(stepWords(undefined)).toBe('Used a tool');
   });

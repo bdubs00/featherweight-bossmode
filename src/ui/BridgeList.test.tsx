@@ -69,7 +69,7 @@ describe('the list of bridges', () => {
     act(() => store.dispatch({ type: 'bridges', bridges: many }));
     const el = mount(<BridgeList current="" />);
     const field = el.querySelector('.list-find input') as HTMLInputElement;
-    expect(field.getAttribute('placeholder')).toBe('Find a bridge');
+    expect(field.getAttribute('placeholder')).toBe('Find a team');
     act(() => {
       field.value = 'logrotate';
       field.dispatchEvent(new Event('input', { bubbles: true }));
@@ -90,7 +90,7 @@ describe('the list of bridges', () => {
         field.dispatchEvent(new Event('input', { bubbles: true }));
       });
     type('zzzz');
-    expect(el.querySelector('.empty[role="status"] p')!.textContent).toBe('No bridge matches zzzz.');
+    expect(el.querySelector('.empty[role="status"] p')!.textContent).toBe('No team matches zzzz.');
     // A filter that matches a closed bridge shows it at once, under a heading and not a toggle that does nothing.
     type('bridge 2');
     expect(el.querySelector('button.group-toggle')).toBeNull();

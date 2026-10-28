@@ -47,9 +47,13 @@
 // itself after three failed runs, a duty of the settings that another app
 // starts and whose last run failed, a duty that posts in a bridge when
 // another bridge closes, and a playbook of weekly patching. A run that Run now starts carries the
-// metadata workbench.duty.
+// metadata workbench.duty. A nightly check of the web hosts tells alice
+// only of a result that found something: last night it found a drift,
+// which waits for her to check it, and the nights before found nothing. A
+// weekly summary of competitors does the work of the template of the door,
+// so the door names it as the same work.
 
-import { inReview } from './routes-work.mjs';
+import { foundLine, inReview } from './routes-work.mjs';
 
 const MIN = 60_000;
 const DAY = 24 * 60 * MIN;
@@ -528,6 +532,20 @@ export function register({ on, refuse, readJson, now, AGENTS, admin, S, publish 
   });
   S.transcripts.set('duty-notes-0', [{ seq: 1, time: ago(24 * 60 + 7), kind: 'user', text: 'Draft the release notes of yesterday from the changes merged today.', who: 'duty:daily-release-notes' }]);
   S.results.set('duty-notes-0', { runId: 'duty-notes-0', title: 'Release notes of yesterday', agent: 'scribe', status: 'ready', started: ago(24 * 60 + 7), changed: ago(24 * 60), next: [] });
+  // The drafts before it, which alice checked: each run holds the thumb of its verdict, so the page of the duty shows it.
+  for (const e of D.get('daily-release-notes').history) {
+    if (!e.run || S.runs.has(e.run)) continue;
+    const day = new Date(e.slot).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    S.runs.set(e.run, {
+      id: e.run, agent: 'scribe', title: 'Release notes of ' + day, state: 'completed', seq: 7, origin: 'duty', principal: 'duty:daily-release-notes',
+      input: 'Draft the release notes of ' + day + ' from the changes merged that day.',
+      output: '## For people who run the fleet\n\n- The notes of ' + day + '.',
+      metadata: { 'workbench.duty': 'daily-release-notes', 'workbench.review': '1', 'fw.title': 'Release notes of ' + day },
+      reactions: e.verdict === 'sent-back' ? { down: 1 } : { up: 1 },
+      createdAt: e.slot, updatedAt: e.at, member: 'default/crew-1', usage: { turns: 4, costUSD: e.costUSD },
+    });
+    S.results.set(e.run, { runId: e.run, title: 'Release notes of ' + day, agent: 'scribe', status: 'ready', started: e.slot, changed: e.at, next: [] });
+  }
   add(
     {
       name: 'nightly-restore-test',
@@ -612,6 +630,47 @@ export function register({ on, refuse, readJson, now, AGENTS, admin, S, publish 
     },
     // The queue never took the run of the last start, so the start and its failure name no run.
     [{ at: ago(40), slot: ago(40), run: '', state: 'failed', start: 'event', reason: 'The queue of reviewer did not take the run: the queue is full.' }],
+  );
+  // The nightly check of the web hosts tells alice only of what it finds. Last night it found a drift, which waits for her to check it.
+  add(
+    {
+      name: 'check-the-web-hosts-for-drift',
+      title: 'Check the web hosts for drift',
+      agent: 'ops',
+      when: { schedule: { repeat: 'daily', times: ['02:00'], timeZone: 'Europe/Berlin' } },
+      do: { ask: { message: 'Every night, check the web hosts for drift from their Ansible roles. When you find nothing, say so in one line. When you find a drift, start your answer with Found: and the drift.' } },
+      limits: { budget: { maxCostUSD: 0.3 }, overlap: 'skip', catchUp: '6h' },
+      whileAway: { decider: 'nobody', timeout: '24h', then: 'deny' },
+      notify: { failure: ['owner'], needsYou: ['owner'], result: ['owner'], resultWhen: 'found' },
+    },
+    runsOf(24 * 60, 4, (i) => ({ at: ago(i * 24 * 60 + 300), slot: ago(i * 24 * 60 + 310), run: 'duty-drift-' + i, state: 'completed', costUSD: Math.round((0.04 + i / 100) * 100) / 100, ...(i > 0 ? { verdict: 'unchecked' } : {}) })),
+  );
+  for (const e of D.get('check-the-web-hosts-for-drift').history) {
+    const found = e.run === 'duty-drift-0';
+    const output = found
+      ? 'Found: web-2 drifted from its role in two files.\n\n| File | Role | Host |\n|---|---|---|\n| /etc/nginx/nginx.conf | worker_processes auto | worker_processes 4 |\n| /etc/logrotate.d/nginx | rotate 14 | rotate 52 |\n\nweb-1 and web-3 match their roles.'
+      : 'Nothing drifted. web-1, web-2, and web-3 match their roles.';
+    S.runs.set(e.run, {
+      id: e.run, agent: 'ops', title: 'Check the web hosts for drift', state: 'completed', seq: 5, origin: 'duty', principal: 'duty:check-the-web-hosts-for-drift',
+      input: 'Check the web hosts for drift from their Ansible roles.', output,
+      metadata: { 'workbench.duty': 'check-the-web-hosts-for-drift', 'workbench.found': '1', 'fw.title': 'Check the web hosts for drift' },
+      createdAt: e.slot, updatedAt: e.at, member: 'default/ops-0', usage: { turns: 3, costUSD: e.costUSD },
+    });
+    S.transcripts.set(e.run, [{ seq: 1, time: e.slot, kind: 'user', text: 'Check the web hosts for drift from their Ansible roles.', who: 'duty:check-the-web-hosts-for-drift' }, { seq: 2, time: e.at, kind: 'assistant', text: output }]);
+    S.results.set(e.run, { runId: e.run, title: 'Check the web hosts for drift', agent: 'ops', status: 'ready', summary: output, started: e.slot, changed: e.at, next: [] });
+  }
+  // A weekly summary of competitors: the template of the door does the same work, so its plan names this duty.
+  add(
+    {
+      name: 'weekly-competitor-summary',
+      title: 'Weekly competitor summary',
+      agent: 'writer',
+      when: { schedule: { repeat: 'weekly', days: ['mon'], times: ['09:00'], timeZone: 'Europe/Berlin' } },
+      do: { ask: { message: 'Sum up what our competitors shipped last week, in the wiki under market/{date}.md.' } },
+      limits: { budget: { maxCostUSD: 0.4 }, overlap: 'skip', catchUp: '6h' },
+      notify: { failure: ['owner'], needsYou: ['owner'], result: ['owner'], resultWhen: 'always' },
+    },
+    [],
   );
   // The run of the restore test waits for an answer, on no bridge, so Activity shows its card.
   const waiting = D.get('nightly-restore-test').history[0];
@@ -1040,11 +1099,15 @@ export function register({ on, refuse, readJson, now, AGENTS, admin, S, publish 
       const run = last && last.run ? S.runs.get(last.run) : null;
       if (run && run.state === 'input-required' && run.pending) items.push({ kind: run.pending.schema ? 'question' : 'approval', run: run.id, approval: run.pending.id, duty: d.name, agent: d.agent, bridge: '', text: d.agent + ' waits for your answer.', since: last.at });
     }
-    // A result to check: a run whose owner asked to check each result, until a person reacts.
+    // A result to check: a run whose owner asked to check each result, until a person reacts. A duty that tells only of
+    // what it finds gives the people of notify.result a result that found something.
     for (const r of S.runs.values()) {
-      if (!inReview(r)) continue;
       const duty = (r.metadata || {})['workbench.duty'] || '';
-      items.push({ kind: 'result', run: r.id, approval: '', duty, agent: r.agent, bridge: '', text: (r.title || 'A result') + ' is ready to check.', since: r.updatedAt });
+      const d = duty ? D.get(duty) : null;
+      if (!inReview(r)) continue;
+      const found = (r.metadata || {})['workbench.review'] !== '1' && !!foundLine(r);
+      const title = r.title || (d && d.title) || 'A result';
+      items.push({ kind: 'result', run: r.id, approval: '', duty, agent: r.agent, bridge: '', text: found ? title + ': it found something.' : title + ' is ready to check.', since: r.updatedAt });
     }
     return { items };
   });

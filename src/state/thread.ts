@@ -9,7 +9,7 @@ import { stepWords } from '../lib/steps';
 import { hrefOf } from '../lib/route';
 import { decidedRuns, hiddenLine, napOf, napRuns } from '../lib/lines';
 
-/** One quiet line for one tool call of a run, such as Ran "ls", Created a/b.yml, or Opened the bridge Release notes. */
+/** One quiet line for one tool call of a run, such as Ran "ls", Created a/b.yml, or Opened the team Release notes. */
 export interface Step {
   key: string;
   at: string;
@@ -74,9 +74,9 @@ export function directEntries(entries: Entry[], handle: string, runs: string[]):
  */
 const FRONT_WORDS: Record<string, [string, string, string]> = {
   fleet: ['Read the fleet', 'Reading the fleet', 'Did not read the fleet'],
-  bridge_open: ['Opened the bridge', 'Opening the bridge', 'Did not open the bridge'],
-  bridge_close: ['Closed the bridge', 'Closing the bridge', 'Did not close the bridge'],
-  bridge_post: ['Posted to the bridge', 'Posting to the bridge', 'Did not post to the bridge'],
+  bridge_open: ['Opened the team', 'Opening the team', 'Did not open the team'],
+  bridge_close: ['Closed the team', 'Closing the team', 'Did not close the team'],
+  bridge_post: ['Posted to the team', 'Posting to the team', 'Did not post to the team'],
   bridge_read: ['Read the channel', 'Reading the channel', 'Did not read the channel'],
   pages_write: ['Wrote a page', 'Writing a page', 'Did not write a page'],
   pages_read: ['Read a page', 'Reading a page', 'Did not read a page'],

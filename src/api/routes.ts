@@ -24,6 +24,8 @@ import type {
   Fleet,
   InboxItem,
   WorkBoard,
+  RunBudget,
+  TeamVerdict,
   Marketplace,
   Member,
   MessagePage,
@@ -342,6 +344,21 @@ export const api = {
   inbox: () => call<{ items: InboxItem[] }>('/v1/inbox').then((r) => (r && r.items) || []),
   /** work reads the board of the work: one card per piece of work, from the request to its end. */
   work: (q: { days?: number; all?: boolean } = {}) => call<WorkBoard>('/v1/work' + query({ days: q.days, all: q.all ? 'true' : undefined })),
+  /**
+   * reviewTeam checks the result of a team (POST /v1/work/review). up
+   * closes its bridge with the verdict accepted. down posts the note in the
+   * bridge to every seat, and the bridge stays open.
+   */
+  reviewTeam: (bridge: string, verdict: TeamVerdict, note?: string) =>
+    call<unknown>('/v1/work/review', { method: 'POST', body: note ? { bridge, verdict, note } : { bridge, verdict } }),
+  /** letGo lets a stopped card go (POST /v1/work/letgo). The card moves to Done with the verdict let-go. A second call does nothing. */
+  letGo: (card: string) => call<unknown>('/v1/work/letgo', { method: 'POST', body: { card } }),
+  /**
+   * changeBudget gives a run new limits (PATCH /v1/runs/{id}/budget). Each
+   * field that it sets replaces the same limit of the run for the work that
+   * follows. A run that stopped at a limit stays stopped until a follow-up.
+   */
+  changeBudget: (id: string, budget: RunBudget) => call<{ budget?: RunBudget; run?: Run }>(run(id) + '/budget', { method: 'PATCH', body: budget }),
 
   /** The notification settings of the person who is signed in: the channels, the quiet hours, and what the front offers. */
   notifications: () => call<NotifyRead>('/v1/notifications'),

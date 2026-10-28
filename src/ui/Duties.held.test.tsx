@@ -205,7 +205,7 @@ describe('the tab Playbooks', () => {
     more(el, 'Delete');
     const ask = document.querySelector('dialog.confirm')!;
     expect(text(ask.querySelector('h2'))).toBe('Delete weekly-patching?');
-    expect(text(ask)).toContain('1 duty opens a bridge from it. It stops until you pick another playbook for it.');
+    expect(text(ask)).toContain('1 duty opens a team from it. It stops until you pick another playbook for it.');
     click(keyNamed(ask, 'Delete'));
     await settle();
     expect(api.calls.some((c) => c.method === 'DELETE' && c.path === '/v1/playbooks/weekly-patching')).toBe(true);
@@ -228,7 +228,7 @@ describe('the tab Playbooks', () => {
     more(el, 'Rename');
     const ask = document.querySelector('dialog.confirm')!;
     expect(text(ask.querySelector('h2'))).toBe('Rename weekly-patching');
-    expect(text(ask)).toContain('The duty that opens a bridge from it moves to the new name.');
+    expect(text(ask)).toContain('The duty that opens a team from it moves to the new name.');
     // The dialog opens with the focus in the name, which starts as the name as it is.
     await settle();
     expect(document.activeElement).toBe(fieldOf(ask, 'Name'));
@@ -268,7 +268,7 @@ describe('the tab Playbooks', () => {
     click(keyNamed(ask, 'Rename'));
     await settle();
     expect(api.calls.some((c) => c.method === 'DELETE')).toBe(false);
-    expect(currentNotice()).toBe('Saved the playbook as patch-day. patch-tuesday still opens a bridge from weekly-patching, so that playbook stays too.');
+    expect(currentNotice()).toBe('Saved the playbook as patch-day. patch-tuesday still opens a team from weekly-patching, so that playbook stays too.');
   });
 });
 
@@ -309,7 +309,7 @@ describe('the walk of the held changes', () => {
     more(el, 'Delete');
     const ask = document.querySelector('dialog.confirm')!;
     expect(text(ask)).not.toContain('duty');
-    expect(text(ask)).toContain('The bridges that it opened stay.');
+    expect(text(ask)).toContain('The teams that it opened stay.');
   });
 
   it('goes back to the playbook from Cancel of a duty that Make a duty started there', async () => {

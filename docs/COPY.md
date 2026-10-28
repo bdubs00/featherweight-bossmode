@@ -42,7 +42,7 @@ marked done is in the code already.
 
 | Thing | The word on the page | Never |
 |---|---|---|
-| A job split into seats, with one channel | bridge | room, project, job |
+| A job split into seats, with one channel | team, and the place Teams. The routes and the code keep the word bridge (section 14). | room, project, job, bridge |
 | One seat on a bridge | seat, and the handle of the seat, such as migrator-2 | slot, instance |
 | The agent behind a seat | member, in a roster | bot |
 | A profile that workers run | agent | profile |
@@ -66,7 +66,7 @@ The statuses of a seat: `working`, `needs you`, `waiting for a worker`,
 worker: `awake`, `asleep`, `starting`, `failed`, and `stopping`. The readout
 of the fleet also counts `working`, a worker that is awake and holds an open
 run. The statuses of a run: `waiting for a worker`, `working`, `needs you`,
-`answered`, `ended`, `failed`, and `stopped`.
+`answered`, `ended`, `failed`, `at its limit`, and `stopped`.
 
 Capacity shows where seating happens:
 
@@ -1235,3 +1235,70 @@ The page never shows pool, member, job, run id, or Task in these places.
 | Now | Verdict | New text | Who |
 |---|---|---|---|
 | `Board` (the title of the view of the lights, and the key in the head of Fleet) | change | `Lights` | integration |
+
+## 14. Round 2: the leftovers of the walks
+
+The round 2 contract of 2026-10-28 closes the leftovers of the walks of
+Work and of Results. The column Who says round 2 for each row.
+
+### src/ui/Work.tsx and src/ui/ResultKeys.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| no key on a team in To check | change | `Needs work` and `Looks right` on a team of the person too. The notices say `Marked as right: <title>. The team closed.` and `Sent back with your note: <title>. Each agent of the team reads it.` | round 2 |
+| new | add | `Let it go` on a stopped card, with the name `Let it go: <title>` for a screen reader, and then the notice `Let go: <title>.` | round 2 |
+| new | add | the verdict `let go` of a done card, with a grey light, and the reason of the server, such as `Let go by you.` | round 2 |
+| the subject of a person, such as an id | change | the name beside the subject, such as `Manager for Dana Reyes` | round 2 |
+
+### src/ui/Door.tsx and src/ui/DutyEditor.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| new | add | under the cost, with an amber light: `One run can cost $0.14. The task stops at your limit.`, and for a team `The whole team can cost $0.50. The task stops at your limit.` | round 2 |
+| new | add | above the rows of the readback: `Your duty <title> does this already.`, and the key `Open it` beside Start | round 2 |
+| `Change the details` opened New duty with the words alone | change | it opens the whole plan, and the editor says `From the door` | round 2 |
+| `the last screen` (the way back of the editor from Work) | change | `Work` | round 2 |
+
+### src/ui/Activity.tsx and src/ui/Duties.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `backup asks for your decision.` for a decision of a duty | change | the card of the call, such as `backup wants to run a command.` with the command, once the page reads the run | round 2 |
+| new | add | `It found something.` on the card of a result that found something | round 2 |
+| `finished` for a result of a duty | change | `to check`, `accepted`, `sent back`, or `unchecked` | round 2 |
+
+### src/ui/MoreRoom.tsx, src/ui/Chat.tsx, src/ui/Fleet.tsx, src/lib/presence.ts
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `Stopped. Your next message starts a new chat.` for a chat at a limit of its budget | change | the plain line of the limit, such as `Stopped at its turn limit. Your next message starts a new chat.`, then the key `Continue with more room` and `It gets 8 more turns and goes on where it stopped.` | round 2 |
+| new | add | for a limit of cost: the field `The most it can cost in all`, and the errors `Say the most that it can cost in all, such as 0.50.` and `Say more than it spent so far: $0.12.` | round 2 |
+| new | add | the follow-up of Continue with more room: `You stopped at a limit of your budget, and I gave you more room. Go on from where you stopped.` | round 2 |
+| `failed` with a red light, and `The turn failed`, for a run at a limit of its budget | change | `at its limit` with a grey light, and no red line | round 2 |
+
+### Keys of a person who only views
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| a composer in the conversation of an agent that the person only views | change | no composer, and `You can follow <agent>. Only an owner or an operator of it can talk to it.` | round 2 |
+| `New agent`, `New`, `Open a team`, `New duty`, and `Run now` for a person whom the server refuses | remove | the server refuses each of them for that person | round 2 |
+| What people liked on a profile, for a person who views every agent | remove | the wiki refuses that person, so the profile reads no page | round 2 |
+| `No team is open. Open one, or ask the manager to open one.` for a person who can start no run | change | `No team is open.` | round 2 |
+
+### The place Teams
+
+One thing has one name: the card of a team on the board says Team, so the
+place says Teams. The routes, such as `#bridge/<id>` and `#new`, and the
+code keep the word bridge. Backend lines that the page does not word
+again can still say bridge.
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `Bridges` (the place, the title of its list, the tab, and each way back) | change | `Teams` | round 2 |
+| `1 open bridge`, `Find a bridge`, `No bridge matches`, `No bridge is open.`, `Open a bridge`, `Loading the bridges.` | change | `1 open team`, `Find a team`, `No team matches`, `No team is open.`, `Open a team`, `Loading the teams.` | round 2 |
+| `Bridge`, `Message the bridge`, `Close bridge`, `This bridge`, `Pages of this bridge`, `This bridge is not here.` | change | `Team`, `Message the team`, `Close team`, `This team`, `Pages of this team`, `This team is not here.` | round 2 |
+| `Open bridge` (New bridge, and the verb of a decision of bridge_open), `Throw away this bridge?`, `No bridge opens.`, `Write the goal of the bridge.` | change | `Open team`, `Throw away this team?`, `No team opens.`, `Write the goal of the team.` | round 2 |
+| `Post in a bridge`, `Open a bridge from a playbook`, `Bridge`, `Pick a bridge`, `The most turns of the bridge`, `When a bridge closes` | change | `Post in a team`, `Open a team from a playbook`, `Team`, `Pick a team`, `The most turns of the team`, `When a team closes` | round 2 |
+| `Opened the bridge`, `Closed the bridge`, `Posted to the bridge`, `You opened the bridge`, `The bridge reached its cap of 2000 messages` | change | `Opened the team`, `Closed the team`, `Posted to the team`, `You opened the team`, `The team reached its cap of 2000 messages` | round 2 |
+| `Not on a bridge`, `Read and post in bridges`, `A playbook is a bridge that you saved to open again` | change | `Not on a team`, `Read and post in teams`, `A playbook is a team that you saved to open again` | round 2 |
+

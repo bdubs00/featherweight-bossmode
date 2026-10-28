@@ -919,6 +919,11 @@ export interface Budget {
   maxCostUSD?: number;
 }
 
+/** The limits of one run that PATCH /v1/runs/{id}/budget changes. Each field that a change sets replaces the same limit of the run. */
+export interface RunBudget extends Budget {
+  maxToolCalls?: number;
+}
+
 /** The profile that the new-agent screen sends, a part of the profile of the kernel. */
 export interface NewProfile {
   description?: string;
@@ -1430,8 +1435,13 @@ export interface WorkCard {
   /** conversation, bridge, duty, job, or event. */
   kind: 'conversation' | 'bridge' | 'duty' | 'job' | 'event';
   title: string;
-  /** Who asked: kind person, duty, app, manager, or agent; via page, mcp, queue, bridge, schedule, event, call, now, or manager. */
-  from: { kind: string; name?: string; via?: string };
+  /**
+   * Who asked: kind person, duty, app, manager, or agent; via page, mcp,
+   * queue, bridge, schedule, event, call, now, or manager. display is the
+   * name of a person beside the subject in name, which can be an id. The
+   * page shows it in place of the subject.
+   */
+  from: { kind: string; name?: string; via?: string; display?: string };
   stage: WorkStage;
   /** Who moves it next: worker, agent, you, person, manager, or "" when it is done. */
   next?: string;
@@ -1445,12 +1455,16 @@ export interface WorkCard {
   costUSD: number;
   /** True when the pool replaced the worker of a part that had not ended. */
   lost?: boolean;
-  /** The verdict of a done card: accepted (a thumb up or a heart), checked (a machine check passed), sent-back (a thumb down), or unchecked. */
+  /** The verdict of a done card: accepted (a thumb up or a heart), checked (a machine check passed), sent-back (a thumb down), unchecked, or let-go (a person let a stopped card go). */
   verdict?: WorkVerdict;
 }
 
-/** The verdict on a result: a person accepted it, a machine check passed, a person sent it back, or nobody checked it. */
-export type WorkVerdict = 'accepted' | 'checked' | 'sent-back' | 'unchecked';
+/**
+ * The verdict on a result: a person accepted it, a machine check passed, a
+ * person sent it back, or nobody checked it. let-go is a word of the board
+ * only: a person let a stopped card go, and Results does not count it.
+ */
+export type WorkVerdict = 'accepted' | 'checked' | 'sent-back' | 'unchecked' | 'let-go';
 
 /** One lane of the board: the cards of a stage, the cards whose next move is the person's, and the oldest wait. */
 export interface WorkLane {
@@ -1500,7 +1514,12 @@ export interface TaskPlan {
   /** The agents that the person can pick instead. */
   others: { agent: string; name: string }[];
   when: { said?: string; readback: string; next: string[] };
-  cost: { basis: string; per: 'run' | 'bridge'; runsPerMonth: number };
+  /**
+   * low and high are dollars for the whole task: one run of the agent, or
+   * all seats of a team. Both are absent while no run of the agents has a
+   * price.
+   */
+  cost: { basis: string; per: 'run' | 'bridge'; runsPerMonth: number; low?: number; high?: number };
   asks: string[];
   quiet: string[];
   tell: TaskTell;
@@ -1510,4 +1529,9 @@ export interface TaskPlan {
   start: { duty?: DutyRecord & { notify?: DutyNotify & { result?: string[]; resultWhen?: 'always' | 'found' } }; bridge?: { title: string; goal: string; placement?: Placement; members: { handle: string; agent: string; task: string }[]; caps?: Record<string, number>; delegation?: Record<string, boolean> }; run?: { member: string; body: NewRun } };
   /** The address of what Start makes, when the plan knows it. */
   open: string;
+  /** A duty of the person that does the same work already. The page offers Open it beside Start. */
+  same?: { duty: string; title: string };
 }
+
+/** The verdict of a check of a team: up closes the bridge with the verdict accepted, and down posts the note to every seat. */
+export type TeamVerdict = 'up' | 'down';

@@ -140,10 +140,24 @@
   max-width: 160px;
   font-weight: 700;
 }
-.rb-gap {
+.rb-gap,
+.rb-low,
+.rb-same {
   display: flex;
   align-items: baseline;
   gap: var(--s-2);
+}
+/* The warning of a cost below the cheapest run: ink words beside an amber light, as a line that waits for the person. */
+.rb-low {
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+}
+.rb-low:empty {
+  display: none;
+}
+/* A duty that does the same work already: one line above the rows, which Open it beside Start opens. */
+.rb-same {
+  margin: var(--s-2) 0 0;
 }
 .rb .choices {
   grid-template-columns: 1fr;

@@ -134,7 +134,7 @@ export function What({ d }: { d: Pick<Decision, 'tool' | 'input'> }) {
       return (
         <div class="plan">
           {plan.title && <p class="plan-title">{plan.title}</p>}
-          {plan.goal && <Markdown text={plan.goal} class="plan-goal" refs />}
+          {plan.goal && <Markdown text={plan.goal} class="plan-goal" refs headings={4} />}
           {plan.spawn && <p class="plan-meta">Fresh sandbox per seat</p>}
           {plan.seats.length > 0 && (
             <ul class="plan-seats" aria-label="Seats">
@@ -164,7 +164,7 @@ export function What({ d }: { d: Pick<Decision, 'tool' | 'input'> }) {
         </div>
       );
     case 'handoff':
-      return plan.task ? <Markdown text={plan.task} class="plan-goal plan-handoff" refs /> : null;
+      return plan.task ? <Markdown text={plan.task} class="plan-goal plan-handoff" refs headings={4} /> : null;
     case 'fields':
       return (
         <div class="plan">

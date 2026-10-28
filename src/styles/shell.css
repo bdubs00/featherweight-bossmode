@@ -631,6 +631,14 @@ dialog.confirm .notify-said.field-error {
     /* The keys never squeeze the title out of the header. */
     min-width: 5em;
   }
+  /* A title with a count keeps the count beside its words, as on a wide
+     window: the title takes the width of its words, up to most of the
+     header, so a short title such as Work never pushes its count away. */
+  .pane-head-title > .t-title.clip:has(+ .chip) {
+    min-width: 0;
+    flex-shrink: 0;
+    max-width: 60%;
+  }
   /* The header of a skill keeps its name: the kind goes, and the key Copy
      leaves out the slash command, which the text of the skill shows. */
   .skill .pane-head .head-kind,

@@ -29,7 +29,7 @@ describe('the address line', () => {
     expect(addressWords([])).toBe('To everyone');
     expect(addressWords(['reviewer'])).toBe('To reviewer');
     expect(addressWords(['a', 'b'])).toBe('To a and b');
-    const el = mount(<Composer draft="c1" label="Message the bridge" placeholder="Message the bridge" members={members} onSend={async () => true} />);
+    const el = mount(<Composer draft="c1" label="Message the team" placeholder="Message the team" members={members} onSend={async () => true} />);
     expect(el.querySelector('.address')!.textContent).toBe('To everyone');
     type(el, 'Hello @reviewer and @migrator-1');
     expect(el.querySelector('.address')!.textContent).toBe('To reviewer and migrator-1');
@@ -40,13 +40,13 @@ describe('the address line', () => {
     expect(keyWords('macOS')).toBe('⌘+Enter');
     expect(keyWords('Linux x86_64')).toBe('Ctrl+Enter');
     expect(keyWords('Windows')).toBe('Ctrl+Enter');
-    const el = mount(<Composer draft="c3" label="Message the bridge" placeholder="Message the bridge" onSend={async () => true} />);
+    const el = mount(<Composer draft="c3" label="Message the team" placeholder="Message the team" onSend={async () => true} />);
     expect(el.querySelector('.tools .keys')!.textContent).toMatch(/\+Enter$/);
     // A touch screen has no such key.
     const was = window.matchMedia;
     window.matchMedia = ((q: string) => ({ matches: q === '(pointer: coarse)', media: q, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
     try {
-      const touch = mount(<Composer draft="c4" label="Message the bridge" placeholder="Message the bridge" onSend={async () => true} />);
+      const touch = mount(<Composer draft="c4" label="Message the team" placeholder="Message the team" onSend={async () => true} />);
       expect(touch.querySelector('.tools .keys')).toBeNull();
       expect(touch.querySelector('.tools .send')).not.toBeNull();
     } finally {
@@ -63,7 +63,7 @@ describe('the address line', () => {
 describe('the reply chip', () => {
   it('says Replying to, addresses the agent, and stops on its key', () => {
     const clear = vi.fn();
-    const el = mount(<Composer draft="c3" label="Message the bridge" placeholder="Message the bridge" members={members} reply={{ seq: 7, who: 'reviewer', text: 'Will do.', handle: 'reviewer' }} onClearReply={clear} onSend={async () => true} />);
+    const el = mount(<Composer draft="c3" label="Message the team" placeholder="Message the team" members={members} reply={{ seq: 7, who: 'reviewer', text: 'Will do.', handle: 'reviewer' }} onClearReply={clear} onSend={async () => true} />);
     const chip = el.querySelector('.replying.slidein .reply-to')!;
     expect(chip.textContent).toBe('Replying to reviewer');
     expect(el.querySelector('textarea')!.getAttribute('placeholder')).toBe('Message reviewer');
@@ -74,7 +74,7 @@ describe('the reply chip', () => {
 
   it('sends the reply to the addressees that the text names', async () => {
     const send = vi.fn(async () => true);
-    const el = mount(<Composer draft="c4" label="Message the bridge" placeholder="Message the bridge" members={members} reply={{ seq: 7, who: 'Alice', text: 'Check it.' }} onSend={send} />);
+    const el = mount(<Composer draft="c4" label="Message the team" placeholder="Message the team" members={members} reply={{ seq: 7, who: 'Alice', text: 'Check it.' }} onSend={send} />);
     expect(el.querySelector('.address')!.textContent).toBe('To everyone');
     type(el, '@migrator-1 take it');
     await act(async () => {
@@ -84,7 +84,7 @@ describe('the reply chip', () => {
   });
 
   it('says why a closed bridge takes no message', () => {
-    const el = mount(<Composer draft="c5" label="Message the bridge" placeholder="Message the bridge" members={members} disabled="Closed. Reopen it to send." onSend={async () => true} />);
+    const el = mount(<Composer draft="c5" label="Message the team" placeholder="Message the team" members={members} disabled="Closed. Reopen it to send." onSend={async () => true} />);
     const box = el.querySelector('textarea')!;
     expect(box.disabled).toBe(true);
     expect(box.getAttribute('placeholder')).toBe('Closed. Reopen it to send.');
@@ -94,7 +94,7 @@ describe('the reply chip', () => {
 describe('a composer while the page reaches no server', () => {
   it('turns off Send and Attach files with the reason, and keeps taking words for the draft', async () => {
     const send = vi.fn(async () => true);
-    const el = mount(<Composer draft="c-off" label="Message the bridge" placeholder="Message the bridge" members={members} attach onSend={send} />);
+    const el = mount(<Composer draft="c-off" label="Message the team" placeholder="Message the team" members={members} attach onSend={send} />);
     type(el, 'Keep 14.');
     act(() => noteAnswer(0));
     const key = [...el.querySelectorAll('button')].find((b) => b.textContent === 'Send') as HTMLButtonElement;

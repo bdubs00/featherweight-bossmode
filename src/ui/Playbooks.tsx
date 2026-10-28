@@ -62,7 +62,7 @@ export function SavePlaybook({ bridge, confirm = 'Save playbook', onClose, onSav
       return;
     }
     if (!b || members.length === 0) {
-      setError('This bridge has no seat to save.');
+      setError('This team has no seat to save.');
       return;
     }
     setBusy(true);
@@ -132,7 +132,7 @@ export function PlaybookPick({ value, onChange, label = 'Playbook', error, empty
           {value && list && !names.includes(value) && <option value={value}>{value + ', not here'}</option>}
         </select>
       </Field>
-      {list && list.length === 0 && <p class="t-meta">Save one from a bridge: open More, then Save as playbook.</p>}
+      {list && list.length === 0 && <p class="t-meta">Save one from a team: open More, then Save as playbook.</p>}
     </>
   );
 }
@@ -230,7 +230,7 @@ export function PlaybookList({ current }: { current?: string }) {
         {off && <p class="empty">This workbench keeps no playbooks.</p>}
         {list && !off && count === 0 && (
           <div class="empty">
-            <p>No playbook yet. Save one from a bridge: open More, then Save as playbook.</p>
+            <p>No playbook yet. Save one from a team: open More, then Save as playbook.</p>
           </div>
         )}
         {list && words && count > 0 && shown.length === 0 && <p class="empty">No playbook holds those words.</p>}
@@ -277,7 +277,7 @@ function PlaybookHome() {
 }
 
 /** PLAYBOOK_IS says what a playbook is, on the empty tab. */
-export const PLAYBOOK_IS = 'A playbook is a bridge that you saved to open again: its goal, its seats, and its caps.';
+export const PLAYBOOK_IS = 'A playbook is a team that you saved to open again: its goal, its seats, and its caps.';
 
 /** The width from which two panes show side by side, as App names it. */
 const TWO_PANES = '(min-width: 800px)';
@@ -386,7 +386,7 @@ function PlaybookView({ name }: { name: string }) {
             Duties that open it <Chip label={users.length === 1 ? '1 duty' : users.length + ' duties'}>{users.length}</Chip>
           </h2>
           {users.length === 0 ? (
-            <p class="t-meta">No duty opens a bridge from it.</p>
+            <p class="t-meta">No duty opens a team from it.</p>
           ) : (
             <ul class="prof-duties">
               {users.map((d) => (
@@ -438,7 +438,7 @@ function SeatTask({ task }: { task: string }) {
 }
 
 /** usersWords says how many duties open a bridge from a playbook. */
-const usersWords = (n: number) => (n === 1 ? '1 duty opens a bridge from it.' : n + ' duties open a bridge from it.');
+const usersWords = (n: number) => (n === 1 ? '1 duty opens a team from it.' : n + ' duties open a team from it.');
 
 /** DeletePlaybook asks before it deletes a playbook, and says what a duty that opens a bridge from it does then. */
 function DeletePlaybook({ name, users, onClose, onDone }: { name: string; users: Duty[]; onClose: () => void; onDone: () => void }) {
@@ -464,7 +464,7 @@ function DeletePlaybook({ name, users, onClose, onDone }: { name: string; users:
       {users.length > 0 ? (
         <p>{usersWords(users.length) + (users.length === 1 ? ' It stops until you pick another playbook for it.' : ' They stop until you pick another playbook for them.')}</p>
       ) : (
-        <p>The bridges that it opened stay.</p>
+        <p>The teams that it opened stay.</p>
       )}
     </Confirm>
   );
@@ -531,7 +531,7 @@ function RenamePlaybook({ name, users, onClose }: { name: string; users: Duty[];
     onClose();
     const newTitle = next;
     if (stuck.length) {
-      showError(new Error('Saved the playbook as ' + newTitle + '. ' + listWords(stuck) + (stuck.length === 1 ? ' still opens' : ' still open') + ' a bridge from ' + name + ', so that playbook stays too.'));
+      showError(new Error('Saved the playbook as ' + newTitle + '. ' + listWords(stuck) + (stuck.length === 1 ? ' still opens' : ' still open') + ' a team from ' + name + ', so that playbook stays too.'));
     } else {
       const ok = await attempt(() => removePlaybook(name));
       if (ok) showSaid('Renamed the playbook to ' + newTitle + '.', { label: 'See the playbook', href: bookHref(next) });
@@ -558,7 +558,7 @@ function RenamePlaybook({ name, users, onClose }: { name: string; users: Duty[];
           </span>
         )}
       </Field>
-      {users.length > 0 && <p>{users.length === 1 ? 'The duty that opens a bridge from it moves to the new name.' : 'The ' + users.length + ' duties that open a bridge from it move to the new name.'}</p>}
+      {users.length > 0 && <p>{users.length === 1 ? 'The duty that opens a team from it moves to the new name.' : 'The ' + users.length + ' duties that open a team from it move to the new name.'}</p>}
     </Confirm>
   );
 }

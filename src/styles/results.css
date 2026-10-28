@@ -385,3 +385,8 @@
   font-weight: 700;
   color: var(--ink);
 }
+/* A result of a duty that tells only of what it finds: one bold line above the task. */
+.result-found {
+  margin: 0 0 var(--s-2);
+  font-weight: 700;
+}

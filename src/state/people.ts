@@ -49,7 +49,7 @@ export interface PeopleInput {
 }
 
 /** The title of the group of agents that sit on no bridge. */
-export const NOT_ON_A_BRIDGE = 'Not on a bridge';
+export const NOT_ON_A_BRIDGE = 'Not on a team';
 
 /** newestRun is the id of the newest run of a seat, or "". */
 export const newestRun = (m: Pick<Member, 'runs'>): string => (m.runs && m.runs.length ? m.runs[m.runs.length - 1] : '');

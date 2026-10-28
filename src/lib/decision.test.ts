@@ -87,7 +87,7 @@ describe('valueLine', () => {
 
 describe('verbOf', () => {
   it('names the action in a verb, and Allow only as the fallback', () => {
-    expect(verbOf({ tool: 'front.bridge_open', label: 'Allow' })).toBe('Open bridge');
+    expect(verbOf({ tool: 'front.bridge_open', label: 'Allow' })).toBe('Open team');
     expect(verbOf({ tool: 'front.pages_write', label: 'Allow' })).toBe('Write page');
     expect(verbOf({ tool: 'spawn_task', label: 'Allow' })).toBe('Hand off');
     expect(verbOf({ tool: 'bash', label: 'Run command' })).toBe('Run command');

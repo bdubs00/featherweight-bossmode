@@ -2,6 +2,12 @@
 // workbench: one card per piece of work, from the request to its end.
 //
 //   GET /v1/work?days=7&all=false   {"sentence", "lanes": [{"stage", "count", "yours", "oldest"}], "cards": [<card>], "days"}
+//   POST /v1/work/review            {"bridge", "verdict", "note"}: the check of a team. up closes the bridge with
+//                                   the verdict accepted. down posts the note in the bridge to every seat, and the
+//                                   bridge stays open.
+//   POST /v1/work/letgo             {"card"}: lets a stopped card go. The card moves to Done with the verdict let-go
+//                                   and the reason "Let go by <name>.". Only the person whose move it is, or an
+//                                   owner of its agent, can. A second call does nothing.
 //
 // A card is {"id", "kind", "title", "from": {"kind", "name", "via"}, "stage",
 // "next", "reason", "opened", "since", "ended", "agents", "parts", "links",
@@ -16,7 +22,10 @@
 // the workbench, in short: a bridge is one card, a start of a duty is one
 // card, the items of a batch are one card, and a conversation is one card.
 // A run that only the archive holds and that did not end is stopped and
-// lost. A card that did not end stays however old it is.
+// lost. A card that did not end stays however old it is, until a person
+// lets it go. A duty that tells of a result only when it finds something
+// puts a run whose answer starts with Found: in review, with that line as
+// its reason. A person shows by the name beside the subject, in display.
 
 import { nextOf } from './routes-e.mjs';
 
@@ -32,6 +41,9 @@ const LANE = {
   done: ['is done', 'are done'],
 };
 
+/** The reason of a team whose agents all finished, in plain words. */
+const TEAM_DONE = 'Each agent finished its part. Check the result.';
+
 const plural = (n, one, many) => (n === 1 ? '1 ' + one : n + ' ' + many);
 const ms = (t) => (t ? Date.parse(t) : 0);
 
@@ -42,11 +54,35 @@ function span(d) {
   return plural(Math.floor(d / DAY), 'day', 'days');
 }
 
-/** inReview reports whether a run waits for its owner to check its result: it asked for a check, ended well, and has no reaction. */
+/** The people of the fake by subject: the name beside the subject. A person of Cloudflare Access has an id as the subject. */
+export const PEOPLE = {
+  'alice@example.com': 'Alice',
+  'bob@example.com': 'Bob',
+  'erin@example.com': 'Erin',
+  'fd1e8a14-ac12-5a00-b4d6-bb6e50d15c10': 'Dana Reyes',
+};
+
+/** foundLine is the first line of an answer that starts with Found:, or "". A duty that tells only of what it finds sends such a result. */
+export function foundLine(r) {
+  const first = String((r && r.output) || '')
+    .split('\n')
+    .map((l) => l.trim())
+    .find(Boolean);
+  return first && /^found:/i.test(first) ? first : '';
+}
+
+/**
+ * inReview reports whether a run waits for a person to check its result: it
+ * ended well and has no reaction, and its owner asked to check each result
+ * (the metadata workbench.review), or its duty tells of a result only when
+ * it finds something (workbench.found) and it found something.
+ */
 export function inReview(r) {
   const md = r.metadata || {};
   const re = r.reactions || {};
-  return r.state === 'completed' && md['workbench.review'] === '1' && !(re.up > 0 || re.down > 0 || re.heart > 0);
+  if (r.state !== 'completed' || re.up > 0 || re.down > 0 || re.heart > 0) return false;
+  if (md['workbench.review'] === '1') return true;
+  return md['workbench.found'] === '1' && !!foundLine(r);
 }
 
 /** verdictOf is the verdict of a run that ended well: a person first, then the done check of the agent. */
@@ -75,13 +111,17 @@ function runPart(r) {
     case 'suspended':
       return { ...p, stage: 'working', reason: r.activity && r.activity.tool ? 'Runs ' + r.activity.tool + '.' : 'Works.', since: r.createdAt };
     case 'completed': {
-      if (inReview(r)) return { ...p, stage: 'review', reason: 'A result to check.' };
+      if (inReview(r)) return { ...p, stage: 'review', reason: foundLine(r) || 'A result to check.' };
       const verdict = verdictOf(r);
       const reason = { accepted: 'Accepted.', checked: 'Its done check passed.', 'sent-back': 'Sent back.', unchecked: 'Answered.' }[verdict];
       return { ...p, stage: 'done', reason, verdict };
     }
-    case 'failed':
+    case 'failed': {
+      // A limit of the budget is no fault: the card says which limit stopped it.
+      const limit = /^budget exceeded:?\s*([A-Za-z]+)/.exec(r.error || '');
+      if (limit) return { ...p, stage: 'stopped', reason: 'Stopped at its ' + ({ maxTurns: 'turn', maxTokens: 'token', maxCostUSD: 'cost', maxToolCalls: 'tool call', deadline: 'time' }[limit[1]] || 'budget') + ' limit.' };
       return { ...p, stage: 'stopped', reason: r.error ? 'Failed: ' + String(r.error).slice(0, 200) : 'Failed.' };
+    }
     case 'canceled':
       return { ...p, stage: 'done', reason: 'Canceled.' };
   }
@@ -124,7 +164,7 @@ function settle(card, parts, me) {
   card.stage = top.stage;
   card.reason = top.reason;
   card.since = top.since;
-  if (card.kind === 'bridge' && card.stage === 'review') card.reason = 'The seats ended their turns.';
+  if (card.kind === 'bridge' && card.stage === 'review') card.reason = TEAM_DONE;
   if ((card.kind === 'job' && card.stage !== 'needs-you') || (card.kind === 'bridge' && card.parts.total > 1 && (card.stage === 'working' || card.stage === 'waiting'))) {
     card.reason = partWords(card.parts) || card.reason;
   }
@@ -148,7 +188,7 @@ export function board(S, me, { days = 7, all = false } = {}) {
   for (const b of S.bridges.values()) {
     const ch = S.channels.get(b.id) || [];
     const last = ch.length ? ch[ch.length - 1].at : b.createdAt;
-    const card = blank('bridge:' + b.id, 'bridge', b.title, { kind: 'person', name: b.operatorName || b.operator, via: 'bridge' }, b.createdAt);
+    const card = blank('bridge:' + b.id, 'bridge', b.title, { kind: 'person', name: b.operator, via: 'bridge', ...(PEOPLE[b.operator] ? { display: PEOPLE[b.operator] } : {}) }, b.createdAt);
     card.links.bridge = b.id;
     card.mine = b.operator === me;
     const parts = [];
@@ -188,10 +228,11 @@ export function board(S, me, { days = 7, all = false } = {}) {
         case 'fired':
           break;
         default:
-          parts.push({ ...p, stage: 'review', reason: 'The seats ended their turns.', since: last });
+          parts.push({ ...p, stage: 'review', reason: TEAM_DONE, since: last });
       }
     }
-    if (b.state === 'closed') parts.push({ stage: 'done', reason: 'Closed.', since: b.closedAt || last, verdict: 'unchecked' });
+    // A team that a person checked with Looks right closed as accepted.
+    if (b.state === 'closed') parts.push({ stage: 'done', reason: b.verdict === 'accepted' ? 'Accepted.' : 'Closed.', since: b.closedAt || last, verdict: b.verdict || 'unchecked' });
     if (!parts.length) parts.push({ stage: 'stopped', reason: 'No seat.', since: last });
     card.agents = [...new Set(card.agents)].sort();
     cards.push(settle(card, parts, me));
@@ -260,7 +301,8 @@ export function board(S, me, { days = 7, all = false } = {}) {
     if (!g) {
       const md = r.metadata || {};
       const job = id.startsWith('job:');
-      g = { card: blank(id, job ? 'job' : 'conversation', job ? md['fw.batch'] : r.title || r.agent, { kind: 'person', name: r.principal, via: job ? 'queue' : r.origin === 'mcp' ? 'mcp' : 'page' }, r.createdAt), parts: [] };
+      const via = job ? 'queue' : r.origin === 'mcp' ? 'mcp' : r.origin === 'manager' ? 'manager' : 'page';
+      g = { card: blank(id, job ? 'job' : 'conversation', job ? md['fw.batch'] : r.title || r.agent, { kind: 'person', name: r.principal, via, ...(PEOPLE[r.principal] ? { display: PEOPLE[r.principal] } : {}) }, r.createdAt), parts: [] };
       if (job) g.card.links.batch = md['fw.batch'];
       groups.set(id, g);
     }
@@ -278,6 +320,13 @@ export function board(S, me, { days = 7, all = false } = {}) {
     g.parts.push(p);
   }
   for (const g of groups.values()) cards.push(settle(g.card, g.parts, me));
+
+  // A stopped card that a person let go ends in Done, with the verdict let-go. A card that moved on since then stays where it is.
+  for (const c of cards) {
+    const g = S.letGo && S.letGo.get(c.id);
+    if (!g || c.stage !== 'stopped') continue;
+    Object.assign(c, { stage: 'done', verdict: 'let-go', reason: 'Let go by ' + (g.by === me ? 'you' : g.name) + '.', since: g.at, ended: g.at, next: '' });
+  }
 
   // The board keeps the cards of the person, a card that did not end however old, and a card that ended in the window.
   // A card in review waits for a person, so it stays however old it is.
@@ -311,7 +360,8 @@ function sentence(lanes, n, days, now) {
   return out.join(' ');
 }
 
-export function register({ on, refuse, S }) {
+export function register({ on, refuse, readJson, S, now, AGENTS, admin, viewerOf, publish, post, system, moveSeat }) {
+  S.letGo = S.letGo || new Map();
   on('GET', '/v1/work', (c) => {
     const q = c.url.searchParams;
     const days = q.has('days') ? Number(q.get('days')) : 7;
@@ -319,5 +369,54 @@ export function register({ on, refuse, S }) {
     const all = q.get('all');
     if (all && all !== 'true' && all !== 'false') refuse(400, 'all is true or false');
     return board(S, c.person.subject, { days, all: all === 'true' });
+  });
+
+  // The check of a team: up closes the bridge as accepted, and down posts the note to every seat.
+  on('POST', '/v1/work/review', async (c) => {
+    const body = await readJson(c.req);
+    for (const k of Object.keys(body)) if (!['bridge', 'run', 'verdict', 'note'].includes(k)) refuse(400, `json: unknown field "${k}"`);
+    // The older words right and work still work.
+    const verdict = { right: 'up', work: 'down' }[body.verdict] || body.verdict;
+    const note = String(body.note || '').trim();
+    if (verdict !== 'up' && verdict !== 'down') refuse(400, `verdict is "${verdict}", not up or down`);
+    if (verdict === 'down' && !note) refuse(400, 'Needs work needs a note that says what must change.');
+    if (note.length > 4000) refuse(400, 'the note is at most 4000 bytes of text');
+    if (viewerOf(c.person)) refuse(403, 'checking a result needs the operator role');
+    if (!body.bridge) refuse(400, 'the check of a team names its bridge');
+    const b = S.bridges.get(String(body.bridge));
+    if (!b) refuse(404, `no bridge ${body.bridge}`);
+    if (b.operator !== c.person.subject && !admin()) refuse(403, 'only the person who opened the bridge checks its result');
+    if (b.state !== 'open') refuse(409, `the bridge ${b.id} is closed`);
+    const who = c.person.name.toLowerCase();
+    if (verdict === 'up') {
+      Object.assign(b, { state: 'closed', closedAt: now(), verdict: 'accepted' });
+      system(b.id, 'closed', `${who} checked the result and closed the bridge as accepted.`);
+      return { bridge: b.id, reaction: 'up', followUp: false, closed: true };
+    }
+    const seats = b.members.filter((m) => !m.fired);
+    post(b.id, { kind: 'person', name: c.person.subject, display: c.person.name }, 'Needs work: ' + note, { to: seats.map((m) => m.handle) });
+    for (const m of seats) moveSeat(b.id, m, 'working', { turn: 1, tool: '', phrase: 'Reads the note of ' + c.person.name, since: now() });
+    // The seats work on the note, then end their turns, and the team waits to be checked again.
+    setTimeout(() => {
+      for (const m of seats) if (m.presence === 'working') moveSeat(b.id, m, 'idle', null);
+    }, 5000);
+    return { bridge: b.id, reaction: 'down', followUp: true, closed: false };
+  });
+
+  // Let a stopped card go: the person whose move it is, an admin, or an owner of an agent of the card.
+  on('POST', '/v1/work/letgo', async (c) => {
+    const body = await readJson(c.req);
+    for (const k of Object.keys(body)) if (k !== 'card') refuse(400, `json: unknown field "${k}"`);
+    const id = String(body.card || '');
+    if (!id) refuse(400, 'card names no card');
+    const all = board(S, c.person.subject, { days: 90, all: true });
+    const card = all.cards.find((x) => x.id === id);
+    if (!card) refuse(404, `no card ${id}`);
+    if (card.verdict === 'let-go') return card;
+    if (card.stage !== 'stopped') refuse(409, `the card ${id} is not stopped`);
+    const owns = admin() || card.agents.some((a) => (AGENTS.find((x) => x.name === a) || {}).role === 'owner');
+    if (viewerOf(c.person) || !(card.next === 'you' || owns)) refuse(403, 'only the person whose move it is, or an owner of its agent, can let it go');
+    S.letGo.set(id, { by: c.person.subject, name: PEOPLE[c.person.subject] || c.person.name, at: now() });
+    return board(S, c.person.subject, { days: 90, all: true }).cards.find((x) => x.id === id) || card;
   });
 }

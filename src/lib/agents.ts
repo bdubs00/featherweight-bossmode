@@ -67,6 +67,33 @@ export function mayStart(me: Pick<Whoami, 'admin' | 'canCreate' | 'roles'> | nul
   return me.admin || me.canCreate || roles.length === 0 || roles.some((r) => r === 'owner' || r === 'operator');
 }
 
+type Roles = Pick<Whoami, 'admin' | 'roles'> & { canCreate?: boolean };
+
+/**
+ * viewsOnly reports whether the person only views an agent: the role
+ * viewer on it, and no admin. The front refuses such a person a run and a
+ * message of the agent, so the page offers no composer.
+ */
+export function viewsOnly(me: Roles | null | undefined, agent: string): boolean {
+  return !!me && !me.admin && !!me.roles && me.roles[agent] === 'viewer';
+}
+
+/**
+ * viewsAll reports whether the person views every agent and operates none,
+ * such as a sponsor: roles that name agents, none of them owner or
+ * operator, and no admin. The wiki refuses such a person, so the page reads
+ * no page of the wiki for them. A person whose roles name no agent may, as
+ * the server decides.
+ */
+export function viewsAll(me: Roles | null | undefined): boolean {
+  if (!me || me.admin) return false;
+  const roles = Object.values(me.roles || {});
+  return roles.length > 0 && !roles.some((r) => r === 'owner' || r === 'operator');
+}
+
+/** mayCreateAgent reports whether the person can make an agent: an admin, or a person whom the server lets create one. */
+export const mayCreateAgent = (me: Roles | null | undefined): boolean => !me || !!me.admin || me.canCreate !== false;
+
 /** holdsTask reports whether the fleet view lists a Task of a member: a worker of a pool. */
 export function holdsTask(fleet: Fleet, member: string): boolean {
   return (fleet.pools || []).some((p) => (p.tasks || []).some((t) => member === p.atespace + '/' + t.name || member === t.name));

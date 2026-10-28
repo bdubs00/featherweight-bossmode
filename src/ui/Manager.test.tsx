@@ -141,7 +141,7 @@ describe('the manager', () => {
     const el = mount(<Manager fresh />);
     await settle();
     expect(el.querySelector('#manager-title')!.textContent).toContain('New conversation');
-    expect(el.querySelector('.thread-empty')!.textContent).toBe('Ask about the fleet, or ask for a bridge.');
+    expect(el.querySelector('.thread-empty')!.textContent).toBe('Ask about the fleet, or ask for a team.');
     // A new conversation puts the focus in the message box.
     await vi.waitFor(() => expect(document.activeElement).toBe(el.querySelector('#composer')));
     typeIn(el.querySelector('#composer'), 'Hello');
@@ -258,7 +258,7 @@ describe('the thread', () => {
     const after: Item[] = [...call, { seq: 4, time: T, kind: 'decided', id: 'ap', text: 'allow' }, { seq: 5, time: T, kind: 'result', callId: 'c1', text: 'Opened the bridge br-n "Notes".' }, { seq: 6, time: T, kind: 'assistant', text: 'Open.' }];
     const blocks = blocksOf(after);
     expect(blocks.map((b) => (b.kind === 'item' ? b.it.kind : 'steps'))).toEqual(['user', 'ask', 'decided', 'steps', 'assistant']);
-    expect(blocks[3].kind === 'steps' && blocks[3].steps[0]).toMatchObject({ text: 'Opened the bridge', bridge: 'br-n', target: 'Notes' });
+    expect(blocks[3].kind === 'steps' && blocks[3].steps[0]).toMatchObject({ text: 'Opened the team', bridge: 'br-n', target: 'Notes' });
   });
 
   it('reads a slash command of a known skill, also the skill of a server', () => {

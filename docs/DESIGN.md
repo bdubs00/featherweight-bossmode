@@ -343,7 +343,10 @@ centered, because they are not anyone's voice. Numbers in chips are centered
 in the chip. Nothing is justified.
 
 The places of the app bar, top to bottom: the logo well, Activity, Chat,
-Bridges, Fleet, Duties, Skills, Routines, Wiki, Manager, and the account at the foot. Each place has a 22-pixel
+Teams, Fleet, Duties, Skills, Routines, Wiki, Manager, and the account at the foot.
+The place Teams is the place of the bridges. Its label and its words say
+team, as the card of a team on the board says Team. Its routes and its
+code keep the word bridge (section 11.12). Each place has a 22-pixel
 icon over a 12-pixel label. A narrow window puts the places in a bar at the
 bottom. There each place takes the width of its label, and the account key
 is 44 pixels wide. Under 440 pixels the labels take the condensed width of
@@ -1253,3 +1256,65 @@ for a person who does not tell the greens apart. The tiles name their
 figures in sentence case, and a meta line joins its parts with a comma.
 
 The lights view of Fleet is Lights, at `#board`.
+
+### 11.12 Round 2: the leftovers of the walks
+
+The round 2 contract of 2026-10-28 closes the leftovers of the walks of
+Work and of Results. Section 19.1 of `docs/CONTRACT.md` names the shapes,
+and section 14 of `docs/COPY.md` the words. Nothing here adds a color, a
+radius, a shadow, a type size, or a motion.
+
+- **A team to check.** A team in To check whose next move is the person's
+  holds Needs work and Looks right, as a result of one run does. Its check
+  goes to its bridge. Looks right closes the team as accepted, and Needs
+  work sends the note to every seat. The keys stay secondary, so the
+  board keeps no orange key.
+- **Let it go.** A stopped card of the person, or of an agent that the
+  person owns, holds the secondary key Let it go. The card then ends in
+  Done with the verdict let go and a grey light, because nothing failed
+  and nothing waits. The key asks nothing first: the runs keep their
+  state, and only the card moves.
+- **A name, never an id.** A card names a person by the name beside the
+  subject, so a subject that is an id never shows.
+- **A cost below the cheapest run.** As the person types, a line under the
+  cost says that one run can cost more. It is a line with an amber light,
+  as a line that waits for the person: the light holds still, and the
+  words are ink at the size of meta. Start still works, because a task
+  that stops at the limit can be what the person wants.
+- **The same work.** A plan that names a duty of the person that does the
+  same work says so in one line above the rows, and Open it stands beside
+  Start as a secondary key. Start stays the one orange key.
+- **Change the details.** The editor opens on the whole plan of the door,
+  with the cost that the person typed, and its first line says From the
+  door, in the muted words of a line of the form.
+- **Activity.** A decision of a duty on no bridge reads its run, so its
+  card names the call, as the board does. The card of a result that found
+  something says so in one bold line above the task.
+- **The headings of an answer.** An answer inside a card starts its
+  headings below the title of the card, an h3. The page moves every
+  heading of the answer down by the same steps. Thus an h2 of an agent
+  becomes an h4 at 15 pixels and weight 700. The h5 and the h6 take the
+  look of the h4.
+- **The page of a duty.** The line of a run that the address opens comes
+  to the top of the pane, and stays there while the page settles, until
+  the person scrolls, types, or touches the pane. Only the pane scrolls,
+  so the header of the pane stays in sight. A result says its
+  verdict with the light of the board: to check (amber, still), accepted
+  (green), sent back (red), or unchecked (grey).
+- **A run at a limit of its budget.** A limit is no fault: the run says at
+  its limit with a grey light, as a seat does, and its conversation drops
+  the red line of a failed turn. A chat or a conversation with an agent
+  ends on the quiet line of the limit. Under it, in the middle of the
+  thread as a system line, stands the secondary key Continue with more
+  room. A limit of
+  cost shows a field for the most it can cost, and the page fills no
+  amount.
+- **A person who only views.** The page shows no key that the server
+  refuses. The conversation of an agent that the person only views has no
+  composer. There is no New agent, no New, no Open a team, and no New
+  duty. A duty that the person cannot change has no Run now. The profile
+  reads no page of the wiki for a person whom the wiki refuses.
+- **A count beside a short title.** On a phone, a main title with a count
+  takes the width of its words, up to most of the header, so the count
+  stays beside a short title such as Work. A long title still wraps to two
+  lines.

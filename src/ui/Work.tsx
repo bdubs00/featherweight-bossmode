@@ -7,8 +7,12 @@
 // it is, who asked, why it stands where it stands, and since when. A card
 // whose next move is the person's says Your move, and a card that the
 // manager decides says Manager decides. A done card says its verdict:
-// accepted, checked, sent back, or unchecked. Done shows its newest cards
-// and the key Show all. A card To check offers Looks right and Needs work.
+// accepted, checked, sent back, unchecked, or let go. Done shows its
+// newest cards and the key Show all. A card To check offers Looks right and
+// Needs work, also a team, whose check goes to its bridge. A stopped card
+// offers Let it go to the person whose move it is and to an owner of its
+// agent: the card then ends in Done. A person shows by the name beside the
+// subject, so a subject that is an id never shows.
 // The card opens the place that holds the work: for a decision or a result
 // of the person, the card in Activity that ends it. Each lane is one stop
 // of the Tab key: ArrowUp and ArrowDown move between its cards, and
@@ -18,7 +22,7 @@
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
-import type { WorkBoard, WorkCard, WorkStage, WorkVerdict } from '../api/types';
+import type { Whoami, WorkBoard, WorkCard, WorkStage, WorkVerdict } from '../api/types';
 import { list, personName, since } from '../lib/words';
 import { nextShort, titleOfName } from '../lib/duties';
 import { hrefOf } from '../lib/route';
@@ -26,7 +30,8 @@ import { store, useSelect } from '../state/store';
 import { useDutyLabel } from '../state/duties';
 import { Door, mayStartWork, type Started } from './Door';
 import { ResultKeys } from './ResultKeys';
-import { focusLost, smooth, useRoving } from './keys';
+import { attempt, showSaid } from './notice';
+import { focusLost, holdFocus, smooth, useRoving } from './keys';
 import { Button, Chip, Led, PaneHeader } from './primitives';
 import type { Tone } from '../lib/presence';
 
@@ -46,6 +51,8 @@ export const VERDICTS: Record<WorkVerdict, { word: string; tone: Tone }> = {
   checked: { word: 'checked', tone: 'green' },
   'sent-back': { word: 'sent back', tone: 'red' },
   unchecked: { word: 'unchecked', tone: 'grey' },
+  // A person let a stopped card go: the board shows the word, and Results does not count it.
+  'let-go': { word: 'let go', tone: 'grey' },
 };
 
 /** The word of each kind of card. */
@@ -109,7 +116,8 @@ export function fromWords(c: WorkCard, me: string | string[] = []): string {
       return name;
     default: {
       const mine = f.kind === 'person' && isMe(name, mine_);
-      const who = mine ? 'You' : f.kind === 'person' ? personName(name) : name;
+      // The name beside the subject, so a subject that is an id never shows.
+      const who = mine ? 'You' : f.kind === 'person' ? f.display || personName(name) : name;
       if (f.via === 'manager') return 'Manager for ' + (mine ? 'you' : who);
       if (f.via === 'mcp') return who + ' in an MCP client';
       return who;
@@ -126,6 +134,45 @@ export function labelOfCard(c: WorkCard): string {
   if (c.lost) parts.push('lost');
   if (c.reason) parts.push(c.reason);
   return parts.join(', ');
+}
+
+/**
+ * mayLetGo reports whether the person can let a stopped card go: the person
+ * whose move it is, an admin, and an owner of an agent of the card, as the
+ * front decides it (docs/CONTRACT.md, section 19).
+ */
+export function mayLetGo(c: WorkCard, me: Pick<Whoami, 'admin' | 'roles'> | null | undefined): boolean {
+  if (c.stage !== 'stopped') return false;
+  if (c.next === 'you') return true;
+  if (!me) return false;
+  return !!me.admin || c.agents.some((a) => !!me.roles && me.roles[a] === 'owner');
+}
+
+/** LetGo is the key of a stopped card that ends it in Done with the verdict let go. */
+function LetGo({ c, onDone }: { c: WorkCard; onDone: () => void }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <div class="result-keys">
+      <Button
+        size="s"
+        aria-label={'Let it go: ' + c.title}
+        aria-disabled={busy || undefined}
+        onClick={async () => {
+          if (busy) return;
+          setBusy(true);
+          const after = holdFocus();
+          const ok = await attempt(() => api.letGo(c.id));
+          setBusy(false);
+          if (!ok) return;
+          showSaid('Let go: ' + c.title + '.');
+          onDone();
+          after();
+        }}
+      >
+        Let it go
+      </Button>
+    </div>
+  );
 }
 
 /** The time between two reads of the board, in milliseconds. */
@@ -177,12 +224,13 @@ function whoWords(c: WorkCard, label: string, faces: Record<string, { displayNam
   return list(c.agents.slice(0, 2).map((a) => (faces[a] && faces[a].displayName) || titleOfName(a)));
 }
 
-function CardView({ c, now, onDecided }: { c: WorkCard; now: number; onDecided: () => void }) {
+function CardView({ c, now, onDecided }: { c: WorkCard; now: number; onDecided: (stage: WorkStage) => void }) {
   // A card of a duty names the duty by its title, once the page reads the duties.
   const duty = useDutyLabel(c.from && c.from.kind === 'duty' ? c.from.name || '' : '');
   const subject = useSelect((s) => (s.me && s.me.principal ? s.me.principal.subject : ''));
   const signin = useSelect((s) => (s.me && s.me.principal ? s.me.principal.name || '' : ''));
   const faces = useSelect((s) => s.faces);
+  const me = useSelect((s) => s.me);
   const total = c.parts && c.parts.total > 1 ? c.parts.total : 0;
   const verdict = c.stage === 'done' && c.verdict ? VERDICTS[c.verdict] : null;
   const run = c.links.run;
@@ -208,13 +256,16 @@ function CardView({ c, now, onDecided }: { c: WorkCard; now: number; onDecided: 
         {total > 0 && <span>{total + (c.kind === 'bridge' ? ' agents' : ' parts')}</span>}
       </span>
       {/* Only the person whose move it is checks a result: another person, or a viewer under Everyone, reads it only.
-          A bridge to check has no one result: its operator reads the channel, then closes it or gives a new task (as a4ce6cb of drive/flow). */}
-      {c.stage === 'review' && c.next === 'you' && run && c.kind !== 'bridge' && <ResultKeys run={run} title={c.title} size="s" onDone={onDecided} />}
+          A team has no one result: its check goes to its bridge, which Looks right closes and Needs work keeps open with the note. */}
+      {c.stage === 'review' && c.next === 'you' && (c.kind === 'bridge' ? !!c.links.bridge : !!run) && (
+        <ResultKeys run={c.kind === 'bridge' ? undefined : run} bridge={c.kind === 'bridge' ? c.links.bridge : undefined} title={c.title} size="s" onDone={() => onDecided(c.stage)} />
+      )}
+      {mayLetGo(c, me) && <LetGo c={c} onDone={() => onDecided(c.stage)} />}
     </div>
   );
 }
 
-function LaneView({ stage, cards, count, oldest, now, onDecided }: { stage: WorkStage; cards: WorkCard[]; count: number; oldest?: string; now: number; onDecided: () => void }) {
+function LaneView({ stage, cards, count, oldest, now, onDecided }: { stage: WorkStage; cards: WorkCard[]; count: number; oldest?: string; now: number; onDecided: (stage: WorkStage) => void }) {
   const lane = LANES[stage];
   const id = 'lane-' + stage;
   // The lane is one stop of the Tab key. The arrows move between its cards.
@@ -305,7 +356,7 @@ function Follow({ board, made }: { board: WorkBoard | null; made: Started['made'
   );
 }
 
-/** WorkBoardView is the board of six lanes. onDecided reads the board again after Looks right or Needs work, and onRetry after a failed read. */
+/** WorkBoardView is the board of six lanes. onDecided reads the board again after Looks right, Needs work, or Let it go, with the lane of the card, and onRetry after a failed read. */
 export function WorkBoardView({
   board,
   failed,
@@ -317,7 +368,7 @@ export function WorkBoardView({
 }: {
   board: WorkBoard | null;
   failed: boolean;
-  onDecided: () => void;
+  onDecided: (stage: WorkStage) => void;
   onRetry?: () => void;
   /** True when the board shows only the tasks of the person, not of everyone. */
   mine?: boolean;
@@ -399,12 +450,13 @@ export function Work() {
   const setAll = (x: boolean) => setPick(x);
   const [again, setAgain] = useState(0);
   const { board, failed, reload } = useBoard(all, again);
-  // After Looks right or Send back, the card leaves To check. The focus then stays in that lane.
-  const decided = useRef(false);
+  // After Looks right, Send back, or Let it go, the card leaves its lane. The focus then stays in that lane.
+  const decided = useRef<WorkStage | ''>('');
   useEffect(() => {
     if (!decided.current || !board) return;
-    decided.current = false;
-    if (focusLost()) jumpTo('review', false);
+    const lane = decided.current;
+    decided.current = '';
+    if (focusLost()) jumpTo(lane, false);
   }, [board]);
   const open = board ? board.lanes.filter((l) => l.stage !== 'done').reduce((n, l) => n + l.count, 0) : 0;
   return (
@@ -437,8 +489,8 @@ export function Work() {
           <WorkBoardView
             board={board}
             failed={failed}
-            onDecided={() => {
-              decided.current = true;
+            onDecided={(stage) => {
+              decided.current = stage;
               reload();
             }}
             onRetry={reload}

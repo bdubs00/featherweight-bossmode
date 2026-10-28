@@ -75,7 +75,7 @@ describe('NewBridge', () => {
     click(migrator());
     click(migrator());
     click(el.querySelector('input[value="spawn"]'));
-    click(keyNamed(el, 'Open bridge'));
+    click(keyNamed(el, 'Open team'));
     await settle();
     const post = api.calls.find((c) => c.method === 'POST')!;
     expect(post.body).toEqual({
@@ -100,7 +100,7 @@ describe('NewBridge', () => {
     expect((el.querySelector('input[value="queue"]') as HTMLInputElement).checked).toBe(true);
     typeIn(el.querySelector('textarea'), 'Migrate logrotate.');
     click(el.querySelector('input[value="spawn"]'));
-    click(keyNamed(el, 'Open bridge'));
+    click(keyNamed(el, 'Open team'));
     expect((el.querySelector('details.advanced') as HTMLDetailsElement).open).toBe(true);
     expect([...el.querySelectorAll('[role="alert"]')].map((x) => x.textContent)).toContain('A fresh sandbox per seat needs a manager. Pick keep warm workers, or set up a manager.');
   });
@@ -108,9 +108,9 @@ describe('NewBridge', () => {
   it('says what is missing in the words of the copy', () => {
     api = fakeApi({});
     const el = mount(<NewBridge />);
-    click(keyNamed(el, 'Open bridge'));
+    click(keyNamed(el, 'Open team'));
     const alerts = [...el.querySelectorAll('[role="alert"]')].map((x) => x.textContent);
-    expect(alerts).toContain('Write the goal of the bridge.');
+    expect(alerts).toContain('Write the goal of the team.');
     expect(alerts).toContain('Member 1 needs an agent.');
     // The form reads the playbooks of the person, and sends nothing.
     expect(api.calls.filter((c) => c.method !== 'GET')).toEqual([]);
@@ -123,7 +123,7 @@ describe('NewBridge', () => {
     click([...el.querySelectorAll('input[name="mode"]')][1]);
     expect(el.querySelector('.pick-anchor')).toBeNull();
     // The key says what it does on this path: the manager plans the seats, and no bridge opens yet.
-    expect(keyNamed(el, 'Open bridge')).toBeUndefined();
+    expect(keyNamed(el, 'Open team')).toBeUndefined();
     click(keyNamed(el, 'Ask the manager'));
     await settle();
     const start = api.calls.find((c) => c.method === 'POST')!;
@@ -186,9 +186,9 @@ describe('the draft and the errors of the form', () => {
     const el = mount(<NewBridge />);
     click(keyNamed(el, 'Add a seat'));
     click(migrator(el));
-    click(keyNamed(el, 'Open bridge'));
+    click(keyNamed(el, 'Open team'));
     await settle();
-    expect(alerts(el)).toEqual(['Write the goal of the bridge.', 'Member 1 needs a task.']);
+    expect(alerts(el)).toEqual(['Write the goal of the team.', 'Member 1 needs a task.']);
     // A missing task is no fault of the handle: Advanced stays shut, and the task alone shows red.
     expect((el.querySelector('details.advanced') as HTMLDetailsElement).open).toBe(false);
     expect(el.querySelector('input[aria-label="Task of migrator"]')!.getAttribute('aria-invalid')).toBe('true');
@@ -207,7 +207,7 @@ describe('the draft and the errors of the form', () => {
     expect(sessionStorage.getItem(DRAFT_KEY)).not.toBeNull();
     click(keyNamed(el, 'Cancel'));
     const dialog = el.querySelector('dialog.confirm')!;
-    expect(dialog.querySelector('h2')!.textContent).toBe('Throw away this bridge?');
+    expect(dialog.querySelector('h2')!.textContent).toBe('Throw away this team?');
     click(keyNamed(dialog, 'Throw away'));
     expect(sessionStorage.getItem(DRAFT_KEY)).toBeNull();
     expect(location.hash).toBe('');

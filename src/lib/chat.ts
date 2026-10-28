@@ -30,7 +30,7 @@ export const CONTINUES_KEY = 'workbench.continues';
  * was replaced says closed, because it takes no further message. The other
  * states keep the words of runStatus.
  */
-export function chatStatus(r: Pick<Run, 'state' | 'output'> & Partial<Pick<Run, 'input' | 'title' | 'archived'>>): Light {
+export function chatStatus(r: Pick<Run, 'state' | 'output'> & Partial<Pick<Run, 'input' | 'title' | 'archived' | 'error'>>): Light {
   if (r.archived && r.state !== 'failed') return { word: 'closed', tone: 'grey', label: 'Closed when its agent restarted. You can read it.' };
   if (r.state === 'completed') {
     if (r.output) return { word: 'answered', tone: 'grey', label: 'Answered. Your next message follows up.' };
