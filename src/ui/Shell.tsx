@@ -377,8 +377,8 @@ function MoreMenu({ items, dot }: { items: PlaceItem[]; dot?: boolean }) {
  * account. With work, a wide window shows five places and the key More,
  * which opens every place in the bar and then says Fewer. It is a
  * disclosure: it says whether it is open, and Escape on it folds the
- * places back. A phone opens More as a menu. onReach opens Where to reach me. place is the place to light,
- * when the route alone does not say it.
+ * places back. A phone opens More as a menu. onReach opens Where to reach
+ * me. place is the place to light, when the route alone does not say it.
  */
 export function AppBar({ route, place: placeProp, onSignOut, onReach }: { route: Route; place?: Place; onSignOut: () => void; onReach: () => void }) {
   const place = placeProp || placeOf(route);
