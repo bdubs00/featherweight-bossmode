@@ -34,7 +34,8 @@ export interface TaskTemplate {
 
 /** The templates of the door, in plain words. A deployment could name its own. */
 export const TEMPLATES: TaskTemplate[] = [
-  { label: 'A weekly summary of competitors', words: 'Every Monday at 9am, sum up what our competitors Acme and Globex shipped last week.' },
+  // A template names no company: a person who keeps the words as they are gets a summary of their own competitors, not of made-up ones.
+  { label: 'A weekly summary of competitors', words: 'Every Monday at 9am, sum up what our competitors shipped last week.' },
   { label: 'A draft, reviewed before it goes out', words: 'Write the launch email for our new pricing, have it reviewed, and show me before it goes out.' },
   { label: 'A nightly check of hosts', words: 'Every night, check the web hosts for drift from their Ansible roles. Tell me only when something drifted.' },
   { label: 'A big job, split across agents', words: 'Split the migration of the remaining Puppet modules to Ansible across 3 agents, with a review and a test of each part.' },

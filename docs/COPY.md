@@ -1156,6 +1156,7 @@ The page never shows pool, member, job, run id, or Task in these places.
 | the door for a person who can start no task, such as a viewer of every agent | change | no door, and the line `You can follow the work here. Only an owner or an operator of an agent can start a task.` | ux walk |
 | the name of an agent without a face in the readback, such as `writer does it` | change | the name with a capital, `Writer does it`, as the rest of the page names an agent | ux walk |
 | `Someone else` only for a task of one agent | change | also for a team: the plan then gives the shares to the agent that the person picks | ux walk |
+| the words of the template `A weekly summary of competitors`: `... what our competitors Acme and Globex shipped ...` | change | `Every Monday at 9am, sum up what our competitors shipped last week.`, with no made-up company | ux walk |
 | `Next: <time>, <time>` | change | `Next: <time>; <time>`, because each time holds a comma | ux walk |
 
 ### src/ui/Work.tsx
