@@ -116,6 +116,10 @@
   color: var(--ink);
   text-decoration: none;
 }
+/* A card that the arrows bring into view stops below the head of its lane, which stays on top. */
+.work-lane .work-title {
+  scroll-margin-top: calc(var(--h-header) + var(--s-2));
+}
 /* The whole card opens its place: the link of the title covers the card,
    and the keys of a result to check sit above it. */
 .work-title::after {
