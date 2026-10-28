@@ -78,6 +78,15 @@
   text-decoration: none;
 }
 
+/* A status line in a tile wraps, so a long count such as 245 runs without a price stays whole on a phone. */
+.rs-tile .status {
+  white-space: normal;
+  align-items: flex-start;
+}
+.rs-tile .status .led {
+  margin-top: 4px;
+}
+
 /* A bar of parts: thin, with a gap of the surface between two parts. */
 .rs-bar {
   display: flex;

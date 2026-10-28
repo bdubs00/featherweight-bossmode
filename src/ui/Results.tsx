@@ -85,6 +85,17 @@ export function periodWords(p: { start: string; end: string }, unit: 'day' | 'we
   return { label, short: days < 1 ? 'under a day' : days === 1 ? '1 day' : days + ' days' };
 }
 
+/**
+ * firstWork names the start of the first period with work when periods
+ * before it hold none, such as an archive that began 2 weeks ago in a
+ * window of 90 days. A sponsor then reads why 30 and 90 days agree.
+ */
+export function firstWork(v: Pick<Value, 'periods' | 'work'>): string {
+  if (!v.work.pieces) return '';
+  const i = v.periods.findIndex((p) => p.done + p.failed + p.sentBack + p.unchecked + p.accepted > 0 || p.usd > 0);
+  return i > 0 ? day(v.periods[i].start) : '';
+}
+
 /** lineHref is the address of what a line of work is: the page of its duty, or the profile of its agent. A source has no page. */
 export function lineHref(l: Pick<ValueLine, 'kind' | 'name' | 'agent'>): string {
   if (l.kind === 'duty') return hrefOf({ place: 'duties', name: l.name });
@@ -158,6 +169,7 @@ function Body({ v, onSaved }: { v: Value; onSaved: () => void }) {
       </p>
       <p class="rs-span t-meta">
         <time dateTime={v.since}>{day(v.since)}</time> to <time dateTime={v.until}>{day(v.until)}</time>
+        {firstWork(v) && <span>Nothing before {firstWork(v)}</span>}
         {v.partial && (
           <>
             {' '}
@@ -238,7 +250,7 @@ function Figures({ v, unit, toCheck, mine, measured, onSaved }: { v: Value; unit
           help="A done task needed nobody when no person decided for it or wrote to it after the ask. A decision that the manager or a timeout made is no action of a person. A thumb on the result afterwards does not count either."
         >
           <p class="t-meta">
-            {v.people.actions === 1 ? '1 action of a person' : v.people.actions.toLocaleString() + ' actions of people'}, {v.people.reworked} sent back with a message
+            {v.people.actions === 1 ? '1 action of a person' : v.people.actions.toLocaleString() + ' actions of people'}, {v.people.reworked} followed up after they ended
             {(v.people.handled || 0) > 0 && <>, {v.people.handled} {v.people.handled === 1 ? 'decision' : 'decisions'} without a named person</>}
           </p>
           {mine.length > 0 ? (
@@ -518,10 +530,9 @@ function Lines({ lines, onSaved }: { lines: ValueLine[]; onSaved: () => void }) 
             <td class="num narrow-hide">{l.work.done ? pct(l.noPerson / l.work.done) : ''}</td>
             <td class="num narrow-hide">{l.medianLeadSeconds ? span(l.medianLeadSeconds) : ''}</td>
             <td class="num phone-hide">
-              {l.unpriced > 0 && <span class="t-meta rs-lead-line">at least</span>}
-              {costText(l.usd)}
+              <LineSpend usd={l.usd} unpriced={l.unpriced} />
             </td>
-            <td class="num narrow-hide">{l.work.done ? costText(l.perDone) : ''}</td>
+            <td class="num narrow-hide">{l.work.done ? <LineSpend usd={l.perDone} unpriced={l.unpriced} each /> : ''}</td>
             <td class="phone-hide">
               <Estimate line={l} owner={owner(l.agent)} onSaved={onSaved} />
             </td>
@@ -530,6 +541,29 @@ function Lines({ lines, onSaved }: { lines: ValueLine[]; onSaved: () => void }) 
       </tbody>
     </table>
     </div>
+  );
+}
+
+/**
+ * LineSpend is the spend of a line, or of one of its tasks. With runs that
+ * have no price, a figure of a cent or more says at least, and a smaller
+ * one says nothing it cannot back: the spend says no price when nothing
+ * had a price, and the cost of a task says unknown.
+ */
+export function LineSpend({ usd, unpriced, each }: { usd: number; unpriced: number; each?: boolean }) {
+  if (unpriced <= 0) return <>{costText(usd)}</>;
+  const title = unpriced === 1 ? '1 run without a price' : unpriced + ' runs without a price';
+  if (usd >= 0.01)
+    return (
+      <span title={title}>
+        <span class="t-meta rs-lead-line">at least</span>
+        {costText(usd)}
+      </span>
+    );
+  return (
+    <span class="t-meta" title={title}>
+      {each ? 'unknown' : usd > 0 ? 'under $0.01, more without a price' : 'no price'}
+    </span>
   );
 }
 

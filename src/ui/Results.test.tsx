@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { act } from 'preact/test-utils';
 import type { Value } from '../api/value';
-import { Results, hours, lineHref, pct, periodWords, span } from './Results';
+import { LineSpend, Results, firstWork, hours, lineHref, pct, periodWords, span } from './Results';
 import { forgetDuties } from '../state/duties';
 import { fakeFetch, mount, seedFleet, unmountAll, type Call } from './testkit-b';
 
@@ -207,7 +207,7 @@ describe('Results', () => {
     over = { people: { actions: 5, noPerson: 9, reworked: 1, waitSeconds: 7200, waitingNow: 0, handled: 3 } };
     const box = mount(<Results />);
     await flush();
-    expect(box.textContent).toContain('5 actions of people, 1 sent back with a message, 3 decisions without a named person');
+    expect(box.textContent).toContain('5 actions of people, 1 followed up after they ended, 3 decisions without a named person');
     expect(box.textContent).not.toContain('waiting for');
   });
 
@@ -232,6 +232,27 @@ describe('Results', () => {
     over = { people: { actions: 1, noPerson: 9, reworked: 1, waitSeconds: 0, waitingNow: 0, handled: 0 } };
     const box = mount(<Results />);
     await flush();
-    expect(box.textContent).toContain('1 action of a person, 1 sent back with a message');
+    expect(box.textContent).toContain('1 action of a person, 1 followed up after they ended');
+  });
+
+  it('says no price, unknown, or at least for a line with runs without a price, and never at least under $0.01', () => {
+    const text = (n: preact.ComponentChildren) => {
+      const b = mount(<>{n}</>);
+      return b.textContent;
+    };
+    expect(text(<LineSpend usd={0} unpriced={39} />)).toBe('no price');
+    expect(text(<LineSpend usd={0.004} unpriced={3} />)).toBe('under $0.01, more without a price');
+    expect(text(<LineSpend usd={0.27} unpriced={60} />)).toBe('at least$0.27');
+    expect(text(<LineSpend usd={0.002} unpriced={60} each />)).toBe('unknown');
+    expect(text(<LineSpend usd={0.04} unpriced={0} each />)).toBe('$0.04');
+  });
+
+  it('says that nothing came before the first period with work', () => {
+    const empty = { start: '2026-10-07T04:00:00Z', end: '2026-10-14T04:00:00Z', done: 0, accepted: 0, checked: 0, sentBack: 0, unchecked: 0, failed: 0, usd: 0 };
+    const full = { ...empty, start: '2026-10-14T12:00:00Z', end: '2026-10-21T12:00:00Z', done: 225, unchecked: 225 };
+    const work = { pieces: 225, done: 225, failed: 0, stopped: 0, open: 0 };
+    expect(firstWork({ periods: [empty, full], work })).toBe('Oct 14');
+    expect(firstWork({ periods: [full, empty], work })).toBe('');
+    expect(firstWork({ periods: [empty, empty], work: { ...work, pieces: 0 } })).toBe('');
   });
 });

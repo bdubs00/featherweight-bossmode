@@ -1200,6 +1200,9 @@ The page never shows pool, member, job, run id, or Task in these places.
 | `48 min waiting on people, 0% of all the time to done` | change | `0% of the time to done waited on people`, then `1 h 3 min of waits on people in all, 3 still open` | drive/ux-results |
 | `<n> failed` for the failed and stopped tasks of a line | change | `<n> failed`, `<n> stopped`, and `<n> lost`, each on its own | drive/ux-results |
 | `1 actions of people` | change | `1 action of a person` | drive/ux-results |
+| `<n> sent back with a message` (people.reworked) | change | `<n> followed up after they ended`: on the lab, 35 follow-ups stood beside 3 tasks sent back | drive/ux-results |
+| `at least under $0.01`, `at least $0.00` (a line with runs without a price) | change | `no price` when nothing had a price, `under $0.01, more without a price`, `at least $0.27` from a cent, and `unknown` for the cost of one task | drive/ux-results |
+| new | add | `Nothing before Oct 14` beside the window, when the first periods hold no work | drive/ux-results |
 | new | add | `About Done`: what a task is. `About Spend`: what coordination is and why the spend says at least. `About Time to done` also says what the median and the bar count. | drive/ux-results |
 
 ### src/ui/Duties.tsx, src/ui/DutyEditor.tsx, src/lib/duties.ts
