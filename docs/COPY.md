@@ -1150,6 +1150,9 @@ The page never shows pool, member, job, run id, or Task in these places.
 | new | add | `Each result`, `Only when it finds something`, and `Only when it fails` | integration |
 | new | add | the errors `Say what you need done.`, `Say the most that one run can cost, such as 0.50.`, and `Say the most that the whole team can spend, such as 5.00.` | integration |
 | new | add | `Change the details` and `Start`, then `Set. <readback>` or `Started. <agents> work on it now.` with `Open it` | integration |
+| the notice `Set. <readback>` with `Open it` after Start | remove | the quiet card in place of the readback says it once and takes the focus. The notice said it a second time and followed the person into the next place. | ux walk |
+| `What it can cost` as the third row | change | the last row, beside Start, after `It cannot` | ux walk |
+| `Next: <time>, <time>` | change | `Next: <time>; <time>`, because each time holds a comma | ux walk |
 
 ### src/ui/Work.tsx
 
@@ -1160,6 +1163,11 @@ The page never shows pool, member, job, run id, or Task in these places.
 | new | add | the lanes `Coming up`, `Working`, `Needs you`, `Stopped`, `To check`, and `Done`, each with a count such as `3 tasks` | integration |
 | new | add | the kinds `Chat`, `Team`, `Duty`, `Batch`, and `Event` | integration |
 | new | add | the tags `Yours`, `Manager`, and `Lost` | integration |
+| `Yours` and `Manager` | change | `Your move` and `Manager decides`. In the view of the person every card is theirs, so `Yours` read as an owner, not as whose move it is. | ux walk |
+| new | add | the line on top of Work: `1 task needs you` or `<n> tasks need you`, `1 result to check` or `<n> results to check`, `<n> stopped`, `<n> working`, and `Nothing waits for you.` | ux walk |
+| the name of the person on a card of the person, such as `alice` | change | `You`, and `Manager for you` | ux walk |
+| the name of a duty under a card whose title is that name | change | the agent that does it, such as `Scribe` | ux walk |
+| new | add | `Show all <n>` and `Show fewer` under Done, and `Try again` beside `The board did not load.` | ux walk |
 | new | add | the verdicts of a done card: `accepted`, `checked`, `sent back`, and `unchecked` | integration |
 | new | add | the parts of a card: `5 agents` for a team, `12 parts` for the rest | integration |
 | new | add | `Loading the board.` and `The board did not load.` | integration |

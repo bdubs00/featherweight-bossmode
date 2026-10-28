@@ -52,8 +52,14 @@ const SIGNOFF = /\b(before it goes out|before it is sent|show me|let me (?:see|c
 const TEAM = /\b(split|across|in parallel|several agents|\d+ agents|team)\b/;
 const FOUND = /\b(drift\w*|only when|watch|alert|anything (?:new|changed)|something (?:changed|drifted))\b/;
 
-/** slug makes a name of a duty from words: a-z, 0-9, and hyphens, at most 40 characters. */
-const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40).replace(/-+$/, '') || 'task';
+/** slug makes a name of a duty from words: a-z, 0-9, and hyphens, at most 40 characters, cut between two words. */
+const slug = (s) => {
+  const all = s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  if (all.length <= 40) return all || 'task';
+  const cut = all.slice(0, 41);
+  const end = cut.lastIndexOf('-');
+  return (end > 0 ? cut.slice(0, end) : all.slice(0, 40)).replace(/-+$/, '') || 'task';
+};
 
 /** titleOf makes a short title of the words: the first clause, without the schedule, with a capital. */
 function titleOf(words, said) {

@@ -29,6 +29,15 @@
   padding-bottom: var(--s-2);
   border-bottom: 2px solid var(--ink);
 }
+/* A long lane keeps its head in sight while the pane scrolls, on the ground
+   of the pane. The head sits over the cards that pass under it, so it takes
+   the first step of the stack, below every layer of section 4.6. */
+.work-lane > .work-lane-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--paper);
+}
 .work-lane-head h3 {
   margin: 0;
   font-size: var(--t-meta);
@@ -48,6 +57,7 @@
   gap: var(--s-2);
 }
 .work-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--s-1);
@@ -106,8 +116,39 @@
   color: var(--ink);
   text-decoration: none;
 }
+/* The whole card opens its place: the link of the title covers the card,
+   and the keys of a result to check sit above it. */
+.work-title::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+.work-card:hover .work-title,
 .work-title:hover {
   text-decoration: underline;
+}
+.work-card .result-keys,
+.work-card .result-note {
+  position: relative;
+  z-index: 1;
+}
+/* Show all of Done sits under its newest cards. */
+.work-all {
+  align-self: flex-start;
+}
+/* The line on top of Work: what waits for the person, and what works. */
+.work-glance {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-1) var(--s-2);
+  margin-top: calc(-1 * var(--s-2));
+}
+.work-glance > p {
+  margin: 0 var(--s-2) 0 0;
+}
+.work-glance .status {
+  font-size: var(--t-control);
 }
 .work-reason {
   font-size: var(--t-meta);

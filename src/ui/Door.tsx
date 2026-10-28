@@ -1,16 +1,17 @@
 // The door of the Work place: one field for what a person needs done. The
 // person says the task in words, or starts from a template in words. Read
 // it back asks the server for a plan (POST /v1/work/plan), and the page
-// shows it before anything starts: who does it, when, what it can cost,
-// what it asks you, what it never bothers you with, when you hear of it,
-// where the result lands, and what it cannot do. The plan never names a
-// cost, so Start refuses until the person types the most that a run can
-// cost.
+// shows it before anything starts: who does it, when, what it asks you,
+// what it never bothers you with, when you hear of it, where the result
+// lands, what it cannot do, and last, beside Start, what it can cost. The
+// plan never names a cost, so Start refuses until the person types the most
+// that a run can cost.
 //
 // Start sends the record of the plan to a route that exists already: a
 // duty for a task that repeats, a bridge for a team, and a run for a task
 // that runs once. The person never picks among duty, bridge, run, or chat.
-// The board under the door (Work.tsx) then shows the new task.
+// The board under the door (Work.tsx) then shows the new task, and a quiet
+// card in place of the readback says what Start made and takes the focus.
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
@@ -21,7 +22,7 @@ import { nextWords } from '../lib/duties';
 import { list } from '../lib/words';
 import { loadDuties } from '../state/duties';
 import { loadBridges } from '../state/actions';
-import { showError, showSaid } from './notice';
+import { showError } from './notice';
 import { Button, Card, Choices, Field, Input, LineLed, Mark, TextArea } from './primitives';
 
 /** A template: a label that names the work, and words that the person changes before Read it back. */
@@ -190,36 +191,7 @@ function Readback({ plan, onPlan, onStarted, busy }: { plan: TaskPlan; onPlan: (
           <dt>When</dt>
           <dd>
             <p>{plan.when.readback}</p>
-            {plan.when.next.length > 0 && <p class="t-meta">Next: {plan.when.next.map((t) => nextWords(t)).join(', ')}</p>}
-          </dd>
-        </div>
-        <div class="rb-row">
-          <dt>What it can cost</dt>
-          <dd>
-            <Field label={team ? 'The most the whole team can spend' : 'The most one run can cost'} error={error} id="rb-cost">
-              <span class="rb-money">
-                <span aria-hidden="true">$</span>
-                <Input
-                  ref={field}
-                  inputMode="decimal"
-                  value={cost}
-                  invalid={!!error}
-                  aria-describedby={error ? 'rb-cost-error' : undefined}
-                  onInput={(e) => {
-                    setCost((e.target as HTMLInputElement).value);
-                    setError('');
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      start();
-                    }
-                  }}
-                />
-              </span>
-            </Field>
-            {plan.cost.basis && <p class="t-meta">{plan.cost.basis}</p>}
-            {monthWords(plan, n) && <p class="t-meta">{monthWords(plan, n)}</p>}
+            {plan.when.next.length > 0 && <p class="t-meta">Next: {plan.when.next.map((t) => nextWords(t)).join('; ')}</p>}
           </dd>
         </div>
         <div class="rb-row">
@@ -268,6 +240,36 @@ function Readback({ plan, onPlan, onStarted, busy }: { plan: TaskPlan; onPlan: (
             </dd>
           </div>
         )}
+        {/* The cost comes last, beside Start: the field that Start needs sits next to it, after every row that the person reads first. */}
+        <div class="rb-row">
+          <dt>What it can cost</dt>
+          <dd>
+            <Field label={team ? 'The most the whole team can spend' : 'The most one run can cost'} error={error} id="rb-cost">
+              <span class="rb-money">
+                <span aria-hidden="true">$</span>
+                <Input
+                  ref={field}
+                  inputMode="decimal"
+                  value={cost}
+                  invalid={!!error}
+                  aria-describedby={error ? 'rb-cost-error' : undefined}
+                  onInput={(e) => {
+                    setCost((e.target as HTMLInputElement).value);
+                    setError('');
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      start();
+                    }
+                  }}
+                />
+              </span>
+            </Field>
+            {plan.cost.basis && <p class="t-meta">{plan.cost.basis}</p>}
+            {monthWords(plan, n) && <p class="t-meta">{monthWords(plan, n)}</p>}
+          </dd>
+        </div>
       </dl>
     </Card>
   );
@@ -283,6 +285,11 @@ export function Door({ onStarted }: { onStarted?: () => void }) {
   const [error, setError] = useState('');
   const [started, setStarted] = useState<Started | null>(null);
   const box = useRef<HTMLTextAreaElement>(null);
+  const done = useRef<HTMLDivElement>(null);
+  // What Start made takes the focus, where the readback stood, so the keys go on from there.
+  useEffect(() => {
+    if (started && done.current) done.current.focus();
+  }, [started]);
   const read = async (agent?: string, tell?: TaskTell) => {
     const w = words.trim();
     if (!w) {
@@ -345,6 +352,17 @@ export function Door({ onStarted }: { onStarted?: () => void }) {
           </Button>
         </div>
       </form>
+      {/* What Start made stands where the readback stood, above the templates. */}
+      {started && (
+        <div class="door-started" ref={done} tabIndex={-1} role="status">
+          <Card quiet title={started.title} class="readback-done">
+            <p>{started.said}</p>
+            <p>
+              <a href={started.href}>Open it</a>
+            </p>
+          </Card>
+        </div>
+      )}
       {plan && !stale ? (
         <Readback
           plan={plan}
@@ -354,7 +372,6 @@ export function Door({ onStarted }: { onStarted?: () => void }) {
             setStarted(s);
             setPlan(null);
             setWords('');
-            showSaid(s.said, { href: s.href, label: 'Open it' });
             if (onStarted) onStarted();
           }}
         />
@@ -382,14 +399,6 @@ export function Door({ onStarted }: { onStarted?: () => void }) {
             </div>
           </section>
         )
-      )}
-      {started && (
-        <Card quiet title={started.title} class="readback-done">
-          <p>{started.said}</p>
-          <p>
-            <a href={started.href}>Open it</a>
-          </p>
-        </Card>
       )}
     </div>
   );

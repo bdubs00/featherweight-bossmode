@@ -151,6 +151,28 @@
 .readback .card-actions {
   flex-wrap: wrap;
 }
+/* The readback and what Start made take the width of the door, so their
+   edges line up with the field above them. */
+.door-top .card {
+  max-width: none;
+}
+.door-started:focus {
+  outline: none;
+}
+.door-started:focus-visible > .card {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+/* A narrow window gives each row of the readback one line: the label over its value. */
+@media (max-width: 799px) {
+  .rb-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s-1);
+  }
+  .rb-other {
+    flex-wrap: wrap;
+  }
+}
 
 /* ---------- the key More of the app bar ---------- */
 .place-more {
