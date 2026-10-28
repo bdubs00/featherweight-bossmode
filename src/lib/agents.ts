@@ -4,7 +4,7 @@
 // can seat, list, and open. A profile of the front adds its description,
 // its role, and its lists to an agent of the fleet of the same name.
 
-import type { Agent, Fleet } from '../api/types';
+import type { Agent, Fleet, Whoami } from '../api/types';
 
 /**
  * fleetAgents lists the agents of the fleet by name: the agent of each
@@ -53,6 +53,19 @@ export function fleetAgents(fleet: Fleet | null | undefined, own: Agent[] | null
 
 /** canSeat reports whether the person can start runs of an agent: an owner or an operator can, and so can a person whose role the page cannot tell, because the backend checks it. */
 export const canSeat = (a: Pick<Agent, 'role'>): boolean => !a.role || a.role === 'owner' || a.role === 'operator';
+
+/**
+ * mayStart reports whether the person can start a run of some agent: an
+ * admin, a person who can create agents, and a person with the role owner
+ * or operator on an agent. A person whose roles name no agent, such as the
+ * static token of a fleet whose agents all run in pools, may start too,
+ * because the backend decides. A viewer of every agent may not.
+ */
+export function mayStart(me: Pick<Whoami, 'admin' | 'canCreate' | 'roles'> | null | undefined): boolean {
+  if (!me) return false;
+  const roles = Object.values(me.roles || {});
+  return me.admin || me.canCreate || roles.length === 0 || roles.some((r) => r === 'owner' || r === 'operator');
+}
 
 /** holdsTask reports whether the fleet view lists a Task of a member: a worker of a pool. */
 export function holdsTask(fleet: Fleet, member: string): boolean {

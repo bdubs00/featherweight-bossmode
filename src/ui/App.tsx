@@ -22,6 +22,7 @@ import { api } from '../api/routes';
 import { store, useSelect } from '../state/store';
 import { loadAgents, loadBridges, loadFaces, loadFleet, loadOpenRuns, loadSkills, startStream, stopStream } from '../state/actions';
 import { forgetFaces } from '../lib/faces';
+import { mayStart } from '../lib/agents';
 import { dismissBuild, useNewBuild } from '../lib/build';
 import { applyTheme, themeOf } from '../lib/theme';
 import { canonicalPath, columnOf, go, parentOf, parseRoute, placeOf, type Place, type Route } from '../lib/route';
@@ -388,7 +389,11 @@ export function App() {
       // errors stay quiet.
       loadFleet().catch(() => {});
       loadOpenRuns().catch(() => {});
-      loadSkills().catch(() => {});
+      // The front gives the catalog only to a person who can start an
+      // agent. A viewer, such as a sponsor, gets 403, which the browser
+      // shows as an error on every place, so the page does not ask. Chat
+      // still asks when it opens, for an agent of a pool.
+      if (mayStart(me)) loadSkills().catch(() => {});
     } catch (e) {
       const err = e as { name?: string; message?: string };
       if (err && err.name === 'SigninNeeded') return;

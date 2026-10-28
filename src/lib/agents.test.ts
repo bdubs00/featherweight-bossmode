@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Agent, Fleet } from '../api/types';
-import { canSeat, fleetAgents } from './agents';
+import { canSeat, fleetAgents, mayStart } from './agents';
 
 // A fleet as the real front shows it: the front itself holds no agent, the
 // pools run the migrator and the reviewer, and other members hold agents
@@ -51,5 +51,19 @@ describe('canSeat', () => {
     expect(canSeat({ role: 'operator' })).toBe(true);
     expect(canSeat({ role: '' })).toBe(true);
     expect(canSeat({ role: 'viewer' })).toBe(false);
+  });
+});
+
+describe('mayStart', () => {
+  it('lets an admin, a creator, an owner, an operator, and a person without roles start', () => {
+    expect(mayStart({ admin: true, canCreate: false, roles: { a: 'viewer' } })).toBe(true);
+    expect(mayStart({ admin: false, canCreate: true, roles: { a: 'viewer' } })).toBe(true);
+    expect(mayStart({ admin: false, canCreate: false, roles: { a: 'viewer', b: 'operator' } })).toBe(true);
+    expect(mayStart({ admin: false, canCreate: false, roles: { a: 'owner' } })).toBe(true);
+    expect(mayStart({ admin: false, canCreate: false, roles: {} })).toBe(true);
+  });
+  it('keeps a viewer of every agent, and no person, from starting', () => {
+    expect(mayStart({ admin: false, canCreate: false, roles: { a: 'viewer', b: 'viewer' } })).toBe(false);
+    expect(mayStart(null)).toBe(false);
   });
 });
