@@ -42,6 +42,7 @@ import { PageEditor, PageHistory, PageTree, PageView } from './Pages';
 import { NewBridge } from './NewBridge';
 import { NewAgent } from './NewAgent';
 import { Appearance } from './Appearance';
+import { Results } from './Results';
 import { SkillActions, SkillList, SkillMain } from './Skills';
 import { RoutineAgent, RoutineList, RoutineMain } from './Routines';
 import { DutyList, DutyMain } from './Duties';
@@ -215,6 +216,8 @@ function panesOf(r: Route): Panes {
     }
     case 'appearance':
       return { list: null, main: <Appearance />, details: null };
+    case 'results':
+      return { list: null, main: <Results />, details: null };
   }
 }
 

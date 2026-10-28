@@ -15,6 +15,7 @@ import './styles/wiki.css';
 import './styles/chat.css';
 import './styles/routines.css';
 import './styles/duties.css';
+import './styles/results.css';
 
 applyChoice(readChoice());
 render(<App />, document.getElementById('app')!);

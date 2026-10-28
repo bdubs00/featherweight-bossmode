@@ -75,13 +75,14 @@ export type Route =
   | { place: 'fleet'; agent?: string; board?: boolean; profile?: boolean }
   | { place: 'new-agent' }
   | { place: 'appearance' }
+  | { place: 'results' }
   | { place: 'skills'; item?: SkillItem; add?: boolean }
   | { place: 'routines'; agent?: string; name?: string; tab?: RoutineTab; details?: boolean }
   | { place: 'duties'; name?: string; edit?: boolean; fresh?: boolean; seed?: DutySeed; run?: string; tab?: 'playbooks'; playbook?: string }
   | { place: 'pages'; path?: string; mode: 'tree' | 'read' | 'history' | 'edit' | 'create'; version?: number };
 
 /** The places of the app bar. */
-export type Place = 'activity' | 'chat' | 'bridges' | 'fleet' | 'duties' | 'skills' | 'routines' | 'wiki' | 'manager' | 'account';
+export type Place = 'results' | 'activity' | 'chat' | 'bridges' | 'fleet' | 'duties' | 'skills' | 'routines' | 'wiki' | 'manager' | 'account';
 
 /** The column that a narrow window shows for a route. */
 export type Column = 'list' | 'main' | 'details';
@@ -128,6 +129,8 @@ export function parseRoute(hash: string): Route {
       return { place: 'new-agent' };
     case 'appearance':
       return { place: 'appearance' };
+    case 'results':
+      return { place: 'results' };
     case 'skills':
       if (rest[0] === 'add' && rest.length === 1) return { place: 'skills', add: true };
       if ((rest[0] === 'skill' || rest[0] === 'tool') && rest.length > 1 && rest.slice(1).join('/')) return { place: 'skills', item: { kind: rest[0], id: rest.slice(1).map(dec).join('/') } };
@@ -220,6 +223,8 @@ export function hrefOf(r: Route): string {
       return '#new-agent';
     case 'appearance':
       return '#appearance';
+    case 'results':
+      return '#results';
     case 'skills':
       if (r.add) return '#skills/add';
       return r.item ? '#skills/' + r.item.kind + '/' + encPath(r.item.id) : '#skills';
@@ -280,6 +285,8 @@ export function placeOf(r: Route): Place {
       return 'duties';
     case 'appearance':
       return 'account';
+    case 'results':
+      return 'results';
   }
   return 'bridges';
 }

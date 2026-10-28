@@ -59,10 +59,12 @@ export function Icon({ name, class: cls }: { name: IconName; class?: string }) {
 }
 
 export type GlyphName =
-  | 'activity' | 'chat' | 'bridges' | 'fleet' | 'skills' | 'routines' | 'wiki' | 'manager' | 'thumb-up' | 'thumb-down' | 'heart'
+  | 'results' | 'activity' | 'chat' | 'bridges' | 'fleet' | 'skills' | 'routines' | 'wiki' | 'manager' | 'thumb-up' | 'thumb-down' | 'heart'
   | 'search' | 'close' | 'more' | 'plus' | 'back' | 'reply' | 'question' | 'check' | 'gear' | 'board' | 'clip' | 'duties' | 'history';
 
 const G: Record<GlyphName, JSX.Element> = {
+  // Three bars on a base line, for the results: what the work gave.
+  results: <><path d="M4 20h16" /><path d="M7 16v-3" /><path d="M12 16V9" /><path d="M17 16V5" /></>,
   activity: <><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10 21h4" /></>,
   // A speech bubble, for the quick chat.
   chat: <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v9a1.5 1.5 0 0 1-1.5 1.5H10l-4.5 4v-4h0A1.5 1.5 0 0 1 4 14.5z" />,

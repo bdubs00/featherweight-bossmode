@@ -1,0 +1,321 @@
+/* The Results place: the figures of the work for a sponsor. It uses the
+   tokens of the page and adds no color, radius, shadow, or type size. The
+   verdicts take the colors of the status lights: green for accepted, red
+   for sent back, and grey for unchecked; the wait on people takes amber. */
+
+.rs {
+  max-width: 1180px;
+}
+.rs-span {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-3);
+  margin-bottom: var(--s-3);
+}
+.rs-ink {
+  color: var(--ink);
+}
+.rs-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+/* The figures: six tiles in three columns, two on a tablet and a phone. */
+.rs-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--s-3);
+}
+.rs-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  min-width: 0;
+  padding: var(--s-4);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.rs-tile-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 22px;
+}
+.rs-tile-head h2 {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.rs-figure {
+  font-size: var(--t-title);
+  line-height: var(--t-title-lh);
+  font-weight: 800;
+  font-stretch: 110%;
+  letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums;
+}
+.rs-figure.muted {
+  color: var(--muted);
+}
+.rs-lead,
+.rs-unit {
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+  font-weight: 400;
+  font-stretch: 100%;
+  letter-spacing: 0;
+  color: var(--muted);
+}
+.rs-now {
+  text-decoration: none;
+}
+
+/* A bar of parts: thin, with a gap of the surface between two parts. */
+.rs-bar {
+  display: flex;
+  gap: 2px;
+  height: 10px;
+  background: var(--recess);
+  border-radius: var(--r-led);
+  overflow: hidden;
+}
+.rs-seg {
+  min-width: 2px;
+  border-radius: var(--r-led);
+}
+.seg-accepted {
+  background: var(--led-green);
+  fill: var(--led-green);
+}
+/* Sent back is red with a hatch, so it never reads as accepted for a person
+   who does not tell red from green. */
+.seg-sentBack {
+  background: repeating-linear-gradient(135deg, var(--led-red) 0 3px, var(--card) 3px 5px);
+  fill: url(#rs-hatch);
+}
+.rs-hatch-line {
+  stroke: var(--led-red);
+  stroke-width: 3;
+}
+.rs-hatch-ground {
+  fill: var(--card);
+}
+.seg-unchecked {
+  background: var(--led-grey);
+  fill: var(--led-grey);
+}
+.seg-wait {
+  background: var(--led-amber);
+}
+.seg-work {
+  background: var(--line);
+}
+.rs-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-1) var(--s-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rs-keys li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.rs-key {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: var(--r-led);
+}
+.rs-verdicts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+.rs-verdicts.compact {
+  width: 120px;
+  max-width: 100%;
+}
+.rs-verdicts.compact .rs-bar {
+  height: 8px;
+}
+
+/* A section under the figures: a heading line, then the chart or the lines. */
+.rs-sec {
+  margin-top: var(--s-5);
+}
+.rs-sec-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-2) var(--s-4);
+  margin-bottom: var(--s-3);
+}
+
+/* The chart: one column per period, the count and the date under each. */
+.rs-chart {
+  padding: var(--s-4) var(--s-4) var(--s-3);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.rs-chart svg {
+  display: block;
+  width: 100%;
+  height: 150px;
+}
+.rs-grid {
+  stroke: var(--line);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.rs-grid.soft {
+  stroke: var(--line-soft);
+}
+.rs-hit {
+  fill: transparent;
+}
+.rs-col:hover .rs-hit {
+  fill: var(--recess);
+}
+.rs-axis {
+  display: grid;
+  margin: var(--s-2) 0 0;
+  padding: 0;
+  list-style: none;
+  text-align: center;
+}
+.rs-axis li {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+}
+.rs-axis li > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rs-failed {
+  color: var(--word-red);
+}
+
+/* The lines of work: a table that scrolls on its own in a narrow pane. */
+.rs-table {
+  overflow-x: auto;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.rs-lines {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.rs-lines th,
+.rs-lines td {
+  padding: var(--s-2) var(--s-3);
+  text-align: left;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--line-soft);
+}
+.rs-lines tbody tr:last-child > * {
+  border-bottom: none;
+}
+.rs-lines thead th {
+  color: var(--muted);
+  white-space: nowrap;
+  border-bottom: 1px solid var(--line);
+}
+.rs-lines .num {
+  text-align: right;
+  white-space: nowrap;
+}
+.rs-lines td:nth-child(3) {
+  min-width: 132px;
+}
+.rs-lines td:nth-child(3) > .t-meta {
+  display: block;
+  margin-top: 2px;
+}
+.rs-line {
+  font-weight: 700;
+}
+.rs-line-name {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-width: 0;
+}
+.rs-line .t-meta {
+  display: block;
+  font-weight: 400;
+  margin-left: 28px;
+}
+.rs-line .clip {
+  max-width: 220px;
+}
+.rs-est {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  white-space: nowrap;
+}
+.rs-est-edit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+}
+.rs-est-edit .input {
+  width: 84px;
+}
+
+@media (max-width: 1199px) {
+  .rs-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 799px) {
+  .rs-lines .narrow-hide {
+    display: none;
+  }
+  .rs-line .clip {
+    max-width: 140px;
+  }
+}
+@media (max-width: 439px) {
+  .rs-lines .phone-hide,
+  .rs-lines td .rs-failed {
+    display: none;
+  }
+  .rs-lines th,
+  .rs-lines td {
+    padding: var(--s-2);
+  }
+  .rs-lines td:nth-child(3) {
+    min-width: 0;
+  }
+  .rs-verdicts.compact {
+    width: 72px;
+  }
+  .rs-line .clip {
+    max-width: 128px;
+  }
+  .rs-tiles {
+    gap: var(--s-2);
+  }
+  .rs-tile {
+    padding: var(--s-3);
+  }
+  .rs-axis li > span {
+    font-size: var(--t-caption);
+  }
+}

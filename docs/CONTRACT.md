@@ -1586,3 +1586,41 @@ The page treats an archived run as a run that ended:
 - An archived run keeps no worker busy, takes no decision, and the page
   reads it once, with no poll and no live answer.
 
+
+## 19. Results
+
+The Results place reads what the work of the agents gave and took over a
+window. The workbench answers from its package `value`. The page keeps the
+types in `src/api/value.ts`.
+
+| Route | Answer |
+|---|---|
+| `GET /v1/value?days=7` | The value of the window. `days` is 7, 30, or 90, and 30 without it. Another number answers 400. |
+| `PUT /v1/value/estimates` | Body `{"line", "minutes"}`. It answers the line with its `estimate`. Zero minutes removes the estimate. 404 for a line that the person does not see in 90 days, 403 for a person who does not own the agent of the line, 400 for minutes past 2400. |
+
+The value:
+
+```json
+{"days": 30, "since": "...", "until": "...", "sentence": "In the last 30 days, ...",
+ "work": {"pieces": 394, "done": 373, "failed": 17, "stopped": 3, "open": 1},
+ "checks": {"accepted": 44, "sentBack": 14, "unchecked": 315},
+ "people": {"actions": 172, "noPerson": 270, "reworked": 9, "waitSeconds": 498756, "waitingNow": 1, "handled": 0},
+ "lead": {"measured": 373, "medianSeconds": 134, "waitShare": 0.676},
+ "spend": {"usd": 29.04, "perDone": 0.078, "failedUSD": 1.65, "coordinationUSD": 1.43, "unpriced": 2, "atLeast": true},
+ "estimated": {"minutes": 4525, "lines": 2, "pieces": 64},
+ "periods": [{"start", "end", "done", "accepted", "sentBack", "unchecked", "failed", "usd"}],
+ "lines": [{"key": "duty:daily-release-notes", "kind": "duty", "name": "daily-release-notes", "agent": "scribe",
+            "work": {...}, "checks": {...}, "actions": 3, "noPerson": 10, "medianLeadSeconds": 420,
+            "usd": 0.81, "perDone": 0.04, "unpriced": 0,
+            "estimate": {"minutes": 25, "by": "bob@example.com", "at": "..."}, "estimatedMinutes": 450}],
+ "partial": false, "unknown": 0}
+```
+
+- A piece of work is a run without a parent that is no branch, no check
+  run, and no run of the manager or of the quick chat.
+- `checks` splits the done pieces by the first thumb, heart, or receipt.
+  A grade of a model is no verdict.
+- `spend.atLeast` is true when runs have tokens without a price. The page
+  then says at least.
+- `estimated` and `estimate` exist only when a person set the minutes of a
+  piece of a line. The page shows Not set otherwise.

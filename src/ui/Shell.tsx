@@ -81,6 +81,7 @@ export interface PlaceItem {
 const lastOf: Partial<Record<Place, string>> = {};
 
 const PLACES: PlaceItem[] = [
+  { id: 'results', label: 'Results', glyph: 'results', href: '#results' },
   { id: 'activity', label: 'Activity', glyph: 'activity', href: '#activity' },
   { id: 'chat', label: 'Chat', glyph: 'chat', href: '#chat' },
   { id: 'bridges', label: 'Bridges', glyph: 'bridges', href: '#' },
@@ -100,6 +101,7 @@ const THEMES: [ThemeChoice, string][] = [
 
 /** The names of the places in the title of the tab. */
 const PLACE_NAMES: Record<Place, string> = {
+  results: 'Results',
   activity: 'Activity',
   chat: 'Chat',
   bridges: 'Bridges',
