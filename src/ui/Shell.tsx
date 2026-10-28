@@ -82,6 +82,7 @@ const lastOf: Partial<Record<Place, string>> = {};
 
 const PLACES: PlaceItem[] = [
   { id: 'results', label: 'Results', glyph: 'results', href: '#results' },
+  { id: 'tasks', label: 'Tasks', glyph: 'tasks', href: '#tasks' },
   { id: 'activity', label: 'Activity', glyph: 'activity', href: '#activity' },
   { id: 'chat', label: 'Chat', glyph: 'chat', href: '#chat' },
   { id: 'bridges', label: 'Bridges', glyph: 'bridges', href: '#' },
@@ -102,6 +103,7 @@ const THEMES: [ThemeChoice, string][] = [
 /** The names of the places in the title of the tab. */
 const PLACE_NAMES: Record<Place, string> = {
   results: 'Results',
+  tasks: 'Tasks',
   activity: 'Activity',
   chat: 'Chat',
   bridges: 'Bridges',
@@ -244,10 +246,44 @@ function AccountMenu({ onSignOut, onReach }: { onSignOut: () => void; onReach: (
 /**
  * placesOf gives the places of the app bar for the settings of the front.
  * Routines shows once the settings say that the front keeps routines, and
- * an older front that leaves the key out keeps the place.
+ * an older front that leaves the key out keeps the place. Tasks shows once
+ * the settings name the door. With the door, a person who has not asked
+ * for every place sees four: Tasks, Activity, Chat, and Wiki, and the place
+ * of the screen that shows, so the bar always lights the place you are in.
  */
-export function placesOf(config: BossConfig | null): PlaceItem[] {
-  return config && config.routines !== false ? PLACES : PLACES.filter((it) => it.id !== 'routines');
+export function placesOf(config: BossConfig | null, every = true, current?: Place): PlaceItem[] {
+  const door = !!(config && config.door);
+  const all = PLACES.filter((it) => (it.id !== 'routines' || (config && config.routines !== false)) && (it.id !== 'tasks' || door));
+  if (!door || every) return all;
+  return all.filter((it) => SIMPLE_PLACES.includes(it.id) || it.id === current);
+}
+
+/** The places of a person who has not asked for every place. */
+export const SIMPLE_PLACES: Place[] = ['tasks', 'activity', 'chat', 'wiki'];
+
+const EVERY_KEY = 'fw.bossmode.everyPlace';
+
+/** everyPlace reads whether the person asked for every place of the app bar. A browser without storage shows the four places. */
+export function everyPlace(): boolean {
+  try {
+    return localStorage.getItem(EVERY_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+/** useEveryPlace is the switch More of the app bar, kept in the browser. */
+function useEveryPlace(): [boolean, (on: boolean) => void] {
+  const [on, setOn] = useState(everyPlace);
+  const set = (v: boolean) => {
+    setOn(v);
+    try {
+      localStorage.setItem(EVERY_KEY, v ? '1' : '0');
+    } catch {
+      // A browser without storage keeps the choice for this tab only.
+    }
+  };
+  return [on, set];
 }
 
 /**
@@ -280,11 +316,13 @@ export function AppBar({ route, place: placeProp, onSignOut, onReach }: { route:
   useEffect(() => {
     document.title = tabTitle(place, attention, theme.name);
   }, [place, attention, theme.name]);
+  const [every, setEvery] = useEveryPlace();
+  const door = !!(config && config.door);
   return (
     <nav class="appbar" aria-label="Places">
       <LogoWell src={logo} name={theme.name} href="#" />
       <div class="places">
-        {placesOf(config).map((it) => {
+        {placesOf(config, every, place).map((it) => {
           const on = it.id === place;
           const count = it.id === 'activity' ? attention : 0;
           return (
@@ -300,6 +338,12 @@ export function AppBar({ route, place: placeProp, onSignOut, onReach }: { route:
             </a>
           );
         })}
+        {door && (
+          <button type="button" class="place place-more" aria-pressed={every} title={every ? 'Show four places' : 'Show every place'} onClick={() => setEvery(!every)}>
+            <Glyph name="more" size={22} />
+            <span class="place-label">{every ? 'Fewer' : 'More'}</span>
+          </button>
+        )}
       </div>
       <AccountMenu onSignOut={onSignOut} onReach={onReach} />
     </nav>

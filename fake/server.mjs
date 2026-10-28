@@ -23,6 +23,7 @@
 //   FAKE_ASLEEP=1      every worker of the fleet sleeps, as a fleet at night with no worker awake
 //   FAKE_ASK=<tool>    the manager waits for a decision on one call: bridge_open, pages_write, spawn_task, create_issue, or env
 //   FAKE_PACKAGES=0    the settings say that the deployment has no package mirror, so no profile shows Packages
+//   FAKE_DOOR=0        the settings name no door, so the page shows no Tasks place and every place of the app bar
 
 import http from 'node:http';
 import fs from 'node:fs';
@@ -834,6 +835,8 @@ on('GET', '/v1/bossmode', (c) => {
     templates: TEMPLATES,
     chat: { agent: CHAT_AGENT, member: MANAGER_MEMBER },
     packages: PACKAGES,
+    // The Tasks place: a door that reads what a person needs done back before it starts. FAKE_DOOR=0 leaves it out.
+    door: process.env.FAKE_DOOR !== '0',
   };
 });
 on('GET', '/v1/bossmode/logo', (c) => {
@@ -1582,10 +1585,11 @@ function tick() {
 // routine on a sign-off with writePage. routes-e.mjs serves the Duties place.
 // packages.mjs serves the packages of the pools, archive.mjs adds the
 // conversations whose worker was replaced, and routes-work.mjs serves the
-// board of the work, and routes-value.mjs the Results place.
-for (const name of ['skills.mjs', 'routes-a.mjs', 'routes-b.mjs', 'routes-c.mjs', 'routes-chat.mjs', 'routes-d.mjs', 'routes-e.mjs', 'packages.mjs', 'archive.mjs', 'routes-value.mjs', 'routes-work.mjs']) {
+// board of the work, and routes-value.mjs the Results place, and
+// routes-door.mjs the door of the Work place.
+for (const name of ['skills.mjs', 'routes-a.mjs', 'routes-b.mjs', 'routes-c.mjs', 'routes-chat.mjs', 'routes-d.mjs', 'routes-e.mjs', 'packages.mjs', 'archive.mjs', 'routes-value.mjs', 'routes-work.mjs', 'routes-door.mjs']) {
   const mod = await import('./' + name);
-  mod.register({ on, refuse, readJson, readBody, publish, S, now, AGENTS, FLEET, admin: () => ADMIN, writePage });
+  mod.register({ on, refuse, readJson, readBody, publish, S, now, AGENTS, FLEET, admin: () => ADMIN, writePage, port: PORT });
 }
 
 server.listen(PORT, '127.0.0.1', () => {

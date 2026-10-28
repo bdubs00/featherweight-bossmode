@@ -40,6 +40,8 @@ export interface BossConfig {
   routines?: boolean;
   /** True when the deployment has a package mirror, so the profile of an agent that a pool runs shows Packages. An older front leaves it out. */
   packages?: boolean;
+  /** True when the front serves the door of the Tasks place, POST /v1/tasks/plan and GET /v1/tasks. An older front leaves it out, and the page shows every place. */
+  door?: boolean;
 }
 
 /** A child Task whose parent Task is gone, from GET /v1/fleet/orphans. */
@@ -1452,4 +1454,65 @@ export interface WorkBoard {
   lanes: WorkLane[];
   cards: WorkCard[];
   days: number;
+}
+
+/* ---------- the Tasks place: the door and the board ---------- */
+
+/** How a task runs: once now, on a schedule, or by a team of agents. */
+export type TaskKind = 'once' | 'repeat' | 'team';
+
+/** When the person hears of a result: each one, only one that found something, or only a failure. */
+export type TaskTell = 'each' | 'found' | 'failures';
+
+/** One agent of a plan, and what it does in the task. */
+export interface PlanWho {
+  agent: string;
+  name: string;
+  /** In words, such as does it, checks it, or takes a share. */
+  does: string;
+  /** The seats of this agent, for a team that splits the work. */
+  count?: number;
+}
+
+/**
+ * The answer of POST /v1/tasks/plan: the words of the person read back
+ * before anything starts. start holds the record that Start sends to a
+ * route that exists. The plan never names a cost: the page refuses Start
+ * until the person types one.
+ */
+export interface TaskPlan {
+  words: string;
+  kind: TaskKind;
+  title: string;
+  who: PlanWho[];
+  /** The agents that the person can pick instead. */
+  others: { agent: string; name: string }[];
+  when: { said?: string; readback: string; next: string[] };
+  cost: { basis: string; per: 'run' | 'bridge'; runsPerMonth: number };
+  asks: string[];
+  quiet: string[];
+  tell: TaskTell;
+  result: string;
+  gaps: string[];
+  problems: string[];
+  start: { duty?: DutyRecord & { notify?: DutyNotify & { result?: string[]; resultWhen?: 'always' | 'found' } }; bridge?: { title: string; goal: string; placement?: Placement; members: { handle: string; agent: string; task: string }[]; caps?: Record<string, number>; delegation?: Record<string, boolean> }; run?: { member: string; body: NewRun } };
+  /** The address of what Start makes, when the plan knows it. */
+  open: string;
+}
+
+/** One card of the board of GET /v1/tasks. */
+export interface TaskCard {
+  id: string;
+  kind: 'item' | 'bridge' | 'duty' | 'run';
+  column: 'needs' | 'working' | 'next' | 'done';
+  title: string;
+  agents: string[];
+  /** The status word, such as needs you, working, scheduled, done, failed, or paused. */
+  status: string;
+  /** The moment of the card: since when it waits or works, its next start, or its end. */
+  at: string;
+  /** The address of the page that holds the work. */
+  open: string;
+  detail?: string;
+  cost?: number;
 }
