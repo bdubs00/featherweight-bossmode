@@ -67,7 +67,8 @@ export const NEXT: Record<string, string> = {
 /** A result to check waits for the person, so its light is amber here, as in Activity and on the count of the app bar. */
 const GLANCE: { stage: WorkStage; words: (n: number) => string; mine: boolean; tone: Tone }[] = [
   { stage: 'needs-you', words: (n) => (n === 1 ? '1 task needs you' : n + ' tasks need you'), mine: true, tone: 'amber' },
-  { stage: 'review', words: (n) => (n === 1 ? '1 result to check' : n + ' results to check'), mine: true, tone: 'amber' },
+  // The words of the lane: a team to check holds no one result, so the line says to check, as the lane does.
+  { stage: 'review', words: (n) => n + ' to check', mine: true, tone: 'amber' },
   { stage: 'stopped', words: (n) => n + ' stopped', mine: true, tone: 'red' },
   { stage: 'working', words: (n) => n + ' working', mine: false, tone: 'green' },
 ];

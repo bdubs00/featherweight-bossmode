@@ -1169,7 +1169,7 @@ The page never shows pool, member, job, run id, or Task in these places.
 | new | add | the kinds `Chat`, `Team`, `Duty`, `Batch`, and `Event` | integration |
 | new | add | the tags `Yours`, `Manager`, and `Lost` | integration |
 | `Yours` and `Manager` | change | `Your move` and `Manager decides`. In the view of the person every card is theirs, so `Yours` read as an owner, not as whose move it is. | ux walk |
-| new | add | the line on top of Work: `1 task needs you` or `<n> tasks need you`, `1 result to check` or `<n> results to check`, `<n> stopped`, `<n> working`, and `Nothing waits for you.` | ux walk |
+| new | add | the line on top of Work: `1 task needs you` or `<n> tasks need you`, `<n> to check`, as the lane says, `<n> stopped`, `<n> working`, and `Nothing waits for you.` | ux walk |
 | the name of the person on a card of the person, such as `alice` | change | `You`, and `Manager for you` | ux walk |
 | the name of a duty under a card whose title is that name | change | the agent that does it, such as `Scribe` | ux walk |
 | new | add | `Show all <n>` and `Show fewer` under Done, and `Try again` beside `The board did not load.` | ux walk |

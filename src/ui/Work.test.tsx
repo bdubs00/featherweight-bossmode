@@ -168,7 +168,7 @@ describe('the board of the work', () => {
     await settle();
     const glance = el.querySelector('.work-glance') as HTMLElement;
     const parts = [...glance.querySelectorAll('button')].map((b) => b.textContent);
-    expect(parts).toEqual(['1 task needs you', '1 result to check', '1 stopped', '1 working']);
+    expect(parts).toEqual(['1 task needs you', '1 to check', '1 stopped', '1 working']);
     // The line sits above the door.
     expect(glance.compareDocumentPosition(el.querySelector('#door-words')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     await act(async () => (glance.querySelectorAll('button')[1] as HTMLButtonElement).click());

@@ -1191,7 +1191,7 @@ opens on Work.
 
 Work holds the door on top and the board below, in one pane that scrolls.
 A line above the door says where the next move is the person's, such as
-`1 task needs you`, `1 result to check`, and `4 stopped`, then what works.
+`1 task needs you`, `1 to check`, and `4 stopped`, then what works.
 Each part is a quiet key with the light of its lane, and it takes the focus
 to the first card of that lane. Thus a phone shows what waits before the
 door and the lanes above it.
