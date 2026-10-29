@@ -30,6 +30,7 @@ import { useAttention } from '../state/activity';
 import { Glyph, Icon, type GlyphName } from './icons';
 import { Avatar, Chip, LogoWell, Led, countText } from './primitives';
 import { ManagerDot } from './Manager';
+import { mayStartWork } from './Door';
 import { Notifications } from './Notifications';
 import { focusHome, focusLost } from './keys';
 
@@ -280,9 +281,15 @@ export function operates(me: Whoami | null | undefined): boolean {
 /** The places that need the operator role: the quick chat starts runs, and the wiki needs it to read. */
 const OPERATOR_PLACES: Place[] = ['chat', 'wiki'];
 
-/** opensOn is the place where the page opens with work: Work for a person who can start work, else Results, which answers a sponsor. */
+/**
+ * opensOn is the place where the page opens with work: Work, the home, for
+ * a person who can start work, else Results, which answers a sponsor who
+ * can only view (plan 4.1). A person who can start work is a person whom
+ * the door lets start a task (mayStartWork), such as a person who can
+ * create agents but runs none yet, or a person who operates an agent.
+ */
 export function opensOn(me: Whoami | null | undefined): 'work' | 'results' {
-  return operates(me) ? 'work' : 'results';
+  return operates(me) || mayStartWork(me) ? 'work' : 'results';
 }
 
 /** morePlaces gives the places behind More: the places of the bar that placesOf leaves out. */

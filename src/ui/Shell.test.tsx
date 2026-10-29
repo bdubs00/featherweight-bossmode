@@ -249,6 +249,10 @@ describe('the places of a person who operates no agent', () => {
     // A sponsor opens on Results, which answers what the work gave.
     expect(opensOn(viewer)).toBe('results');
     expect(opensOn({ ...viewer, roles: { writer: 'operator' } })).toBe('work');
+    // Work is the home of everyone who can start work, also a person who can create agents and runs none yet (plan 4.1).
+    expect(opensOn({ ...viewer, canCreate: true })).toBe('work');
+    expect(opensOn({ ...viewer, admin: true })).toBe('work');
+    expect(opensOn(null)).toBe('work');
   });
 
   it('leaves out Chat and Wiki, which refuse a viewer, and the logo opens Results', () => {
