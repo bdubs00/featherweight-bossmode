@@ -158,6 +158,11 @@ export function pageWords(text: string): string {
     .replace(/\bseats\b/g, 'agents')
     .replace(/\bseat\b/g, 'agent')
     .replace(/\bwaiting for a worker\b/gi, (m) => (m[0] === 'W' ? 'Waiting to start' : 'waiting to start'))
+    .replace(/\bThe duty\b/g, 'The job')
+    .replace(/\bthe duty\b/g, 'the job')
+    .replace(/\bduties\b/g, 'jobs')
+    .replace(/\bDuty\b/g, 'Job')
+    .replace(/\bduty\b/g, 'job')
     .replace(/\bits worker\b/g, 'it')
     .replace(/\bworkers\b/g, 'agents')
     .replace(/\bworker\b/g, 'agent');

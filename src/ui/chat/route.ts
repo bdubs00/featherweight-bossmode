@@ -44,6 +44,8 @@ export function parseChat(hash: string): ChatRoute | null {
       const tab: ChannelTab = rest[1] === 'wiki' || rest[1] === 'decisions' ? rest[1] : 'posts';
       return { view: 'channel', id, tab };
     }
+    // #manager is the address of the Manager in the older places and in the links of the server.
+    case 'manager':
     case 'm':
       if (rest[0] === 'new') return { view: 'manager', fresh: true };
       return rest[0] ? { view: 'manager', run: dec(rest[0]) } : { view: 'manager' };

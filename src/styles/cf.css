@@ -1006,6 +1006,8 @@ a.cf-mrow:hover .cf-mrow-top strong {
   }
   .cf-head {
     padding-left: var(--s-4);
+  }
+  .cf-channel .cf-head {
     flex-wrap: wrap;
   }
   /* A phone keeps the title on its own line, and the tabs under it. */

@@ -31,6 +31,7 @@ describe('the addresses of the chat-first page', () => {
   });
   it('leaves the addresses of the older places alone', () => {
     expect(parseChat('#work')).toBeNull();
+    expect(parseChat('#manager')).toEqual({ view: 'manager' });
     expect(parseChat('#bridge/br-1')).toBeNull();
     expect(parseChat('#pages/a.md')).toBeNull();
     expect(parseChat('')).toEqual({ view: 'home' });

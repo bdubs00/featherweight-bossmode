@@ -141,7 +141,18 @@ export function ChatApp({ route, notice, onSignOut }: { route: ChatRoute; notice
         <aside class="cf-side">
           <Sidebar route={route} />
         </aside>
-        <main class="cf-main" id="main" tabIndex={-1}>
+        <main
+          class="cf-main"
+          id="main"
+          tabIndex={-1}
+          onClickCapture={(e) => {
+            // The back key of a pane that an older place drew, such as the Manager, goes back in this page.
+            const a = (e.target as HTMLElement).closest('.pane-head a.back');
+            if (!a) return;
+            e.preventDefault();
+            location.hash = backOfChat(route);
+          }}
+        >
           {notice}
           {p.main}
         </main>

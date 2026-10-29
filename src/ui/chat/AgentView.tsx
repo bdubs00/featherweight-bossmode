@@ -28,6 +28,13 @@ const JOURNAL: Record<string, string> = {
   resting: 'Resting',
   'put-away': 'Put away',
   undone: 'Undone',
+  proposed: 'Proposed a routine',
+  rehearsing: 'Rehearses',
+  live: 'Went live',
+  'stepped-back': 'Stepped back',
+  retired: 'Retired',
+  paused: 'Paused',
+  'stays-out': 'Stays out',
 };
 
 export function AgentView({ name }: { name: string }) {

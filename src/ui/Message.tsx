@@ -4,7 +4,6 @@
 // reaction or a reply show beside them on hover and on focus, and always on
 // a touch screen.
 
-import { createContext } from 'preact';
 import { memo } from 'preact/compat';
 import { useContext, useEffect, useRef, useState } from 'preact/hooks';
 import type { Entry, Member, ReactionKind } from '../api/types';
@@ -12,6 +11,7 @@ import { useSelect } from '../state/store';
 import { dayWords, excerpt, list, personName, plainText, senderName } from '../lib/words';
 import { hrefOf } from '../lib/route';
 import { lineWords, napWords, whoName } from '../lib/lines';
+import { LineText } from './linetext';
 import type { Tone } from '../lib/presence';
 import { decide, react } from '../state/actions';
 import { attempt } from './notice';
@@ -224,12 +224,7 @@ function ReplyChip({ bridge, seq }: { bridge: string; seq: number }) {
 
 /* ---------- one entry ---------- */
 
-/**
- * LineText words the text of a system line for the view that shows it. The
- * chat-first page (src/ui/chat) says channel and joined where the older
- * places say team and took the seat.
- */
-export const LineText = createContext<(text: string) => string>((t) => t);
+export { LineText };
 
 /**
  * NapRow is the one quiet line of a run of sleep and wake pairs of one

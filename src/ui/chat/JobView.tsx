@@ -4,7 +4,7 @@
 // The pane at the right says when it runs, who does it, what it costs at
 // most, and holds Run now, Pause, and Edit.
 
-import { useEffect, useMemo } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'preact/hooks';
 import type { Duty, DutyRun } from '../../api/types';
 import { useSelect } from '../../state/store';
 import { ensureRuns } from '../../state/fetchers';
@@ -72,7 +72,7 @@ function RunPost({ d, r }: { d: Duty; r: DutyRun }) {
           </time>
         </p>
         {r.title && <p class="cf-post-title">{r.title}</p>}
-        {answer ? <Markdown text={answer.length > 1200 ? excerpt(plainText(answer), 600) : answer} refs /> : r.reason ? <p class="cf-post-quiet">{pageWords(r.reason)}</p> : null}
+        {answer ? <Markdown text={answer.length > 1200 ? excerpt(plainText(answer), 600) : answer} refs headings={4} /> : r.reason ? <p class="cf-post-quiet">{pageWords(r.reason)}</p> : null}
         <p class="cf-post-status">
           <Led tone={st.tone} word={st.word} still={st.tone === 'amber' ? undefined : true} />
           {typeof r.costUSD === 'number' && r.costUSD > 0 && <span> · {costText(r.costUSD)}</span>}
@@ -96,6 +96,12 @@ export function JobView({ name }: { name: string }) {
   useEffect(() => {
     if (ids) ensureRuns(ids.split(','));
   }, [ids]);
+  // The stream opens at its foot, on the newest run, as a chat does.
+  const box = useRef<HTMLDivElement>(null);
+  const runsIn = useSelect((s) => ids.split(',').filter((x) => !!s.runs[x]).length);
+  useLayoutEffect(() => {
+    if (box.current) box.current.scrollTop = box.current.scrollHeight;
+  }, [name, history.length, runsIn]);
   if (!d) {
     return (
       <section class="cf-view">
@@ -126,7 +132,7 @@ export function JobView({ name }: { name: string }) {
           About
         </a>
       </header>
-      <div class="scroll cf-stream">
+      <div class="scroll cf-stream" ref={box}>
         <div class="cf-stream-in">
           <p class="cf-stream-start">
             {pageWords(d.readback || '')} {pageWords(dutyWhat(d))}
