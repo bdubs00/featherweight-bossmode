@@ -322,6 +322,8 @@ export function useCardsFor(q: { run?: string; bridge?: string; duty?: string })
 export function WayOut({ run, bridge, duty, result, brief }: { run?: string; bridge?: string; duty?: string; result?: string; brief?: boolean }) {
   const cards = useCardsFor({ run, bridge, duty });
   const answered = useAnswered();
+  // A failed job shows its failure once, with Run again and Pause: the stopped task of the same job adds nothing.
+  const failing = useDuties((s) => !!duty && (s.inbox || []).some((it) => it.kind === 'failure' && it.duty === duty));
   const runs = useSelect((s) => s.runs);
   const lost = useSelect((s) => s.lost);
   const items = cards.map((c) => {
@@ -334,7 +336,7 @@ export function WayOut({ run, bridge, duty, result, brief }: { run?: string; bri
       const text = result || (!channel && r && runs[r] && runs[r].output) || c.summary || '';
       return <SignOff run={channel ? undefined : r || undefined} bridge={c.links.bridge} card={c} result={text} title={c.title} brief={brief} />;
     }
-    if (c.stage === 'stopped') return <LetGo card={c} />;
+    if (c.stage === 'stopped') return failing && c.links.duty === duty ? null : <LetGo card={c} />;
     // A decision whose run is gone, or that the archive keeps, waits for nobody.
     const held = r ? runs[r] : undefined;
     if (r && (lost[r] || (held && held.archived))) return <Nobody card={c} why="Its run ended when the agent that held it restarted." />;
