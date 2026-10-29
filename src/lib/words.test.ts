@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { Decision } from '../api/types';
-import { commandOf, decisionTitle, errorReason, plainText, senderName, since, spanWords, unreadText, whyWords } from './words';
+import { commandOf, decisionTitle, errorReason, personName, plainText, senderName, since, spanWords, unreadText, whyWords } from './words';
+
+describe('personName', () => {
+  it('names the static token Admin token, also as a writer of Know-how, person:token', () => {
+    expect(personName('token')).toBe('Admin token');
+    expect(personName('person:token')).toBe('Admin token');
+    expect(personName('person:alice@example.com')).toBe('alice');
+    expect(personName('alice@example.com')).toBe('alice');
+  });
+});
 
 describe('spanWords', () => {
   it('says a span in its largest whole unit', () => {

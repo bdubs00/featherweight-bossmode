@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { KnowhowSummary, NoteItem } from '../api/knowhow';
-import { byWords, canDecide, canEditNote, canUndo, conflictWords, entrySentence, figuresOf, groupNotes, heldBackLine, isMine, labelOf, moneyPair, noteTitle, runLinks, sourceOf, undoRefusal, undoRefusalOf, usesWords, waitSentence } from './knowhow';
+import { byWords, canDecide, canEditNote, canUndo, conflictWords, entrySentence, figuresOf, groupNotes, heldBackLine, isMine, labelOf, moneyPair, noteTitle, runLinks, sourceOf, switchByWords, undoRefusal, undoRefusalOf, usesWords, waitSentence } from './knowhow';
 
 const ME = { subject: 'alice@example.com', name: 'Alice' };
 
@@ -31,11 +31,22 @@ describe('the words of a note', () => {
     expect(labelOf('unchecked')).toBeNull();
   });
 
+  it('says who turned the switch last, and when', () => {
+    const now = new Date(2026, 9, 28, 12);
+    expect(switchByWords({ askFirst: true, by: 'person:token', at: new Date(2026, 9, 28, 9).toISOString() }, ME, now)).toBe('Turned on by Admin token, today.');
+    expect(switchByWords({ askFirst: false, by: 'person:bob@example.com', at: new Date(2026, 9, 27, 9).toISOString() }, ME, now)).toBe('Turned off by bob, yesterday.');
+    expect(switchByWords({ askFirst: true }, ME, now)).toBe('');
+    expect(switchByWords(null, ME, now)).toBe('');
+  });
+
   it('says who wrote a note, and knows the notes of the person', () => {
     expect(byWords('review', ME, 'Triage')).toBe('the after-work review');
     expect(byWords('agent', ME, 'Triage')).toBe('Triage');
     expect(byWords('person:alice@example.com', ME, 'Triage')).toBe('you');
     expect(byWords('person:bob@example.com', ME, 'Triage')).toBe('bob');
+    // A write of the static token reads Admin token, also for a person who signed in with it.
+    expect(byWords('person:token', ME, 'Triage')).toBe('Admin token');
+    expect(byWords('person:token', { subject: 'token', kind: 'token' }, 'Triage')).toBe('Admin token');
     // The server names no actor on the page.
     expect(byWords('front', ME, 'Triage')).toBe('');
     expect(isMine('person:alice@example.com', ME)).toBe(true);

@@ -1,11 +1,13 @@
 // An agent: its face, what it does, the channels it works in, the jobs it
-// does, and what it learned. A note that waits shows Keep and Not now. The
+// does, and what it learned. A note that waits shows Keep and Not now. A
+// note, an entry of the journal, and the switch name the person who wrote
+// or turned them, and a write of the static token reads Admin token. The
 // setup of the agent (its tools, its rules, its budget) stays in the older
 // place behind Set up.
 
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { knowhowApi, type JournalEntry, type KnowhowSettings, type KnowhowSummary, type NoteItem } from '../../api/knowhow';
-import { heldBackLine } from '../../lib/knowhow';
+import { byWords, heldBackLine, switchByWords } from '../../lib/knowhow';
 import { selectAgents } from '../../state/agents';
 import { Switch } from '../ChannelDialog';
 import { routinesApi, type RoutineRecord } from '../../api/routines';
@@ -119,6 +121,9 @@ export function AgentView({ name }: { name: string }) {
   const summary = useRead<KnowhowSummary>(name, (a) => knowhowApi.summary(a, 7).then((x) => (x ? [x] : [])));
   const week = summary && summary[0];
   const owner = useSelect((s) => ((selectAgents(s) || []).find((a) => a.name === name) || { role: '' }).role === 'owner');
+  const me = useSelect((s) => (s.me ? s.me.principal : null));
+  // A person or the after-work review names the writer; the agent itself goes without saying on its own page.
+  const writer = (by: string): string => (by === 'agent' ? '' : byWords(by, me, title));
   const [settings, setSettings] = useState<KnowhowSettings | null>(null);
   const [turning, setTurning] = useState(false);
   useEffect(() => {
@@ -226,6 +231,7 @@ export function AgentView({ name }: { name: string }) {
               {shownNotes.map((n) => (
                 <li>
                   <strong>{n.name}</strong> <span class={'cf-note-state' + (n.state === 'out-of-date' ? ' stale' : '')}>{noteWords(n.state)}</span>
+                  {writer(n.by) && <span class="cf-post-quiet"> by {writer(n.by)}</span>}
                   {n.description && <span class="cf-note-desc">{n.description}</span>}
                 </li>
               ))}
@@ -236,12 +242,13 @@ export function AgentView({ name }: { name: string }) {
             {week && (week.costPerJob ? week.costPerJob.runs > 0 : true) && <p class="cf-learn-line">{heldBackLine(week)}</p>}
             {owner && settings && <Switch label="Ask me before it keeps a note" on={settings.askFirst} disabled={turning} onChange={turn} />}
             {!owner && settings && settings.askFirst && <p class="cf-post-quiet">It asks an owner before it keeps a note.</p>}
+            {settings && switchByWords(settings, me) && <p class="cf-post-quiet cf-switch-by">{switchByWords(settings, me)}</p>}
             {journal === null && <p class="cf-post-quiet">Loading.</p>}
             {journal && journal.length === 0 && <p class="cf-post-quiet">Nothing yet.</p>}
             <ul class="cf-alist">
               {(journal || []).map((j) => (
                 <li>
-                  <strong>{JOURNAL[j.what] || j.what.replace(/-/g, ' ')}</strong> {j.why} <span class="cf-post-quiet">{shortTime(j.at)}</span>
+                  <strong>{JOURNAL[j.what] || j.what.replace(/-/g, ' ')}</strong> {j.why} <span class="cf-post-quiet">{writer(j.by) ? 'by ' + writer(j.by) + ', ' : ''}{shortTime(j.at)}</span>
                 </li>
               ))}
             </ul>

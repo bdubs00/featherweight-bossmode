@@ -209,4 +209,19 @@ describe('NewAgent', () => {
     expect(m.profile.effort).toBe('high');
     expect(m.profile.budget).toEqual({ maxCostUSD: 2.5 });
   });
+
+  it('offers the answer as a check of done: what it must hold and must not hold becomes one check of the answer', () => {
+    const r = requestOf({ ...emptyForm([]), name: 'a', holds: 'READY, v2', lacks: 'I could not' }, []);
+    expect(r.profile.done).toEqual({ checks: [{ name: 'The answer', tool: 'answer', contains: ['READY', 'v2'], lacks: ['I could not'] }] });
+    expect(requestOf({ ...emptyForm([]), name: 'a', lacks: 'TODO' }, []).profile.done).toEqual({ checks: [{ name: 'The answer', tool: 'answer', lacks: ['TODO'] }] });
+    expect(requestOf({ ...emptyForm([]), name: 'a', holds: ' , ' }, []).profile.done).toBeUndefined();
+    expect(formErrors({ ...emptyForm([]), name: 'a', holds: Array.from({ length: 17 }, (_, i) => 'w' + i).join(',') }, []).holds).toBe('Name at most 16 words or phrases in all.');
+  });
+
+  it('shows the two fields of the answer under How it knows it is done', () => {
+    const el = mount(<NewAgent />);
+    const sec = el.querySelector('[aria-labelledby="agent-done"]')!;
+    expect(sec.querySelector('h2')!.textContent).toContain('How it knows it is done');
+    expect([...sec.querySelectorAll('label')].map((x) => x.textContent!.trim())).toEqual(['Its answer must hold', 'Its answer must not hold']);
+  });
 });

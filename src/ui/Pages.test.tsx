@@ -141,6 +141,30 @@ describe('a page', () => {
   });
 });
 
+describe('the page of the hearts of an agent', () => {
+  it('shows each heading with the channel by its title and no id, in either form that the server wrote', async () => {
+    const text = [
+      '# What people liked from writer',
+      '',
+      'The server adds an entry for each heart that a person puts on a result of writer in a bridge.',
+      '',
+      '## 2026-10-28, channel "Release notes" (01K8CH), writer, run 01K8R1',
+      '',
+      '- What writer did: Drafted the notes.',
+      '',
+      '## 2026-10-21, bridge "Migrate Puppet" (b1), writer-2, run 01K8R2',
+      '',
+      '- What writer did: Kept the names.',
+      '',
+    ].join('\n');
+    api = fakeApi({ 'GET /v1/pages/agents/writer/learned.md': { ...page(text, 'hl', 'bossmode'), path: 'agents/writer/learned.md', title: '' } });
+    const el = mount(<PageView path="agents/writer/learned.md" />);
+    await settle();
+    expect([...el.querySelectorAll('.article h2')].map((h) => h.textContent)).toEqual(['2026-10-28, writer in the channel \u201cRelease notes\u201d', '2026-10-21, writer-2 in the channel \u201cMigrate Puppet\u201d']);
+    expect(el.querySelector('.article')!.textContent).not.toMatch(/\bbridge\b|01K8/);
+  });
+});
+
 describe('the links of a page', () => {
   it('resolve a relative link against the folder of the page and open the page of the wiki, and keep a path outside the wiki as text', async () => {
     const text = 'Follow [the house style](../../runbooks/ansible-style.md), [the notes](notes.md), and [the site](https://example.com/style). [The root](../../../outside.md) and [a file](../../roles/cron/tasks/main.yml) are not pages.';

@@ -642,6 +642,14 @@
   padding-left: var(--s-5);
   padding-right: var(--s-5);
 }
+/* A channel lays out its stream from the top: a channel with two posts shows
+   them right under the sign-off card or the head, not pushed down to the
+   composer. A long channel still opens at its newest post, because Posts
+   scrolls to the end. */
+.cf-channel .msgs > .start,
+.cf-channel .msgs > .entries {
+  margin-top: 0;
+}
 
 /* A stream that the page draws itself: a job, a task, an agent. */
 .cf-stream {

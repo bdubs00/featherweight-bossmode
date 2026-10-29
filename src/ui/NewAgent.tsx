@@ -1,6 +1,8 @@
 // A new agent, at #new-agent. The name and what it handles come first,
 // then how many can work at once, with 2 as the default, and the template
-// of its workers when the settings offer more than one. Then the skills.
+// of its workers when the settings offer more than one. Then the skills,
+// and how it knows it is done: what its answer must hold and must not
+// hold, a check of the answer that the kernel makes at the end of each run.
 // Advanced holds the model, the effort, the budget, the point of the
 // context compaction, the rules, and the time zone. Create agent sends PUT
 // /v1/agents/{name} with the profile and workers, and the answer shows the
@@ -22,12 +24,13 @@ import { go, hrefOf } from '../lib/route';
 import { useCatalog } from './Skills';
 import { SkillPicker } from './SkillPicker';
 import { attempt, showSaid } from './notice';
-import { Advanced, Button, Chip, Field, Input, Led, Mark, PaneHeader, TextArea } from './primitives';
+import { Advanced, Button, Chip, Field, Help, Input, Led, Mark, PaneHeader, TextArea } from './primitives';
 import { Abilities } from './Abilities';
 import { abilitiesOf, rulesWords } from '../lib/tools';
 import { policyRules } from '../state/people';
 import { useToolCatalog } from '../state/tools';
 import { rulesWithPackages, switchWords, withPackages } from '../lib/packages';
+import { answerCheck, answerError, splitWords } from '../lib/done';
 
 /** The default number of workers of a new agent, as fleet.DefaultWorkers of the backend. */
 export const DEFAULT_WORKERS = 2;
@@ -67,6 +70,9 @@ export interface AgentForm {
   ask: string;
   deny: string;
   timeZone: string;
+  /** What the answer of each run must hold, and must not hold: one phrase per comma or line. */
+  holds: string;
+  lacks: string;
 }
 
 /** defaultTemplate is the template that the settings mark as the default, or the first one. */
@@ -92,6 +98,8 @@ export function emptyForm(templates: Template[]): AgentForm {
     ask: '',
     deny: '',
     timeZone: '',
+    holds: '',
+    lacks: '',
   };
 }
 
@@ -115,6 +123,8 @@ export function formErrors(f: AgentForm, taken: string[]): Partial<Record<keyof 
   if (!whole(f.tokens)) out.tokens = 'Write a whole number.';
   if (f.cost.trim() !== '' && !(Number(f.cost) > 0)) out.cost = 'Write an amount in dollars, such as 2.50.';
   if (f.compactAt.trim() === '' || !Number.isInteger(Number(f.compactAt)) || Number(f.compactAt) < 1024) out.compactAt = 'Write a whole number of tokens, at least 1024.';
+  const answer = answerError(splitWords(f.holds), splitWords(f.lacks));
+  if (answer) out.holds = answer;
   return out;
 }
 
@@ -123,7 +133,8 @@ export function formErrors(f: AgentForm, taken: string[]): Partial<Record<keyof 
  * What the agent handles becomes its description and its first
  * instruction. A field left empty stays out, so the agent takes the value
  * of the configuration. A template goes out only when the settings offer
- * more than one.
+ * more than one. What the answer must hold or must not hold becomes the
+ * one check of its definition of done, a check of the answer.
  */
 export function requestOf(f: AgentForm, templates: Template[]): { profile: NewProfile; workers: WorkersAsk } {
   const what = f.what.trim();
@@ -145,6 +156,8 @@ export function requestOf(f: AgentForm, templates: Template[]): { profile: NewPr
   if (Object.keys(budget).length) profile.budget = budget;
   const at = Number(f.compactAt);
   if (at !== DEFAULT_COMPACTION || f.compactModel.trim()) profile.compaction = { at, ...(f.compactModel.trim() ? { model: f.compactModel.trim() } : {}) };
+  const check = answerCheck(splitWords(f.holds), splitWords(f.lacks));
+  if (check) profile.done = { checks: [check] };
   const workers: WorkersAsk = { replicas: Number(f.workers) };
   if (templates.length > 1 && f.template) workers.template = f.template;
   return { profile, workers };
@@ -330,6 +343,22 @@ export function NewAgent() {
               Skills <Chip>{f.skills.length}</Chip>
             </h2>
             {cat ? <SkillPicker skills={cat.skills} value={f.skills} onChange={(v) => set('skills', v)} /> : <p class="t-meta">Loading the skills.</p>}
+          </section>
+          <section aria-labelledby="agent-done">
+            <h2 class="sec-head t-sub" id="agent-done">
+              How it knows it is done{' '}
+              <Help label="What the answer is">
+                The answer is what the agent says at the end of a run. A run is done only when its answer holds each of these words and none of the others. Put a comma between two words or phrases.
+              </Help>
+            </h2>
+            <div class="field-row">
+              <Field label="Its answer must hold" error={errors.holds}>
+                <Input value={f.holds} spellcheck={false} invalid={!!errors.holds} placeholder="READY" onInput={text('holds')} />
+              </Field>
+              <Field label="Its answer must not hold">
+                <Input value={f.lacks} spellcheck={false} placeholder="I could not" onInput={text('lacks')} />
+              </Field>
+            </div>
           </section>
           <Advanced id="agent-advanced">
             <div class="field-row">

@@ -1,14 +1,17 @@
 // Results: what the work of the agents gave and what it took, for a person
 // who pays for the agents and decides whether they are worth it. One pane:
 // the window, six figures, the done work by period with the verdicts of
-// people, and the lines of work. A result that waits for a check and a
+// people, and the work by job and agent. A result that waits for a check and a
 // task that waits for a person link to Activity, with the one count of the
 // work that needs the person, the number of the app bar and of Work. A
 // heart is no verdict, and a weak check of done is no check. The name of a line
 // opens its duty or its agent. Every figure is what the records hold: an
 // unchecked result shows as unchecked, a spend with unpriced tokens says
 // at least, and hours of a person show only from an estimate that names
-// the person who set it. The operator metrics stay in Prometheus.
+// the person who set it. The operator metrics stay in Prometheus. The words
+// are those of the page: job, agent, and channel, never duty, worker, seat,
+// bridge, or pool. A line of the API (ValueLine) is a row of Work by job
+// and agent; its field names stay.
 
 import { useEffect, useState } from 'preact/hooks';
 import { ApiError } from '../api/client';
@@ -105,7 +108,14 @@ export function lineHref(l: Pick<ValueLine, 'kind' | 'name' | 'agent'>): string 
   return '';
 }
 
-const KIND_WORD: Record<ValueLine['kind'], string> = { duty: 'duty', source: 'source', agent: 'agent' };
+/** The word of the kind of a row. A duty of the API is a job on the page. */
+const KIND_WORD: Record<ValueLine['kind'], string> = { duty: 'job', source: 'source', agent: 'agent' };
+
+/** unpricedWords counts the runs whose cost is unknown, because their model has no price. */
+export const unpricedWords = (n: number): string => (n === 1 ? '1 run of unknown cost' : n + ' runs of unknown cost');
+
+/** LOST_WORDS say what a lost task is, for its tooltip. */
+const LOST_WORDS = 'Stopped because the agent that held it was replaced.';
 
 export function Results() {
   const [days, setDays] = useState<Window>(readWindow);
@@ -223,18 +233,22 @@ function Figures({ v, unit, toCheck, mine, measured, onSaved }: { v: Value; unit
         <Tile
           label="Done"
           figure={v.work.done.toLocaleString()}
-          help="A task is one thing that a person or a duty asked of an agent, such as a start of a duty or a message to an agent. The work of the manager and of the quick chat is no task. Its cost shows as coordination under Spend."
+          help="A task is one thing that a person or a job asked of an agent, such as a run of a job or a message to an agent. The work of the Manager and of the quick chat is no task. Its cost shows as coordination under Spend. A lost task stopped because the agent that held it was replaced."
         >
           <p class="t-meta">
             {v.work.failed + v.work.stopped} failed or stopped, {v.work.open} open
-            {(v.work.lost || 0) > 0 && <>, {v.work.lost} lost</>}
+            {(v.work.lost || 0) > 0 && (
+              <>
+                , <span title={LOST_WORDS}>{v.work.lost} lost</span>
+              </>
+            )}
           </p>
         </Tile>
         <Tile
           label="Checked"
           figure={checkedOf(v.checks).toLocaleString()}
           unit={'of ' + v.work.done.toLocaleString()}
-          help="A result is checked when a person gave it a thumb, when a receipt of another system accepted or rejected it, or when the done check of the agent passed. A done check that only reads a file does not count, because a run that did nothing passes it. A heart keeps a result on the wiki, and it is no check. The grade of a model does not count either."
+          help="A result is checked when a person gave it a thumb, when a receipt of another system accepted or rejected it, or when the done check of the agent passed. A done check that only reads a file or the answer, and looks for nothing in it, does not count, because a run that did nothing passes it. A heart keeps a result on the wiki, and it is no check. The grade of a model does not count either."
         >
           <Verdicts checks={v.checks} />
           {toCheck.n > 0 && (
@@ -247,7 +261,7 @@ function Figures({ v, unit, toCheck, mine, measured, onSaved }: { v: Value; unit
           label="Spend"
           lead={v.spend.atLeast ? 'at least' : ''}
           figure={costText(v.spend.usd)}
-          help="What the models of the agents cost in the window, for all the work, also the work that failed. Coordination is the manager and the quick chat. The spend says at least when some runs used a model without a price."
+          help="What the models of the agents cost in the window, for all the work, also the work that failed. Coordination is the Manager and the quick chat. The spend says at least when the cost of some runs is unknown, because their model has no price."
         >
           {v.work.done > 0 && (!v.spend.atLeast || v.spend.perDone >= 0.01) && (
             <p class="t-meta">
@@ -258,13 +272,13 @@ function Figures({ v, unit, toCheck, mine, measured, onSaved }: { v: Value; unit
           <p class="t-meta">
             {costText(v.spend.failedUSD)} on failed work, {costText(v.spend.coordinationUSD)} on coordination
           </p>
-          {v.spend.unpriced > 0 && <Led tone="grey" word={v.spend.unpriced + (v.spend.unpriced === 1 ? ' run without a price' : ' runs without a price')} />}
+          {v.spend.unpriced > 0 && <Led tone="grey" word={unpricedWords(v.spend.unpriced)} label="Their model has no price, so their cost is unknown." />}
         </Tile>
         <Tile
           label="Needed nobody"
           figure={v.people.noPerson.toLocaleString()}
           unit={'of ' + v.work.done.toLocaleString()}
-          help="A done task needed nobody when no person decided for it or wrote to it after the ask. A decision that the manager or a timeout made is no action of a person. A thumb on the result afterwards does not count either."
+          help="A done task needed nobody when no person decided for it or wrote to it after the ask. A decision that the Manager or a timeout made is no action of a person. A thumb on the result afterwards does not count either."
         >
           <p class="t-meta">
             {v.people.actions === 1 ? '1 action of a person' : v.people.actions.toLocaleString() + ' actions of people'}, {v.people.reworked} followed up after they ended
@@ -283,7 +297,7 @@ function Figures({ v, unit, toCheck, mine, measured, onSaved }: { v: Value; unit
           figure={measured ? span(v.lead.medianSeconds) : 'None yet'}
           unit={measured ? 'median' : ''}
           muted={!measured}
-          help="From the ask to the first end of a done task. Half of the done tasks took this long or less. The bar adds up the time of all the done tasks and shows the part that waited for a person, so a few long waits weigh much. The time that a task waited for a worker is not in it."
+          help="From the ask to the first end of a done task. Half of the done tasks took this long or less. The bar adds up the time of all the done tasks and shows the part that waited for a person, so a few long waits weigh much. The time that a task waited for its agent to be free is not in it."
         >
           {measured && (
             <>
@@ -302,11 +316,11 @@ function Figures({ v, unit, toCheck, mine, measured, onSaved }: { v: Value; unit
           figure={v.estimated ? hours(v.estimated.minutes) : 'Not set'}
           unit={v.estimated ? 'est.' : ''}
           muted={!v.estimated}
-          help="Nothing measures the time that people spend. The owner of an agent sets the minutes that a person takes for one task of a line, in Lines of work. The page multiplies them by the done tasks that nobody sent back."
+          help="Nothing measures the time that people spend. The owner of an agent sets the minutes that a person takes for one task of a job or an agent, in Work by job and agent. The page multiplies them by the done tasks that nobody sent back."
         >
           {v.estimated && (
             <p class="t-meta">
-              {v.estimated.pieces === 1 ? '1 task' : v.estimated.pieces + ' tasks'} of {v.estimated.lines} {v.estimated.lines === 1 ? 'line' : 'lines'}, {v.work.done - v.estimated.pieces} without an estimate
+              {v.estimated.pieces === 1 ? '1 task' : v.estimated.pieces + ' tasks'} of {v.estimated.lines} {v.estimated.lines === 1 ? 'job or agent' : 'jobs or agents'}, {v.work.done - v.estimated.pieces} without an estimate
             </p>
           )}
         </Tile>
@@ -323,7 +337,7 @@ function Figures({ v, unit, toCheck, mine, measured, onSaved }: { v: Value; unit
       <section class="rs-sec" aria-labelledby="rs-lines">
         <div class="rs-sec-head">
           <h2 class="t-sub" id="rs-lines">
-            Lines of work
+            Work by job and agent
           </h2>
         </div>
         <Lines lines={v.lines} onSaved={onSaved} />
@@ -492,7 +506,7 @@ function Lines({ lines, onSaved }: { lines: ValueLine[]; onSaved: () => void }) 
     <table class="rs-lines">
       <thead>
         <tr class="t-caption">
-          <th scope="col">Line</th>
+          <th scope="col">Job or agent</th>
           <th scope="col" class="num">
             Done
           </th>
@@ -536,7 +550,12 @@ function Lines({ lines, onSaved }: { lines: ValueLine[]; onSaved: () => void }) 
               <b>{l.work.done.toLocaleString()}</b>
               {l.work.failed > 0 && <span class="t-meta rs-failed"> {l.work.failed} failed</span>}
               {l.work.stopped > 0 && <span class="t-meta rs-failed"> {l.work.stopped} stopped</span>}
-              {(l.work.lost || 0) > 0 && <span class="t-meta rs-failed"> {l.work.lost} lost</span>}
+              {(l.work.lost || 0) > 0 && (
+                <span class="t-meta rs-failed" title={LOST_WORDS}>
+                  {' '}
+                  {l.work.lost} lost
+                </span>
+              )}
             </td>
             <td>
               <Verdicts checks={l.checks} compact />
@@ -562,14 +581,15 @@ function Lines({ lines, onSaved }: { lines: ValueLine[]; onSaved: () => void }) 
 }
 
 /**
- * LineSpend is the spend of a line, or of one of its tasks. With runs that
- * have no price, a figure of a cent or more says at least, and a smaller
- * one says nothing it cannot back: the spend says no price when nothing
- * had a price, and the cost of a task says unknown.
+ * LineSpend is the spend of a row of a job or an agent, or of one of its
+ * tasks. With runs of unknown cost, because their model has no price, a
+ * figure of a cent or more says at least, and a smaller one says nothing
+ * it cannot back: the spend says unknown cost when no run had a price, and
+ * the cost of a task says unknown.
  */
 export function LineSpend({ usd, unpriced, each }: { usd: number; unpriced: number; each?: boolean }) {
   if (unpriced <= 0) return <>{costText(usd)}</>;
-  const title = unpriced === 1 ? '1 run without a price' : unpriced + ' runs without a price';
+  const title = unpricedWords(unpriced) + ', because their model has no price';
   if (usd >= 0.01)
     return (
       <span title={title}>
@@ -579,12 +599,12 @@ export function LineSpend({ usd, unpriced, each }: { usd: number; unpriced: numb
     );
   return (
     <span class="t-meta" title={title}>
-      {each ? 'unknown' : usd > 0 ? 'under $0.01, more without a price' : 'no price'}
+      {each ? 'unknown' : usd > 0 ? 'under $0.01, and more of unknown cost' : 'unknown cost'}
     </span>
   );
 }
 
-/** Estimate is the minutes that a person takes for one piece of a line, with who set it, and Set for the owner of the agent. */
+/** Estimate is the minutes that a person takes for one task of a job or an agent, with who set it, and Set for the owner of the agent. */
 function Estimate({ line, owner, onSaved }: { line: ValueLine; owner: boolean; onSaved: () => void }) {
   const [edit, setEdit] = useState(false);
   const [text, setText] = useState('');

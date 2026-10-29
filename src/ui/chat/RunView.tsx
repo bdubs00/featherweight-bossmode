@@ -2,7 +2,7 @@
 // stream is its conversation, with the steps folded, the decision that waits
 // as a card, and the answer. A result to sign off ends with Looks right and
 // Needs work. The composer follows up the run. The pane at the right says
-// who did it, for whom, what it cost, and its verdict.
+// who did it, for whom, what it cost, its checks of done, and its verdict.
 
 import { useEffect } from 'preact/hooks';
 import { api } from '../../api/routes';
@@ -21,6 +21,7 @@ import { Composer } from '../Composer';
 import { Msg } from '../Thread';
 import { Glyph } from '../icons';
 import { Led, Mark } from '../primitives';
+import { DonePass } from '../DonePass';
 import { useBoard, agentNameOf, useAnswered } from './data';
 import { WayOut } from './WayOut';
 import { chatHref } from './route';
@@ -174,6 +175,14 @@ export function RunSide({ id }: { id: string }) {
               <>
                 <dt>Cost</dt>
                 <dd>{costText(u.costUSD)}</dd>
+              </>
+            )}
+            {run.done && (
+              <>
+                <dt>Checks</dt>
+                <dd>
+                  <DonePass run={run} />
+                </dd>
               </>
             )}
             {card && card.verdict && (

@@ -51,6 +51,6 @@ export default defineConfig({
     environment: 'jsdom',
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     // tokens.test.ts and scroll.test.ts read the styles as text, so the tests process those files.
-    css: { include: [/(tokens|shell|fleet)\.css/] },
+    css: { include: [/(tokens|shell|fleet|cf|channel)\.css/] },
   },
 });

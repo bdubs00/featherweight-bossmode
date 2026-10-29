@@ -128,6 +128,9 @@ export interface ReviewState {
 export interface KnowhowSettings {
   agent?: string;
   askFirst: boolean;
+  /** Who turned the switch last, as person:<subject>, and when. The static token is person:token. */
+  by?: string;
+  at?: string;
   review?: ReviewState;
 }
 

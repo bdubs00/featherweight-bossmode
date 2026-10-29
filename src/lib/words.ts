@@ -12,12 +12,13 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  * personName is the short name of a subject: the name that the server gives,
  * else the part before an @. The static token of the server reads Admin
  * token, and a subject that is a bare id reads Someone, since an id names
- * nobody that a person knows.
+ * nobody that a person knows. A writer of Know-how, person:<subject>, reads
+ * as its subject, so person:token reads Admin token too.
  */
 export function personName(subject: string | undefined, display?: string): string {
   if (display && !UUID.test(display.trim())) return display;
   if (!subject) return 'someone';
-  const s = subject.trim();
+  const s = subject.trim().replace(/^person:/, '');
   if (s === 'token' || s.toLowerCase() === 'the token of the fleet') return 'Admin token';
   if (UUID.test(s)) return 'Someone';
   const at = s.indexOf('@');

@@ -342,6 +342,32 @@ describe('What it learned', () => {
     expect(rows.map((r) => !!keyNamed(r, 'Undo'))).toEqual([false, false, true, false]);
   });
 
+  it('names every write of the static token Admin token: an entry, an undo, a note, and the switch', async () => {
+    const TOKEN: Whoami = { principal: { subject: 'token', kind: 'token' }, roles: { triage: 'owner' }, admin: true, canCreate: true };
+    act(() => store.dispatch({ type: 'me', me: TOKEN }));
+    const byToken: JournalEntry[] = [
+      { id: pid(21), at: at(5), agent: 'triage', what: 'undone', subject: { note: 'gotchas/gitea-labels.md', scope: 'agent' }, why: 'A person took back a change of the note gotchas/gitea-labels.md (learned).', by: 'person:token' },
+      { id: pid(22), at: at(6), agent: 'triage', what: 'learned', subject: { note: 'gotchas/vpn.md', scope: 'agent' }, why: 'A person wrote this note.', by: 'person:token' },
+    ];
+    api = fakeApi(
+      routes({
+        'GET /v1/knowhow/settings/triage': { ...SETTINGS, by: 'person:token', at: at(10) },
+        'GET /v1/knowhow/journal?agent=triage&limit=50': { entries: byToken },
+        'GET /v1/knowhow/notes?agent=triage': { notes: [item('gotchas/vpn.md', { by: 'person:token' })] },
+      }) as never,
+    );
+    const el = mount(<KnowhowMain agent="triage" tab="learned" />);
+    await settle();
+    expect(text(el.querySelector('.kh-switch-by'))).toBe('Turned on by Admin token, ' + dateWords(at(10)) + '.');
+    const rows = [...el.querySelectorAll('.kh-entry')];
+    expect(rows.map((r) => text(r.querySelector('.kh-meta')))).toEqual(['By Admin token', 'By Admin token']);
+    const notes = mount(<KnowhowMain agent="triage" tab="notes" />);
+    await settle();
+    expect(text(notes.querySelector('.kh-note'))).toContain('By Admin token');
+    expect(notes.textContent).not.toContain('person:token');
+    expect(el.textContent).not.toContain('person:token');
+  });
+
   it('takes an entry back with Undo, and says in place when a later change touched its note', async () => {
     let n = 0;
     api = fakeApi(routes({ ['POST /v1/knowhow/journal/' + J3 + '/undo']: () => (++n === 1 ? { status: 409, body: { detail: 'a later change touched it' } } : { body: { entry: JOURNAL[2], undone: JOURNAL[2] } }) }) as never);

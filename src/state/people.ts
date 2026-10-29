@@ -298,7 +298,9 @@ export interface LikedEntry {
  * agents/<agent>/learned.md, one entry per heading. The front writes each
  * entry as a list: "What <person> asked: ...", "What <agent> did: ...",
  * "The note of <person>: ...", and a link "Open the run" to #run/<id>. Its
- * heading names the bridge in parentheses, the seat, and the run. The page
+ * heading names the channel by its title and its id in parentheses, the
+ * handle, and the run. The server writes channel "<title>" (<id>) now, and
+ * an older page keeps bridge "<title>" (<id>): the page reads both. The page
  * keeps the order of the front, which puts the newest entry first. An entry
  * in paragraphs, as an older front wrote them, gives its first paragraph as
  * what the agent did, and a paragraph "Their note:" as the note.

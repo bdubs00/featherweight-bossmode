@@ -1,5 +1,6 @@
 // The run of a seat: the result first (the title, the status, the failure,
-// the answer, what it did, the limits, and the reactions), and the files
+// the answer, what it did, the limits, its checks of done, and the
+// reactions), and the files
 // that it changed with a viewer, and the pages of the wiki that it wrote.
 // The member conversation shows these on its tabs Run and Files. The run
 // pane of a bridge shows the result and the conversation of the run in the
@@ -38,6 +39,7 @@ import { SeatAgainKey } from './SeatAgain';
 import { Conversation, useTranscript } from './Conversation';
 import { HeartNote } from './Thread';
 import { Icon } from './icons';
+import { DonePass } from './DonePass';
 
 /**
  * useResult reads the result of a run, and reads it again when the run
@@ -505,6 +507,16 @@ export function RunView({ runId, result, bridge, member, who, items, endSeq, gon
             <li>{l}</li>
           ))}
         </ul>
+      )}
+      {run && run.done && (
+        <section class="run-sec" aria-labelledby={'done-' + runId}>
+          <div class="run-sec-head">
+            <h4 class="t-sub" id={'done-' + runId}>
+              Checks of done
+            </h4>
+          </div>
+          <DonePass run={run} />
+        </section>
       )}
       {run && run.state === 'completed' && endSeq ? <ResultReactions run={runId} seq={endSeq} /> : null}
     </div>

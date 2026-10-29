@@ -15,6 +15,7 @@ import {
   holeless,
   matchesRoutine,
   metaOf,
+  compared,
   money,
   pct,
   resumeTo,
@@ -98,6 +99,15 @@ describe('the meta line of a row', () => {
   it('says how often a rehearsing routine agreed over the runs that it would have acted on', () => {
     const r = rec('rehearsing', { evidence: ev([d(1, { decided: 180, acted: 150, agreed: 126, disagreed: 24, handed: 30 })]) });
     expect(metaOf(r, NOW)).toBe('triage, 84% agreed over 150 runs');
+  });
+
+  it('counts the runs whose comparison came, agreed and disagreed, as the ready rule of the workbench does, not the runs that still work', () => {
+    // 30 runs it would have acted on: 20 agreed, 4 disagreed, and 6 still work, so their comparison has not come.
+    const r = rec('rehearsing', { evidence: ev([d(1, { decided: 34, acted: 30, agreed: 20, disagreed: 4, handed: 4 })]) });
+    expect(compared(countsOf(r.evidence))).toBe(24);
+    expect(metaOf(r, NOW)).toBe('triage, 83.3% agreed over 24 runs');
+    // A routine whose every run still works says no figure yet.
+    expect(metaOf(rec('rehearsing', { evidence: ev([d(1, { decided: 3, acted: 3 })]) }), NOW)).toBe('triage');
   });
 
   it('says when a proposed, paused, or retired routine moved, and only the agent before its evidence loads', () => {

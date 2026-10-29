@@ -9,7 +9,8 @@ import type { JournalEntry, JournalSubject, JournalWhat, KnowhowSummary, NoteIte
 import type { Tone } from './presence';
 import { isMe, whoName, type Me } from './lines';
 import { hrefOf } from './route';
-import { money, num, titleOf } from './routines';
+import { dateWords, money, num, titleOf } from './routines';
+import { personName } from './words';
 
 /** The fewest runs from which the page shows a share or a change in percent. The server keeps the same rule for the comparison runs. */
 export const HELD_BACK_MIN = 20;
@@ -103,19 +104,35 @@ export function canDecide(s: JournalSubject, me: Me, role: Role): boolean {
 
 /**
  * byWords names who made a note or a change, for a meta line: you, a
- * person, the agent, or the after-work review. The server names no actor,
- * so its own changes give "".
+ * person, the agent, or the after-work review. A write of the static
+ * token, person:token, reads Admin token, also for a person who signed in
+ * with it, because many people can hold the token. The server names no
+ * actor, so its own changes give "".
  */
 export function byWords(by: string, me: Me, agentName: string): string {
   const b = (by || '').trim();
   if (b === 'review') return 'the after-work review';
   if (b === 'agent') return agentName;
   const who = authorOf(b);
+  if (who === 'token') return personName(who);
   if (who) {
     const w = whoName(who, me);
     return w === 'You' ? 'you' : w;
   }
   return '';
+}
+
+/**
+ * switchByWords says who turned the switch Ask me before it keeps what it
+ * learns, and when, such as Turned on by Admin token, Oct 27. A switch
+ * that nobody turned gives "".
+ */
+export function switchByWords(s: { askFirst: boolean; by?: string; at?: string } | null | undefined, me: Me, now = new Date()): string {
+  if (!s || !s.by) return '';
+  const who = byWords(s.by, me, '');
+  if (!who) return '';
+  const when = s.at ? dateWords(s.at, now) : '';
+  return (s.askFirst ? 'Turned on by ' : 'Turned off by ') + who + (when ? ', ' + when : '') + '.';
 }
 
 /** A source of a note in words, with the address that opens it, if any. */

@@ -506,7 +506,9 @@ export function register({ on, refuse, readJson, publish, now, AGENTS, writePage
     return { entry: bare(out), undone: bare(e) };
   });
 
-  const settings = (agent) => ({ agent, askFirst: !!ask[agent], review: { on: true, agent: 'review', every: '24h0m0s' } });
+  // Who turned the switch last, and when: person:<subject>, so the static token is person:token.
+  const switchedBy = {};
+  const settings = (agent) => ({ agent, askFirst: !!ask[agent], ...(switchedBy[agent] || {}), review: { on: true, agent: 'review', every: '24h0m0s' } });
 
   on('POST', '/v1/knowhow/review/([^/]+)', (c, raw) => {
     const agent = decodeURIComponent(raw);
@@ -528,6 +530,7 @@ export function register({ on, refuse, readJson, publish, now, AGENTS, writePage
     viewAgent(agent);
     if (!canEdit(agent)) refuse(403, 'the switch of an agent needs the owner role on the agent');
     ask[agent] = body.askFirst;
+    switchedBy[agent] = { by: 'person:' + c.person.subject, at: new Date().toISOString() };
     changed(agent);
     return settings(agent);
   });
