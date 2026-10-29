@@ -483,6 +483,24 @@ a.people-title:hover {
 .run-sec {
   margin-top: var(--s-5);
 }
+/* The newest pass of the checks of done of a run: its state, the limit after which it ran, and each check. */
+.done-pass p {
+  margin: 0;
+}
+.done-pass-limit,
+.done-pass-checks {
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+  color: var(--muted);
+}
+.done-pass-checks {
+  margin: var(--s-1) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.done-pass-checks li.failed {
+  color: var(--ink);
+}
 .run-sec-head {
   display: flex;
   align-items: center;
