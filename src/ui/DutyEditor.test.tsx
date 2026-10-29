@@ -138,7 +138,8 @@ describe('New duty', () => {
     // The defaults of the other sections.
     expect((el.querySelector('input[name="duty-overlap"][value="skip"]') as HTMLInputElement).checked).toBe(true);
     expect(fieldOf(el, 'Catch up a missed time')!.value).toBe('1h');
-    expect((el.querySelector('input[name="duty-decider"][value="manager"]') as HTMLInputElement).checked).toBe(true);
+    // One default while you are away, as the door has it: nobody decides (plan A9).
+    expect((el.querySelector('input[name="duty-decider"][value="nobody"]') as HTMLInputElement).checked).toBe(true);
     expect(select(el, 'How long a question waits')!.value).toBe('2h');
     expect(select(el, 'Then')!.value).toBe('deny');
     expect([...el.querySelectorAll<HTMLInputElement>('section[aria-labelledby="duty-tell-head"] input')].map((i) => [i.closest('label')!.textContent, i.checked])).toEqual([
@@ -313,7 +314,7 @@ describe('New duty', () => {
       when: { schedule: WEEKDAYS },
       do: { ask: { message: 'Draft the notes of {date}' } },
       limits: { budget: { maxCostUSD: 0.5 }, overlap: 'skip', catchUp: '1h' },
-      whileAway: { decider: 'manager', timeout: '2h', then: 'deny' },
+      whileAway: { decider: 'nobody', timeout: '2h', then: 'deny' },
       notify: { failure: ['owner'], needsYou: ['owner'] },
     };
     expect(check.body).toEqual(record);

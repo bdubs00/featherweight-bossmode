@@ -799,9 +799,16 @@ export function limitWords(l: DutyRecord['limits'] | undefined, schedule = true,
 /** REVIEW_LINE says that each result of a duty waits for its owner to check it. */
 export const REVIEW_LINE = 'Each result waits for you to check it: Looks right or Needs work.';
 
-/** awayWords reads back who decides while the person is away. */
+/**
+ * AWAY is the default of every duty while the person is away, as the front
+ * fills it: nobody decides, and after 2 hours the answer is no. A duty of
+ * the door and a duty of New duty take the same default (plan A9).
+ */
+export const AWAY: NonNullable<DutyRecord['whileAway']> = { decider: 'nobody', timeout: '2h', then: 'deny' };
+
+/** awayWords reads back who decides while the person is away, as duties.AwayWords of the front does. */
 export function awayWords(w: DutyRecord['whileAway'] | undefined): string {
-  const a = w || { decider: 'manager', timeout: '2h', then: 'deny' };
+  const a = w || AWAY;
   const who = a.decider === 'nobody' ? 'Nobody decides a question for you.' : 'The manager decides a question for you.';
   const then = a.then === 'cancel' ? 'the run stops' : 'the answer is no';
   return who + ' After ' + spanText(a.timeout || '2h') + ' without an answer, ' + then + '.';
@@ -1062,9 +1069,9 @@ export function emptyForm(zone: string): DutyForm {
     bridgeTurns: '',
     overlap: 'skip',
     catchUp: '1h',
-    decider: 'manager',
-    timeout: '2h',
-    then: 'deny',
+    decider: AWAY.decider,
+    timeout: AWAY.timeout,
+    then: AWAY.then,
     failures: true,
     questions: true,
     results: false,
@@ -1178,7 +1185,7 @@ export function formOf(d: Duty, zone: string): DutyForm {
     bridgeTurns: opens ? num(b.maxTurns) : '',
     overlap: l.overlap || 'skip',
     catchUp: l.catchUp === undefined ? '1h' : l.catchUp,
-    decider: w && w.decider === 'nobody' ? 'nobody' : 'manager',
+    decider: w && w.decider === 'manager' ? 'manager' : 'nobody',
     timeout: (w && w.timeout) || '2h',
     then: w && w.then === 'cancel' ? 'cancel' : 'deny',
     failures: !d.notify || !d.notify.failure ? true : d.notify.failure.includes('owner'),

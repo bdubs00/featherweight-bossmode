@@ -19,7 +19,7 @@ import { ApiError } from '../api/client';
 import type { ComponentChildren } from 'preact';
 import type { DutyRecord, TaskPlan, TaskTell, Whoami } from '../api/types';
 import { hrefOf } from '../lib/route';
-import { nextWords, timeOf, titleOfName } from '../lib/duties';
+import { awayWords, nextWords, timeOf, titleOfName } from '../lib/duties';
 import { list } from '../lib/words';
 import { loadDuties } from '../state/duties';
 import { loadBridges } from '../state/actions';
@@ -95,6 +95,20 @@ export function lowWords(plan: Pick<TaskPlan, 'kind' | 'cost'>, cost: number | n
 }
 
 /**
+ * centWords warns that the cost that the person types is below one cent,
+ * whatever the basis says: a run stops at such a limit almost at once, and
+ * a basis of "under $0.01" gives no low bound to warn against (plan A12).
+ * It reads the text as the person types it, so 0.001 warns before Start.
+ */
+export function centWords(text: string): string {
+  const t = text.trim().replace(/^\$/, '');
+  if (!/^\d*\.?\d+$/.test(t)) return '';
+  const v = Number(t);
+  if (!(v >= 0) || v >= 0.01) return '';
+  return 'That is less than one cent. A run stops at such a limit almost at once. Say at least 0.01.';
+}
+
+/**
  * dutyOfPlan is the record of a duty that Change the details hands to the
  * editor: the plan of the door, with the cost that the person typed.
  */
@@ -165,8 +179,8 @@ function Readback({ plan, onPlan, onStarted, busy }: { plan: TaskPlan; onPlan: (
   const start = async () => {
     if (going || busy) return;
     if (agentProblem) return;
-    if (n === null) {
-      setError(team ? 'Say the most that the whole team can spend, such as 5.00.' : 'Say the most that one run can cost, such as 0.50.');
+    if (n === null || centWords(cost)) {
+      setError(centWords(cost) || (team ? 'Say the most that the whole team can spend, such as 5.00.' : 'Say the most that one run can cost, such as 0.50.'));
       if (field.current) field.current.focus();
       return;
     }
@@ -293,6 +307,15 @@ function Readback({ plan, onPlan, onStarted, busy }: { plan: TaskPlan; onPlan: (
             </dd>
           </div>
         )}
+        {/* A task that repeats says who decides a question of its run while you are away, as New duty and the duty page say it. */}
+        {plan.kind === 'repeat' && (
+          <div class="rb-row">
+            <dt>While you are away</dt>
+            <dd>
+              <p>{plan.away || awayWords(plan.start.duty && plan.start.duty.whileAway)}</p>
+            </dd>
+          </div>
+        )}
         <div class="rb-row">
           <dt>The result</dt>
           <dd>
@@ -338,11 +361,11 @@ function Readback({ plan, onPlan, onStarted, busy }: { plan: TaskPlan; onPlan: (
               </span>
             </Field>
             {plan.cost.basis && <p class="t-meta">{plan.cost.basis}</p>}
-            {/* A cost below the cheapest run says so as the person types, before Start. */}
+            {/* A cost below one cent, or below the cheapest run, says so as the person types, before Start. */}
             <p class="rb-low" role="status">
-              {lowWords(plan, n) && (
+              {(centWords(cost) || lowWords(plan, n)) && (
                 <>
-                  <LineLed tone="amber" /> {lowWords(plan, n)}
+                  <LineLed tone="amber" /> {centWords(cost) || lowWords(plan, n)}
                 </>
               )}
             </p>

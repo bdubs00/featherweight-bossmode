@@ -1228,7 +1228,7 @@ The page never shows pool, member, job, run id, or Task in these places.
 | `Failures and questions.` (Tell me about) | change | the list of what the person hears of, such as `Failures, questions, and each result.` or `Failures and each result that found something.` | integration |
 | new | add | `Each result waits for you to check it: Looks right or Needs work.` on the page of a duty and in its save dialog | integration |
 | new | add | the switches `Results`, `Only a result that found something`, and `Ask me to check each result` under You | integration |
-| the save dialog says the schedule and the limits | change | the dialog also says who decides while the person is away, such as `The manager decides a question for you. After 2 hours without an answer, the answer is no.` | integration |
+| the save dialog says the schedule and the limits | change | the dialog also says who decides while the person is away, such as `Nobody decides a question for you. After 2 hours without an answer, the answer is no.` | integration |
 
 ### src/ui/Board.tsx, src/ui/Fleet.tsx
 

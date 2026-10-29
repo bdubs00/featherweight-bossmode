@@ -32,6 +32,7 @@ import {
   toWords,
   whenError,
   whenFormOf,
+  AWAY,
   awayWords,
   tellWords,
   checkTools,
@@ -197,7 +198,8 @@ describe('the form of a duty', () => {
     const r = recordOf(f, null, 'draft-the-notes');
     expect(r.limits.budget).toEqual({});
     expect(r.do.ask!.message).toBe('Draft the notes of {date}.');
-    expect(r.whileAway).toEqual({ decider: 'manager', timeout: '2h', then: 'deny' });
+    // One default while you are away, the default of the front: nobody decides (plan A9).
+    expect(r.whileAway).toEqual({ decider: 'nobody', timeout: '2h', then: 'deny' });
     expect(r.notify).toEqual({ failure: ['owner'], needsYou: ['owner'] });
     expect(r.limits.catchUp).toBe('1h');
     expect('revision' in r).toBe(false);
@@ -584,5 +586,15 @@ describe('the title of a duty', () => {
     // A problem of the title shows beside the name.
     expect(dutySlot('title')).toBe('name');
     expect(nameWordsReason('x'.repeat(101), [])).toBe('A name holds 100 characters at most.');
+  });
+});
+
+describe('while you are away', () => {
+  it('reads one default, nobody decides, as the front fills it, and keeps the manager of a duty that names it', () => {
+    expect(AWAY).toEqual({ decider: 'nobody', timeout: '2h', then: 'deny' });
+    expect(awayWords(undefined)).toBe('Nobody decides a question for you. After 2 hours without an answer, the answer is no.');
+    expect(awayWords({ decider: 'manager', timeout: '30m', then: 'cancel' })).toBe('The manager decides a question for you. After 30 minutes without an answer, the run stops.');
+    expect(formOf({ ...duty(), whileAway: undefined }, 'UTC').decider).toBe('nobody');
+    expect(formOf(duty(), 'UTC').decider).toBe('manager');
   });
 });

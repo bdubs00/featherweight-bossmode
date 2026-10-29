@@ -1217,8 +1217,8 @@ function EditorForm({ name, seed, base: read, heading, back: home }: FormProps) 
               label="Who decides a question of a run"
               value={f.decider}
               options={[
-                { id: 'manager', label: 'The manager decides' },
                 { id: 'nobody', label: 'Nobody', meta: 'The question waits for you.' },
+                { id: 'manager', label: 'The manager decides' },
               ]}
               onChange={(decider) => patch({ decider })}
             />
