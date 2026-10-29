@@ -104,6 +104,29 @@ describe('the plain facts of a later front', () => {
   });
 });
 
+describe('the words of a front that says channel and agent', () => {
+  it('reads the lines of a channel as it reads the lines of a bridge', () => {
+    const cases: [string, string, string][] = [
+      ['opened', 'alice@example.com opened the channel with 3 members', 'You opened the team'],
+      ['closed', 'token closed the channel', 'token closed the team'],
+      ['reopened', 'token reopened the channel', 'token reopened the team'],
+      ['fired', 'token took scribe off the channel', 'token fired scribe'],
+      ['task', 'alice@example.com started writer again on its task: Write the notes', 'You seated writer again'],
+      ['changed', 'token changed the settings of the channel', 'token changed the settings'],
+      ['failed', 'The server failed to start reviewer-2: no queue for the agent', 'reviewer-2 did not take the seat'],
+      ['failed', 'The server failed to start reviewer-2 again: no queue for the agent', 'reviewer-2 did not take the seat'],
+      ['failed', 'The manager did not get the ask to start reviewer-2: the run is gone', 'reviewer-2 did not take the seat'],
+      ['failed', 'The server failed to queue the run of reviewer-2: no queue for the agent', 'reviewer-2 did not start'],
+      ['cap', 'The channel reached its cap of 2000 messages', 'The team reached its cap of 2000 messages'],
+      ['cap', 'The channel reached its cap of 400 turns', 'The team reached its cap of 400 turns'],
+      ['cap', 'The channel reached its cap of 30 deliveries a minute, and writer did not get message 9', 'The team reached its cap of 30 a minute'],
+      ['lost', 'migrator-1 lost its run 01RUN9: the fleet no longer holds it', 'migrator-1 lost its worker'],
+    ];
+    for (const [event, text, words] of cases) expect(lineWords({ event, text }, ALICE).text).toBe(words);
+    expect(lostRunOf({ from: { kind: 'system' }, event: 'lost', text: 'migrator-1 lost its run 01RUN9: the fleet no longer holds it' })).toBe('01RUN9');
+  });
+});
+
 describe('isMe and whoName', () => {
   it('names the person who reads the page You, by the subject, the name, or the words of the token', () => {
     expect(isMe('token', TOKEN)).toBe(true);
