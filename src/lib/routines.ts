@@ -141,6 +141,15 @@ export function metaOf(r: RoutineRecord, now = Date.now(), withAgent = true): st
   return fig ? `${r.agent}, ${fig}` : r.agent;
 }
 
+/**
+ * compared counts the runs that the routine would have acted on and whose
+ * comparison came: those that agreed and those that did not. The ready
+ * rule of the workbench counts them against its bound (routines/evidence.go,
+ * Ready), not acted: a run that still works has its decision but not yet
+ * its comparison, so it counts toward no bound.
+ */
+export const compared = (t: Pick<Counts, 'agreed' | 'disagreed'>): number => (t.agreed || 0) + (t.disagreed || 0);
+
 /** figureOf is the figure of the status of a routine for its meta line, or "". */
 function figureOf(r: RoutineRecord, now: number): string {
   const s = statusOf(r);
@@ -148,7 +157,8 @@ function figureOf(r: RoutineRecord, now: number): string {
   const t = ev ? countsOf(ev) : null;
   if (s === 'needs-you') return t ? `rehearsed ${units(t.decided)}` : '';
   if (s === 'live') return ev ? `${num(weekOf(ev.days, now))} this week` : '';
-  if (s === 'rehearsing') return t && t.acted > 0 ? `${pct(t.agreed / t.acted)} agreed over ${units(t.acted)}` : '';
+  // How close a rehearsing routine is to going live: the share that agreed over the runs that the comparison settled, as the ready rule counts them.
+  if (s === 'rehearsing') return t && compared(t) > 0 ? `${pct(t.agreed / compared(t))} agreed over ${units(compared(t))}` : '';
   const m = lastMove(r);
   return m ? since(m.at, now) : '';
 }
