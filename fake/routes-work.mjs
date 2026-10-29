@@ -1,7 +1,8 @@
 // The fake route of the board of the work, after the package work of the
 // workbench: one card per piece of work, from the request to its end.
 //
-//   GET /v1/work?days=7&all=false   {"sentence", "lanes": [{"stage", "count", "yours", "oldest"}], "cards": [<card>], "days"}
+//   GET /v1/work?days=7&all=false   {"sentence", "lanes": [{"stage", "count", "yours", "oldest"}], "cards": [<card>], "days",
+//                                   "done", "waiting": {"count", "needsYou", "toCheck", "notes"}}
 //   POST /v1/work/review            {"bridge", "verdict", "note"}: the check of a team. up closes the bridge with
 //                                   the verdict accepted. down posts the note in the bridge to every seat, and the
 //                                   bridge stays open.
@@ -15,15 +16,20 @@
 // waiting, working, needs-you, stopped, review, done. A run is in review
 // only when its owner asked to check each result: the metadata
 // workbench.review is 1, or its duty has review. It leaves review on the
-// first reaction. A done card carries its verdict: accepted (a thumb up or
-// a heart), checked (the done check of the agent passed, stop checked),
-// sent-back (a thumb down), or unchecked. The fake builds the cards from
+// first thumb. A done card carries its verdict: accepted (a thumb up; a
+// heart is no verdict), checked (the done check of the agent passed, stop
+// checked), sent-back (a thumb down), or unchecked. The fake builds the cards from
 // its bridges, its runs, and the history of its duties with the rules of
 // the workbench, in short: a bridge is one card, a start of a duty is one
 // card, the items of a batch are one card, and a conversation is one card.
 // A run that only the archive holds and that did not end is stopped and
-// lost. A card that did not end stays however old it is, until a person
-// lets it go. A duty that tells of a result only when it finds something
+// lost. A card that waits or works stays however old it is. A stopped card
+// stays until a person lets it go, or for seven days, after which it lets
+// itself go. To check and Done show the newest card first. done counts the
+// done cards without the canceled cards and the cards let go, and waiting
+// is the one count of the work that needs the person: the cards of Needs
+// you and To check whose next move is the person's. The fake keeps no
+// note that waits, so notes is 0. A duty that tells of a result only when it finds something
 // puts a run whose answer starts with Found: in review, with that line as
 // its reason. A person shows by the name beside the subject, in display.
 
@@ -33,7 +39,7 @@ const DAY = 24 * 60 * 60 * 1000;
 const STAGES = ['waiting', 'working', 'needs-you', 'stopped', 'review', 'done'];
 const WEIGHT = { 'needs-you': 6, working: 5, waiting: 4, stopped: 3, review: 2, done: 1 };
 const LANE = {
-  waiting: ['waits for a worker', 'wait for a worker'],
+  waiting: ['is coming up', 'are coming up'],
   working: ['is in work', 'are in work'],
   'needs-you': ['needs a person', 'need a person'],
   stopped: ['stopped', 'stopped'],
@@ -73,14 +79,14 @@ export function foundLine(r) {
 
 /**
  * inReview reports whether a run waits for a person to check its result: it
- * ended well and has no reaction, and its owner asked to check each result
+ * ended well and has no thumb, and its owner asked to check each result
  * (the metadata workbench.review), or its duty tells of a result only when
  * it finds something (workbench.found) and it found something.
  */
 export function inReview(r) {
   const md = r.metadata || {};
   const re = r.reactions || {};
-  if (r.state !== 'completed' || re.up > 0 || re.down > 0 || re.heart > 0) return false;
+  if (r.state !== 'completed' || re.up > 0 || re.down > 0) return false;
   if (md['workbench.review'] === '1') return true;
   return md['workbench.found'] === '1' && !!foundLine(r);
 }
@@ -89,7 +95,7 @@ export function inReview(r) {
 function verdictOf(r) {
   const re = r.reactions || {};
   if (re.down > 0) return 'sent-back';
-  if (re.up > 0 || re.heart > 0) return 'accepted';
+  if (re.up > 0) return 'accepted';
   if (r.stop === 'checked') return 'checked';
   return 'unchecked';
 }
@@ -98,7 +104,7 @@ function verdictOf(r) {
 function runPart(r) {
   const p = { run: r.id, since: r.updatedAt, approval: '', lost: false };
   const open = !['completed', 'failed', 'canceled'].includes(r.state);
-  if (r.archived && open) return { ...p, stage: 'stopped', lost: true, reason: 'Its worker was replaced before it ended, so it cannot go on.' };
+  if (r.archived && open) return { ...p, stage: 'stopped', lost: true, reason: 'The agent that held it is gone.' };
   switch (r.state) {
     case 'input-required': {
       const a = r.pending || {};
@@ -106,7 +112,7 @@ function runPart(r) {
       return { ...p, stage: 'needs-you', reason, approval: a.id || '', since: a.requestedAt || r.updatedAt };
     }
     case 'queued':
-      return { ...p, stage: 'waiting', reason: 'Waits for a worker.', since: r.createdAt };
+      return { ...p, stage: 'waiting', reason: 'Waits to start.', since: r.createdAt };
     case 'running':
     case 'suspended':
       return { ...p, stage: 'working', reason: r.activity && r.activity.tool ? 'Runs ' + r.activity.tool + '.' : 'Works.', since: r.createdAt };
@@ -214,10 +220,10 @@ export function board(S, me, { days = 7, all = false } = {}) {
           parts.push({ ...p, stage: 'working', reason: m.handle + ' works.' });
           break;
         case 'waiting':
-          parts.push({ ...p, stage: 'waiting', reason: m.handle + ' waits for a worker.' });
+          parts.push({ ...p, stage: 'waiting', reason: m.handle + ' waits to start.' });
           break;
         case 'error':
-          parts.push({ ...p, stage: 'stopped', reason: m.gone ? m.handle + ' lost its worker before it ended.' : m.handle + ' stopped with an error.', lost: !!m.gone });
+          parts.push({ ...p, stage: 'stopped', reason: m.gone ? m.handle + ' stopped: the agent that held it is gone.' : m.handle + ' stopped with an error.', lost: !!m.gone });
           break;
         case 'limit':
           parts.push({ ...p, stage: 'stopped', reason: m.handle + ' stopped at a limit.' });
@@ -327,12 +333,18 @@ export function board(S, me, { days = 7, all = false } = {}) {
     if (!g || c.stage !== 'stopped') continue;
     Object.assign(c, { stage: 'done', verdict: 'let-go', reason: 'Let go by ' + (g.by === me ? 'you' : g.name) + '.', since: g.at, ended: g.at, next: '' });
   }
+  // A card that stopped seven days ago and that nobody moved lets itself go.
+  for (const c of cards) {
+    if (c.stage !== 'stopped' || !c.since || now - ms(c.since) < 7 * DAY) continue;
+    const at = new Date(ms(c.since) + 7 * DAY).toISOString();
+    Object.assign(c, { stage: 'done', verdict: 'let-go', reason: 'It stopped 7 days ago and nobody moved it, so it let itself go.', since: at, ended: at, next: '' });
+  }
 
   // The board keeps the cards of the person, a card that did not end however old, and a card that ended in the window.
   // A card in review waits for a person, so it stays however old it is.
   const shown = cards.filter((c) => (all || c.mine) && !(c.stage === 'done' && now - ms(c.since) > days * DAY));
   const rank = Object.fromEntries(STAGES.map((s, i) => [s, i]));
-  shown.sort((a, b) => rank[a.stage] - rank[b.stage] || (a.stage === 'done' ? ms(b.since) - ms(a.since) : ms(a.since) - ms(b.since)));
+  shown.sort((a, b) => rank[a.stage] - rank[b.stage] || (a.stage === 'done' || a.stage === 'review' ? ms(b.since) - ms(a.since) : ms(a.since) - ms(b.since)));
   const lanes = STAGES.map((stage) => {
     const of = shown.filter((c) => c.stage === stage);
     const oldest = of.reduce((o, c) => (!o || ms(c.since) < ms(o) ? c.since : o), '');
@@ -342,10 +354,14 @@ export function board(S, me, { days = 7, all = false } = {}) {
     delete c.mine;
     c.links.runs = c.links.runs.slice(0, 20);
   }
-  return { sentence: sentence(lanes, shown.length, days, now), lanes, cards: shown, days };
+  const done = shown.filter((c) => c.stage === 'done' && ['accepted', 'checked', 'sent-back', 'unchecked'].includes(c.verdict)).length;
+  const yours = (stage) => lanes.find((l) => l.stage === stage).yours;
+  const waiting = { needsYou: yours('needs-you'), toCheck: yours('review'), notes: 0 };
+  waiting.count = waiting.needsYou + waiting.toCheck + waiting.notes;
+  return { sentence: sentence(lanes, shown.length, days, now, done), lanes, cards: shown, days, done, waiting };
 }
 
-function sentence(lanes, n, days, now) {
+function sentence(lanes, n, days, now, finished) {
   if (!n) return 'No work in the last ' + plural(days, 'day', 'days') + '.';
   const open = lanes.filter((l) => l.stage !== 'done').reduce((s, l) => s + l.count, 0);
   const out = [plural(open, 'task is open', 'tasks are open') + '.'];
@@ -356,7 +372,7 @@ function sentence(lanes, n, days, now) {
     out.push(s + '.');
   }
   const done = lanes.find((l) => l.stage === 'done');
-  if (done.count) out.push(done.count + ' done in the last ' + plural(days, 'day', 'days') + '.');
+  if (done.count) out.push(finished + ' done in the last ' + plural(days, 'day', 'days') + (done.count > finished ? ', and ' + (done.count - finished) + ' canceled or let go' : '') + '.');
   return out.join(' ');
 }
 

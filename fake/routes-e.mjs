@@ -30,7 +30,8 @@
 //   GET    /v1/playbooks/{name}             the playbook whole
 //   PUT    /v1/playbooks/{name}             {"goal", "placement", "seats", "caps", "delegation", "revision"}: 201, 200, 400, or 409
 //   DELETE /v1/playbooks/{name}             204
-//   GET    /v1/inbox                        {"items": [{"kind", "run", "approval", "duty", "agent", "bridge", "text", "since"}]}
+//   GET    /v1/inbox                        {"items": [{"kind", "run", "approval", "duty", "agent", "bridge", "text", "since"}],
+//                                            "waiting": {"count", "needsYou", "toCheck", "notes"}}: the one count of the board
 //
 // The header X-Time-Zone gives the zone of a schedule that names none. The
 // fake reads the words of a person with a small grammar, as the front
@@ -53,7 +54,7 @@
 // weekly summary of competitors does the work of the template of the door,
 // so the door names it as the same work.
 
-import { foundLine, inReview } from './routes-work.mjs';
+import { board, foundLine, inReview } from './routes-work.mjs';
 
 const MIN = 60_000;
 const DAY = 24 * 60 * MIN;
@@ -1090,7 +1091,7 @@ export function register({ on, refuse, readJson, now, AGENTS, admin, S, publish 
   /* ---------- the inbox ---------- */
 
   // What needs the person from the duties: a paused duty, a failed last run, and a run of a duty that waits for an answer.
-  on('GET', '/v1/inbox', () => {
+  on('GET', '/v1/inbox', (c) => {
     const items = [];
     for (const d of D.values()) {
       const last = d.history[0];
@@ -1109,6 +1110,13 @@ export function register({ on, refuse, readJson, now, AGENTS, admin, S, publish 
       const title = r.title || (d && d.title) || 'A result';
       items.push({ kind: 'result', run: r.id, approval: '', duty, agent: r.agent, bridge: '', text: found ? title + ': it found something.' : title + ' is ready to check.', since: r.updatedAt });
     }
-    return { items };
+    // The one count of the work that needs the person comes from the lanes of the board, and a team whose agents
+    // finished is a result to check, with its bridge and no run.
+    const b = board(S, c.person.subject, {});
+    for (const card of b.cards) {
+      if (card.kind !== 'bridge' || card.stage !== 'review' || card.next !== 'you') continue;
+      items.push({ kind: 'result', run: '', approval: '', duty: '', agent: card.agents[0] || '', bridge: card.links.bridge, text: card.title + ': the agents finished, and the result waits for a check.', since: card.since });
+    }
+    return { items, waiting: b.waiting };
   });
 }
