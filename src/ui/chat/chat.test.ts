@@ -6,7 +6,7 @@ import type { Bridge, Member, WorkCard } from '../../api/types';
 import type { InboxRow } from '../../state/inbox';
 import { chatHref, focusOf, parseChat, type ChatRoute } from './route';
 import { askWords, needsOf, type NeedsInput } from './needs';
-import { channelRow, pageWords, peopleWords, sortChannels } from './channels';
+import { channelRow, lineText, openedWords, pageWords, peopleWords, sortChannels } from './channels';
 import { handleFor } from './Members';
 import { matches } from './TopBar';
 import { lastWords } from './Sidebar';
@@ -179,5 +179,20 @@ describe('a channel in the sidebar', () => {
   it('marks a channel where a job repeats', () => {
     const r = channelRow(b({}), [], facts, '', [{ name: 'j', agent: 'scribe', when: {}, do: { post: { bridge: 'br-1', message: 'Go' } }, limits: {} } as never]);
     expect(r.repeats).toBe(true);
+  });
+});
+
+describe('the lines of a channel', () => {
+  const sys = (event: string, text: string) => ({ from: { kind: 'system' as const }, event, text });
+  it('says how many agents an opened channel got', () => {
+    expect(openedWords([sys('opened', 'manager opened the bridge for ann, with 2 members.'), sys('started', 'one started: x'), sys('started', 'two started: y')])).toBe('Opened channel · 2 members');
+    expect(openedWords([sys('opened', 'ann opened the bridge with 3 members.')])).toBe('Opened channel · 3 members');
+    expect(openedWords([sys('started', 'one started: x')])).toBeUndefined();
+  });
+  it('says channel and joined in a line', () => {
+    expect(lineText('ann opened the team')).toBe('ann opened the channel');
+    expect(lineText('migrator-1 took the seat')).toBe('migrator-1 joined');
+    expect(lineText('ann seated tester again')).toBe('ann started tester again');
+    expect(lineText('tester lost its worker')).toBe('tester lost its run');
   });
 });

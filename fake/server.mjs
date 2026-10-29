@@ -1628,8 +1628,9 @@ function tick() {
       system(b.id, 'asleep', 'tester went to sleep.');
     }
   }
-  // A member posts a message.
-  const [handle, text] = CHATTER[chatN++ % CHATTER.length];
+  // A member posts each line of the chatter once, so a channel never shows a post twice.
+  if (chatN >= CHATTER.length) return;
+  const [handle, text] = CHATTER[chatN++];
   const m = b.members.find((x) => x.handle === handle);
   if (m && !m.fired) post(b.id, { kind: 'agent', handle, run: m.runs[m.runs.length - 1] }, text, { to: (text.match(/@([a-z0-9-]+)/g) || []).map((x) => x.slice(1)) });
 }

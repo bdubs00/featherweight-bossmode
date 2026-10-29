@@ -162,3 +162,37 @@ export function pageWords(text: string): string {
     .replace(/\bworkers\b/g, 'agents')
     .replace(/\bworker\b/g, 'agent');
 }
+
+/**
+ * lineText puts a system line of a channel in the words of the chat-first
+ * page: the older places say team and took the seat.
+ */
+export function lineText(text: string): string {
+  return pageWords(
+    String(text || '')
+      .replace(/\blost its worker\b/g, 'lost its run')
+      .replace(/\btook the seat\b/g, 'joined')
+      .replace(/\bseated (\S+) again\b/g, 'started $1 again')
+      .replace(/\bseated\b/g, 'added'),
+  )
+    .replace(/\breopened the team\b/g, 'reopened the channel')
+    .replace(/\bthe team\b/g, 'the channel')
+    .replace(/\bThe team\b/g, 'The channel')
+    .replace(/\bis fired\b/g, 'was taken off')
+    .replace(/\bfired\b/g, 'took off');
+}
+
+/**
+ * openedWords is the words of a fold of system lines that starts with the
+ * opening of a channel: Opened channel · 3 members. It counts the agents
+ * that started in the fold, else the members that the line names. A fold
+ * of any other lines answers undefined.
+ */
+export function openedWords(entries: (Pick<import('../../api/types').Entry, 'event' | 'text' | 'from'> | undefined)[]): string | undefined {
+  const first = entries[0];
+  if (!first || first.from.kind !== 'system' || first.event !== 'opened') return undefined;
+  const started = entries.filter((e) => !!e && e.from.kind === 'system' && (e.event === 'started' || e.event === 'joined') && !/ woke up\b/.test(e.text || '')).length;
+  const m = /with (\d+) members?/.exec(first.text || '');
+  const n = started || (m ? Number(m[1]) : 0);
+  return n ? 'Opened channel · ' + n + (n === 1 ? ' member' : ' members') : 'Opened channel';
+}

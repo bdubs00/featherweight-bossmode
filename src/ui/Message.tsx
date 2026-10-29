@@ -4,8 +4,9 @@
 // reaction or a reply show beside them on hover and on focus, and always on
 // a touch screen.
 
+import { createContext } from 'preact';
 import { memo } from 'preact/compat';
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useContext, useEffect, useRef, useState } from 'preact/hooks';
 import type { Entry, Member, ReactionKind } from '../api/types';
 import { useSelect } from '../state/store';
 import { dayWords, excerpt, list, personName, plainText, senderName } from '../lib/words';
@@ -224,6 +225,13 @@ function ReplyChip({ bridge, seq }: { bridge: string; seq: number }) {
 /* ---------- one entry ---------- */
 
 /**
+ * LineText words the text of a system line for the view that shows it. The
+ * chat-first page (src/ui/chat) says channel and joined where the older
+ * places say team and took the seat.
+ */
+export const LineText = createContext<(text: string) => string>((t) => t);
+
+/**
  * NapRow is the one quiet line of a run of sleep and wake pairs of one
  * seat, such as "migrator-1 slept and woke up 4 times", with the clock time
  * of its last line. The pairs say nothing that a person acts on, so the
@@ -267,6 +275,7 @@ export interface EntryProps {
 
 /** EntryRow draws one entry. It reads its own entry, so a change redraws only it. */
 export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, fresh, listed, onReply }: EntryProps) {
+  const words = useContext(LineText);
   const e = useSelect((s) => (s.channels[bridge] ? (s.channels[bridge].bySeq[seq] as Entry | undefined) : undefined));
   const prev = useSelect((s) => (prevSeq && s.channels[bridge] ? (s.channels[bridge].bySeq[prevSeq] as Entry | undefined) : undefined));
   // A row reads strings of the roster, never the roster itself, so a change
@@ -296,6 +305,7 @@ export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, fresh, li
     // The page words the line from its event, and keeps the sentence of the backend for the tooltip.
     const w = lineWords(e, me);
     const page = w.page || e.page;
+    const text = words(w.text);
     return (
       <>
         {dayLine}
@@ -303,7 +313,7 @@ export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, fresh, li
           <p>
             <LineLed tone={toneOfEvent(e.event)} />
             <span class="sys-text" title={w.title}>
-              {w.raw ? <InlineMarkdown text={w.text} /> : w.text}
+              {w.raw ? <InlineMarkdown text={text} /> : text}
               {page && (
                 <>
                   {' '}

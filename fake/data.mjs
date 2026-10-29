@@ -453,6 +453,7 @@ function channelTwo(b) {
     list.push(e);
     return e;
   };
+  push({ kind: 'agent', handle: 'manager', run: 'run-manager-1' }, 'I opened this channel and put two agents on it. **scribe** drafts the notes of 2.4 from the merged pull requests, and **reviewer-2** checks each note against its pull request.');
   push(sys('opened'), 'manager opened the bridge for alice, with 2 members.');
   push(sys('started'), 'scribe started: Draft the release notes of 2.4 from the merged changes.', { mirrors: { run: 'run-scribe', seq: 1, type: 'fw.run.queued' } });
   push(sys('started'), 'reviewer-2 started: Check each note against its pull request.', { mirrors: { run: 'run-reviewer-2', seq: 1, type: 'fw.run.queued' } });
