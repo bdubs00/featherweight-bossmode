@@ -12,7 +12,7 @@ import { useSelect } from '../../state/store';
 import { themeOf } from '../../lib/theme';
 import { Notifications } from '../Notifications';
 import { Manager } from '../Manager';
-import { DecisionTitle } from '../Decision';
+import { DecisionTitle, QuestionTitle } from '../Decision';
 import { LineText } from '../Message';
 import { lineText } from './channels';
 import { TopBar } from './TopBar';
@@ -131,6 +131,7 @@ export function ChatApp({ route, notice, onSignOut }: { route: ChatRoute; notice
   const right = p.right && (three || focus === 'right') ? p.right : null;
   return (
     <DecisionTitle.Provider value="Asks first">
+    <QuestionTitle.Provider value="Asks you">
     <LineText.Provider value={lineText}>
     <div class="cf" data-focus={focus} data-right={right ? '1' : '0'} data-view={route.view}>
       <a class="skip" href="#main" onClick={(e) => (e.preventDefault(), document.getElementById('main')?.focus())}>
@@ -161,6 +162,7 @@ export function ChatApp({ route, notice, onSignOut }: { route: ChatRoute; notice
       {reach && <Notifications onClose={() => setReach(false)} />}
     </div>
     </LineText.Provider>
+    </QuestionTitle.Provider>
     </DecisionTitle.Provider>
   );
 }

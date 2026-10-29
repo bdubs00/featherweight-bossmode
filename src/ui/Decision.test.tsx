@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'preact/test-utils';
 import type { Decision, Run } from '../api/types';
 import { store } from '../state/store';
-import { AskCard, DecisionCard, canAlways, mayDecide } from './Decision';
+import { AskCard, DecisionCard, QuestionTitle, canAlways, mayDecide } from './Decision';
 import { bridgeOf, fakeFetch, mount, settle, unmountAll } from './testkit-a';
 import { clearNotice, clearSaid, currentNotice, currentSaid } from './notice';
 import { setFetch } from '../api/client';
@@ -216,6 +216,16 @@ describe('the question', () => {
     schema: { type: 'object', properties: { audience: { type: 'string', title: 'Audience', enum: ['operators', 'developers'], enumNames: ['Operators', 'Developers'] } }, required: ['audience'] },
     state: 'pending',
   };
+
+  it('says Asks you in the chat-first page, beside Asks first, and Needs your answer in the older places', () => {
+    const el = mount(
+      <QuestionTitle.Provider value="Asks you">
+        <DecisionCard d={q} who="scribe" />
+        <AskCard bridge="b1" e={{ seq: 4, at: '2026-10-28T10:00:00Z', from: { kind: 'agent', handle: 'scribe', run: 'run-scribe' }, text: 'Who reads these notes first?', ask: { choices: ['Operators'] } } as never} who="scribe" body={<p>Who?</p>} />
+      </QuestionTitle.Provider>,
+    );
+    expect([...el.querySelectorAll('.card-title h3')].map((h) => h.textContent)).toEqual(['Asks you', 'Asks you']);
+  });
 
   it('asks with the amber light and offers each choice and Decline', () => {
     const el = mount(<DecisionCard d={q} who="scribe" />);

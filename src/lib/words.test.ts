@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Decision } from '../api/types';
-import { commandOf, decisionTitle, errorReason, plainText, since, spanWords, unreadText, whyWords } from './words';
+import { commandOf, decisionTitle, errorReason, plainText, senderName, since, spanWords, unreadText, whyWords } from './words';
 
 describe('spanWords', () => {
   it('says a span in its largest whole unit', () => {
@@ -92,5 +92,13 @@ describe('errorReason', () => {
     expect(errorReason({ state: 'failed', error: 'The worker stopped. It can start again.' })).toBe('The worker stopped');
     expect(errorReason({ state: 'completed' })).toBe('');
     expect(errorReason(undefined)).toBe('');
+  });
+});
+
+describe('senderName', () => {
+  it('names the Manager with a capital, an agent by its handle, and a person by name', () => {
+    expect(senderName({ kind: 'agent', handle: 'manager', run: 'r1' })).toBe('Manager');
+    expect(senderName({ kind: 'agent', handle: 'scribe', run: 'r2' })).toBe('scribe');
+    expect(senderName({ kind: 'system' })).toBe('bossmode');
   });
 });

@@ -33,6 +33,12 @@ import { Glyph } from './icons';
  */
 export const DecisionTitle = createContext('Needs your decision');
 
+/**
+ * QuestionTitle is the title of a question that waits for the person. The
+ * chat-first page says Asks you, beside Asks first.
+ */
+export const QuestionTitle = createContext('Needs your answer');
+
 /** canAlways reports whether a card offers Always allow: as the front says, else by the rule of the front (alwaysByRule). */
 export function canAlways(d: Decision): boolean {
   // A person approves each package, so a card of env never offers Always allow, whatever the front says.
@@ -362,10 +368,11 @@ export function QuestionCard({ d, who, onDecide, settle }: { d: Decision; who: s
     }
   };
   const question = d.reason || 'A question for you';
+  const head = useContext(QuestionTitle);
   return (
     <Card
       class={'decide question' + (pending ? '' : ' done')}
-      title={pending ? 'Needs your answer' : question}
+      title={pending ? head : question}
       tone={pending ? 'amber' : undefined}
       quiet={!pending}
       settle={pending && settle}
@@ -465,8 +472,9 @@ export function AskCard({ bridge, e, who, body, settle }: { bridge: string; e: E
     setBusy(false);
     if (ok) showSaid('The question of ' + handle + ' ended without an answer.');
   };
+  const head = useContext(QuestionTitle);
   return (
-    <Card class="decide question ask" title="Needs your answer" tone="amber" settle={settle} label={'Question from ' + who}>
+    <Card class="decide question ask" title={head} tone="amber" settle={settle} label={'Question from ' + who}>
       <div class="ask-text">{body}</div>
       {choices.length > 0 && (
         <div class={'pick' + (choices.length === 2 ? ' two' : '')} role="group" aria-label={'Answers for ' + who}>

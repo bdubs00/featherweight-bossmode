@@ -15,7 +15,8 @@ export function personName(subject: string | undefined, display?: string): strin
 
 /** senderName names the sender of a channel entry. */
 export function senderName(s: Sender): string {
-  if (s.kind === 'agent') return s.handle || 'an agent';
+  // The handle manager is reserved for the Manager of the workspace, which a person reads as a name.
+  if (s.kind === 'agent') return s.handle === 'manager' ? 'Manager' : s.handle || 'an agent';
   if (s.kind === 'person') return personName(s.name, s.display);
   return 'bossmode';
 }

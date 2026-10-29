@@ -406,7 +406,7 @@ export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, fresh, li
             <header>
               <b>{author}</b>
               <When at={e.at} />
-              {to.length > 0 && <span class="to">to {list(to.map((h) => (h === 'operator' ? 'you' : h)))}</span>}
+              {to.length > 0 && <span class="to">to {list(to.map((h) => (h === 'operator' ? 'you' : h === 'manager' ? 'Manager' : h)))}</span>}
               {e.pinned && <Chip>pinned</Chip>}
             </header>
           )}
