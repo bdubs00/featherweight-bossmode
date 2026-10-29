@@ -18,18 +18,37 @@ import { canSeat } from '../../lib/agents';
 import { attempt, showSaid } from '../notice';
 import { Glyph } from '../icons';
 import { Avatar, Button, Led, Mark } from '../primitives';
-import { agentStatus, jobsOf, nowWords, pageWords, peopleOf } from './channels';
+import { agentStatus, jobsOf, pageWords, peopleOf } from './channels';
 import { entriesOf } from '../../state/reducer';
 import { agentNameOf } from './data';
 import { Clock } from './Sidebar';
 import { MakeJob } from './MakeJob';
 import { chatHref } from './route';
-import { newestRun } from '../../state/people';
 
 /** handleFor makes a free handle for a new agent of a channel: its name, then its name with a number. */
 export function handleFor(agent: string, taken: string[]): string {
   if (!taken.includes(agent)) return agent;
   for (let i = 2; ; i++) if (!taken.includes(agent + '-' + i)) return agent + '-' + i;
+}
+
+/**
+ * memberName names an agent of a channel by its name in the channel, and
+ * adds the name of the agent where the two differ beyond a number, such as
+ * author (Net Auditor). migrator-2 of the agent migrator stays migrator-2.
+ */
+export function memberName(handle: string, display: string, agent: string): string {
+  const base = handle.replace(/-\d+$/, '').toLowerCase();
+  if (base === agent.toLowerCase() || base === display.toLowerCase() || !display) return handle;
+  return handle + ' (' + display + ')';
+}
+
+/** agentLine is the one line of what an agent does: the tagline of its face, else the short description of its profile, never its prompt. */
+export function agentLine(agent: string, faces: Record<string, { tagline?: string }>, known: { name: string; description?: string }[] | null): string {
+  const f = faces[agent];
+  if (f && f.tagline) return f.tagline;
+  const a = (known || []).find((x) => x.name === agent);
+  const d = a && a.description ? a.description.split(/\n/)[0].trim() : '';
+  return d.length > 140 ? d.slice(0, 139).replace(/\s+\S*$/, '') + '…' : d;
 }
 
 /** jobLine says the schedule and the agent of a job, such as Every weekday at 4:00 PM · Scribe. */
@@ -93,45 +112,38 @@ function Files({ id }: { id: string }) {
   );
 }
 
-/** AddAgent is the picker of Edit: an agent that the person can start, and Add. */
+/** AddAgent lists the agents that can join the channel in Edit, each with Add. An agent that sits in the channel already joins again under a new name. */
 function AddAgent({ id, taken }: { id: string; taken: string[] }) {
   const agents = useSelect(selectAgents);
   const faces = useSelect((s) => s.faces);
   const manager = useSelect((s) => (s.config && s.config.manager ? s.config.manager.agent : ''));
   const goal = useSelect((s) => (s.bridges.byId[id] ? s.bridges.byId[id].goal || s.bridges.byId[id].title : ''));
-  const [agent, setAgent] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState('');
   const list = (agents || []).filter((a) => a.name !== 'default' && a.name !== manager && canSeat(a));
+  const add = async (agent: string) => {
+    if (busy) return;
+    setBusy(agent);
+    const handle = handleFor(agent, taken);
+    const ok = await attempt(() => addMember(id, { handle, agent, task: goal }));
+    setBusy('');
+    if (ok) showSaid('Added ' + handle + ' to the channel.');
+  };
   return (
     <div class="cf-add">
-      <label class="t-meta" for="cf-add-agent">
-        Add an agent
-      </label>
-      <div class="cf-add-row">
-        <select id="cf-add-agent" class="recess" value={agent} onChange={(e) => setAgent((e.target as HTMLSelectElement).value)}>
-          <option value="">Pick one</option>
-          {list.map((a) => (
-            <option value={a.name}>{agentNameOf({ faces }, a.name)}</option>
-          ))}
-        </select>
-        <Button
-          size="s"
-          aria-disabled={!agent || busy || undefined}
-          onClick={async () => {
-            if (!agent || busy) return;
-            setBusy(true);
-            const handle = handleFor(agent, taken);
-            const ok = await attempt(() => addMember(id, { handle, agent, task: goal }));
-            setBusy(false);
-            if (ok) {
-              showSaid('Added ' + handle + ' to the channel.');
-              setAgent('');
-            }
-          }}
-        >
-          Add
-        </Button>
-      </div>
+      <h4 class="cf-add-head">Add an agent</h4>
+      {agents === null && <p class="cf-side-note">Loading the agents.</p>}
+      {agents !== null && list.length === 0 && <p class="cf-side-note">No other agent can join this channel. Make one in Agents.</p>}
+      <ul class="cf-add-list">
+        {list.map((a) => (
+          <li>
+            <Mark agent={a.name} size={20} />
+            <span class="cf-add-name">{agentNameOf({ faces }, a.name)}</span>
+            <Button size="s" aria-disabled={!!busy || undefined} aria-label={'Add ' + agentNameOf({ faces }, a.name)} onClick={() => add(a.name)}>
+              {busy === a.name ? 'Adding' : 'Add'}
+            </Button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -140,6 +152,8 @@ export function Members({ id }: { id: string }) {
   const b = useSelect((s) => s.bridges.byId[id]);
   const roster = useSelect((s) => s.rosters[id]);
   const facts = useSelect(selectFacts);
+  const faces = useSelect((s) => s.faces);
+  const known = useSelect(selectAgents);
   const me = useSelect((s) => (s.me && s.me.principal ? s.me.principal.subject : ''));
   const meName = useSelect((s) => (s.me && s.me.principal ? s.me.principal.name : undefined));
   const duties = useDuties((s) => s.list);
@@ -182,10 +196,10 @@ export function Members({ id }: { id: string }) {
                 </a>
                 <span class="cf-mrow-main">
                   <span class="cf-mrow-top">
-                    <strong>{m.handle}</strong>
+                    <strong>{memberName(m.handle, agentNameOf({ faces }, m.agent), m.agent)}</strong>
                     <Led tone={st.tone} word={st.word} still={st.tone === 'amber' ? undefined : true} />
                   </span>
-                  <span class="cf-mrow-line">{nowWords(m, facts.runs[newestRun(m)])}</span>
+                  <span class="cf-mrow-line">{agentLine(m.agent, faces, known)}</span>
                 </span>
                 {edit && (
                   <Button
