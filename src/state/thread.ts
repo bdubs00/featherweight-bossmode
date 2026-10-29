@@ -95,6 +95,17 @@ const ENV_REMOVE: [string, string, string] = ['Removed', 'Removing', 'Did not re
 
 const text = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
 
+/** NOTE_WAITS is the line of a call of the memory tool whose change waits for a person, under ask first: the agent does not keep the note until a person keeps it. */
+export const NOTE_WAITS = 'A note waits for you';
+
+/** notesThatWait names the calls whose change of a note waits for a person, from the items memory of a transcript. */
+export function notesThatWait(items: Item[]): Set<string> {
+  return new Set(items.filter((x) => x.kind === 'memory' && x.detail === 'waiting' && x.callId).map((x) => x.callId!));
+}
+
+/** waitsWords gives the step of a call whose note waits the line that says so. */
+export const waitsWords = (s: Step, callId: string | undefined, waits: Set<string>): Step => (callId && waits.has(callId) ? { ...s, text: NOTE_WAITS, worded: true } : s);
+
 /** openedBridge reads the id of the bridge that bridge_open opened from its result: "Opened the bridge <id> ...". */
 export function openedBridge(result: string | undefined): string {
   const m = /\bOpened (?:the bridge )?([a-z0-9][a-z0-9_-]*)/i.exec(String(result || ''));
@@ -162,6 +173,7 @@ export function stepOf(it: Item, file?: Item, result?: Item): Step {
  * call already ran.
  */
 export function placedSteps(items: Item[]): Map<number, Step> {
+  const waits = notesThatWait(items);
   const results = new Map<string, Item>();
   const files = new Map<string, Item>();
   const asked = new Set<string>();
@@ -182,7 +194,7 @@ export function placedSteps(items: Item[]): Map<number, Step> {
       if (!after) continue;
       at = after;
     }
-    placed.push([at.seq, { ...stepOf(c, f, r), at: at.time }]);
+    placed.push([at.seq, { ...waitsWords(stepOf(c, f, r), c.callId, waits), at: at.time }]);
   }
   placed.sort((a, b) => a[0] - b[0]);
   return new Map(placed);

@@ -13,7 +13,7 @@ import { ApiError } from '../api/client';
 import { api } from '../api/routes';
 import type { Fleet, Item, NewRun, Result, Run } from '../api/types';
 import { store, useSelect } from '../state/store';
-import { stepOf, type Step } from '../state/thread';
+import { notesThatWait, stepOf, waitsWords, type Step } from '../state/thread';
 import { decisionOf } from '../lib/decision';
 import { atLimit } from '../lib/presence';
 import { plainError } from '../lib/runerror';
@@ -276,6 +276,7 @@ type Block = { kind: 'item'; it: Item } | { kind: 'steps'; steps: Step[] };
  * calls of one turn share a seq, and each keeps its own line.
  */
 export function stepsAt(items: Item[]): Map<Item, Step> {
+  const waits = notesThatWait(items);
   const results = new Map<string, Item>();
   const files = new Map<string, Item>();
   const asked = new Set<string>();
@@ -296,7 +297,7 @@ export function stepsAt(items: Item[]): Map<Item, Step> {
       if (!after) continue;
       at = after;
     }
-    out.set(at, { ...stepOf(c, f, r), key: 'step-' + (c.callId || c.seq), at: at.time });
+    out.set(at, { ...waitsWords(stepOf(c, f, r), c.callId, waits), key: 'step-' + (c.callId || c.seq), at: at.time });
   }
   return out;
 }
@@ -316,7 +317,8 @@ export function blocksOf(items: Item[]): Block[] {
     steps = [];
   };
   for (const it of items) {
-    if (it.kind === 'tools') continue;
+    // A change of a note words the line of its call, and makes no line of its own.
+    if (it.kind === 'tools' || it.kind === 'memory') continue;
     if (it.kind === 'tool' || it.kind === 'result' || it.kind === 'file') {
       const s = placed.get(it);
       if (s) steps.push(s);

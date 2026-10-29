@@ -485,7 +485,8 @@ export interface Result {
 export interface Item {
   seq: number;
   time: string;
-  kind: 'user' | 'assistant' | 'tool' | 'result' | 'file' | 'ask' | 'decided' | 'note' | 'end' | 'tools';
+  /** memory: a change of a note by a tool call, with detail waiting when the change waits for a person (ask first). */
+  kind: 'user' | 'assistant' | 'tool' | 'result' | 'file' | 'memory' | 'ask' | 'decided' | 'note' | 'end' | 'tools';
   text?: string;
   detail?: string;
   tool?: string;

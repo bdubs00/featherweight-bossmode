@@ -127,6 +127,18 @@ describe('the direct thread', () => {
     ]);
   });
 
+  it('says that a note waits for you when the change of the memory tool waits for a person, and that the agent wrote in its notes otherwise (U1)', () => {
+    const items: Item[] = [
+      { seq: 1, time: at(1), kind: 'tool', tool: 'memory', callId: 'm1', input: { command: 'create', path: '/memories/ports.md', file_text: 'x' } },
+      { seq: 2, time: at(1), kind: 'memory', tool: 'memory', callId: 'm1', path: 'mem://agent/triage/ports.md', text: 'create', detail: 'waiting' },
+      { seq: 3, time: at(1), kind: 'result', callId: 'm1', text: 'Not kept yet.' },
+      { seq: 4, time: at(2), kind: 'tool', tool: 'memory', callId: 'm2', input: { command: 'create', path: '/memories/hosts.md', file_text: 'y' } },
+      { seq: 5, time: at(2), kind: 'memory', tool: 'memory', callId: 'm2', path: 'mem://agent/triage/hosts.md', text: 'create' },
+      { seq: 6, time: at(2), kind: 'result', callId: 'm2', text: 'File created successfully at: /memories/hosts.md' },
+    ];
+    expect(stepsOf(items).map((x) => x.text)).toEqual(['A note waits for you', 'Wrote in its notes']);
+  });
+
   it('reads the id of the bridge that bridge_open opened, in the words of the front and of the fake', () => {
     expect(openedBridge('Opened the bridge 01m5kpw79kyq9j8nbpnhvtwm95 "T" for a with 2 members.')).toBe('01m5kpw79kyq9j8nbpnhvtwm95');
     expect(openedBridge('Opened br-notes.')).toBe('br-notes');

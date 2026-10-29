@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'preact/test-utils';
-import type { Run } from '../api/types';
+import type { Item, Run } from '../api/types';
 import { store } from '../state/store';
-import { POLL_MS, READ_GAP_MS, forgetTranscripts, usePoll, useTranscript } from './Conversation';
+import { POLL_MS, READ_GAP_MS, blocksOf, forgetTranscripts, usePoll, useTranscript } from './Conversation';
 import { at, fakeFetch, mount, unmountAll, type Call } from './testkit-b';
 
 let calls: Call[] = [];
@@ -100,5 +100,19 @@ describe('useTranscript', () => {
     });
     // The first read, the first step at once, and one more read after the gap for the rest.
     expect(reads()).toBe(3);
+  });
+});
+
+describe('blocksOf and a note that waits', () => {
+  it('words the call of a note that waits for a person, and gives the change of the note no line of its own (U1)', () => {
+    const t = '2026-10-28T10:00:00Z';
+    const items: Item[] = [
+      { seq: 1, time: t, kind: 'tool', tool: 'memory', callId: 'm1', input: { command: 'create', path: '/memories/ports.md', file_text: 'x' } },
+      { seq: 2, time: t, kind: 'memory', tool: 'memory', callId: 'm1', path: 'mem://agent/triage/ports.md', text: 'create', detail: 'waiting' },
+      { seq: 3, time: t, kind: 'result', callId: 'm1', text: 'Not kept yet.' },
+    ];
+    const blocks = blocksOf(items);
+    expect(blocks.length).toBe(1);
+    expect(blocks[0].kind === 'steps' && blocks[0].steps.map((s) => s.text)).toEqual(['A note waits for you']);
   });
 });
