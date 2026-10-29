@@ -6,7 +6,7 @@ import type { Bridge, Member, WorkCard } from '../../api/types';
 import type { InboxRow } from '../../state/inbox';
 import { chatHref, focusOf, parseChat, type ChatRoute } from './route';
 import { askWords, needsOf, needsOfCount, type NeedsInput } from './needs';
-import { channelRow, lineText, openedWords, pageWords, peopleWords, sortChannels } from './channels';
+import { channelRow, lineText, openedWords, pageWords, peopleWords, sortChannels, channelPeople, roleWords, channelStatus } from './channels';
 import { handleFor } from './Members';
 import { matches } from './TopBar';
 import { lastWords } from './Sidebar';
@@ -328,5 +328,29 @@ describe('a decision whose call the page has not read', () => {
     );
     expect(rows[0].head).toBe('Restore the backup of last night');
     expect(rows[0].line).toBe('Asks first · backup');
+  });
+});
+
+describe('the people of a channel from the front', () => {
+  it('lists the people of the front with their names and roles, and you once', () => {
+    const b = { operator: 'fd1e8a14-ac12', people: [{ subject: 'fd1e8a14-ac12', display: 'Dana Reyes', role: 'asked' }, { subject: 'bob@example.com', display: 'Bob', role: 'posted' }] };
+    expect(channelPeople(b, 'alice@example.com', [])).toEqual([
+      { subject: 'fd1e8a14-ac12', display: 'Dana Reyes', role: 'asked' },
+      { subject: 'bob@example.com', display: 'Bob', role: 'posted' },
+      { subject: 'alice@example.com' },
+    ]);
+    expect([roleWords('asked'), roleWords('owner'), roleWords('posted'), roleWords(undefined)]).toEqual(['Asked for this', 'Owns the job that opened it', 'Posted here', '']);
+  });
+  it('reads the people from the posts of an older front, which names none', () => {
+    const got = channelPeople({ operator: 'dana@example.com' }, 'alice@example.com', [{ from: { kind: 'person', name: 'bob@example.com', display: 'Bob' } }]);
+    expect(got.map((p) => [p.subject, p.role || ''])).toEqual([
+      ['dana@example.com', 'asked'],
+      ['bob@example.com', ''],
+      ['alice@example.com', ''],
+    ]);
+  });
+  it('says whom a channel of another person waits for, and needs you for your own', () => {
+    expect(channelStatus({ state: 'open', needsYou: 1, waitsFor: 'Dana Reyes' }, [{ word: 'needs you', tone: 'amber' }]).word).toBe('waits for Dana');
+    expect(channelStatus({ state: 'open', needsYou: 1, waitsFor: 'you' }, [{ word: 'needs you', tone: 'amber' }]).word).toBe('needs you');
   });
 });

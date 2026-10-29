@@ -8,7 +8,7 @@ import { ApiError } from '../../api/client';
 import { store, useSelect } from '../../state/store';
 import { loadBridge, loadChannel, markRead, patchBridge } from '../../state/actions';
 import { entriesOf, membersOf } from '../../state/reducer';
-import { peopleOf } from './channels';
+import { channelPeople } from './channels';
 import { personName } from '../../lib/words';
 import { attempt, showSaid } from '../notice';
 import { Confirm, Empty } from '../common';
@@ -54,12 +54,12 @@ export function useOpenChannel(id: string): void {
 /** Faces shows the faces of the agents of a channel, then the people. */
 function Faces({ id }: { id: string }) {
   const roster = useSelect((s) => s.rosters[id]);
-  const operator = useSelect((s) => (s.bridges.byId[id] ? s.bridges.byId[id].operator : ''));
+  const b = useSelect((s) => s.bridges.byId[id]);
   const me = useSelect((s) => (s.me && s.me.principal ? s.me.principal.subject : ''));
   const meName = useSelect((s) => (s.me && s.me.principal ? s.me.principal.name : undefined));
   const agents = membersOf(roster).filter((m) => m && !m.fired);
   const channel = useSelect((s) => s.channels[id]);
-  const people = useMemo(() => peopleOf(operator, me, entriesOf(channel)), [operator, me, channel]);
+  const people = useMemo(() => channelPeople(b || { operator: '' }, me, entriesOf(channel)), [b, me, channel]);
   return (
     <a class="cf-faces" href={chatHref({ view: 'channel', id, tab: 'posts', members: true })} title="Members" aria-label={agents.length + (agents.length === 1 ? ' agent' : ' agents') + ' and ' + people.length + (people.length === 1 ? ' person' : ' people')}>
       {agents.slice(0, 5).map((m) => (

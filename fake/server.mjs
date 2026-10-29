@@ -38,7 +38,7 @@ import { checkSvg, identicon } from './faces.mjs';
 import { TEMPLATES } from './routes-c.mjs';
 import { TOOLS_OF, allowlistOf, givesTool } from './skills.mjs';
 import { ARCHIVED_REFUSAL } from './archive.mjs';
-import { foundLine } from './routes-work.mjs';
+import { PEOPLE, foundLine } from './routes-work.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const DIST = path.resolve(here, '..', 'dist');
@@ -257,19 +257,40 @@ function counts(e, subject) {
   return true;
 }
 
+/** displayOf is the name of a person that the page shows, as the front gives it (people.Display): a known name, else the part of an email before the @, else A person. */
+const displayOf = (subject) => PEOPLE[subject] || (/^[^@\s]+@/.test(subject) ? subject.split('@')[0] : /^[0-9a-f-]{20,}$/.test(subject) ? 'A person' : subject || 'A person');
+
+/** peopleOfBridge lists the people of a channel as the front names them: who asked for it first, then who posted lately. */
+function peopleOfBridge(b, ch) {
+  const out = [{ subject: b.operator, display: displayOf(b.operator), role: 'asked' }];
+  for (const e of [...ch].reverse()) {
+    if (e.from.kind !== 'person' || !e.from.name || out.some((p) => p.subject === e.from.name)) continue;
+    out.push({ subject: e.from.name, display: e.from.display || displayOf(e.from.name), role: 'posted' });
+  }
+  return out;
+}
+
 /** listItem is a bridge of GET /v1/bridges for one person. */
 function listItem(b, subject) {
   const ch = S.channels.get(b.id) || [];
   const read = S.reads.get(b.id + '|' + subject) || 0;
   const { members, ...rest } = b;
+  const needsYou = members.filter((m) => m.presence === 'needs-you').length;
+  const last = [...ch].reverse().find((e) => e.from.kind === 'agent' && e.text);
   return {
     ...rest,
+    // The topic is the whole request, under the short title. A channel that the open gave none has its goal, when it says more than the title.
+    ...(b.topic || (b.goal && b.goal !== b.title) ? { topic: b.topic || b.goal } : {}),
     lastSeq: ch.length ? ch[ch.length - 1].seq : 0,
     ...(ch.length ? { lastAt: ch[ch.length - 1].at } : {}),
     read,
     unread: ch.slice(-2000).filter((e) => e.seq > read && counts(e, subject)).length,
     memberCount: members.length,
-    needsYou: members.filter((m) => m.presence === 'needs-you').length,
+    needsYou,
+    // For whom the channel waits: you, when you asked for it, else the name of the person who did.
+    ...(needsYou ? { waitsFor: b.operator === subject ? 'you' : displayOf(b.operator) } : {}),
+    ...(last ? { summary: String(last.text).split('\n').map((l) => l.replace(/^#+\s*/, '').trim()).find(Boolean).slice(0, 200) } : {}),
+    people: peopleOfBridge(b, ch),
   };
 }
 

@@ -18,7 +18,7 @@ import { canSeat } from '../../lib/agents';
 import { attempt, showSaid } from '../notice';
 import { Glyph } from '../icons';
 import { Avatar, Button, Led, Mark } from '../primitives';
-import { agentStatus, jobsOf, pageWords, peopleOf } from './channels';
+import { agentStatus, channelPeople, jobsOf, pageWords, roleWords } from './channels';
 import { entriesOf } from '../../state/reducer';
 import { agentNameOf } from './data';
 import { Clock } from './Sidebar';
@@ -164,7 +164,7 @@ export function Members({ id }: { id: string }) {
   const jobs = useMemo(() => jobsOf(id, duties), [id, duties]);
   if (!b) return null;
   const closed = b.state === 'closed';
-  const people = peopleOf(b.operator, me, entries);
+  const people = channelPeople(b, me, entries);
   return (
     <section class="cf-members" aria-labelledby="cf-members-h">
       <header class="cf-head cf-head-right">
@@ -225,8 +225,8 @@ export function Members({ id }: { id: string }) {
             <span class="cf-sec-n">{people.length}</span>
           </h3>
           {people.map((p) => {
-            const name = p.subject === me ? meName || personName(p.subject) : p.display || personName(p.subject);
-            const part = [p.subject === b.operator ? 'Asked for this' : '', p.subject === me ? 'you' : ''].filter(Boolean).join(', ');
+            const name = p.subject === me ? meName || p.display || personName(p.subject) : p.display || personName(p.subject);
+            const part = [roleWords(p.role), p.subject === me ? 'you' : ''].filter(Boolean).join(', ');
             return (
               <div class="cf-mrow">
                 <Avatar subject={p.subject} display={name} size={32} />

@@ -96,6 +96,35 @@ export function peopleOf(operator: string, me: string, entries: { from: { kind: 
   return out;
 }
 
+/** A person of a channel as the page shows it: the subject, the name, and the role, as the front names them. */
+export interface PersonOf {
+  subject: string;
+  display?: string;
+  /** asked for the person who asked for the channel, owner for the owner of the job that opened it, posted for a person who posted. */
+  role?: string;
+}
+
+/**
+ * channelPeople lists the people of a channel: the people of the front, with
+ * the names and the roles that it gives (Bridge.people), and you, each once.
+ * An older front names none, and the page then reads them from the person
+ * who opened the channel and the posts that it read (peopleOf).
+ */
+export function channelPeople(b: Pick<Bridge, 'operator' | 'people'>, me: string, entries: { from: { kind: string; name?: string; display?: string } }[]): PersonOf[] {
+  if (!b.people || !b.people.length) return peopleOf(b.operator, me, entries).map((p) => ({ ...p, role: p.subject === b.operator ? 'asked' : undefined }));
+  const out: PersonOf[] = b.people.map((p) => ({ subject: p.subject, display: p.display || undefined, role: p.role }));
+  if (me && !out.some((p) => p.subject === me)) out.push({ subject: me });
+  return out;
+}
+
+/** roleWords says the role of a person of a channel in a few words, or "". */
+export function roleWords(role: string | undefined): string {
+  if (role === 'asked') return 'Asked for this';
+  if (role === 'owner') return 'Owns the job that opened it';
+  if (role === 'posted') return 'Posted here';
+  return '';
+}
+
 /** jobsOf lists the repeating jobs of a channel: the duties that post in it. */
 export function jobsOf(id: string, duties: Duty[] | null | undefined): Duty[] {
   return (duties || []).filter((d) => d.do && d.do.post && d.do.post.bridge === id);
@@ -117,12 +146,19 @@ export function channelRow(b: Bridge, members: Member[] | null, f: Facts, me: st
     title: b.title,
     open: b.state === 'open',
     agents,
-    people: peopleWords(b.operator, me),
+    people: rowPeople(b, me),
     at: b.lastAt || b.closedAt || b.createdAt,
     unread: b.unread || 0,
     repeats: jobsOf(b.id, duties).length > 0,
     face: agents[0] ? agents[0].agent : '',
   };
+}
+
+/** rowPeople names the people of a channel in its row, such as Dana, you: the first person of the front that is not you, else the person who opened it. */
+function rowPeople(b: Bridge, me: string): string {
+  const other = (b.people || []).find((p) => p.subject !== me);
+  if (other) return peopleWords(other.subject, me, other.display);
+  return peopleWords(b.operator, me);
 }
 
 /**
@@ -132,9 +168,11 @@ export function channelRow(b: Bridge, members: Member[] | null, f: Facts, me: st
  * finished channel never reads idle, which says to a reader that nothing
  * happens.
  */
-export function channelStatus(b: Pick<Bridge, 'state' | 'needsYou'>, agents: Status[], card?: Pick<WorkCard, 'stage' | 'verdict'>): Status {
+export function channelStatus(b: Pick<Bridge, 'state' | 'needsYou' | 'waitsFor'>, agents: Status[], card?: Pick<WorkCard, 'stage' | 'verdict'>): Status {
   const checked = !!card && card.stage === 'done' && (card.verdict === 'accepted' || card.verdict === 'checked');
   if (b.state === 'closed') return checked ? { word: 'done, checked', tone: 'green' } : { word: 'closed', tone: 'grey' };
+  // A channel of another person waits for that person, who counts it, not for you.
+  if (b.needsYou && b.waitsFor && b.waitsFor !== 'you') return { word: 'waits for ' + b.waitsFor.split(/\s+/)[0], tone: 'amber', still: true };
   const has = (w: string) => agents.some((a) => a.word === w);
   if (has('needs you') || (card && card.stage === 'needs-you') || (!agents.length && b.needsYou)) return { word: 'needs you', tone: 'amber' };
   if (has('working') || (card && card.stage === 'working')) return { word: 'working', tone: 'green' };
