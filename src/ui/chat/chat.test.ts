@@ -29,12 +29,34 @@ describe('the addresses of the chat-first page', () => {
     ];
     for (const r of routes) expect(parseChat(chatHref(r))).toEqual(r);
   });
-  it('leaves the addresses of the older places alone', () => {
-    expect(parseChat('#work')).toBeNull();
-    expect(parseChat('#manager')).toEqual({ view: 'manager' });
-    expect(parseChat('#bridge/br-1')).toBeNull();
+  it('leaves the older places that have no home here to the shell as they are', () => {
     expect(parseChat('#pages/a.md')).toBeNull();
+    expect(parseChat('#skills')).toBeNull();
+    expect(parseChat('#duties/new')).toBeNull();
+    expect(parseChat('#duties/nightly/edit')).toBeNull();
+    expect(parseChat('#new-agent')).toBeNull();
     expect(parseChat('')).toEqual({ view: 'home' });
+  });
+  it('sends an older address to its home on this page', () => {
+    expect(parseChat('#manager')).toEqual({ view: 'manager' });
+    expect(parseChat('#work')).toEqual({ view: 'home' });
+    expect(parseChat('#bridge/br-1')).toEqual({ view: 'channel', id: 'br-1', tab: 'posts' });
+    expect(parseChat('#bridge/br-1/roster')).toEqual({ view: 'channel', id: 'br-1', tab: 'posts', members: true });
+    expect(parseChat('#member/br-1/one')).toEqual({ view: 'channel', id: 'br-1', tab: 'posts', members: true });
+    expect(parseChat('#fleet')).toEqual({ view: 'agents' });
+    expect(parseChat('#fleet/scribe/profile')).toEqual({ view: 'agent', name: 'scribe', setup: true });
+    expect(parseChat('#knowhow/scribe/notes')).toEqual({ view: 'agent', name: 'scribe' });
+    expect(parseChat('#duties/nightly')).toEqual({ view: 'job', name: 'nightly' });
+    expect(parseChat('#duties/nightly/run/r1')).toEqual({ view: 'run', id: 'r1' });
+    expect(parseChat('#activity/d:r1/p1')).toEqual({ view: 'run', id: 'r1' });
+    expect(parseChat('#activity/q:br-1/7')).toEqual({ view: 'channel', id: 'br-1', tab: 'posts' });
+    expect(parseChat('#chat/r2')).toEqual({ view: 'run', id: 'r2' });
+    expect(parseChat('#new')).toEqual({ view: 'manager', fresh: true });
+  });
+  it('reads and writes the views of the grid and of an agent', () => {
+    const routes: ChatRoute[] = [{ view: 'agents' }, { view: 'results' }, { view: 'files' }, { view: 'settings' }, { view: 'agent', name: 'scribe', setup: true }];
+    for (const r of routes) expect(parseChat(chatHref(r))).toEqual(r);
+    expect(focusOf({ view: 'agent', name: 'scribe', setup: true })).toBe('right');
   });
   it('names the pane that a phone shows', () => {
     expect(focusOf({ view: 'home' })).toBe('side');

@@ -28,7 +28,7 @@ import { applyTheme, themeOf } from '../lib/theme';
 import { canonicalPath, columnOf, go, parentOf, parseRoute, placeOf, type Place, type Route } from '../lib/route';
 import { isTyping } from './keys';
 import { clearNotice, clearSaid, currentSaidLink, holdSaid, showError, undoSaid, useNotice, useSaid, useUndo } from './notice';
-import { EmptyPane, Shell, opensOn, shownOf } from './Shell';
+import { EmptyPane, opensOn, shownOf } from './Shell';
 import { BridgeList } from './BridgeList';
 import { Channel } from './Channel';
 import { Roster } from './Roster';
@@ -51,7 +51,7 @@ import { KnowhowAgents, KnowhowMain } from './Knowhow';
 import { DutyList, DutyMain } from './Duties';
 import { PlaybookList, PlaybookMain } from './Playbooks';
 import { Signin } from './Signin';
-import { ChatApp, LegacyFrame } from './chat/ChatApp';
+import { ChatApp } from './chat/ChatApp';
 import { parseChat } from './chat/route';
 import { Button, Card, Led } from './primitives';
 
@@ -556,13 +556,11 @@ export function App() {
   }
 
   const shown = notice ? <Notice text={notice} /> : said ? <Said text={said} undo={undo} /> : fresh ? <NewBuild /> : null;
-  // A person who only views opens on Results: the chat-first page needs a person who can start work.
-  if (chat && !(chat.view === 'home' && auth.kind === 'ready' && config && config.work && opensOn(store.get().me) === 'results')) return <ChatApp route={chat} notice={shown} onSignOut={signOut} />;
+  // A person who only views opens on Results: the home of the chat-first page needs a person who can start work.
+  const viewer = !!config && !!config.work && opensOn(store.get().me) === 'results';
+  if (chat) return <ChatApp route={chat.view === 'home' && viewer ? { view: 'results' } : chat} notice={shown} onSignOut={signOut} />;
+  // An older place opens in the same shell: its list, its main pane, and its details, with the column that a narrow window shows.
   const panes = panesOf(route);
-  const place = placeIn(route);
-  return (
-    <LegacyFrame onSignOut={signOut}>
-      <Shell route={route} place={place} list={panes.list} main={panes.main} details={panes.details} notice={shown} onSignOut={signOut} />
-    </LegacyFrame>
-  );
+  const column = shownOf(columnOf(route), !!panes.list, !!panes.details);
+  return <ChatApp route={null} old={{ list: panes.list, main: panes.main, details: panes.details, column, place: placeIn(route) }} notice={shown} onSignOut={signOut} />;
 }

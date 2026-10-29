@@ -15,7 +15,8 @@
 // again every five seconds. Otherwise it reads nothing more. A front
 // without packages answers 404, and the section then does not exist.
 
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useContext, useEffect, useRef, useState } from 'preact/hooks';
+import { LineText } from './linetext';
 import { api } from '../api/routes';
 import { ApiError, SigninNeeded } from '../api/client';
 import type { PackageSwitch, Packages, PackagesBody } from '../api/types';
@@ -174,6 +175,8 @@ export function PackagesSection({ agent, pool, owner, onSwitch }: { agent: strin
   const remove = (k: PackageKind, item: string) => save({ [k]: p[k].filter((x) => x.name !== item).map((x) => x.name) }, 'field');
 
   const line = lineOf(p, (task) => sleeping.has(task) || sleeping.has(task.slice(task.lastIndexOf('/') + 1)));
+  // The chat-first page words the lines of the state without the workers that take the change.
+  const words = useContext(LineText);
   const output = line && line.failure ? line.failure.output || line.failure.error || '' : '';
   const id = 'packages-' + agent;
   const any = p.python.length > 0 || p.tools.length > 0;
@@ -265,7 +268,7 @@ export function PackagesSection({ agent, pool, owner, onSwitch }: { agent: strin
           {line && (
             <p class="pkgs-state" role="status">
               <LineLed tone={line.tone} />
-              <span>{line.text}</span>
+              <span>{words(line.text)}</span>
             </p>
           )}
           {output && (
@@ -277,7 +280,7 @@ export function PackagesSection({ agent, pool, owner, onSwitch }: { agent: strin
               <Command class="pkgs-output">{output}</Command>
             </details>
           )}
-          {(any || p.applying) && !(line && line.asleep) && <p class="pkgs-note">{NOTE_TEXT}</p>}
+          {(any || p.applying) && !(line && line.asleep) && <p class="pkgs-note">{words(NOTE_TEXT)}</p>}
           <Switch label={ASK_TEXT} on={p.ask} disabled={!owner} onChange={(ask) => save({ ask })} />
         </>
       )}
@@ -293,9 +296,7 @@ export function PackagesSection({ agent, pool, owner, onSwitch }: { agent: strin
             setAskOff(false);
           }}
         >
-          <p>
-            The workers of {agent} lose {offWords(p)}.
-          </p>
+          <p>{words('The workers of ' + agent + ' lose ' + offWords(p) + '.')}</p>
         </Confirm>
       )}
       {(problem || error) && !(p.on && owner) && (

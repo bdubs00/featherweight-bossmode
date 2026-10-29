@@ -312,7 +312,6 @@
   overflow-x: hidden;
   padding-bottom: var(--s-4);
   border-top: 1px solid var(--line);
-  scrollbar-width: thin;
 }
 .cf-sec {
   padding-top: var(--s-2);
@@ -356,9 +355,13 @@
   background: var(--line-soft);
 }
 .cf-row.on {
-  border-color: var(--raised-line);
-  background: var(--raised);
-  box-shadow: var(--e-row);
+  border-color: var(--cf-sel-line);
+  background: var(--cf-sel);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.cf-row.on .cf-row-title,
+.cf-row.on .cf-row-name {
+  color: var(--ink);
 }
 .cf-pin {
   margin-top: var(--s-2);
@@ -728,7 +731,6 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  scrollbar-width: thin;
 }
 .cf-msec {
   padding: var(--s-3) var(--s-4) var(--s-4);
@@ -1081,4 +1083,321 @@ a.cf-mrow:hover .cf-mrow-top strong {
 .cf-side-in,
 .cf-side-scroll {
   min-width: 0;
+}
+
+/* ---------- round 2: the selected row ---------- */
+/* The row of what shows: a snow row on the platinum sidebar of the light
+   theme, a lighter row on the graphite one, with the bar of the accent at
+   its start. The accent marks the place that shows, as it marks the tab
+   that shows. --raised equals the chrome of the light theme, so it marked
+   nothing there. */
+:root {
+  --cf-sel: #fbfbf8;
+  --cf-sel-line: #b4b4ac;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --cf-sel: #4a4a45;
+    --cf-sel-line: #5e5e58;
+  }
+}
+:root[data-theme='dark'] {
+  --cf-sel: #4a4a45;
+  --cf-sel-line: #5e5e58;
+}
+.cf-sub.on {
+  background: var(--cf-sel);
+  box-shadow: inset 3px 0 0 var(--accent);
+  font-weight: 700;
+}
+
+/* ---------- round 2: the scrollbars ---------- */
+/* Every scroll area of the shell takes one quiet bar: a thumb of the line
+   color, inset from the edge, with no track, that turns muted under the
+   pointer. Chrome draws it with the WebKit pseudo-elements, which the
+   standard properties turn off, so the shell sets those back to auto there.
+   Firefox takes the standard properties. */
+@supports selector(::-webkit-scrollbar) {
+  .cf,
+  .cf * {
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+  }
+}
+@supports not selector(::-webkit-scrollbar) {
+  .cf,
+  .cf * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--line) transparent;
+  }
+}
+.cf ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+  background: transparent;
+}
+.cf ::-webkit-scrollbar-track,
+.cf ::-webkit-scrollbar-corner {
+  background: transparent;
+}
+.cf ::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: var(--line);
+  background-clip: padding-box;
+}
+.cf ::-webkit-scrollbar-thumb:hover,
+.cf ::-webkit-scrollbar-thumb:active {
+  background-color: var(--muted);
+}
+.cf ::-webkit-scrollbar-button {
+  display: none;
+}
+
+/* ---------- round 2: an older place in the shell ---------- */
+/* The panes of an older place take the head, the type, and the colors of a
+   channel: no groove band, the head of a stream, and its list as a column
+   at the start of the middle. */
+.cf .groove {
+  display: none;
+}
+.cf .pane-head {
+  min-height: 56px;
+  height: auto;
+  padding: 0 var(--s-3) 0 var(--s-5);
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+}
+.cf .pane-head > .t-title,
+.cf .pane-head > .t-heading {
+  font-size: 20px;
+  line-height: 26px;
+  font-weight: 800;
+  font-stretch: 106%;
+  letter-spacing: -0.015em;
+}
+.cf-right .pane-head {
+  padding-left: var(--s-4);
+  background: var(--chrome);
+}
+.cf-right .pane,
+.cf-right .screen {
+  background: var(--chrome);
+}
+.cf-old-view {
+  min-width: 0;
+}
+.cf-old {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+}
+.cf-old > .pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  background: var(--paper);
+}
+.cf-old > .pane-list {
+  flex: none;
+  width: 300px;
+  border-right: 1px solid var(--line);
+  background: var(--chrome);
+}
+.cf-old > .pane-list .pane-head {
+  background: var(--chrome);
+  padding-left: var(--s-4);
+}
+.cf-old > .pane-main {
+  flex: 1;
+  position: relative;
+}
+.cf-right > .pane-details {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  width: auto;
+  border: 0;
+}
+.cf-setup {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.cf-library-head .tabs {
+  margin-left: var(--s-5);
+}
+
+/* ---------- round 2: Agents, the Library, Settings ---------- */
+.cf-head-n {
+  color: var(--muted);
+  font-weight: 700;
+}
+.cf-list-in {
+  margin-top: 0;
+}
+.cf-agent-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cf-agent-row + .cf-agent-row {
+  border-top: 1px solid var(--line-soft);
+}
+.cf-agent-link {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-3);
+  margin: 0 calc(-1 * var(--s-2));
+  padding: var(--s-3) var(--s-2);
+  border-radius: var(--r);
+  color: var(--ink);
+  text-decoration: none;
+}
+.cf-agent-link:hover {
+  background: var(--line-soft);
+}
+.cf-agent-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cf-agent-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px var(--s-2);
+}
+.cf-agent-does {
+  color: var(--muted);
+}
+.cf-agent-where {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+.cf-tag {
+  padding: 1px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  color: var(--muted);
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+}
+.cf-tag-job::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  vertical-align: 1px;
+}
+.cf-agent-go {
+  flex: none;
+  align-self: center;
+  transform: rotate(180deg);
+  color: var(--muted);
+}
+.cf-notes li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px var(--s-2);
+}
+.cf-note-state {
+  color: var(--muted);
+  font-size: var(--t-meta);
+}
+.cf-note-state.stale {
+  color: var(--word-amber);
+  font-weight: 600;
+}
+.cf-note-desc {
+  flex-basis: 100%;
+  color: var(--muted);
+}
+.cf-set {
+  padding: var(--s-4) 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.cf-set:first-child {
+  padding-top: 0;
+}
+.cf-set:last-child {
+  border-bottom: 0;
+}
+.cf-set-line {
+  max-width: 62ch;
+  margin: 0 0 var(--s-3);
+  color: var(--muted);
+}
+.cf-set-agents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cf-set-agents a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 4px 10px 4px 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  color: var(--ink);
+  text-decoration: none;
+  font-weight: 600;
+}
+.cf-set-agents a:hover {
+  background: var(--line-soft);
+}
+
+/* ---------- round 2: medium and phone ---------- */
+@media (max-width: 1199px) {
+  .cf[data-focus='right'] .cf-right > .pane-details .back,
+  .cf[data-focus='right'] .cf-setup .back {
+    display: inline-flex;
+  }
+}
+@media (max-width: 799px) {
+  .cf-old > .pane-list,
+  .cf-old > .pane-main {
+    display: none;
+    flex: 1;
+    width: auto;
+    border: 0;
+  }
+  .cf-old[data-show='list'] > .pane-list,
+  .cf-old[data-show='main'] > .pane-main,
+  .cf-old[data-list='0'] > .pane-main {
+    display: flex;
+  }
+  .cf .pane-head {
+    padding-left: var(--s-4);
+  }
+  .cf-library-head {
+    flex-wrap: wrap;
+  }
+  .cf-library-head .tabs {
+    order: 9;
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+}
+.cf-learn-line {
+  margin: 0 0 var(--s-2);
+}
+.cf-agent-in .check {
+  margin: 0 0 var(--s-3);
 }

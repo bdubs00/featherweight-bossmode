@@ -45,15 +45,15 @@ export function Clock({ label }: { label?: string }) {
   );
 }
 
-/** The other places of the page, behind the grid: they stay reachable, out of the way. */
+/**
+ * The other places of the page, behind the grid. The Library holds the wiki,
+ * the files, and the skills, and its key sits in the top bar. The theme
+ * sits in the menu of the account. What an agent learned shows on the agent.
+ */
 const PLACES = [
   { label: 'Results', href: '#results' },
-  { label: 'Agents', href: '#fleet' },
-  { label: 'Jobs setup', href: '#duties' },
-  { label: 'Skills', href: '#skills' },
-  { label: 'Know-how', href: '#knowhow' },
-  { label: 'The board', href: '#work' },
-  { label: 'Appearance', href: '#appearance' },
+  { label: 'Agents', href: '#agents' },
+  { label: 'Settings', href: '#settings' },
 ];
 
 /** managerStatus says what the Manager does now, in the words of the row. */
@@ -94,9 +94,9 @@ function ManagerRow({ current }: { current: boolean }) {
   );
 }
 
-function NeedRowView({ r }: { r: NeedRow }) {
+function NeedRowView({ r, current }: { r: NeedRow; current: boolean }) {
   return (
-    <a class="cf-row cf-need" href={r.href} title={r.head + (r.line ? ': ' + r.line : '')}>
+    <a class={'cf-row cf-need' + (current ? ' on' : '')} href={r.href} title={r.head + (r.line ? ': ' + r.line : '')} aria-current={current ? 'page' : undefined}>
       {r.agent ? <Mark agent={r.agent} size={36} /> : <span class="cf-need-ic">!</span>}
       <span class="cf-row-main">
         <span class="cf-row-top">
@@ -112,7 +112,7 @@ function NeedRowView({ r }: { r: NeedRow }) {
   );
 }
 
-function ChannelRowView({ c, current }: { c: ChannelRow; current: boolean }) {
+function ChannelRowView({ c, current, open, agent }: { c: ChannelRow; current: boolean; open: boolean; agent: string }) {
   const href = chatHref({ view: 'channel', id: c.id, tab: 'posts' });
   const sub = c.open ? [agentCount(c.agents.length), c.people].filter(Boolean).join(' · ') : '';
   return (
@@ -122,7 +122,7 @@ function ChannelRowView({ c, current }: { c: ChannelRow; current: boolean }) {
         <span class="cf-row-main">
           <span class="cf-row-top">
             <span class="cf-row-title">
-              {current && c.agents.length > 0 && <Glyph name="back" size={12} class="cf-chev" />}
+              {open && c.agents.length > 0 && <Glyph name="back" size={12} class="cf-chev" />}
               <span class="cf-row-name">{c.title}</span>
               {c.repeats && <Clock label="Repeats on a schedule" />}
             </span>
@@ -137,11 +137,11 @@ function ChannelRowView({ c, current }: { c: ChannelRow; current: boolean }) {
           </span>
         </span>
       </a>
-      {current && c.agents.length > 0 && (
+      {open && c.agents.length > 0 && (
         <ul class="cf-chan-agents" aria-label={'Agents of ' + c.title}>
           {c.agents.map((a) => (
             <li>
-              <a href={chatHref({ view: 'channel', id: c.id, tab: 'posts', members: true })} class="cf-sub">
+              <a href={chatHref({ view: 'agent', name: a.agent })} class={'cf-sub' + (agent === a.agent ? ' on' : '')} aria-current={agent === a.agent ? 'page' : undefined}>
                 <Mark agent={a.agent} size={20} />
                 <span class="cf-sub-name">{a.handle}</span>
                 <Led tone={a.status.tone} word={a.status.word} still={a.status.tone === 'amber' ? undefined : true} />
@@ -205,7 +205,10 @@ export function useChannelRows(): { open: ChannelRow[]; closed: ChannelRow[]; lo
   }, [bridges, rosters, facts, me, list]);
 }
 
-export function Sidebar({ route }: { route: ChatRoute }) {
+/** The channel that the person opened last, so its agents stay listed while one of them shows. */
+let lastChannel = '';
+
+export function Sidebar({ route }: { route: ChatRoute | null }) {
   const [filter, setFilter] = useState<Filter>(readFilter);
   const [closedOpen, setClosedOpen] = useState(false);
   const [allNeeds, setAllNeeds] = useState(false);
@@ -223,7 +226,14 @@ export function Sidebar({ route }: { route: ChatRoute }) {
   const { open, closed, loaded } = useChannelRows();
   const managerUnread = useManagerUnread().size;
   const duties = useDuties((s) => s.list);
-  const key = streamKey(route);
+  const key = route ? streamKey(route) : '';
+  if (route && route.view === 'channel') lastChannel = route.id;
+  // The open channel lists its agents, and so does the channel of the agent that shows.
+  const agent = route && route.view === 'agent' ? route.name : '';
+  // An agent keeps the channel that the person opened last when it works there, else the first open channel where it works.
+  const agentChannel = agent ? (open.find((c) => c.id === lastChannel && c.agents.some((x) => x.agent === agent)) || open.find((c) => c.agents.some((x) => x.agent === agent))) : undefined;
+  const expanded = route && route.view === 'channel' ? route.id : agentChannel ? agentChannel.id : '';
+  const here = typeof location !== 'undefined' ? location.hash : '';
   const unreadChannels = open.filter((c) => c.unread > 0);
   const unreadCount = unreadChannels.length + (managerUnread ? 1 : 0);
   const pills: [Filter, string, number][] = [
@@ -237,9 +247,6 @@ export function Sidebar({ route }: { route: ChatRoute }) {
       <div class="cf-side-head">
         <h2 class="cf-ws">{name}</h2>
         <Pop label="Other places" keyClass="cf-icon-key" keyBody={<Icon name="grid" />} items={PLACES} />
-        <a class="cf-icon-key" href={chatHref({ view: 'manager', fresh: true })} title="New channel: ask the Manager" aria-label="New channel: ask the Manager">
-          <Icon name="plus" />
-        </a>
       </div>
       <div class="cf-pills" role="group" aria-label="Show">
         {pills.map(([f, label, n]) => (
@@ -264,7 +271,7 @@ export function Sidebar({ route }: { route: ChatRoute }) {
           </section>
         ) : (
           <>
-            {(filter === 'all' || managerUnread > 0) && <ManagerRow current={route.view === 'manager'} />}
+            {(filter === 'all' || managerUnread > 0) && <ManagerRow current={!!route && route.view === 'manager'} />}
             {filter === 'all' && (needs.length > 0 || needsCount > 0) && (
               <section class="cf-sec cf-needs" aria-labelledby="cf-needs-h">
                 <h3 class="cf-sec-head" id="cf-needs-h">
@@ -272,7 +279,7 @@ export function Sidebar({ route }: { route: ChatRoute }) {
                   <span class="cf-sec-n">{needsCount}</span>
                 </h3>
                 {(allNeeds ? needs : needs.slice(0, NEEDS_SHOWN)).map((r) => (
-                  <NeedRowView r={r} />
+                  <NeedRowView r={r} current={here === r.href} />
                 ))}
                 {needs.length > NEEDS_SHOWN && (
                   <button type="button" class="cf-closed-key cf-more-needs" aria-expanded={allNeeds} onClick={() => setAllNeeds(!allNeeds)}>
@@ -290,14 +297,14 @@ export function Sidebar({ route }: { route: ChatRoute }) {
               {loaded && open.length === 0 && filter === 'all' && <p class="cf-side-note">No channel is open. Ask the Manager for work, and it opens one.</p>}
               {loaded && filter === 'unread' && unreadCount === 0 && <p class="cf-side-note">Nothing unread.</p>}
               {(filter === 'unread' ? unreadChannels : open).map((c) => (
-                <ChannelRowView c={c} current={key === 'c:' + c.id} />
+                <ChannelRowView c={c} current={key === 'c:' + c.id} open={expanded === c.id} agent={agent} />
               ))}
               {filter === 'all' && closed.length > 0 && (
                 <>
                   <button type="button" class="cf-closed-key" aria-expanded={closedOpen} onClick={() => setClosedOpen(!closedOpen)}>
                     {closed.length === 1 ? '1 closed channel' : closed.length + ' closed channels'}
                   </button>
-                  {closedOpen && closed.map((c) => <ChannelRowView c={c} current={key === 'c:' + c.id} />)}
+                  {closedOpen && closed.map((c) => <ChannelRowView c={c} current={key === 'c:' + c.id} open={expanded === c.id} agent={agent} />)}
                 </>
               )}
             </section>

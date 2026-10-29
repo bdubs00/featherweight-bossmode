@@ -137,57 +137,37 @@ describe('a form and the keys of the page', () => {
       document.body.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
     });
 
-  it('keeps Open a team on Escape and on /, and gives the half-filled job back after a move away', async () => {
+  it('keeps New agent on Escape and on /, in the shell of the page', async () => {
     sessionStorage.clear();
     const el = mount(<App />);
-    await vi.waitFor(() => expect(el.querySelector('.appbar, nav')).not.toBeNull());
-    await visit('#new');
-    const goal = () => el.querySelector('.newbridge textarea') as HTMLTextAreaElement;
-    act(() => {
-      goal().value = 'Migrate logrotate.';
-      goal().dispatchEvent(new Event('input', { bubbles: true }));
-    });
-    // The focus leaves the field, as a second Escape or a click on a key does. Neither key leaves the form.
-    act(() => goal().blur());
+    await vi.waitFor(() => expect(el.querySelector('.cf')).not.toBeNull());
+    await visit('#new-agent');
+    // The older form shows in the shell of the chat-first page, with no app bar of its own.
+    expect(el.querySelector('.cf .cf-old')).not.toBeNull();
+    expect(el.querySelector('.appbar')).toBeNull();
     key('Escape');
     await settle();
-    expect(location.hash).toBe('#new');
+    expect(location.hash).toBe('#new-agent');
     key('/');
     await settle();
-    expect(location.hash).toBe('#new');
-    await visit('#bridge/b1');
-    await visit('#new');
-    expect(goal().value).toBe('Migrate logrotate.');
+    expect(location.hash).toBe('#new-agent');
   });
 });
 
-describe('the conversation of a seat', () => {
-  const lit = (el: HTMLElement) => el.querySelector('.place[aria-current="page"] .place-label')!.textContent;
-
-  it('stays in Bridges when a bridge opens it, with the bridges in the list and Back to the members of its bridge', async () => {
+describe('the older addresses of a seat and of the fleet', () => {
+  it('opens the members of the channel of a seat', async () => {
     const el = mount(<App />);
-    await vi.waitFor(() => expect(el.querySelector('.appbar, nav')).not.toBeNull());
-    await visit('#bridge/b1/roster');
+    await vi.waitFor(() => expect(el.querySelector('.cf')).not.toBeNull());
     await visit('#member/b1/migrator-1');
-    expect(lit(el)).toBe('Teams');
-    expect(el.querySelector('.pane-list #bridges-title')).not.toBeNull();
-    const back = el.querySelector('.member-main .pane-head a.back') as HTMLAnchorElement;
-    expect(back.getAttribute('href')).toBe('#bridge/b1/roster');
-    expect(back.getAttribute('aria-label')).toBe('Back to the members of Migrate Puppet');
-    expect(backOf({ place: 'member', bridge: 'b1', handle: 'migrator-1', tab: 'chat' })).toEqual({ place: 'bridge', id: 'b1', pane: 'roster' });
-    // A move between the tabs of the seat keeps the place.
-    await visit('#member/b1/migrator-1/run');
-    expect(lit(el)).toBe('Teams');
+    await vi.waitFor(() => expect(el.querySelector('#cf-members-h')).not.toBeNull());
+    expect(backOf({ place: 'member', bridge: 'b1', handle: 'migrator-1', tab: 'chat' })).toEqual({ place: 'fleet' });
   });
 
-  it('stays in Fleet when the Fleet place opens it', async () => {
+  it('opens Agents for the Fleet place', async () => {
     const el = mount(<App />);
-    await vi.waitFor(() => expect(el.querySelector('.appbar, nav')).not.toBeNull());
+    await vi.waitFor(() => expect(el.querySelector('.cf')).not.toBeNull());
     await visit('#fleet');
-    await visit('#member/b1/migrator-1');
-    expect(lit(el)).toBe('Fleet');
-    expect((el.querySelector('.member-main .pane-head a.back') as HTMLAnchorElement).getAttribute('href')).toBe('#fleet');
-    expect(backOf({ place: 'member', bridge: 'b1', handle: 'migrator-1', tab: 'chat' })).toEqual({ place: 'fleet' });
+    await vi.waitFor(() => expect(el.querySelector('#cf-agents-title')).not.toBeNull());
   });
 });
 

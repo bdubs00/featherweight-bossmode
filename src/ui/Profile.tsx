@@ -580,7 +580,15 @@ export function DoneSec({ agent, done }: { agent: string; done: DoneBlock }) {
   );
 }
 
-export function Profile({ agent, back }: { agent: string; back?: { href: string; label: string } }) {
+/**
+ * Profile is the profile of an agent. With setup, it is the setup pane of
+ * the chat-first page (src/ui/chat): what the agent can do, its face, its
+ * hearts, and its packages. The scheduler places the work there, so the
+ * pane leaves out the workers and the figures of today, and the jobs of the
+ * agent show on the agent view beside it.
+ */
+export function Profile({ agent, back, setup }: { agent: string; back?: { href: string; label: string }; setup?: boolean }) {
+  // The setup pane sits beside the agent view, which names the agent already, so its head says what it holds.
   const face = useSelect((s) => s.faces[agent]);
   // The profile of GET /v1/agents/{name}, else the agent of the fleet,
   // which also stands in while the profile loads.
@@ -664,7 +672,7 @@ export function Profile({ agent, back }: { agent: string; back?: { href: string;
     <section class="screen profile" aria-labelledby="profile-title">
       <PaneHeader
         id="profile-title"
-        title={title}
+        title={setup ? 'Setup' : title}
         back={{ href: back ? back.href : '#fleet', label: back ? back.label : 'Fleet', to: 'main' }}
         actions={
           owner && !edit ? (
@@ -677,7 +685,7 @@ export function Profile({ agent, back }: { agent: string; back?: { href: string;
           ) : undefined
         }
       >
-        <Chip>agent</Chip>
+        {!setup && <Chip>agent</Chip>}
       </PaneHeader>
       <div class="scroll">
         <section class={'prof-ident' + (edit ? ' editing' : '')} aria-label={title}>
@@ -742,12 +750,12 @@ export function Profile({ agent, back }: { agent: string; back?: { href: string;
           </section>
         )}
         {info && info.done && <DoneSec agent={agent} done={info.done} />}
-        <AgentDuties agent={agent} />
+        {!setup && <AgentDuties agent={agent} />}
         {/* The wiki refuses a person who views every agent, such as a sponsor, so the profile reads no page for them. */}
         {!noWiki && <Liked agent={agent} />}
-        <Workers agent={agent} owner={owner} pool={pool} setPool={setPool} />
+        {!setup && <Workers agent={agent} owner={owner} pool={pool} setPool={setPool} />}
         {packagePool && <PackagesSection key={packagePool} agent={agent} pool={packagePool} owner={owner} onSwitch={setSectionSwitch} />}
-        <TodaySec agent={agent} today={today} />
+        {!setup && <TodaySec agent={agent} today={today} />}
       </div>
     </section>
   );

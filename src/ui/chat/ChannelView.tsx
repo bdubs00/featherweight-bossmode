@@ -136,7 +136,6 @@ export function ChannelView({ id, tab }: { id: string; tab: ChannelTab }) {
           items={[
             { label: 'Make this a job', onSelect: () => setConfirm('job') },
             closed ? { label: 'Reopen the channel', onSelect: () => void attempt(() => patchBridge(id, { state: 'open' })) } : { label: 'Close the channel', onSelect: () => setConfirm('close') },
-            { label: 'Open in the old view', href: '#bridge/' + encodeURIComponent(id), sep: true },
           ]}
         />
       </header>

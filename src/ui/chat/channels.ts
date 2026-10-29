@@ -197,6 +197,11 @@ export function pageWords(text: string): string {
 export function lineText(text: string): string {
   return pageWords(
     String(text || '')
+      // The scheduler places the work, so the lines of packages name no worker.
+      .replace(/^(Ready|Updating) on \d+ of \d+ workers?\.$/, (_m, w: string) => (w === 'Ready' ? 'Ready.' : 'Updating now.'))
+      .replace(/^The change waits for (its worker|\d+ workers) to wake up\.$/, 'The change takes effect at the next run.')
+      .replace(/^Workers take a change in about a minute\./, 'A change takes about a minute.')
+      .replace(/^The workers of (\S+) lose /, '$1 loses ')
       .replace(/\blost its worker\b/g, 'lost its run')
       .replace(/\btook the seat\b/g, 'joined')
       .replace(/\bseated (\S+) again\b/g, 'started $1 again')
