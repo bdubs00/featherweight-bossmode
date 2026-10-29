@@ -1866,6 +1866,7 @@ page never calls `GET /v1/knowhow/runs`, which is for the kernel.
 | `GET /v1/knowhow/waiting` | **Added to the workbench** for the page: without `agent`, `{"waiting": [<change>]}` lists the changes of every agent that the person can view and read. The list of agents reads it once to mark the agents that need you. |
 | `POST /v1/knowhow/waiting/{id}` | `{"keep": true}` for Keep and `{"keep": false}` for Not now. The answer is `{"kept", "entry"}`. Not now drops the change, and a new note that waited is put away. A 409 means that the note changed since. The change stays until a person drops it, and a quiet line says so above the cards. |
 | `GET /v1/knowhow/summary?agent=<name>&days=7` | See below. |
+| `POST /v1/knowhow/review/{agent}` | **Added to the workbench**: starts the after-work review of the agent now. No body. 202 with `{"agent", "started": true, "run", "profile"}`, or 200 with `started: false` and `reason` when the agent has nothing to review. The header offers it to an owner as Review now while `review.on`, and says `The after-work review of <agent> started. What it keeps shows here.` or the reason. Without a review profile, 409 with the reason. |
 
 The summary of `summary.go`:
 

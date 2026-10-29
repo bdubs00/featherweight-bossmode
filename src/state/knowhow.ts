@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { ApiError } from '../api/client';
-import { knowhowApi, type JournalEntry, type KnowhowSettings, type KnowhowSummary, type NoteItem, type NoteRecord, type WaitingChange, type WriteAnswer } from '../api/knowhow';
+import { knowhowApi, type JournalEntry, type KnowhowSettings, type KnowhowSummary, type NoteItem, type NoteRecord, type ReviewNow, type WaitingChange, type WriteAnswer } from '../api/knowhow';
 import { noteKey } from '../lib/knowhow';
 import { store } from './store';
 
@@ -233,6 +233,11 @@ export async function decide(agent: string, id: string, keep: boolean): Promise<
     throw e;
   }
   await refresh(agent);
+}
+
+/** reviewNow starts the after-work review of an agent now. It answers what the server did: the run, or why no run started. */
+export async function reviewNow(agent: string): Promise<ReviewNow> {
+  return knowhowApi.reviewNow(agent);
 }
 
 /** undo takes back one entry of the journal, then reads the agent again. A 409 changes nothing, and the error goes on to the screen. */

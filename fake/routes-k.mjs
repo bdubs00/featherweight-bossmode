@@ -21,6 +21,7 @@
 //   POST   /v1/knowhow/waiting/{id}                      {"keep"}: {"kept", "entry"}. A change whose note changed since
 //                                                        answers 409 and stays until a person drops it.
 //   GET    /v1/knowhow/summary?agent=&days=7             the four numbers, split into normal and held-back runs, and the line
+//   POST   /v1/knowhow/review/{agent}                    for an owner: {"agent", "started": false, "reason"}. The fake starts no run.
 //
 // An id of an entry or of a change is public: <id>-<agent in base64url>.
 // The stream carries {"kind": "knowhow", "agent"} on each change.
@@ -497,6 +498,13 @@ export function register({ on, refuse, readJson, publish, now, AGENTS, writePage
   });
 
   const settings = (agent) => ({ agent, askFirst: !!ask[agent], review: { on: true, agent: 'review', every: '24h0m0s' } });
+
+  on('POST', '/v1/knowhow/review/([^/]+)', (c, raw) => {
+    const agent = decodeURIComponent(raw);
+    viewAgent(agent);
+    if (!canEdit(agent)) refuse(403, 'a start of the after-work review needs the owner role on the agent');
+    return { agent, started: false, reason: `The agent ${agent} has no open candidate. Nothing to review now.` };
+  });
 
   on('GET', '/v1/knowhow/settings/([^/]+)', (c, raw) => {
     const agent = decodeURIComponent(raw);

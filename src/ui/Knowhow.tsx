@@ -18,7 +18,7 @@ import { go, hrefOf, type KnowhowTab } from '../lib/route';
 import { statusOf } from '../lib/routines';
 import { clock, dayWords } from '../lib/words';
 import { selectAgents } from '../state/agents';
-import { decide, loadAgent, loadAllWaiting, loadOlder, setAskFirst, undo, useKnowhow, useKnowhowView } from '../state/knowhow';
+import { decide, loadAgent, loadAllWaiting, loadOlder, reviewNow, setAskFirst, undo, useKnowhow, useKnowhowView } from '../state/knowhow';
 import { loadRoutines, useRoutines, useRoutinesView } from '../state/routines';
 import { useSelect } from '../state/store';
 import { Switch } from './ChannelDialog';
@@ -244,7 +244,7 @@ function KnowhowView({ agent, tab: asked }: { agent: string; tab: KnowhowTab }) 
             </p>
           )
         ) : (
-          <Head agent={agent} owner={owner} />
+          <Head agent={agent} owner={owner} name={name} />
         )}
         {tab === 'learned' && !off && <Waiting key={agent} agent={agent} role={role} name={name} />}
         {tab === 'learned' && !off && <Journal agent={agent} role={role} name={name} />}
@@ -265,9 +265,12 @@ function KnowhowView({ agent, tab: asked }: { agent: string; tab: KnowhowTab }) 
  * Head is the header of the place for one agent: the four numbers of its
  * last 7 days, the line that compares the held-back runs with the others,
  * and the switch Ask me before it keeps what it learns. A person who does
- * not own the agent gets no switch, and a line says when it is on.
+ * not own the agent gets no switch, and a line says when it is on. While
+ * the after-work review runs, an owner starts it now with Review now; the
+ * server says when the agent has nothing to review. While it is off, a
+ * line says why.
  */
-function Head({ agent, owner }: { agent: string; owner: boolean }) {
+function Head({ agent, owner, name }: { agent: string; owner: boolean; name: string }) {
   const summary = useKnowhow((s) => s.agents[agent] && s.agents[agent].summary);
   const settings = useKnowhow((s) => s.agents[agent] && s.agents[agent].settings);
   const review = settings && settings.review;
@@ -278,6 +281,16 @@ function Head({ agent, owner }: { agent: string; owner: boolean }) {
     setBusy(true);
     try {
       await setAskFirst(agent, on);
+    } catch (e) {
+      showError(e);
+    }
+    setBusy(false);
+  };
+  const startReview = async () => {
+    setBusy(true);
+    try {
+      const r = await reviewNow(agent);
+      showSaid(r.started ? 'The after-work review of ' + name + ' started. What it keeps shows here.' : r.reason || 'Nothing to review now.');
     } catch (e) {
       showError(e);
     }
@@ -315,6 +328,11 @@ function Head({ agent, owner }: { agent: string; owner: boolean }) {
       {owner && settings && (
         <div class="kh-switch">
           <Switch label="Ask me before it keeps what it learns" on={settings.askFirst} disabled={busy} onChange={turn} />
+          {review && review.on && (
+            <Button size="s" kind="quiet" class="kh-review-now" disabled={busy} onClick={startReview}>
+              Review now
+            </Button>
+          )}
         </div>
       )}
       {!owner && settings && settings.askFirst && <p class="t-meta kh-asks">It asks an owner before it keeps what it learns.</p>}

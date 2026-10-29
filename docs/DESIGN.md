@@ -1381,7 +1381,10 @@ The work:
   does not own the agent gets no switch. For that person, a line says `It
   asks an owner before it keeps what it learns.` while the switch is on.
   While the after-work review is off, a line gives the reason of the
-  server, such as `The after-work review is off: no agent is set.`
+  server, such as `The after-work review is off: no agent is set.` While
+  it is on, an owner has the quiet key Review now beside the switch. It
+  starts the review of the agent at once, and the notice of the page says
+  that it started, or why nothing needs a review.
 - The rule of 20. The server applies it to the held-back runs and words
   the line. Under 20, the line says `Not enough held-back runs yet.` The
   page keeps the rule for its own figures. Under 20 runs, the share done

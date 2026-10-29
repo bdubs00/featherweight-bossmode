@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { JournalEntry, NoteRecord, WaitingChange } from '../api/knowhow';
 import { fakeApi, mount, unmountAll } from '../ui/testkit-c';
 import { store } from './store';
-import { decide, forgetKnowhow, knowhow, knowhowChanged, loadAgent, loadAllWaiting, loadNote, loadOlder, putAway, saveNote, setAskFirst, useKnowhowView, JOURNAL_PAGE } from './knowhow';
+import { decide, forgetKnowhow, knowhow, knowhowChanged, loadAgent, loadAllWaiting, loadNote, loadOlder, putAway, reviewNow, saveNote, setAskFirst, useKnowhowView, JOURNAL_PAGE } from './knowhow';
 
 const flush = async () => {
   for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
@@ -192,5 +192,13 @@ describe('the stream', () => {
     store.dispatch({ type: 'stream', event: { id: '92', kind: 'reset', data: null } });
     await flush();
     expect(api.calls.filter((c) => c.path.startsWith('/v1/knowhow/summary'))).toHaveLength(2);
+  });
+});
+
+describe('the after-work review now', () => {
+  it('starts the after-work review of an agent now, and says what the server did', async () => {
+    api = fakeApi(routes({ 'POST /v1/knowhow/review/triage': () => ({ status: 202, body: { agent: 'triage', started: true, run: 'r9', profile: 'review' } }) }) as never);
+    expect(await reviewNow('triage')).toMatchObject({ started: true, run: 'r9' });
+    expect(api.calls[0]).toMatchObject({ method: 'POST', path: '/v1/knowhow/review/triage' });
   });
 });

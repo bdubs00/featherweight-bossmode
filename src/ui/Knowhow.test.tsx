@@ -553,3 +553,31 @@ describe('the words of the place', () => {
     }
   });
 });
+
+describe('the after-work review now', () => {
+  it('lets an owner start the after-work review now, says what the server did, and offers no key while the review is off', async () => {
+    let n = 0;
+    api = fakeApi(
+      routes({
+        'POST /v1/knowhow/review/triage': () => (++n === 1 ? { status: 202, body: { agent: 'triage', started: true, run: 'r9', profile: 'review' } } : { body: { agent: 'triage', started: false, reason: 'The agent triage has no open candidate. Nothing to review now.' } }),
+      }) as never,
+    );
+    const el = mount(<KnowhowMain agent="triage" tab="learned" />);
+    await settle();
+    click(keyNamed(el.querySelector('.kh-head')!, 'Review now'));
+    await settle();
+    expect(api.calls.find((c) => c.method === 'POST')!.path).toBe('/v1/knowhow/review/triage');
+    expect(currentSaid()).toBe('The after-work review of Triage started. What it keeps shows here.');
+    click(keyNamed(el.querySelector('.kh-head')!, 'Review now'));
+    await settle();
+    expect(currentSaid()).toBe('The agent triage has no open candidate. Nothing to review now.');
+    unmountAll();
+    api.restore();
+    api = fakeApi(routes({ 'GET /v1/knowhow/settings/triage': { ...SETTINGS, review: { on: false, reason: 'The after-work review is off: no agent is set.' } } }) as never);
+    forgetKnowhow();
+    const off = mount(<KnowhowMain agent="triage" tab="learned" />);
+    await settle();
+    expect(keyNamed(off.querySelector('.kh-head')!, 'Review now')).toBeUndefined();
+    expect(text(off.querySelector('.kh-review'))).toBe('The after-work review is off: no agent is set.');
+  });
+});
