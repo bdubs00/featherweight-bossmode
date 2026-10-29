@@ -5,7 +5,8 @@
 // conversation of a run both draw with these rows.
 
 import type { ComponentChildren } from 'preact';
-import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
+import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
+import { LineText } from './linetext';
 import type { Entry, ReactionKind } from '../api/types';
 import type { Step, ThreadRow } from '../state/thread';
 import { sameSender } from '../state/thread';
@@ -38,13 +39,14 @@ export function eventTone(event: string | undefined): Tone {
  * clock time yet, and aria-busy tells a screen reader that it grows.
  */
 export function Msg(p: { face: ComponentChildren; name: string; at?: string; compact?: boolean; label?: string; id?: string; corner?: ComponentChildren; tag?: ComponentChildren; pending?: boolean; children: ComponentChildren }) {
+  const words = useContext(LineText);
   return (
     <article class={'tmsg' + (p.compact ? ' compact' : '') + (p.pending ? ' pending' : '')} id={p.id} aria-label={p.label} aria-busy={p.pending ? 'true' : undefined}>
       {p.compact ? <span class="tmsg-gutter" /> : p.face}
       <div class="tmsg-body">
         {!p.compact && (
           <header class="tmsg-head">
-            <b>{p.name}</b>
+            <b>{words(p.name)}</b>
             {p.at && <When at={p.at} />}
             {p.tag}
           </header>
@@ -58,11 +60,12 @@ export function Msg(p: { face: ComponentChildren; name: string; at?: string; com
 
 /** Quiet is a quiet line in the middle of the thread: a system line or a step, with an optional light. title is the tooltip of its text. */
 export function Quiet({ tone, at, err, title, children }: { tone?: Tone; at?: string; err?: boolean; title?: string; children: ComponentChildren }) {
+  const words = useContext(LineText);
   return (
     <div class={'tline' + (err ? ' err' : '')}>
       {tone && <LineLed tone={tone} />}
       <span class="tline-text" title={title}>
-        {children}
+        {typeof children === 'string' ? words(children) : children}
       </span>
       {at && <When at={at} />}
     </div>
@@ -81,10 +84,11 @@ export function BridgeRef({ id, title }: { id: string; title?: string }) {
  * not already say adds Error.
  */
 export function StepText({ step }: { step: Step }) {
+  const words = useContext(LineText);
   const path = step.path ? <code>{step.path}</code> : null;
   return (
     <>
-      {step.text}
+      {words(step.text)}
       {step.cmd && (
         <>
           {' '}

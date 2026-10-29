@@ -19,6 +19,7 @@ import './styles/duties.css';
 import './styles/results.css';
 import './styles/work.css';
 import './styles/door.css';
+import './styles/cf.css';
 
 applyChoice(readChoice());
 render(<App />, document.getElementById('app')!);

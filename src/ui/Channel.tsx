@@ -15,7 +15,8 @@ import { useBridgePages } from '../state/bridgepages';
 import { membersOf, selectFacts, type Channel as ChannelState, type Roster, type State } from '../state/reducer';
 import { questionWaits } from '../state/inbox';
 import { senderName, since } from '../lib/words';
-import { decidedRuns, hiddenLine } from '../lib/lines';
+import { decidedRuns, hiddenLine, napOf } from '../lib/lines';
+import { openedWords } from './chat/channels';
 import { go, hrefOf, type BridgeTab } from '../lib/route';
 import { useRoving, smooth } from './keys';
 import { attempt, showSaid } from './notice';
@@ -90,15 +91,15 @@ function typistsKey(s: State, bridge: string): string {
  * ChannelComposer is the composer of a bridge. It reads the roster for the @
  * completion, so a change of presence redraws it and not the channel.
  */
-function ChannelComposer(p: { id: string; closed: boolean; reply: Entry | null; onClearReply: () => void }) {
+function ChannelComposer(p: { id: string; closed: boolean; reply: Entry | null; onClearReply: () => void; placeholder?: string }) {
   const roster = useSelect((s) => s.rosters[p.id]);
   const members = useMemo(() => membersOf(roster).filter((m) => !m.fired), [roster]);
   const r = p.reply;
   return (
     <Composer
       draft={p.id}
-      label="Message the team"
-      placeholder="Message the team"
+      label={p.placeholder || 'Message the team'}
+      placeholder={p.placeholder || 'Message the team'}
       members={members}
       disabled={p.closed ? 'Closed. Reopen it to send.' : ''}
       reply={r ? { seq: r.seq, who: senderName(r.from), text: r.text, handle: r.from.kind === 'agent' ? r.from.handle : undefined } : null}
@@ -126,14 +127,25 @@ const shapes = new WeakMap<object, { day: string; shape: Shape }>();
  * entry keeps its shape until it changes. A line that says a decision
  * leaves the channel when the channel holds the card that shows it.
  */
-function channelShape(ch: ChannelState | undefined): string | undefined {
+function channelShape(ch: ChannelState | undefined, latestNaps = false): string | undefined {
   if (!ch) return undefined;
   const today = new Date().toDateString();
   const out: Shape[] = [];
   const decided = decidedRuns(ch.seqs.map((seq) => ch.bySeq[seq] as Entry));
+  // With latestNaps, a line that says an agent went to sleep or woke up shows only when it is the newest such line of that agent.
+  const latest = new Map<string, number>();
+  if (latestNaps)
+    for (const seq of ch.seqs) {
+      const n = napOf(ch.bySeq[seq] as Entry);
+      if (n) latest.set(n.handle, seq);
+    }
   for (const seq of ch.seqs) {
     const e = ch.bySeq[seq] as Entry;
     if (hiddenLine(e, decided)) continue;
+    if (latestNaps) {
+      const n = napOf(e);
+      if (n && latest.get(n.handle) !== seq) continue;
+    }
     let c = shapes.get(e);
     if (!c || c.day !== today) {
       c = { day: today, shape: shapeOf(e) };
@@ -170,27 +182,32 @@ function useMedia(query: string): boolean {
 /** partEnd is the seq of the last entry of a part of a fold. */
 const partEnd = (p: Part): number => (p.kind === 'naps' ? p.seqs[p.seqs.length - 1] : p.seq);
 
-function FoldLine({ f, open, onToggle }: { f: Extract<Item, { kind: 'fold' }>; open: boolean; onToggle: () => void }) {
+function FoldLine({ f, open, onToggle, label }: { f: Extract<Item, { kind: 'fold' }>; open: boolean; onToggle: () => void; label?: string }) {
   return (
     <div class="fold">
       <button type="button" class="fold-key" aria-expanded={open} onClick={onToggle} data-item>
         <Glyph name="back" size={14} class={open ? 'turn-down' : 'turn-right'} />
-        <span>{foldWords(f)}</span>
+        <span>{label || foldWords(f)}</span>
         {f.failed > 0 && <Led tone="red" word={f.failed + ' failed'} />}
       </button>
     </div>
   );
 }
 
-function Posts({ id, closed }: { id: string; closed: boolean }) {
+/**
+ * Posts is the stream of a channel. The chat-first page (src/ui/chat) reuses
+ * it with its own placeholder, and without the line of the waves, which
+ * names workers.
+ */
+export function Posts({ id, closed, placeholder, quiet }: { id: string; closed: boolean; placeholder?: string; quiet?: boolean }) {
   const goal = useSelect((s) => (s.bridges.byId[id] ? s.bridges.byId[id].goal || s.bridges.byId[id].title : ''));
   const title = useSelect((s) => (s.bridges.byId[id] ? s.bridges.byId[id].title : ''));
   // The channel reads the order and the shapes of the entries, never the
   // entries: a changed entry redraws its own row only.
   const seqs = useSelect((s) => (s.channels[id] ? s.channels[id].seqs : undefined));
-  const key = useSelect((s) => channelShape(s.channels[id]));
+  const key = useSelect((s) => channelShape(s.channels[id], quiet));
   const prev = useSelect((s) => (s.channels[id] ? s.channels[id].prev : 0));
-  const waves = useSelect((s) => wavesLine(membersOf(s.rosters[id]), s.fleet));
+  const waves = useSelect((s) => (quiet ? '' : wavesLine(membersOf(s.rosters[id]), s.fleet)));
   // The seats that work now, as one text, so a change elsewhere in the store does not redraw the channel.
   const typingKey = useSelect((s) => typistsKey(s, id));
   const typists = useMemo(() => (typingKey ? (JSON.parse(typingKey) as (Typist & { phrase: string })[]) : []), [typingKey]);
@@ -292,6 +309,9 @@ function Posts({ id, closed }: { id: string; closed: boolean }) {
   }, [typingKey]);
 
   const onReply = useCallback((seq: number) => setReply(seq), []);
+  // The fold that starts with the opening of the channel says so, with the count of its agents.
+  const entriesOf = useSelect((s) => s.channels[id]);
+  const openedOf = (seqs: number[]): string | undefined => (entriesOf ? openedWords(seqs.map((q) => entriesOf.bySeq[q] as Entry)) : undefined);
   const replyEntry = useSelect((s) => (reply && s.channels[id] ? s.channels[id].bySeq[reply] : undefined));
 
   const earlier = async () => {
@@ -321,7 +341,7 @@ function Posts({ id, closed }: { id: string; closed: boolean }) {
               const isOpen = open.has(it.key);
               return (
                 <div class={'fold-group' + (isOpen ? ' open' : '')} key={it.key}>
-                  <FoldLine f={it} open={isOpen} onToggle={() => toggle(it.key)} />
+                  <FoldLine f={it} open={isOpen} onToggle={() => toggle(it.key)} label={quiet ? openedOf(it.seqs) : undefined} />
                   {isOpen &&
                     it.parts.map((p, i) => {
                       const prevSeq = i === 0 ? it.prevSeq : partEnd(it.parts[i - 1]);
@@ -354,7 +374,7 @@ function Posts({ id, closed }: { id: string; closed: boolean }) {
           }}
         />
       )}
-      <ChannelComposer id={id} closed={closed} reply={replyEntry || null} onClearReply={() => setReply(null)} />
+      <ChannelComposer id={id} closed={closed} reply={replyEntry || null} onClearReply={() => setReply(null)} placeholder={placeholder} />
     </>
   );
 }
@@ -383,7 +403,7 @@ function PageWriter({ id, p }: { id: string; p: BridgePage }) {
  * wherever its agents put it. Each row links the page in the Wiki and
  * names the seat that wrote it.
  */
-function WikiTab({ id }: { id: string }) {
+export function WikiTab({ id }: { id: string }) {
   const { pages, loaded, failed } = useBridgePages(id);
   const list = useRoving<HTMLUListElement>();
   const head = 'bridges/' + id + '/';
@@ -453,7 +473,7 @@ export function cardOrder(entries: Entry[], waits: (e: Entry) => boolean = () =>
  * part of a channel. A closed bridge takes no answer, so its questions do
  * not count.
  */
-function waitingCards(ch: ChannelState | undefined, r: Roster | undefined, closed = false): number {
+export function waitingCards(ch: ChannelState | undefined, r: Roster | undefined, closed = false): number {
   if (!ch) return 0;
   let n = 0;
   for (const seq of ch.seqs) {
@@ -464,14 +484,14 @@ function waitingCards(ch: ChannelState | undefined, r: Roster | undefined, close
 }
 
 /** isClosed reports whether the page holds a bridge as closed. */
-const isClosed = (s: { bridges: { byId: Record<string, { state: string }> } }, id: string): boolean => !!s.bridges.byId[id] && s.bridges.byId[id].state === 'closed';
+export const isClosed = (s: { bridges: { byId: Record<string, { state: string }> } }, id: string): boolean => !!s.bridges.byId[id] && s.bridges.byId[id].state === 'closed';
 
 /**
  * DecisionsTab lists the cards of the bridge, the ones that wait first.
  * When none waits, a line says so above the cards that were decided or
  * answered, so a past card never reads as work that waits.
  */
-function DecisionsTab({ id }: { id: string }) {
+export function DecisionsTab({ id }: { id: string }) {
   const [loading, setLoading] = useState(true);
   const waits = useSelect((s) => (s.channels[id] ? waitingCards(s.channels[id], s.rosters[id], isClosed(s, id)) : 0));
   const key = useSelect((s) => {

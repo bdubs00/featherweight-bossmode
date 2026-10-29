@@ -5,12 +5,13 @@
 // a touch screen.
 
 import { memo } from 'preact/compat';
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useContext, useEffect, useRef, useState } from 'preact/hooks';
 import type { Entry, Member, ReactionKind } from '../api/types';
 import { useSelect } from '../state/store';
 import { dayWords, excerpt, list, personName, plainText, senderName } from '../lib/words';
 import { hrefOf } from '../lib/route';
 import { lineWords, napWords, whoName } from '../lib/lines';
+import { LineText } from './linetext';
 import type { Tone } from '../lib/presence';
 import { decide, react } from '../state/actions';
 import { attempt } from './notice';
@@ -223,6 +224,8 @@ function ReplyChip({ bridge, seq }: { bridge: string; seq: number }) {
 
 /* ---------- one entry ---------- */
 
+export { LineText };
+
 /**
  * NapRow is the one quiet line of a run of sleep and wake pairs of one
  * seat, such as "migrator-1 slept and woke up 4 times", with the clock time
@@ -267,6 +270,7 @@ export interface EntryProps {
 
 /** EntryRow draws one entry. It reads its own entry, so a change redraws only it. */
 export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, fresh, listed, onReply }: EntryProps) {
+  const words = useContext(LineText);
   const e = useSelect((s) => (s.channels[bridge] ? (s.channels[bridge].bySeq[seq] as Entry | undefined) : undefined));
   const prev = useSelect((s) => (prevSeq && s.channels[bridge] ? (s.channels[bridge].bySeq[prevSeq] as Entry | undefined) : undefined));
   // A row reads strings of the roster, never the roster itself, so a change
@@ -296,6 +300,7 @@ export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, fresh, li
     // The page words the line from its event, and keeps the sentence of the backend for the tooltip.
     const w = lineWords(e, me);
     const page = w.page || e.page;
+    const text = words(w.text);
     return (
       <>
         {dayLine}
@@ -303,7 +308,7 @@ export const EntryRow = memo(function EntryRow({ bridge, seq, prevSeq, fresh, li
           <p>
             <LineLed tone={toneOfEvent(e.event)} />
             <span class="sys-text" title={w.title}>
-              {w.raw ? <InlineMarkdown text={w.text} /> : w.text}
+              {w.raw ? <InlineMarkdown text={text} /> : text}
               {page && (
                 <>
                   {' '}
