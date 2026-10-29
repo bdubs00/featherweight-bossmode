@@ -124,9 +124,18 @@ function runPart(r) {
       return { ...p, stage: 'done', reason, verdict };
     }
     case 'failed': {
-      // A limit of the budget is no fault: the card says which limit stopped it.
+      // A limit of the budget is no fault: the card says which limit stopped it, then what the checks of done found
+      // after its final report, as the front says it (work.go, limitWords).
       const limit = /^budget exceeded:?\s*([A-Za-z]+)/.exec(r.error || '');
-      if (limit) return { ...p, stage: 'stopped', reason: 'Stopped at its ' + ({ maxTurns: 'turn', maxTokens: 'token', maxCostUSD: 'cost', maxToolCalls: 'tool call', deadline: 'time' }[limit[1]] || 'budget') + ' limit.' };
+      if (limit) {
+        let reason = 'Stopped at ' + (LIMIT_WORDS[limit[1]] || 'a limit of its budget') + '.';
+        const d = r.done;
+        if (d && d.state === 'failed') {
+          const failed = (d.checks || []).filter((x) => !x.passed).map((x) => x.name || x.tool);
+          reason += ' Not done: ' + (failed.length ? 'the check ' + failed.join(', ') + ' failed.' : 'its checks did not pass.');
+        } else if (d && d.state === 'checked' && !d.weak) reason += ' Its checks passed.';
+        return { ...p, stage: 'stopped', reason };
+      }
       return { ...p, stage: 'stopped', reason: r.error ? 'Failed: ' + String(r.error).slice(0, 200) : 'Failed.' };
     }
     case 'canceled':
@@ -208,6 +217,9 @@ function summaryOf(S, card) {
   }
   return '';
 }
+
+/** The words of a limit of the budget, as the front says them (work.go, limitWords). */
+const LIMIT_WORDS = { maxTurns: 'its limit of steps', maxToolCalls: 'its limit of tool calls', maxCallsPerTurn: 'its limit of tool calls in one step', maxTokens: 'its limit of tokens', maxCostUSD: 'its limit of cost', deadline: 'its time limit' };
 
 export function board(S, me, { days = 7, all = false } = {}) {
   const now = Date.now();

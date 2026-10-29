@@ -34,6 +34,8 @@ const CHATS = [
   { who: ALICE, when: daysAgo(1, 16), q: 'What does the cron role do with the hiera keys?', a: 'It reads `cron_jobs` as a list and makes one job per item, with the user root unless an item names another.', step: true },
   // The chat stopped at its limit of 8 turns, as the kernel words it. Continue with more room gives it 8 more.
   { who: ALICE, when: daysAgo(1, 10), q: 'Draft a reply to the platform team about the freeze.', a: '', state: 'failed', error: 'budget exceeded: maxTurns', turns: 8 },
+  // A run that stopped at its limit of tool calls ran its checks of done after its final report, and they passed.
+  { who: ALICE, when: at(40), q: 'Collect the open ports of web-1 and web-2 into reports/ports.md.', a: 'I reached my limit of tool calls. reports/ports.md lists the ports of web-1; web-2 is not in it yet.', state: 'failed', error: 'budget exceeded: maxToolCalls', turns: 6, done: { state: 'checked', attempt: 1, attempts: 1, checks: [{ name: 'the report is saved', tool: 'files', passed: true }] } },
   { who: ALICE, when: daysAgo(3, 14), q: 'Explain the difference between a handler and a task that notifies.', a: 'A handler runs once at the end of a play, however many tasks notify it.' },
   { who: ALICE, when: daysAgo(6, 11), q: 'Plan the migration of the ntp module.', a: '1. Read the manifests.\n2. List the resources.\n3. Write the plan to the wiki before any edit.' },
   { who: BOB, when: at(50), q: 'Which bridges are open?', a: 'Two: the Puppet migration and the release notes of 2.4.' },
@@ -56,6 +58,7 @@ export function register({ on, S }) {
       id, agent: 'chat', title: c.q.replace(/[.?!]$/, ''), state: failed ? 'failed' : 'completed', input: c.q, output: c.a || undefined, error: c.error, seq: items.length,
       // alice gave the summary of 2.3 a thumb up, so its card is done and accepted.
       ...(c.up ? { reactions: { up: 1 } } : {}),
+      ...(c.done ? { done: c.done } : {}),
       origin: c.origin || 'http', principal: c.who, metadata: { 'fw.view': 'quickchat' }, createdAt: c.when, updatedAt: c.when, member: MEMBER,
       usage: { inputTokens: 4200 + i * 310, outputTokens: 380 + i * 40, turns: c.turns || (c.step ? 2 : 1), costUSD: Math.round((0.03 + i * 0.01) * 100) / 100 },
       resolved: { model: 'model-large', tools: ['files', 'recall', 'memory', 'clock', 'front.pages_*'], skills: ['wiki-writer', 'docs/search-docs'] },

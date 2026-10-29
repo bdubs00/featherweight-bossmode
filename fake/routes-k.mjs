@@ -135,6 +135,14 @@ function seedNotes() {
       uses: 2,
       lastUsed: minsAgo(60 * 30),
     }),
+    // An owner wrote this note of the agent through the admin token: the front records the writer as person:token.
+    note('triage', AGENT, 'places/vpn-portal.md', 'The VPN portal answers only on its internal address, vpn.lab.internal, from the office network.', {
+      by: 'person:token',
+      at: minsAgo(60 * 6),
+      state: 'unchecked',
+      uses: 1,
+      lastUsed: minsAgo(60 * 2),
+    }),
     note('identity-desk', AGENT, 'places/mailbox-groups.md', 'A shared mailbox grants access through the group mbx-<name>, never to a person directly.', {
       at: minsAgo(60 * 24 * 3),
       sources: [{ ref: 'run:' + run(61) }, { ref: 'page:runbooks/mailboxes.md', version: 'v2' }],
@@ -168,6 +176,7 @@ function seedJournal(N) {
   const at = (m) => minsAgo(m);
   /** An entry keeps prev, the note before the change, so its undo can put it back. */
   return [
+    { id: 'kh-00', at: at(60 * 6), agent: 'triage', what: 'learned', subject: { note: 'places/vpn-portal.md' }, why: 'A person wrote this note.', runs: [], by: 'person:token', undo: { revision: 0 } },
     { id: 'kh-01', at: at(25), agent: 'triage', what: 'stepped-back', subject: { routine: 'reopen-a-ticket-the-requester-answered' }, why: 'A ticket that it handled came back sent back, so it rehearses again.', runs: [run(91)], by: 'front', undo: null },
     { id: 'kh-02', at: at(60 * 3), agent: 'triage', what: 'out-of-date', subject: { note: 'gotchas/gitea-labels.md' }, why: 'The page agents/triage/labels.md changed after the note was written.', runs: [], by: 'front', undo: null },
     {
