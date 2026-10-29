@@ -112,7 +112,7 @@ function panesOf(r: ChatRoute, bridgeTitle: (id: string) => string, onReach: () 
     case 'results':
       return { main: <Results />, right: null, title: 'Results' };
     case 'files':
-      return { main: <FilesView />, right: null, title: 'Library' };
+      return { main: <FilesView path={r.path} />, right: null, title: 'Library' };
     case 'settings':
       return { main: <SettingsView onReach={onReach} />, right: null, title: 'Settings' };
     case 'today':
@@ -144,6 +144,7 @@ export function backOfChat(r: ChatRoute): string {
   if (r.view === 'channel' && r.members) return chatHref({ view: 'channel', id: r.id, tab: 'posts' });
   if ((r.view === 'job' || r.view === 'run') && r.about) return chatHref(r.view === 'job' ? { view: 'job', name: r.name } : { view: 'run', id: r.id });
   if (r.view === 'agent' && r.setup) return chatHref({ view: 'agent', name: r.name });
+  if (r.view === 'files' && r.path) return chatHref({ view: 'files' });
   if (r.view === 'agent') return chatHref({ view: 'agents' });
   return '#';
 }

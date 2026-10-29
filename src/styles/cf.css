@@ -1592,3 +1592,28 @@ a.cf-mrow:hover .cf-mrow-top strong {
 .cf-head > :not(.cf-titles):not(.cf-title):not(.grow) {
   flex-shrink: 0;
 }
+
+/* ---------- the Files of the Library ---------- */
+.cf-file-from {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+/* The line of the channel that wrote a file reads as a line of the page, not as a notice. */
+.cf .cf-file-from {
+  margin: 0 0 var(--s-4);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: var(--t-meta);
+}
+.cf .cf-file-from a {
+  color: var(--ink);
+  font-weight: 600;
+}
+/* The version and the age of a file keep their words whole; the folder gives up its room first. */
+.cf-files-list .wrow .meta > :not(:first-child) {
+  flex: none;
+  white-space: nowrap;
+}

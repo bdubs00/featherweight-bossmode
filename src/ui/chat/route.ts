@@ -12,7 +12,8 @@
 //                with /setup for its setup on a narrow window
 //   #agents      every agent, with New agent
 //   #results     what the work gave
-//   #library/files  the files that the channels wrote; the wiki (#pages)
+//   #library     the files that the channels wrote, with #library/<path>
+//                for one of them in the reader; the wiki (#pages)
 //                and the skills (#skills) are the other tabs of the Library
 //   #today       what needs you, what works, and what finished since your
 //                last visit: the cold open of a wide window when nothing waits
@@ -36,7 +37,7 @@ export type ChatRoute =
   | { view: 'agent'; name: string; setup?: boolean }
   | { view: 'agents' }
   | { view: 'results' }
-  | { view: 'files' }
+  | { view: 'files'; path?: string }
   | { view: 'settings' }
   | { view: 'today' };
 
@@ -93,7 +94,7 @@ export function parseChat(hash: string): ChatRoute | null {
     case 'results':
       return { view: 'results' };
     case 'library':
-      return { view: 'files' };
+      return rest.length && rest.join('/') ? { view: 'files', path: rest.map(dec).join('/') } : { view: 'files' };
     case 'settings':
       return { view: 'settings' };
     case 'today':
@@ -157,7 +158,7 @@ export function chatHref(r: ChatRoute): string {
     case 'results':
       return '#results';
     case 'files':
-      return '#library';
+      return '#library' + (r.path ? '/' + r.path.split('/').map(enc).join('/') : '');
     case 'settings':
       return '#settings';
     case 'today':

@@ -2,7 +2,7 @@
 // Needs you, the status of a channel, and the words of the page.
 
 import { describe, expect, it } from 'vitest';
-import type { Bridge, Member, WorkCard } from '../../api/types';
+import type { Bridge, Member, PageMeta, WorkCard } from '../../api/types';
 import type { InboxRow } from '../../state/inbox';
 import { chatHref, focusOf, parseChat, type ChatRoute } from './route';
 import { askWords, needsOf, needsOfCount, type NeedsInput } from './needs';
@@ -352,5 +352,35 @@ describe('the people of a channel from the front', () => {
   it('says whom a channel of another person waits for, and needs you for your own', () => {
     expect(channelStatus({ state: 'open', needsYou: 1, waitsFor: 'Dana Reyes' }, [{ word: 'needs you', tone: 'amber' }]).word).toBe('waits for Dana');
     expect(channelStatus({ state: 'open', needsYou: 1, waitsFor: 'you' }, [{ word: 'needs you', tone: 'amber' }]).word).toBe('needs you');
+  });
+});
+
+describe('the files of the Library', () => {
+  const page = (path: string, at: string, run = ''): PageMeta => ({ path, title: '', hash: path, size: 1, by: 'scribe', at, ...(run ? { run } : {}) });
+  it('groups the files by channel, newest first, and the pages of agents outside any channel last', async () => {
+    const { fileGroups, OUTSIDE } = await import('./LibraryView');
+    const groups = fileGroups(
+      [
+        { id: 'old', title: 'Backup policy', pages: [page('homelab/backups.md', '2026-10-20T10:00:00Z'), page('bridges/old/plan.md', '2026-10-21T10:00:00Z')] },
+        { id: 'new', title: 'Proxmox blanks table', pages: [page('homelab/proxmox/blanks.md', '2026-10-27T10:00:00Z')] },
+        { id: 'none', title: 'Quiet channel', pages: [] },
+      ],
+      [page('homelab/backups.md', '2026-10-20T10:00:00Z', 'r1'), page('notes/release.md', '2026-10-26T10:00:00Z', 'r2'), page('index.md', '2026-10-01T10:00:00Z')],
+    );
+    expect(groups.map((g) => g.title + ' ' + g.pages.length)).toEqual(['Proxmox blanks table 1', 'Backup policy 2', OUTSIDE + ' 1']);
+    expect(groups[2].pages[0].path).toBe('notes/release.md');
+  });
+  it('names the folder of a file by the title of its channel, never by its id', async () => {
+    const { folderWords, fileName } = await import('./LibraryView');
+    expect(folderWords('bridges/01m5j6039qykvczxfdtft71qvj/plan.md', { '01m5j6039qykvczxfdtft71qvj': 'Backup policy' })).toBe('Backup policy');
+    expect(folderWords('bridges/01m5x/notes/a.md', {})).toBe('a channel that is gone/notes');
+    expect(folderWords('homelab/proxmox/blanks.md', {})).toBe('homelab/proxmox');
+    expect(folderWords('index.md', {})).toBe('wiki');
+    expect(fileName('homelab/proxmox/blanks.md')).toBe('blanks.md');
+  });
+  it('gives a file of the Library its address', () => {
+    expect(parseChat('#library/homelab/proxmox/blanks.md')).toEqual({ view: 'files', path: 'homelab/proxmox/blanks.md' });
+    expect(chatHref({ view: 'files', path: 'a b/c.md' })).toBe('#library/a%20b/c.md');
+    expect(parseChat('#library')).toEqual({ view: 'files' });
   });
 });
