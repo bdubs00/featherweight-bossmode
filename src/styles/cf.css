@@ -1401,3 +1401,12 @@ a.cf-mrow:hover .cf-mrow-top strong {
 .cf-agent-in .check {
   margin: 0 0 var(--s-3);
 }
+
+/* A phone keeps the top bar over a view that has no back key of its own,
+   such as Results or an older place, so the way home stays in sight. */
+@media (max-width: 799px) {
+  .cf[data-view='results'] .cf-top,
+  .cf[data-view='old'] .cf-top {
+    display: grid;
+  }
+}
