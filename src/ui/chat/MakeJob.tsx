@@ -23,6 +23,31 @@ import { Choices, Field, Input } from '../primitives';
 import { reloadBoard } from './data';
 import { chatHref } from './route';
 
+/** shortTask is the first sentence of the task of an agent, for its choice: the whole task is its prompt. */
+export function shortTask(task: string): string {
+  const first = String(task || '').split(/(?<=[.!?])\s/)[0].trim();
+  return first.length > 90 ? first.slice(0, 89).replace(/\s+\S*$/, '') + '…' : first;
+}
+
+/**
+ * basisWords is the line of what runs cost, with only the sentences about
+ * the agent that runs the job: the server can name an agent that the
+ * dialog does not offer.
+ */
+export function basisWords(plan: Pick<TaskPlan, 'cost' | 'members' | 'who'>, handle: string): string {
+  const basis = (plan.cost && plan.cost.basis) || '';
+  if (!plan.members || !plan.members.length) return basis;
+  const m = plan.members.find((x) => x.handle === handle) || plan.members[0];
+  const names = [m.handle, m.name, m.agent].filter(Boolean).map((x) => String(x).toLowerCase());
+  return basis
+    .split(/(?<=\.)\s+/)
+    .filter((s) => {
+      const r = /^Runs of (.+?) in the last/.exec(s);
+      return !r || names.includes(r[1].toLowerCase());
+    })
+    .join(' ');
+}
+
 export function MakeJob({ bridge, onClose }: { bridge: string; onClose: () => void }) {
   const b = useSelect((s) => s.bridges.byId[bridge]);
   const agent = useSelect((s) => {
@@ -73,7 +98,9 @@ export function MakeJob({ bridge, onClose }: { bridge: string; onClose: () => vo
     }
     setBusy(true);
     try {
-      const made = await startPlan(plan, n);
+      // The job takes the name of its channel, which is short, and keeps the whole request as its message. The title of a plan can stop in the middle of a phrase.
+      const named = plan.start.duty && b ? { ...plan, start: { ...plan.start, duty: { ...plan.start.duty, title: b.title } } } : plan;
+      const made = await startPlan(named, n);
       showSaid(made.said);
       reloadBoard();
       onClose();
@@ -112,7 +139,7 @@ export function MakeJob({ bridge, onClose }: { bridge: string; onClose: () => vo
         <>
           <dl class="cf-readback">
             <dt>Job</dt>
-            <dd>{plan.title}</dd>
+            <dd>{b ? b.title : plan.title}</dd>
             <dt>When</dt>
             <dd>{plan.when.readback}</dd>
             {!inChannel && (
@@ -136,7 +163,7 @@ export function MakeJob({ bridge, onClose }: { bridge: string; onClose: () => vo
               legend="Who runs it"
               value={handle}
               error={error}
-              options={(plan.members || []).map((m) => ({ id: m.handle, label: m.handle, meta: m.task || m.name }))}
+              options={(plan.members || []).map((m) => ({ id: m.handle, label: m.name && m.name !== m.handle ? m.handle + ' (' + m.name + ')' : m.handle, meta: shortTask(m.task || '') }))}
               onChange={(h) => {
                 setHandle(h);
                 void readBack(h);
@@ -158,7 +185,7 @@ export function MakeJob({ bridge, onClose }: { bridge: string; onClose: () => vo
               </span>
             </Field>
           )}
-          {plan.cost.basis && <p class="t-meta">{plan.cost.basis}</p>}
+          {basisWords(plan, handle) && <p class="t-meta">{basisWords(plan, handle)}</p>}
         </>
       )}
     </Confirm>
