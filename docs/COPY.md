@@ -1419,3 +1419,68 @@ older app bar and its frame are gone.
 | new | add | `Library` with the tabs `Wiki`, `Files`, and `Skills`. Files lists the pages of each channel, with their versions. | done |
 | `Teams` (a group of the wiki tree) | change | `Channels` | done |
 | new | add | `Settings`: `Where to reach you` with `Change where to reach you`, `Connections` with `Open the connections`, `Packages` with one key per agent that the person owns, and for an admin `Every job` with `Pause every job` or `Resume every job` | done |
+
+## 16. The coalesce walk
+
+The live walk of the coalesce branches found these strings. The kernel
+keeps the tool name `answer` for a check of the final answer of a run
+(`fw.DoneAnswer`), and `fw.done.checked` names the `limit` of a pass that
+ran after the run stopped at a limit. The API keeps its field names, such
+as `lines`, `duty`, `unpriced`, and `lost`; only the words change.
+
+### src/lib/done.ts, src/ui/Profile.tsx, src/ui/NewAgent.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `answer` (the name of a check of the answer without a name) | change | `The answer` | done |
+| new | add | under a check of the answer: `Must hold "READY", and must not hold "TODO".`, with curly quotes | done |
+| new | add | the warning of a check of the answer that looks for nothing: `This check reads the answer and looks for nothing in it, so every answer passes it. Results does not count such a run as checked. Name what the answer must hold.` | done |
+| new | add | New agent: the section `How it knows it is done`, with `What the answer is` behind its question mark, and the fields `Its answer must hold` (placeholder `READY`) and `Its answer must not hold` (placeholder `I could not`) | done |
+| new | add | `Name at most 16 words or phrases in all.` and `Each word or phrase can hold at most 4096 bytes.` | done |
+
+### src/ui/DonePass.tsx, src/ui/RunPane.tsx, src/ui/chat/RunView.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| new | add | `Checks` in About this task, and `Checks of done` in the run pane | done |
+| new | add | `Its checks passed.`, `Its checks passed, but they show nothing about this run.`, `A check failed, and it fixes its work.`, `Not done: 1 of 2 checks failed.` | done |
+| new | add | `Checked after its limit of steps.` (maxTurns), `… of tool calls.` (maxToolCalls), `… of tool calls in one step.` (maxCallsPerTurn), `… of tokens.` (maxTokens), `… of cost.` (maxCostUSD), and `Checked after a limit of its budget.` for any other limit, as `limitWords` of `work/work.go` | done |
+| new | add | each check: `<name>: passed`, `<name>: failed: <why>`, or `<name>: skipped: <why>` | done |
+
+### src/lib/knowhow.ts, src/lib/words.ts, src/ui/Knowhow.tsx, src/ui/chat/AgentView.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `person:token`, `token`, or `you` (a write of the static token in Know-how) | change | `Admin token`, on a note, an entry of the journal, an undo, and the switch, also for a person who signed in with the token | done |
+| new | add | under the switch: `Turned on by Admin token, today.` or `Turned off by bob, Oct 27.` | done |
+| the journal and the notes of the agent view name nobody | change | `by Admin token, 14 min` and `by the after-work review, 2 h` after an entry; ` by Admin token` after a note. The agent itself goes without saying on its own page. | done |
+
+### src/lib/routines.ts
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `triage, 84% agreed over 150 runs`, counted over the runs it would have acted on | change | the same words, counted over the runs whose comparison came (agreed plus disagreed), as the ready rule of the workbench counts them. A run that still works counts in no figure. | done |
+
+### src/lib/learned.ts, src/ui/Pages.tsx: the page agents/<agent>/learned.md
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `2026-10-21, bridge "Migrate Puppet" (b1), migrator-2, run 01RUN2` and `2026-10-28, channel "Release notes" (01K8…), writer, run 01K8…` (the heading of a heart) | change | `2026-10-21, migrator-2 in the channel "Migrate Puppet"`, with curly quotes and no id. The hearts of the profile read both forms. | done |
+| `… on a result of writer in a bridge.` and `The front adds …` (before the first heart) | change | `… in a channel.` and `The server adds …` | done |
+
+### src/ui/Results.tsx
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `Lines of work` | change | `Work by job and agent` | done |
+| `Line` (the head of the first column) | change | `Job or agent` | done |
+| `duty` (the kind of a row) | change | `job` | done |
+| `6 tasks of 1 line, 2 without an estimate` | change | `6 tasks of 1 job or agent, 2 without an estimate` | done |
+| `245 runs without a price` | change | `245 runs of unknown cost`, with the tooltip `Their model has no price, so their cost is unknown.` | done |
+| `no price`, `under $0.01, more without a price` (the spend of a row) | change | `unknown cost`, `under $0.01, and more of unknown cost` | done |
+| `17 lost` | keep | with the tooltip `Stopped because the agent that held it was replaced.`; About Done says what a lost task is | done |
+| `The time that a task waited for a worker is not in it.` (About Time to done) | change | `The time that a task waited for its agent to be free is not in it.` | done |
+| `a person or a duty asked of an agent, such as a start of a duty` (About Done) | change | `a person or a job asked of an agent, such as a run of a job` | done |
+| `A done check that only reads a file does not count` (About Checked) | change | `A done check that only reads a file or the answer, and looks for nothing in it, does not count` | done |
+| `the manager` (About Done, Spend, and Needed nobody) | change | `the Manager` | done |
+| `17 tasks were lost when a pool replaced the worker.`, `245 runs have tokens without a price.` (the sentence of the server, for a screen reader) | change | `17 tasks stopped because the agents that held them were replaced.` and `The cost of 245 runs is unknown, because their model has no price.` The workbench writes them now; the fake says the same. | done |
