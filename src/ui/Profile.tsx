@@ -15,7 +15,7 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
 import { ApiError } from '../api/client';
-import type { PackageSwitch, Pool, Today } from '../api/types';
+import type { DoneBlock, PackageSwitch, Pool, Today } from '../api/types';
 import { store, useSelect } from '../state/store';
 import { loadAgentSkills, loadAgents, loadFaces, loadFleet } from '../state/actions';
 import { forgetProfiles, useFleetAgent, useProfile } from '../state/profiles';
@@ -39,6 +39,7 @@ import { forgetReads, readCache, useEventRead } from '../state/eventread';
 import { PackagesSection } from './Packages';
 import { poolOfAgent, rulesWithPackages, withPackages } from '../lib/packages';
 import { viewsAll } from '../lib/agents';
+import { checkName, weakCheck, WEAK_WORDS } from '../lib/done';
 
 const WORKER_HELP = 'A worker runs the work of one agent, one seat at a time. Keep is how many it keeps ready.';
 /** The tooltip of a worker of an older setup of its agent. */
@@ -547,6 +548,38 @@ export function AgentGone({ agent, quiet }: { agent: string; quiet?: boolean }) 
 }
 
 /** Profile is the profile of an agent. back is the conversation that a narrow window goes back to. */
+/**
+ * DoneSec says how the agent knows that its work is done: the checks of its
+ * definition of done. A weak check, one that only reads a file and looks
+ * for nothing in it, says so (plan 4.4): a run that did nothing passes it,
+ * so Results does not count such a run as checked.
+ */
+export function DoneSec({ agent, done }: { agent: string; done: DoneBlock }) {
+  const checks = done.checks || [];
+  if (!checks.length) return null;
+  return (
+    <section class="prof-sec" aria-labelledby={'done-' + agent}>
+      <div class="prof-sec-head">
+        <h3 class="t-sub" id={'done-' + agent}>
+          How it knows it is done
+        </h3>
+      </div>
+      <ul class="prof-done">
+        {checks.map((c) => (
+          <li>
+            <span>{checkName(c)}</span>
+            {weakCheck(c) && (
+              <p class="prof-weak" role="note">
+                <Led tone="amber" word="weak check" still /> {WEAK_WORDS}
+              </p>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function Profile({ agent, back }: { agent: string; back?: { href: string; label: string } }) {
   const face = useSelect((s) => s.faces[agent]);
   // The profile of GET /v1/agents/{name}, else the agent of the fleet,
@@ -708,6 +741,7 @@ export function Profile({ agent, back }: { agent: string; back?: { href: string;
             )}
           </section>
         )}
+        {info && info.done && <DoneSec agent={agent} done={info.done} />}
         <AgentDuties agent={agent} />
         {/* The wiki refuses a person who views every agent, such as a sponsor, so the profile reads no page for them. */}
         {!noWiki && <Liked agent={agent} />}
