@@ -51,6 +51,8 @@ import { KnowhowAgents, KnowhowMain } from './Knowhow';
 import { DutyList, DutyMain } from './Duties';
 import { PlaybookList, PlaybookMain } from './Playbooks';
 import { Signin } from './Signin';
+import { ChatApp, LegacyFrame } from './chat/ChatApp';
+import { parseChat } from './chat/route';
 import { Button, Card, Led } from './primitives';
 
 type Auth = { kind: 'loading' } | { kind: 'ready' } | { kind: 'signin'; signinUrl: string; expired: boolean; returned: boolean; error: string } | { kind: 'failed'; error: string };
@@ -323,7 +325,9 @@ export function App() {
   const said = useSaid();
   const undo = useUndo();
   const fresh = useNewBuild();
-  const open = route.place === 'bridge' ? route.id : '';
+  // The chat-first page has its own addresses (src/ui/chat/route.ts). Every other address opens an older place.
+  const chat = parseChat(location.hash);
+  const open = chat && chat.view === 'channel' ? chat.id : route.place === 'bridge' ? route.id : '';
   const config = useSelect((s) => s.config);
 
   useEffect(() => {
@@ -389,9 +393,9 @@ export function App() {
       setAuth({ kind: 'ready' });
       const cfg = await api.config().catch(() => null);
       store.dispatch({ type: 'config', config: cfg });
-      // With work, the page opens on Work, and on Results for a person who
-      // can start no work, such as a sponsor. An address that names a place keeps it.
-      if (cfg && cfg.work && (location.hash === '' || location.hash === '#')) go({ place: opensOn(me) }, true);
+      // The page opens on the chat-first home, and on Results for a person
+      // who can start no work, such as a sponsor. An address that names a place keeps it.
+      if (cfg && cfg.work && opensOn(me) === 'results' && (location.hash === '' || location.hash === '#')) go({ place: 'results' }, true);
       await Promise.all([loadBridges(), loadFaces().catch(showError), loadAgents().catch(showError)]);
       startStream(unauthorized);
       // The fleet, its open runs, and the skills fill the statuses of the
@@ -460,6 +464,8 @@ export function App() {
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) return;
       if (document.querySelector('dialog[open]')) return;
+      // The chat-first page keeps its own keys (src/ui/chat/ChatApp.tsx).
+      if (parseChat(location.hash)) return;
       if (e.key === '/' && !isTyping(e)) {
         // A form keeps the person: / would leave it for a composer elsewhere.
         if (isForm(parseRoute(location.hash))) return;
@@ -549,7 +555,14 @@ export function App() {
     );
   }
 
+  const shown = notice ? <Notice text={notice} /> : said ? <Said text={said} undo={undo} /> : fresh ? <NewBuild /> : null;
+  // A person who only views opens on Results: the chat-first page needs a person who can start work.
+  if (chat && !(chat.view === 'home' && auth.kind === 'ready' && config && config.work && opensOn(store.get().me) === 'results')) return <ChatApp route={chat} notice={shown} onSignOut={signOut} />;
   const panes = panesOf(route);
   const place = placeIn(route);
-  return <Shell route={route} place={place} list={panes.list} main={panes.main} details={panes.details} notice={notice ? <Notice text={notice} /> : said ? <Said text={said} undo={undo} /> : fresh ? <NewBuild /> : null} onSignOut={signOut} />;
+  return (
+    <LegacyFrame onSignOut={signOut}>
+      <Shell route={route} place={place} list={panes.list} main={panes.main} details={panes.details} notice={shown} onSignOut={signOut} />
+    </LegacyFrame>
+  );
 }

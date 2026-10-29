@@ -11,7 +11,8 @@
 // A card that the person may not decide shows no key either: it says who
 // decides, so the page never offers an action that the front refuses.
 
-import { useState } from 'preact/hooks';
+import { createContext } from 'preact';
+import { useContext, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import type { Decision, Entry, Run } from '../api/types';
 import { formOf, type Field as SchemaField } from '../lib/schema';
@@ -25,6 +26,12 @@ import { Markdown, When } from './common';
 import { Button, Card, Command, Field, Input, LineLed, TextArea } from './primitives';
 import { Glyph } from './icons';
 
+
+/**
+ * DecisionTitle is the title of a card that waits. The chat-first page
+ * (src/ui/chat) says Asks first, the word of its sidebar.
+ */
+export const DecisionTitle = createContext('Needs your decision');
 
 /** canAlways reports whether a card offers Always allow: as the front says, else by the rule of the front (alwaysByRule). */
 export function canAlways(d: Decision): boolean {
@@ -263,14 +270,15 @@ export function ApprovalCard({ d, who, onDecide, settle }: { d: Decision; who: s
     if (ok && onDecide) onDecide();
   };
   const title = decisionTitle(who, d as Decision);
+  const head = useContext(DecisionTitle);
   return (
     <Card
       class={'decide' + (pending ? '' : ' done')}
-      title={pending ? 'Needs your decision' : title}
+      title={pending ? head : title}
       tone={pending ? 'amber' : undefined}
       quiet={!pending}
       settle={pending && settle}
-      label={(pending ? 'Needs your decision: ' : '') + title}
+      label={(pending ? head + ': ' : '') + title}
       actions={
         pending ? (
           <>

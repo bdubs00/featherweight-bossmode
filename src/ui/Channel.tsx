@@ -90,15 +90,15 @@ function typistsKey(s: State, bridge: string): string {
  * ChannelComposer is the composer of a bridge. It reads the roster for the @
  * completion, so a change of presence redraws it and not the channel.
  */
-function ChannelComposer(p: { id: string; closed: boolean; reply: Entry | null; onClearReply: () => void }) {
+function ChannelComposer(p: { id: string; closed: boolean; reply: Entry | null; onClearReply: () => void; placeholder?: string }) {
   const roster = useSelect((s) => s.rosters[p.id]);
   const members = useMemo(() => membersOf(roster).filter((m) => !m.fired), [roster]);
   const r = p.reply;
   return (
     <Composer
       draft={p.id}
-      label="Message the team"
-      placeholder="Message the team"
+      label={p.placeholder || 'Message the team'}
+      placeholder={p.placeholder || 'Message the team'}
       members={members}
       disabled={p.closed ? 'Closed. Reopen it to send.' : ''}
       reply={r ? { seq: r.seq, who: senderName(r.from), text: r.text, handle: r.from.kind === 'agent' ? r.from.handle : undefined } : null}
@@ -182,7 +182,12 @@ function FoldLine({ f, open, onToggle }: { f: Extract<Item, { kind: 'fold' }>; o
   );
 }
 
-function Posts({ id, closed }: { id: string; closed: boolean }) {
+/**
+ * Posts is the stream of a channel. The chat-first page (src/ui/chat) reuses
+ * it with its own placeholder, and without the line of the waves, which
+ * names workers.
+ */
+export function Posts({ id, closed, placeholder, quiet }: { id: string; closed: boolean; placeholder?: string; quiet?: boolean }) {
   const goal = useSelect((s) => (s.bridges.byId[id] ? s.bridges.byId[id].goal || s.bridges.byId[id].title : ''));
   const title = useSelect((s) => (s.bridges.byId[id] ? s.bridges.byId[id].title : ''));
   // The channel reads the order and the shapes of the entries, never the
@@ -190,7 +195,7 @@ function Posts({ id, closed }: { id: string; closed: boolean }) {
   const seqs = useSelect((s) => (s.channels[id] ? s.channels[id].seqs : undefined));
   const key = useSelect((s) => channelShape(s.channels[id]));
   const prev = useSelect((s) => (s.channels[id] ? s.channels[id].prev : 0));
-  const waves = useSelect((s) => wavesLine(membersOf(s.rosters[id]), s.fleet));
+  const waves = useSelect((s) => (quiet ? '' : wavesLine(membersOf(s.rosters[id]), s.fleet)));
   // The seats that work now, as one text, so a change elsewhere in the store does not redraw the channel.
   const typingKey = useSelect((s) => typistsKey(s, id));
   const typists = useMemo(() => (typingKey ? (JSON.parse(typingKey) as (Typist & { phrase: string })[]) : []), [typingKey]);
@@ -354,7 +359,7 @@ function Posts({ id, closed }: { id: string; closed: boolean }) {
           }}
         />
       )}
-      <ChannelComposer id={id} closed={closed} reply={replyEntry || null} onClearReply={() => setReply(null)} />
+      <ChannelComposer id={id} closed={closed} reply={replyEntry || null} onClearReply={() => setReply(null)} placeholder={placeholder} />
     </>
   );
 }
@@ -383,7 +388,7 @@ function PageWriter({ id, p }: { id: string; p: BridgePage }) {
  * wherever its agents put it. Each row links the page in the Wiki and
  * names the seat that wrote it.
  */
-function WikiTab({ id }: { id: string }) {
+export function WikiTab({ id }: { id: string }) {
   const { pages, loaded, failed } = useBridgePages(id);
   const list = useRoving<HTMLUListElement>();
   const head = 'bridges/' + id + '/';
@@ -453,7 +458,7 @@ export function cardOrder(entries: Entry[], waits: (e: Entry) => boolean = () =>
  * part of a channel. A closed bridge takes no answer, so its questions do
  * not count.
  */
-function waitingCards(ch: ChannelState | undefined, r: Roster | undefined, closed = false): number {
+export function waitingCards(ch: ChannelState | undefined, r: Roster | undefined, closed = false): number {
   if (!ch) return 0;
   let n = 0;
   for (const seq of ch.seqs) {
@@ -464,14 +469,14 @@ function waitingCards(ch: ChannelState | undefined, r: Roster | undefined, close
 }
 
 /** isClosed reports whether the page holds a bridge as closed. */
-const isClosed = (s: { bridges: { byId: Record<string, { state: string }> } }, id: string): boolean => !!s.bridges.byId[id] && s.bridges.byId[id].state === 'closed';
+export const isClosed = (s: { bridges: { byId: Record<string, { state: string }> } }, id: string): boolean => !!s.bridges.byId[id] && s.bridges.byId[id].state === 'closed';
 
 /**
  * DecisionsTab lists the cards of the bridge, the ones that wait first.
  * When none waits, a line says so above the cards that were decided or
  * answered, so a past card never reads as work that waits.
  */
-function DecisionsTab({ id }: { id: string }) {
+export function DecisionsTab({ id }: { id: string }) {
   const [loading, setLoading] = useState(true);
   const waits = useSelect((s) => (s.channels[id] ? waitingCards(s.channels[id], s.rosters[id], isClosed(s, id)) : 0));
   const key = useSelect((s) => {
