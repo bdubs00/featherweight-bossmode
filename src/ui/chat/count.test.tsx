@@ -63,6 +63,7 @@ describe('the one count of Needs you', () => {
     expect(el.querySelector('.title-count')!.textContent).toBe('3');
     expect(el.querySelector('.badge-count')!.textContent).toBe('3');
     // One row per counted task and per note: the stopped task lets itself go.
-    expect([...el.querySelectorAll('.cf-needs .cf-need .cf-row-title')].map((t) => t.textContent)).toEqual(['Triage: Keep this note?', 'Writer needs you', 'Ready to sign off']);
+    expect([...el.querySelectorAll('.cf-needs .cf-need .cf-row-title')].map((t) => t.textContent)).toEqual(['triage wrote a note, ports.md. Keep it?', 'Task a', 'Task b']);
+    expect([...el.querySelectorAll('.cf-needs .cf-need .cf-row-line')].map((t) => t.textContent)).toEqual(['Keep this note?', 'Asks you · Writer', 'Sign off · Writer']);
   });
 });

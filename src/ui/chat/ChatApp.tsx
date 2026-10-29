@@ -23,7 +23,7 @@ import { DecisionTitle, QuestionTitle } from '../Decision';
 import { LineText } from '../Message';
 import { lineText } from './channels';
 import { TopBar } from './TopBar';
-import { Sidebar, useChannelRows } from './Sidebar';
+import { Sidebar } from './Sidebar';
 import { ChannelView } from './ChannelView';
 import { Members } from './Members';
 import { JobView, JobPane } from './JobView';
@@ -33,7 +33,8 @@ import { AgentsView } from './AgentsView';
 import { FilesView, LibraryHead } from './LibraryView';
 import { SettingsView } from './SettingsView';
 import { ManagerSide } from './ManagerSide';
-import { useNeedsCount } from './data';
+import { useBoard, useNeeds, useNeedsCount } from './data';
+import { TodayView, sinceLastVisit } from './TodayView';
 import { chatHref, focusOf, type ChatRoute, type Focus } from './route';
 
 /** The width from which the sidebar and the stream show side by side. */
@@ -56,17 +57,19 @@ function useMedia(q: string): boolean {
 }
 
 /**
- * Home opens a stream where two panes show: the channel that needs you,
- * else the newest open channel, else the Manager. A phone keeps the sidebar.
+ * Home opens where two panes show on the top item of Needs you, the place
+ * where the person answers it, or on Today when nothing waits. A phone
+ * keeps the sidebar, which lists the same items.
  */
 function Home() {
   const two = useMedia(TWO);
-  const { open, loaded } = useChannelRows();
-  const first = open[0];
+  const board = useBoard();
+  const needs = useNeeds();
+  const top = needs[0];
   useEffect(() => {
-    if (!two || !loaded) return;
-    location.replace(first ? chatHref({ view: 'channel', id: first.id, tab: 'posts' }) : chatHref({ view: 'manager' }));
-  }, [two, loaded, first && first.id]);
+    if (!two || !board) return;
+    location.replace(top ? top.href : chatHref({ view: 'today' }));
+  }, [two, board !== null, top && top.href]);
   return null;
 }
 
@@ -112,6 +115,8 @@ function panesOf(r: ChatRoute, bridgeTitle: (id: string) => string, onReach: () 
       return { main: <FilesView />, right: null, title: 'Library' };
     case 'settings':
       return { main: <SettingsView onReach={onReach} />, right: null, title: 'Settings' };
+    case 'today':
+      return { main: <TodayView />, right: null, title: 'Today' };
   }
 }
 
@@ -148,6 +153,8 @@ export function ChatApp({ route, old, notice, onSignOut }: { route: ChatRoute | 
   const bridges = useSelect((s) => s.bridges);
   const config = useSelect((s) => s.config);
   const needs = useNeedsCount();
+  // The last visit is read once, when the page opens, so Today counts from the visit before this one.
+  sinceLastVisit();
   const three = useMedia(THREE);
   const focus: Focus = route ? focusOf(route) : old && old.column === 'details' && old.details ? 'right' : 'main';
   const p: Panes = route

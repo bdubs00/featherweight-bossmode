@@ -14,6 +14,8 @@
 //   #results     what the work gave
 //   #library/files  the files that the channels wrote; the wiki (#pages)
 //                and the skills (#skills) are the other tabs of the Library
+//   #today       what needs you, what works, and what finished since your
+//                last visit: the cold open of a wide window when nothing waits
 //   #settings    where to reach you, the connections, the packages, and the
 //                switch of every job
 //
@@ -35,7 +37,8 @@ export type ChatRoute =
   | { view: 'agents' }
   | { view: 'results' }
   | { view: 'files' }
-  | { view: 'settings' };
+  | { view: 'settings' }
+  | { view: 'today' };
 
 const dec = (s: string): string => {
   try {
@@ -93,6 +96,8 @@ export function parseChat(hash: string): ChatRoute | null {
       return { view: 'files' };
     case 'settings':
       return { view: 'settings' };
+    case 'today':
+      return { view: 'today' };
     // The older addresses that have a home on this page.
     case 'fleet':
       if (!rest[0]) return { view: 'agents' };
@@ -155,6 +160,8 @@ export function chatHref(r: ChatRoute): string {
       return '#library';
     case 'settings':
       return '#settings';
+    case 'today':
+      return '#today';
   }
 }
 

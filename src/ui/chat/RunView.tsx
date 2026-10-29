@@ -12,16 +12,17 @@ import { DUTY_KEY } from '../../state/inbox';
 import { dutyLabel } from '../../lib/duties';
 import { chatTitle, works } from '../../lib/chat';
 import { costText } from '../../lib/cost';
+import { clock, dayWords } from '../../lib/words';
 import { attempt } from '../notice';
 import { Empty, Markdown } from '../common';
 import { Conversation, useTranscript, usePoll } from '../Conversation';
 import { useResult } from '../RunPane';
-import { ResultKeys } from '../ResultKeys';
 import { Composer } from '../Composer';
 import { Msg } from '../Thread';
 import { Glyph } from '../icons';
 import { Led, Mark } from '../primitives';
-import { useBoard, reloadBoard, agentNameOf } from './data';
+import { useBoard, agentNameOf, useAnswered } from './data';
+import { WayOut } from './WayOut';
 import { chatHref } from './route';
 import type { Status } from './channels';
 
@@ -55,6 +56,7 @@ export function RunView({ id }: { id: string }) {
   const t = useTranscript(id);
   usePoll(id);
   const board = useBoard();
+  const answered_ = useAnswered();
   const card = board ? board.cards.find((c) => c.links.run === id || (c.links.runs || []).includes(id)) : undefined;
   if (!run) {
     return (
@@ -71,8 +73,12 @@ export function RunView({ id }: { id: string }) {
   }
   const title = chatTitle(run);
   const answered = t.items.some((x) => x.kind === 'assistant');
-  const toCheck = !!card && card.stage === 'review' && card.next === 'you';
   const st = stateWords(run.state);
+  const duty = (run.metadata && run.metadata[DUTY_KEY]) || '';
+  // A reply makes sense in a conversation of a person that nobody judged yet: a run of a job, a run that the archive keeps, and a result with a verdict take none.
+  const judged = (!!card && (card.verdict === 'accepted' || card.verdict === 'sent-back' || card.verdict === 'let-go')) || answered_.some((a) => a.run === id && a.kind !== 'decision');
+  const reply = !run.archived && (!run.can || run.can.operate) && !duty && !judged;
+  const asked = card && card.from ? (card.from.kind === 'duty' ? 'From the job ' + dutyLabel(duty || card.from.name || '') : card.from.display ? 'Asked by ' + card.from.display : '') : duty ? 'From the job ' + dutyLabel(duty) : '';
   return (
     <section class="cf-view cf-run" aria-labelledby="cf-run-title">
       <header class="cf-head">
@@ -90,7 +96,12 @@ export function RunView({ id }: { id: string }) {
         </a>
       </header>
       <div class="scroll cf-stream">
-        <div class="cf-stream-in">
+        <div class="cf-stream-in cf-run-in">
+          {asked && (
+            <p class="cf-stream-start">
+              {asked}, {dayWords(run.createdAt) === 'Today' ? 'today' : dayWords(run.createdAt)} at {clock(run.createdAt)}
+            </p>
+          )}
           <Conversation run={run} result={res} t={t} agentLabel={name} />
           {!t.loading && !answered && run.output && (
             <div class="thread">
@@ -99,15 +110,10 @@ export function RunView({ id }: { id: string }) {
               </Msg>
             </div>
           )}
-          {toCheck && (
-            <div class="cf-signoff">
-              <p class="cf-signoff-head">Ready to sign off</p>
-              <ResultKeys run={id} title={title} primary onDone={reloadBoard} />
-            </div>
-          )}
+          <WayOut run={id} brief />
         </div>
       </div>
-      {!run.archived && (!run.can || run.can.operate) && (
+      {reply && (
         <Composer
           draft={'run:' + id}
           label={'Reply to ' + name}

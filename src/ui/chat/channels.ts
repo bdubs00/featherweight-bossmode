@@ -4,7 +4,7 @@
 // where it runs: an agent is working, needs you, idle, or asleep. A
 // scheduler places the work, and the person never sees it.
 
-import type { Bridge, Duty, Member, Run } from '../../api/types';
+import type { Bridge, Duty, Member, Run, WorkCard } from '../../api/types';
 import type { Tone } from '../../lib/presence';
 import { seatPresence, type Facts } from '../../lib/status';
 import { personName } from '../../lib/words';
@@ -46,8 +46,6 @@ export function nowWords(m: Pick<Member, 'task' | 'activity'>, run: Pick<Run, 'a
 
 const oneLine = (s: string): string => String(s || '').replace(/\s+/g, ' ').trim();
 
-/** The order of attention of the status of a channel. */
-const RANK = ['needs you', 'stopped', 'working', 'starting', 'at its limit', 'idle', 'not started', 'asleep'];
 
 export interface ChannelRow {
   id: string;
@@ -66,6 +64,8 @@ export interface ChannelRow {
   repeats: boolean;
   /** The agent whose face stands for the channel: the first agent. */
   face: string;
+  /** The first line of its last post, with its sender, such as scribe: Draft one is up. */
+  preview: string;
 }
 
 /** peopleWords names the people of a channel: the person who opened it, and you. */
@@ -106,20 +106,16 @@ export function jobsOf(id: string, duties: Duty[] | null | undefined): Duty[] {
  * roster when the page read it, else none: the row then says only its
  * status from the count of the agents that need you.
  */
-export function channelRow(b: Bridge, members: Member[] | null, f: Facts, me: string, duties: Duty[] | null | undefined): ChannelRow {
+export function channelRow(b: Bridge, members: Member[] | null, f: Facts, me: string, duties: Duty[] | null | undefined, card?: WorkCard, preview?: string): ChannelRow {
   const agents = (members || [])
     .filter((m) => !m.fired)
     .map((m) => ({ handle: m.handle, agent: m.agent, status: agentStatus(f, m), now: nowWords(m, f.runs[newestRun(m)]) }));
-  let status: Status;
-  if (b.state === 'closed') status = { word: 'closed', tone: 'grey' };
-  else if (agents.length) status = agents.map((a) => a.status).sort((x, y) => rank(x.word) - rank(y.word))[0];
-  else if (b.needsYou) status = { word: 'needs you', tone: 'amber' };
-  else status = { word: 'idle', tone: 'grey' };
   return {
+    status: channelStatus(b, agents.map((a) => a.status), card),
+    preview: preview || '',
     id: b.id,
     title: b.title,
     open: b.state === 'open',
-    status,
     agents,
     people: peopleWords(b.operator, me),
     at: b.lastAt || b.closedAt || b.createdAt,
@@ -129,10 +125,25 @@ export function channelRow(b: Bridge, members: Member[] | null, f: Facts, me: st
   };
 }
 
-const rank = (w: string): number => {
-  const i = RANK.indexOf(w);
-  return i < 0 ? RANK.length : i;
-};
+/**
+ * channelStatus is the status of a channel in its row: needs you, working,
+ * done and to check, done and checked, done, or stopped. The task of the
+ * board says how its work ended; the agents say whether it works now. A
+ * finished channel never reads idle, which says to a reader that nothing
+ * happens.
+ */
+export function channelStatus(b: Pick<Bridge, 'state' | 'needsYou'>, agents: Status[], card?: Pick<WorkCard, 'stage' | 'verdict'>): Status {
+  const checked = !!card && card.stage === 'done' && (card.verdict === 'accepted' || card.verdict === 'checked');
+  if (b.state === 'closed') return checked ? { word: 'done, checked', tone: 'green' } : { word: 'closed', tone: 'grey' };
+  const has = (w: string) => agents.some((a) => a.word === w);
+  if (has('needs you') || (card && card.stage === 'needs-you') || (!agents.length && b.needsYou)) return { word: 'needs you', tone: 'amber' };
+  if (has('working') || (card && card.stage === 'working')) return { word: 'working', tone: 'green' };
+  if (has('starting') || (card && card.stage === 'waiting')) return { word: 'starting', tone: 'grey' };
+  if (card && card.stage === 'review') return { word: 'done, to check', tone: 'amber', still: true };
+  if (checked) return { word: 'done, checked', tone: 'green' };
+  if (has('stopped') || (card && card.stage === 'stopped')) return { word: 'stopped', tone: 'red' };
+  return { word: 'done', tone: 'grey' };
+}
 
 /** agentCount says the agents of a channel, such as 3 agents. */
 export function agentCount(n: number): string {
@@ -144,22 +155,16 @@ const ms = (iso: string): number => {
   return isNaN(t) ? 0 : t;
 };
 
-/** sortChannels puts the channels that need you first, then the newest. */
+/** sortChannels puts the channels in the order of their last activity, the newest first. Needs you leads the sidebar already. */
 export function sortChannels(rows: ChannelRow[]): ChannelRow[] {
-  return [...rows].sort((a, b) => {
-    const na = a.status.word === 'needs you' ? 0 : 1;
-    const nb = b.status.word === 'needs you' ? 0 : 1;
-    return na - nb || ms(b.at) - ms(a.at);
-  });
+  return [...rows].sort((a, b) => ms(b.at) - ms(a.at));
 }
 
-/** shortTime is the time of a row: the clock for today, the day of the week within a week, else the date. */
+/** shortTime is the one time format of the page in a row: the clock for today, such as 3:20 AM, the day of the week within a week, such as Mon, else the date, such as Oct 22. */
 export function shortTime(iso: string, now = new Date()): string {
   const t = new Date(iso);
   if (isNaN(t.getTime())) return '';
-  const mins = Math.round((now.getTime() - t.getTime()) / 60000);
-  if (mins < 60) return Math.max(1, mins) + 'm';
-  if (t.toDateString() === now.toDateString()) return t.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false });
+  if (t.toDateString() === now.toDateString()) return t.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
   if (now.getTime() - t.getTime() < 6 * 86400000) return t.toLocaleDateString(undefined, { weekday: 'short' });
   return t.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }

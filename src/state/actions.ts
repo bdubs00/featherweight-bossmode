@@ -220,7 +220,10 @@ export async function sendMessage(id: string, m: NewMessage): Promise<Entry> {
  * which starts its next turn.
  */
 export async function answerQuestion(id: string, handle: string, seq: number, text: string): Promise<Entry> {
-  return sendMessage(id, { text, to: [handle], replyTo: seq });
+  const e = await sendMessage(id, { text, to: [handle], replyTo: seq });
+  // The chat-first page takes the question of the channel off Needs you at once (src/ui/chat/data.ts).
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('fw-decided', { detail: { bridge: id, decision: 'answer' } }));
+  return e;
 }
 
 /** The sentence of a server that has no route to end a question without an answer yet. */

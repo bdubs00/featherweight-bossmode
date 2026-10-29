@@ -181,6 +181,8 @@ export interface Bridge {
   delegation: Delegation;
   caps: Caps;
   members?: Member[];
+  /** The short line under the name of a channel: the request in full, when the Manager names the channel in a few words. A server before it sends none. */
+  topic?: string;
   /** The seq of the newest entry of the channel. */
   lastSeq: number;
   /** The time of the newest entry of the channel, for the freshness of a row of the list. Absent before the first entry, and from an older workbench. */
@@ -1459,6 +1461,8 @@ export type WorkStage = 'waiting' | 'working' | 'needs-you' | 'stopped' | 'revie
 /** One piece of work on the board, a task in the words of the page, from GET /v1/work (docs/CONTRACT.md, section 19). */
 export interface WorkCard {
   id: string;
+  /** The first line of the result, the question, or the decision, as the server words it for a list. A server before it sends none, and the page then takes the title. */
+  summary?: string;
   /** conversation, bridge, duty, job, or event. */
   kind: 'conversation' | 'bridge' | 'duty' | 'job' | 'event';
   title: string;

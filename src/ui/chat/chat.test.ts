@@ -103,8 +103,11 @@ describe('Needs you', () => {
     );
     expect(rows).toHaveLength(1);
     expect(rows[0].kind).toBe('asks');
-    expect(rows[0].head).toBe('scribe asks first');
-    expect(rows[0].line).toContain('make test');
+    // The title says what it asks; the second line says the action and the agent, and names nobody twice.
+    expect(rows[0].head).toBe('Allow: make test');
+    expect(rows[0].line).toBe('Asks first · scribe');
+    expect(rows[0].approval).toBe('p1');
+    expect(rows[0].card).toBe('a');
     expect(rows[0].href).toBe('#r/r1');
   });
   it('gives each wait of a channel its own row, and opens the decisions of the channel', () => {
@@ -114,9 +117,9 @@ describe('Needs you', () => {
         rows: [row({ key: 'd:x/1', bridge: 'br-1', handle: 'one', decision: { run: 'x', id: '1', label: 'Allow', state: 'pending' } }), row({ key: 'q:br-1/7', kind: 'asked', bridge: 'br-1', handle: 'two' })],
       }),
     );
-    expect(rows.map((r) => r.head).sort()).toEqual(['one asks first', 'two asks you']);
-    expect(rows.find((r) => r.head === 'one asks first')!.href).toBe('#c/br-1/decisions');
-    expect(rows.find((r) => r.head === 'two asks you')!.href).toBe('#c/br-1');
+    expect(rows.map((r) => r.line).sort()).toEqual(['Asks first · Channel br-1 · one', 'Asks you · Channel br-1 · two']);
+    expect(rows.find((r) => r.line.startsWith('Asks first'))!.href).toBe('#c/br-1/decisions');
+    expect(rows.find((r) => r.line.startsWith('Asks you'))!.href).toBe('#c/br-1');
   });
   it('keeps a wait that no task names, a task that no row explains, and a note, newest first', () => {
     const rows = needsOf(
@@ -127,8 +130,10 @@ describe('Needs you', () => {
       }),
     );
     expect(rows.map((r) => r.kind)).toEqual(['suggestion', 'paused', 'check']);
-    expect(rows[1].head).toBe('Job paused: Job weekly');
-    expect(rows[2].head).toBe('Job ready to sign off');
+    expect(rows[1].head).toBe('Three runs failed.');
+    expect(rows[1].line).toBe('Paused · Job weekly');
+    expect(rows[2].head).toBe('A task');
+    expect(rows[2].line).toBe('Sign off · Job nightly · Scribe');
     expect(rows[0].href).toBe('#a/scribe');
   });
   it('leaves out a row that needs nobody', () => {
@@ -194,10 +199,18 @@ describe('a channel in the sidebar', () => {
     const r = channelRow(b({}), [m('one', 'waiting')], facts, 'me@example.com', []);
     expect(r.agents[0].status.word).toBe('starting');
   });
-  it('puts the channels that need you first', () => {
+  it('sorts the channels by their last activity, since Needs you leads the sidebar', () => {
     const quiet = channelRow(b({ id: 'q', lastAt: '2026-10-28T12:00:00Z' }), [m('a', 'idle')], facts, '', []);
     const needs = channelRow(b({ id: 'n', lastAt: '2026-10-28T09:00:00Z' }), [m('a', 'needs-you')], facts, '', []);
-    expect(sortChannels([quiet, needs]).map((c) => c.id)).toEqual(['n', 'q']);
+    expect(sortChannels([needs, quiet]).map((c) => c.id)).toEqual(['q', 'n']);
+  });
+  it('says done, done to check, or done and checked for a finished channel, and never idle', () => {
+    const idle = [m('a', 'idle'), m('b', 'asleep')];
+    expect(channelRow(b({}), idle, facts, '', []).status.word).toBe('done');
+    expect(channelRow(b({}), idle, facts, '', [], { stage: 'review' } as never).status.word).toBe('done, to check');
+    expect(channelRow(b({}), idle, facts, '', [], { stage: 'done', verdict: 'accepted' } as never).status.word).toBe('done, checked');
+    expect(channelRow(b({ state: 'closed' }), idle, facts, '', [], { stage: 'done', verdict: 'checked' } as never).status.word).toBe('done, checked');
+    expect(channelRow(b({}), [m('a', 'working')], facts, '', [], { stage: 'review' } as never).status.word).toBe('working');
   });
   it('marks a channel where a job repeats', () => {
     const r = channelRow(b({}), [], facts, '', [{ name: 'j', agent: 'scribe', when: {}, do: { post: { bridge: 'br-1', message: 'Go' } }, limits: {} } as never]);
@@ -256,7 +269,9 @@ describe('Needs you from the one count of the front', () => {
     );
     expect(rows.map((r) => r.key + ' ' + r.kind).sort()).toEqual(['card:c check', 'd:r1/p1 asks', 'n:triage.01 suggestion', 'q:br-1/4 question']);
     expect(rows[0].key).toBe('n:triage.01');
-    expect(rows[0].head).toBe('Triage: Keep this note?');
+    expect(rows[0].head).toBe('triage wrote a note, ports.md. Keep it?');
+    // The title names triage already, so the line does not name it again.
+    expect(rows[0].line).toBe('Keep this note?');
   });
   it('shows a note of the inbox once beside the notes of Know-how, from an older build of the list', () => {
     const rows = needsOf(

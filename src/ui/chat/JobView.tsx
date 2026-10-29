@@ -17,6 +17,7 @@ import { Empty, Markdown } from '../common';
 import { Glyph } from '../icons';
 import { Button, Led, Mark } from '../primitives';
 import { Clock } from './Sidebar';
+import { WayOut } from './WayOut';
 import { agentNameOf, reloadBoard } from './data';
 import { chatHref } from './route';
 import { pageWords, type Status } from './channels';
@@ -141,6 +142,7 @@ export function JobView({ name }: { name: string }) {
           {history.map((r) => (
             <RunPost d={d} r={r} />
           ))}
+          <WayOut duty={name} brief />
           <p class="cf-sys">
             <Led tone="grey" word={d.paused ? 'Paused. It runs again when you resume it.' : next ? 'Next run ' + next : 'No run planned'} still />
           </p>

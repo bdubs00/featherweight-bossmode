@@ -4,7 +4,7 @@
 // channel lists its agents. A phone shows the sidebar as its home screen.
 
 import { useEffect, useMemo, useState } from 'preact/hooks';
-import type { Duty, Run } from '../../api/types';
+import type { Duty, Entry, Run, WorkCard } from '../../api/types';
 import { useSelect } from '../../state/store';
 import { managerRunOf, membersOf, selectFacts } from '../../state/reducer';
 import { useDuties } from '../../state/duties';
@@ -15,7 +15,10 @@ import { Glyph, Icon } from '../icons';
 import { Led, Mark } from '../primitives';
 import { Pop } from './Pop';
 import { agentCount, channelRow, shortTime, sortChannels, type ChannelRow } from './channels';
-import { agentNameOf, useNeeds, useNeedsCount } from './data';
+import { agentNameOf, useBoard, useNeeds, useNeedsCount } from './data';
+import { oneLine } from './needs';
+import { ensureChannels } from '../../state/fetchers';
+import { personName, senderName } from '../../lib/words';
 import { chatHref, streamKey, type ChatRoute } from './route';
 import type { NeedRow } from './needs';
 
@@ -114,7 +117,8 @@ function NeedRowView({ r, current }: { r: NeedRow; current: boolean }) {
 
 function ChannelRowView({ c, current, open, agent }: { c: ChannelRow; current: boolean; open: boolean; agent: string }) {
   const href = chatHref({ view: 'channel', id: c.id, tab: 'posts' });
-  const sub = c.open ? [agentCount(c.agents.length), c.people].filter(Boolean).join(' · ') : '';
+  // The line under the name: the first line of the last post, else who is in the channel.
+  const sub = c.preview || (c.open ? [agentCount(c.agents.length), c.people].filter(Boolean).join(' · ') : '');
   return (
     <>
       <a class={'cf-row cf-chan' + (current ? ' on' : '') + (c.unread ? ' unread' : '')} href={href} aria-current={current ? 'page' : undefined} title={c.title}>
@@ -129,7 +133,7 @@ function ChannelRowView({ c, current, open, agent }: { c: ChannelRow; current: b
             <span class="cf-row-time">{shortTime(c.at)}</span>
           </span>
           <span class="cf-row-sub">
-            <span class="cf-row-line">
+            <span class="cf-row-line" title={c.preview || undefined}>
               <Led tone={c.status.tone} word={c.status.word} still={c.status.tone === 'amber' ? undefined : true} />
               {sub && <span class="cf-row-more"> · {sub}</span>}
             </span>
@@ -199,10 +203,38 @@ export function useChannelRows(): { open: ChannelRow[]; closed: ChannelRow[]; lo
   const facts = useSelect(selectFacts);
   const me = useSelect((s) => (s.me && s.me.principal ? s.me.principal.subject : ''));
   const list = useDuties((s) => s.list);
+  const board = useBoard();
+  const channels = useSelect((s) => s.channels);
+  // The recent end of each open channel gives the preview of its row. The page reads it once per channel, and the stream keeps it.
+  const want = bridges.order.filter((id) => bridges.byId[id].state === 'open').slice(0, PREVIEWS).join(',');
+  useEffect(() => {
+    if (want) ensureChannels(want.split(','));
+  }, [want]);
   return useMemo(() => {
-    const rows = bridges.order.map((id) => bridges.byId[id]).map((b) => channelRow(b, rosters[b.id] ? membersOf(rosters[b.id]) : null, facts, me, list));
+    const cards = new Map<string, WorkCard>();
+    for (const c of (board && board.cards) || []) if (c.links.bridge && !cards.has(c.links.bridge)) cards.set(c.links.bridge, c);
+    const rows = bridges.order
+      .map((id) => bridges.byId[id])
+      .map((b) => channelRow(b, rosters[b.id] ? membersOf(rosters[b.id]) : null, facts, me, list, cards.get(b.id), previewOf(channels[b.id], me)));
     return { open: sortChannels(rows.filter((r) => r.open)), closed: sortChannels(rows.filter((r) => !r.open)), loaded: bridges.loaded };
-  }, [bridges, rosters, facts, me, list]);
+  }, [bridges, rosters, facts, me, list, board, channels]);
+}
+
+/** The most channels whose recent end the sidebar reads for a preview. */
+const PREVIEWS = 20;
+
+/** previewOf is the first line of the last post of a channel, with its sender: You, the name of a person, or the name of an agent in the channel. */
+export function previewOf(ch: { seqs: number[]; bySeq: Record<number, Entry> } | undefined, me: string): string {
+  if (!ch) return '';
+  for (let k = ch.seqs.length - 1; k >= 0; k--) {
+    const e = ch.bySeq[ch.seqs[k]];
+    if (!e || !e.text || (e.from.kind !== 'agent' && e.from.kind !== 'person')) continue;
+    const line = oneLine(e.text);
+    if (!line) continue;
+    const who = e.from.kind === 'person' ? (e.from.name === me ? 'You' : personName(e.from.name, e.from.display)) : senderName(e.from);
+    return who + ': ' + line;
+  }
+  return '';
 }
 
 /** The channel that the person opened last, so its agents stay listed while one of them shows. */
@@ -257,6 +289,24 @@ export function Sidebar({ route }: { route: ChatRoute | null }) {
         ))}
       </div>
       <div class="cf-side-scroll">
+        {/* The Manager and Needs you stay on top under every filter: a filter never hides the inbox. */}
+        <ManagerRow current={!!route && route.view === 'manager'} />
+        {(needs.length > 0 || needsCount > 0) && (
+          <section class="cf-sec cf-needs" aria-labelledby="cf-needs-h">
+            <h3 class="cf-sec-head" id="cf-needs-h">
+              <span>Needs you</span>
+              <span class="cf-sec-n">{needsCount}</span>
+            </h3>
+            {(allNeeds ? needs : needs.slice(0, NEEDS_SHOWN)).map((r) => (
+              <NeedRowView r={r} current={here === r.href} />
+            ))}
+            {needs.length > NEEDS_SHOWN && (
+              <button type="button" class="cf-closed-key cf-more-needs" aria-expanded={allNeeds} onClick={() => setAllNeeds(!allNeeds)}>
+                {allNeeds ? 'Show fewer' : needs.length - NEEDS_SHOWN + ' more need you'}
+              </button>
+            )}
+          </section>
+        )}
         {filter === 'jobs' ? (
           <section class="cf-sec" aria-labelledby="cf-jobs-h">
             <h3 class="cf-sec-head" id="cf-jobs-h">
@@ -271,23 +321,6 @@ export function Sidebar({ route }: { route: ChatRoute | null }) {
           </section>
         ) : (
           <>
-            {(filter === 'all' || managerUnread > 0) && <ManagerRow current={!!route && route.view === 'manager'} />}
-            {filter === 'all' && (needs.length > 0 || needsCount > 0) && (
-              <section class="cf-sec cf-needs" aria-labelledby="cf-needs-h">
-                <h3 class="cf-sec-head" id="cf-needs-h">
-                  <span>Needs you</span>
-                  <span class="cf-sec-n">{needsCount}</span>
-                </h3>
-                {(allNeeds ? needs : needs.slice(0, NEEDS_SHOWN)).map((r) => (
-                  <NeedRowView r={r} current={here === r.href} />
-                ))}
-                {needs.length > NEEDS_SHOWN && (
-                  <button type="button" class="cf-closed-key cf-more-needs" aria-expanded={allNeeds} onClick={() => setAllNeeds(!allNeeds)}>
-                    {allNeeds ? 'Show fewer' : needs.length - NEEDS_SHOWN + ' more need you'}
-                  </button>
-                )}
-              </section>
-            )}
             <section class="cf-sec" aria-labelledby="cf-chans-h">
               <h3 class="cf-sec-head" id="cf-chans-h">
                 <span>Channels</span>

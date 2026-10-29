@@ -18,6 +18,7 @@ import type { InboxRow } from '../../state/inbox';
 import { needsPerson } from '../../state/inbox';
 import { briefOf, planOf, verbOf } from '../../lib/decision';
 import { envCallOf, excerpt, plainText } from '../../lib/words';
+import { costText } from '../../lib/cost';
 import { chatHref } from './route';
 import { pageWords } from './channels';
 
@@ -28,14 +29,21 @@ export interface NeedRow {
   kind: NeedKind;
   /** The agent whose face the row shows, or "" for none. */
   agent: string;
-  /** The first line, in bold: who asks, or what waits. */
+  /** The first line, in bold: what it is about, such as the first line of the result, the question, or the call. */
   head: string;
-  /** The second line: what it wants, and where. */
+  /** The second line: what it wants, where, which agent, and what it cost, with no name twice. */
   line: string;
   /** When the wait started. */
   at: string;
   /** The place where the person answers it. */
   href: string;
+  /** What the row is about, so an answer on the page takes it off at once. */
+  run?: string;
+  bridge?: string;
+  approval?: string;
+  duty?: string;
+  /** The task of the board that the row stands for. */
+  card?: string;
 }
 
 export interface NeedsInput {
@@ -51,6 +59,10 @@ export interface NeedsInput {
   channelTitle: (id: string) => string;
   /** The title of a job, by its name. */
   jobTitle: (name: string) => string;
+  /** The answer of a run that the page holds, for the first line of a result. */
+  answerOf?: (run: string) => string;
+  /** The newest post of an agent in a channel that the page read, for the first line of the result of a channel. */
+  lastPostOf?: (bridge: string) => string;
 }
 
 /** askWords says what a decision asks in one short line, such as Add package jq? or the command it runs. */
@@ -71,21 +83,47 @@ export function askWords(d: Decision): string {
   return verb + '?';
 }
 
-const oneLine = (s: string): string => pageWords(excerpt(plainText(s).replace(/\s+/g, ' ').trim(), 120));
+/** oneLine is the first line of a text, plain, in the words of the page. */
+export const oneLine = (s: string): string => pageWords(excerpt(plainText(String(s || '').split(/\n/).find((l) => l.trim() && !/^#+\s*$/.test(l.trim())) || '').replace(/\s+/g, ' ').trim(), 120));
 
 const ms = (iso: string | undefined): number => {
   const t = new Date(iso || '').getTime();
   return isNaN(t) ? 0 : t;
 };
 
-/** where names the place of a row: in a channel, or in a job. */
-function whereWords(i: NeedsInput, bridge: string | undefined, duty: string | undefined): string {
-  if (bridge) return 'in ' + i.channelTitle(bridge);
-  if (duty) return 'job ' + i.jobTitle(duty);
-  return '';
+/** The word of each kind of row, at the start of its second line. */
+const ACTION: Record<NeedKind, string> = {
+  asks: 'Asks first',
+  question: 'Asks you',
+  check: 'Sign off',
+  stopped: 'Stopped',
+  failed: 'Failed',
+  limit: 'At its limit',
+  paused: 'Paused',
+  suggestion: 'Keep this note?',
+};
+
+const same = (a: string, b: string): boolean => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+/** lineOf joins the second line of a row: the action, then each part that the title and the parts before it do not hold already. */
+export function lineOf(head: string, parts: string[]): string {
+  const out: string[] = [];
+  const h = head.toLowerCase();
+  for (const p of parts) {
+    const t = (p || '').trim();
+    if (!t) continue;
+    if (out.some((x) => same(x, t))) continue;
+    if (out.length > 0 && h.includes(t.toLowerCase())) continue;
+    out.push(t);
+  }
+  return out.join(' · ');
 }
 
-const joined = (parts: string[]): string => parts.filter(Boolean).join(' · ');
+/** reasonWords drops the name of the job from the front of a reason, since the line names the job. */
+const reasonWords = (s: string): string => oneLine(String(s || '').replace(/^The job \S+(?: paused itself)?:\s*/, ''));
+
+/** costWords is the cost of a task in a row, or "" while it cost nothing that the server priced. */
+const costWords = (c: WorkCard | undefined): string => (c && c.costUSD > 0 ? costText(c.costUSD) : '');
 
 /** hrefOfRow is where a row of the inbox is answered. A decision of a channel opens its tab Decisions, which holds every card that waits. */
 function hrefOfRow(r: InboxRow): string {
@@ -98,32 +136,45 @@ function hrefOfRow(r: InboxRow): string {
   return '#';
 }
 
-/** rowOf turns a row of the inbox into a row of Needs you. */
-function rowOf(i: NeedsInput, r: InboxRow): NeedRow {
+/** resultHead is the first line of a result: the summary of the server, else the answer of its run, else the newest post of its channel, else the title. */
+function resultHead(i: NeedsInput, c: WorkCard | undefined, run: string, bridge: string, fallback: string): string {
+  if (c && c.summary) return oneLine(c.summary);
+  const answer = run && i.answerOf ? i.answerOf(run) : '';
+  if (answer) return oneLine(answer);
+  const post = bridge && i.lastPostOf ? i.lastPostOf(bridge) : '';
+  if (post) return oneLine(post);
+  return fallback;
+}
+
+/** rowOf turns a row of the inbox into a row of Needs you, with the task of the board that it stands for. */
+function rowOf(i: NeedsInput, r: InboxRow, c?: WorkCard): NeedRow {
   const who = r.handle || (r.agent ? i.agentName(r.agent) : '');
-  const where = whereWords(i, r.bridge, r.duty);
-  const base = { key: r.key, agent: r.agent || '', at: r.at, href: hrefOfRow(r) };
+  const where = r.bridge ? i.channelTitle(r.bridge) : r.duty ? i.jobTitle(r.duty) : '';
+  const base = { key: r.key, agent: r.agent || '', at: r.at, href: hrefOfRow(r), run: r.run || (c && c.links.run) || undefined, bridge: r.bridge || undefined, approval: (r.decision && r.decision.id) || (c && c.links.approval) || undefined, duty: r.duty || undefined, card: c ? c.id : undefined };
+  const cost = costWords(c);
+  const make = (kind: NeedKind, head: string, parts: string[] = [where, who, cost]): NeedRow => ({ ...base, kind, head, line: lineOf(head, [ACTION[kind], ...parts]) });
+  const summary = c && c.summary ? oneLine(c.summary) : '';
   switch (r.kind) {
     case 'decision':
-      return { ...base, kind: 'asks', head: (who || 'An agent') + ' asks first', line: joined([r.decision ? askWords(r.decision) : '', where]) };
+      return make('asks', summary || (r.decision ? askWords(r.decision) : oneLine(r.reason || '') || 'It asks before it acts.'));
     case 'question':
-      return { ...base, kind: 'question', head: (who || 'An agent') + ' asks you', line: joined([r.decision ? askWords(r.decision) : oneLine(r.reason || ''), where]) };
+      return make('question', summary || (r.decision ? askWords(r.decision) : oneLine(r.reason || '')) || 'It has a question for you.');
     case 'asked':
-      return { ...base, kind: 'question', head: (who || 'An agent') + ' asks you', line: joined([r.entry ? oneLine(r.entry.text || '') : '', where]) };
+      return make('question', summary || (r.entry ? oneLine(r.entry.text || '') : '') || 'It has a question for you.');
     case 'result':
-      return { ...base, kind: 'check', head: r.duty ? 'Job ready to sign off' : 'Ready to sign off', line: joined([oneLine(r.reason || ''), where]) };
+      return make('check', resultHead(i, c, r.run || '', r.bridge || '', where || 'A result to check'));
     case 'limit':
-      return { ...base, kind: 'limit', head: (who || 'An agent') + ' is at its limit', line: joined(['Continue gives it more room', where]) };
+      return make('limit', (who || 'An agent') + ' stopped at its limit', [where, 'Continue gives it more room']);
     case 'duty-paused':
-      return { ...base, kind: 'paused', head: 'Job paused: ' + (r.duty ? i.jobTitle(r.duty) : ''), line: oneLine(r.reason || '') };
+      return make('paused', reasonWords(r.reason || '') || 'The job paused itself.', [where]);
     case 'duty-failed':
-      return { ...base, kind: 'failed', head: 'Job failed: ' + (r.duty ? i.jobTitle(r.duty) : ''), line: oneLine(r.reason || '') };
+      return make('failed', reasonWords(r.reason || '') || 'The job failed.', [where]);
     case 'duty-waits':
-      return { ...base, kind: 'question', head: (who || 'A job') + ' waits for you', line: joined([oneLine(r.reason || ''), where]) };
+      return make('question', summary || oneLine(r.reason || '') || 'The job waits for you.');
     case 'note':
-      return { ...base, kind: 'suggestion', head: (r.handle ? i.agentName(r.handle) : 'An agent') + ': Keep this note?', line: oneLine(r.reason || ''), href: r.handle ? chatHref({ view: 'agent', name: r.handle }) : base.href };
+      return { ...make('suggestion', oneLine(r.reason || '') || 'A note waits for you.', [r.handle ? i.agentName(r.handle) : '']), href: r.handle ? chatHref({ view: 'agent', name: r.handle }) : base.href };
     default:
-      return { ...base, kind: r.kind === 'stopped' ? 'stopped' : 'failed', head: (who || 'An agent') + (r.kind === 'stopped' ? ' stopped' : ' failed'), line: joined([oneLine(r.reason || ''), where]) };
+      return make(r.kind === 'stopped' ? 'stopped' : 'failed', oneLine(r.reason || '') || (r.kind === 'stopped' ? 'It stopped.' : 'It failed.'));
   }
 }
 
@@ -138,17 +189,21 @@ function hrefOfCard(c: WorkCard): string {
 /** cardRow is the row of a task that no row of the inbox explains. */
 function cardRow(i: NeedsInput, c: WorkCard): NeedRow {
   const agent = c.agents[0] || '';
-  const where = whereWords(i, c.links.bridge, c.links.bridge ? '' : c.links.duty);
-  const base = { key: 'card:' + c.id, agent, at: c.since, href: hrefOfCard(c) };
-  if (c.stage === 'review') return { ...base, kind: 'check', head: c.links.duty ? 'Job ready to sign off' : 'Ready to sign off', line: joined([c.title, c.links.bridge ? '' : where]) };
-  if (c.stage === 'stopped') return { ...base, kind: 'stopped', head: 'Stopped: ' + c.title, line: oneLine(c.reason || '') };
-  return { ...base, kind: 'question', head: (agent ? i.agentName(agent) : 'An agent') + ' needs you', line: joined([oneLine(c.reason || c.title), where]) };
+  const where = c.links.bridge ? i.channelTitle(c.links.bridge) : c.links.duty ? i.jobTitle(c.links.duty) : '';
+  const base = { key: 'card:' + c.id, agent, at: c.since, href: hrefOfCard(c), run: c.links.run || undefined, bridge: c.links.bridge || undefined, approval: c.links.approval || undefined, duty: c.links.duty || undefined, card: c.id };
+  const who = agent ? i.agentName(agent) : '';
+  const parts = [where, who, costWords(c)];
+  const make = (kind: NeedKind, head: string): NeedRow => ({ ...base, kind, head, line: lineOf(head, [ACTION[kind], ...parts]) });
+  if (c.stage === 'review') return make('check', resultHead(i, c, c.links.run || '', c.links.bridge || '', c.title));
+  if (c.stage === 'stopped') return make('stopped', c.summary ? oneLine(c.summary) : c.title);
+  return make('question', c.summary ? oneLine(c.summary) : oneLine(c.reason || c.title));
 }
 
 /** suggestionRow is the row of a note that waits for Keep or Not now. */
 function suggestionRow(i: NeedsInput, w: WaitingChange): NeedRow {
-  const what = w.what === 'updated' ? 'Keep this change to a note?' : 'Keep this note?';
-  return { key: 'k:' + w.id, kind: 'suggestion', agent: w.agent, head: i.agentName(w.agent) + ': ' + what, line: oneLine(w.text || w.why || ''), at: w.at, href: chatHref({ view: 'agent', name: w.agent }) };
+  const head = oneLine(w.text || w.why || '') || 'A note waits for you.';
+  const what = w.what === 'updated' ? 'Keep this change?' : 'Keep this note?';
+  return { key: 'k:' + w.id, kind: 'suggestion', agent: w.agent, head, line: lineOf(head, [what, i.agentName(w.agent)]), at: w.at, href: chatHref({ view: 'agent', name: w.agent }) };
 }
 
 /**
@@ -165,26 +220,26 @@ export function needsOf(i: NeedsInput): NeedRow[] {
   const rows = i.rows.filter((r) => needsPerson(r) && !(r.kind === 'note' && r.note && listed.has(r.note)));
   const used = new Set<string>();
   const out: NeedRow[] = [];
-  const take = (r: InboxRow) => {
+  const take = (r: InboxRow, c?: WorkCard) => {
     used.add(r.key);
-    out.push(rowOf(i, r));
+    out.push(rowOf(i, r, c));
   };
   for (const c of i.cards || []) {
     if (c.next !== 'you' || c.stage === 'done' || c.stage === 'waiting' || c.stage === 'working') continue;
     const run = c.links.run || '';
     const byKey = rows.find((r) => !used.has(r.key) && ((c.links.approval && r.key === 'd:' + run + '/' + c.links.approval) || (c.stage === 'review' && r.key === 'v:' + run)));
     if (byKey) {
-      take(byKey);
+      take(byKey, c);
       continue;
     }
     const inChannel = c.links.bridge ? rows.filter((r) => !used.has(r.key) && r.bridge === c.links.bridge) : [];
     if (inChannel.length && c.stage !== 'review') {
-      inChannel.forEach(take);
+      inChannel.forEach((r) => take(r, c));
       continue;
     }
     const ofJob = !c.links.bridge && c.links.duty ? rows.filter((r) => !used.has(r.key) && r.duty === c.links.duty && !r.bridge && (c.stage !== 'stopped' || r.kind === 'duty-failed' || r.kind === 'duty-paused')) : [];
     if (ofJob.length) {
-      ofJob.forEach(take);
+      ofJob.forEach((r) => take(r, c));
       continue;
     }
     out.push(cardRow(i, c));
@@ -220,7 +275,7 @@ export function needsOfCount(i: NeedsInput): NeedRow[] {
       (!c.links.bridge && c.links.duty ? rows.find((r) => free(r) && r.duty === c.links.duty && !r.bridge) : undefined);
     if (match) {
       used.add(match.key);
-      out.push(rowOf(i, match));
+      out.push(rowOf(i, match, c));
     } else out.push(cardRow(i, c));
   }
   for (const r of rows) if (r.kind === 'note') out.push(rowOf(i, r));

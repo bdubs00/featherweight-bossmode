@@ -1410,3 +1410,150 @@ a.cf-mrow:hover .cf-mrow-top strong {
     display: grid;
   }
 }
+
+/* ---------- round 3: the way out of an item, where it lands ---------- */
+.cf-wayouts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+/* In a channel, the card sits under the head, above the posts, so the person sees it first. */
+.cf-channel > .cf-wayouts {
+  flex: none;
+  max-height: 46%;
+  overflow-y: auto;
+  padding: var(--s-3) var(--s-5);
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+}
+.cf-channel > .cf-wayouts > .cf-wayout,
+.cf-channel > .cf-wayouts > .cf-done {
+  max-width: 900px;
+}
+.cf-stream-in > .cf-wayouts {
+  margin: var(--s-4) 0 var(--s-2);
+}
+.cf-wayout {
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--led-amber);
+  border-radius: var(--r);
+  background: var(--wash-need);
+}
+.cf-wayout p {
+  margin: 0 0 var(--s-2);
+}
+.cf-wayout-head {
+  color: var(--word-amber);
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+  font-weight: 700;
+}
+.cf-nobody,
+.cf-stopped {
+  border-color: var(--line);
+  background: var(--card);
+}
+.cf-nobody .cf-wayout-head,
+.cf-stopped .cf-wayout-head {
+  color: var(--ink);
+}
+.cf-signoff-result {
+  margin-bottom: var(--s-2);
+}
+.cf-signoff-result > :first-child {
+  margin-top: 0;
+}
+.cf-wayout-keys {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--s-2);
+}
+.cf-wayout-keys .field-error {
+  margin-right: auto;
+}
+.cf-done {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--t-meta);
+}
+
+/* ---------- round 3: the topic of a channel, under its name ---------- */
+.cf-titles {
+  flex: 0 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.cf-topic {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+}
+
+/* ---------- round 3: a task reads from its top, as a channel does ---------- */
+.cf-run-in {
+  margin-top: 0;
+}
+
+/* ---------- round 3: Today ---------- */
+.cf-today-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cf-today-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-3);
+  margin: 0 calc(-1 * var(--s-2));
+  padding: var(--s-2);
+  border-radius: var(--r);
+  color: var(--ink);
+  text-decoration: none;
+}
+.cf-today-row:hover {
+  background: var(--line-soft);
+}
+.cf-today-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cf-today-meta {
+  color: var(--muted);
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+}
+
+/* ---------- round 3: Add an agent in Members ---------- */
+.cf-add-head {
+  margin: var(--s-2) 0 var(--s-1);
+  font-size: var(--t-meta);
+  font-weight: 700;
+}
+.cf-add-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cf-add-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 4px 0;
+}
+.cf-add-name {
+  flex: 1;
+  min-width: 0;
+}

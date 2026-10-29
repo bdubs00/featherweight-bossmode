@@ -18,6 +18,8 @@ import { Glyph } from '../icons';
 import { Avatar, Led, Mark, Tabs, countText } from '../primitives';
 import { Pop } from './Pop';
 import { MakeJob } from './MakeJob';
+import { WayOut } from './WayOut';
+import { lastPost } from './data';
 import { chatHref, type ChannelTab } from './route';
 
 /** useOpenChannel reads the record, the members, and the recent end of a channel, and keeps it read while the person sees it. */
@@ -82,6 +84,7 @@ export function ChannelView({ id, tab }: { id: string; tab: ChannelTab }) {
     return m ? m.agent : '';
   });
   const [confirm, setConfirm] = useState<'close' | 'job' | null>(null);
+  const result = useSelect((s) => lastPost(s.channels[id]));
   if (!b) {
     return (
       <section class="cf-view" aria-label="Channel">
@@ -102,6 +105,8 @@ export function ChannelView({ id, tab }: { id: string; tab: ChannelTab }) {
     );
   }
   const closed = b.state === 'closed';
+  // The topic of the channel is the line under its name: the request in full. An older server names none, and the goal stands in where it says more than the name.
+  const topic = (b.topic || (b.goal && b.goal.trim() !== b.title.trim() ? b.goal : '')).trim();
   const decisions = firstLoaded || closed ? waiting : Math.max(waiting, b.needsYou || 0);
   const base = { view: 'channel' as const, id };
   return (
@@ -111,9 +116,16 @@ export function ChannelView({ id, tab }: { id: string; tab: ChannelTab }) {
           <Glyph name="back" size={20} />
         </a>
         {face ? <Mark agent={face} size={32} /> : <span class="cf-chan-hash">#</span>}
-        <h1 class="cf-title" id="cf-channel-title" title={b.title}>
-          {b.title}
-        </h1>
+        <div class="cf-titles">
+          <h1 class="cf-title" id="cf-channel-title" title={b.title}>
+            {b.title}
+          </h1>
+          {topic && (
+            <p class="cf-topic" title={topic}>
+              {topic}
+            </p>
+          )}
+        </div>
         {closed && <Led tone="grey" word="closed" />}
         <Faces id={id} />
         <Tabs
@@ -139,6 +151,7 @@ export function ChannelView({ id, tab }: { id: string; tab: ChannelTab }) {
           ]}
         />
       </header>
+      {tab === 'posts' && <WayOut bridge={id} result={result} />}
       {tab === 'posts' && <Posts id={id} closed={closed} quiet placeholder="Post to the channel · type @ to ask one agent" />}
       {tab === 'wiki' && <WikiTab id={id} />}
       {tab === 'decisions' && loadedChannel && <DecisionsTab id={id} />}

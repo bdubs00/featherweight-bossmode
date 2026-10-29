@@ -30,6 +30,8 @@ const keyOf = (run: string, approval: string) => run + '/' + approval;
 
 /** noteDecided records a decision that went out, so a card shows it settled before the stream says so. */
 export function noteDecided(run: string, approval: string, decision: 'allow' | 'deny', note?: string, content?: unknown): void {
+  // The chat-first page takes the row of the decision off Needs you at once (src/ui/chat/data.ts).
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('fw-decided', { detail: { run, approval, decision } }));
   made.set(keyOf(run, approval), { decision, note, content, at: new Date().toISOString() });
   for (const f of [...listeners]) f();
 }

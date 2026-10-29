@@ -11,7 +11,8 @@ import type { State } from '../../state/reducer';
 import type { WorkBoard } from '../../api/types';
 import { store, useSelect } from '../../state/store';
 import { useInboxRows, useWaiting as useOneCount } from '../../state/activity';
-import { useDuties, loadDuties } from '../../state/duties';
+import { useDuties, loadDuties, loadInbox } from '../../state/duties';
+import type { Entry } from '../../api/types';
 import { dutyTitle } from '../../lib/duties';
 import { titleOfName } from '../../lib/duties';
 import { needsOf, needsOfCount, type NeedRow } from './needs';
@@ -46,13 +47,78 @@ const waiting = shared<WaitingChange[]>([]);
 let followers = 0;
 let stop: (() => void) | null = null;
 
-/** reloadBoard reads the board again now, as after an action that moves a task. */
+/** reloadBoard reads the board again now, as after an action that moves a task, and the one count of the inbox with it. */
 export function reloadBoard(): void {
   api.work().then(
     (b) => board.set(b),
     () => {},
   );
+  loadInbox().catch(() => {});
 }
+
+/* ---------- what the person answered on this page ---------- */
+
+/**
+ * An answer that the person gave on this page: a verdict, a decision, or a
+ * dismissal. Its row leaves Needs you at once, and every count drops, until
+ * the reads of the server agree. The place where the person answered keeps
+ * a line that says so, such as You marked this right at 9:49 AM.
+ */
+export interface Answer {
+  kind: 'verdict' | 'decision' | 'dismiss';
+  run?: string;
+  bridge?: string;
+  approval?: string;
+  card?: string;
+  /** The line that stays, such as You marked this right. The time follows it. */
+  words: string;
+  at: string;
+}
+
+const answered = shared<Answer[]>([]);
+
+/** markAnswered takes a row off Needs you at once and reads the board and the count again. */
+export function markAnswered(a: Omit<Answer, 'at'>): void {
+  answered.set([...answered.get(), { ...a, at: new Date().toISOString() }]);
+  reloadBoard();
+}
+
+/** useAnswered lists the answers that the person gave on this page. */
+export function useAnswered(): Answer[] {
+  return answered.use();
+}
+
+/** answers reports whether an answer of the person takes a row off Needs you. */
+export function answers(a: Answer, r: Pick<NeedRow, 'kind' | 'run' | 'bridge' | 'approval' | 'card'>): boolean {
+  if (a.card && r.card === a.card) return true;
+  // The answer of a question of a channel takes off the question of that channel, which names no approval.
+  if (a.kind === 'decision' && !a.approval) return !!a.bridge && r.kind === 'question' && r.bridge === a.bridge && !r.approval;
+  if (a.kind === 'decision') return !!a.approval && r.approval === a.approval && (!a.run || !r.run || r.run === a.run);
+  if (a.kind === 'verdict') return r.kind === 'check' && ((!!a.run && r.run === a.run) || (!!a.bridge && !a.run && r.bridge === a.bridge));
+  return false;
+}
+
+/** answerFor finds the answer that the person gave here about a run, a channel, or a task, for the line that stays. */
+export function answerFor(list: Answer[], q: { run?: string; bridge?: string; card?: string }): Answer | undefined {
+  for (let k = list.length - 1; k >= 0; k--) {
+    const a = list[k];
+    if ((q.card && a.card === q.card) || (q.run && a.run === q.run) || (q.bridge && !a.run && a.bridge === q.bridge)) return a;
+  }
+  return undefined;
+}
+
+/** forgetAnswers drops the answers, for the tests. */
+export function forgetAnswers(): void {
+  answered.set([]);
+}
+
+// A decision on any card of the page, also in a channel, takes its row off at once.
+if (typeof window !== 'undefined')
+  window.addEventListener('fw-decided', (e) => {
+    const d = (e as CustomEvent<{ run?: string; approval?: string; bridge?: string; decision: string }>).detail;
+    if (d && d.approval) markAnswered({ kind: 'decision', run: d.run, approval: d.approval, words: d.decision === 'deny' ? 'You denied this' : 'You answered this' });
+    else if (d && d.bridge) markAnswered({ kind: 'decision', bridge: d.bridge, words: 'You answered this' });
+  });
 
 /** reloadWaiting reads the notes that wait again. */
 export function reloadWaiting(): void {
@@ -147,7 +213,10 @@ export function useNeeds(): NeedRow[] {
   const { rows } = useInboxRows();
   const faces = useSelect((s) => s.faces);
   const bridges = useSelect((s) => s.bridges);
+  const runs = useSelect((s) => s.runs);
+  const channels = useSelect((s) => s.channels);
   const list = useDuties((s) => s.list);
+  const done = useAnswered();
   return useMemo(
     () =>
       (count ? needsOfCount : needsOf)({
@@ -160,9 +229,21 @@ export function useNeeds(): NeedRow[] {
           const d = (list || []).find((x) => x.name === name);
           return d ? dutyTitle(d) : name;
         },
+        answerOf: (run) => (runs[run] && runs[run].output) || '',
+        lastPostOf: (bridge) => lastPost(channels[bridge]),
       }),
-    [cards, notes, count, rows, faces, bridges, list],
-  );
+    [cards, notes, count, rows, faces, bridges, list, runs, channels],
+  ).filter((r) => !done.some((a) => answers(a, r)));
+}
+
+/** lastPost is the text of the newest post of an agent in a channel that the page read, or "". */
+export function lastPost(ch: { seqs: number[]; bySeq: Record<number, Entry> } | undefined, who: 'agent' | 'any' = 'agent'): string {
+  if (!ch) return '';
+  for (let k = ch.seqs.length - 1; k >= 0; k--) {
+    const e = ch.bySeq[ch.seqs[k]];
+    if (e && (e.from.kind === 'agent' || (who === 'any' && e.from.kind === 'person')) && e.text) return e.text;
+  }
+  return '';
 }
 
 /**
@@ -173,5 +254,15 @@ export function useNeeds(): NeedRow[] {
 export function useNeedsCount(): number {
   const count = useOneCount();
   const rows = useNeeds();
-  return count ? count.count : rows.length;
+  const done = useAnswered();
+  // The rows that the person answered here leave the count at once, until the next read of the server agrees.
+  const gone = useHiddenCount(done);
+  return count ? Math.max(0, count.count - gone) : rows.length;
+}
+
+/** useHiddenCount counts the rows of the count of the server that an answer of this page took off. */
+function useHiddenCount(done: Answer[]): number {
+  const cards = useBoard();
+  if (!done.length || !cards) return 0;
+  return cards.cards.filter((c) => c.next === 'you' && (c.stage === 'needs-you' || c.stage === 'review')).filter((c) => done.some((a) => answers(a, { kind: c.stage === 'review' ? 'check' : 'asks', run: c.links.run, bridge: c.links.bridge, approval: c.links.approval, card: c.id }))).length;
 }
