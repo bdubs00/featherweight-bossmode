@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { JournalEntry, NoteRecord, WaitingChange } from '../api/knowhow';
 import { fakeApi, mount, unmountAll } from '../ui/testkit-c';
 import { store } from './store';
-import { decide, forgetKnowhow, knowhow, knowhowChanged, loadAgent, loadAllWaiting, loadNote, loadOlder, putAway, saveNote, setAskFirst, useKnowhowView, JOURNAL_PAGE } from './knowhow';
+import { decide, forgetKnowhow, knowhow, knowhowChanged, loadAgent, loadAllWaiting, loadNote, loadOlder, putAway, reviewNow, saveNote, setAskFirst, useKnowhowView, JOURNAL_PAGE } from './knowhow';
 
 const flush = async () => {
   for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
@@ -118,6 +118,28 @@ describe('the know-how of an agent', () => {
     expect(api.calls[0].path).toBe('/v1/knowhow/waiting');
     expect(knowhow.get().allWaiting!.map((w) => w.agent)).toEqual(['triage']);
   });
+
+  it('keeps the switch and what waits for an agent when the list of every agent answers last', async () => {
+    let release!: () => void;
+    const late = new Promise<void>((r) => (release = r));
+    api = fakeApi(
+      routes({
+        'GET /v1/knowhow/waiting?agent=triage': { waiting: [] },
+        'GET /v1/knowhow/waiting': async () => {
+          await late;
+          return { body: { waiting: [] } };
+        },
+      }) as never,
+    );
+    const all = loadAllWaiting();
+    await loadAgent('triage');
+    expect(knowhow.get().agents.triage.settings).toMatchObject({ askFirst: true });
+    release();
+    await all;
+    expect(knowhow.get().allWaiting).toEqual([]);
+    expect(knowhow.get().agents.triage.settings).toMatchObject({ askFirst: true });
+    expect(knowhow.get().agents.triage.waiting).toEqual([]);
+  });
 });
 
 describe('a note', () => {
@@ -170,5 +192,13 @@ describe('the stream', () => {
     store.dispatch({ type: 'stream', event: { id: '92', kind: 'reset', data: null } });
     await flush();
     expect(api.calls.filter((c) => c.path.startsWith('/v1/knowhow/summary'))).toHaveLength(2);
+  });
+});
+
+describe('the after-work review now', () => {
+  it('starts the after-work review of an agent now, and says what the server did', async () => {
+    api = fakeApi(routes({ 'POST /v1/knowhow/review/triage': () => ({ status: 202, body: { agent: 'triage', started: true, run: 'r9', profile: 'review' } }) }) as never);
+    expect(await reviewNow('triage')).toMatchObject({ started: true, run: 'r9' });
+    expect(api.calls[0]).toMatchObject({ method: 'POST', path: '/v1/knowhow/review/triage' });
   });
 });

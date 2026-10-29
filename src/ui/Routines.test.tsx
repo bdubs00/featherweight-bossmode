@@ -37,7 +37,7 @@ function rec(name: string, standing: RoutineRecord['standing'], more: Partial<Ro
   };
 }
 
-/** The routine that needs you: 1,480 tickets rehearsed, 97.6% agreed, 48 handed to the agent, none sent back. */
+/** The routine that needs you: 1,480 runs rehearsed, 97.6% agreed, 48 handed to the agent, none sent back. */
 const ACK = rec('acknowledge-a-new-ticket', 'rehearsing', {
   ready: true,
   updatedAt: '2026-10-23T09:00:00Z',
@@ -136,11 +136,11 @@ describe('the tab Routines of an agent', () => {
     expect(el.querySelector('.rt-row[href$="renew-a-certificate"]')).toBeNull();
     // A routine that needs you sits on the wash, with an amber count and the breathing light. The tab names the agent, so the row does not.
     const need = el.querySelector('.rt-row.need')!;
-    expect(text(need)).toBe('Acknowledge a new ticket needs you rehearsed 1,480 tickets');
+    expect(text(need)).toBe('Acknowledge a new ticket needs you rehearsed 1,480 runs');
     expect(need.getAttribute('href')).toBe('#routines/triage/acknowledge-a-new-ticket');
     expect(el.querySelector('.rt-group .chip-amber')).not.toBeNull();
     expect(need.querySelector('.led-amber.breathe')).not.toBeNull();
-    expect(text(el.querySelector('.rt-row[href$="reopen-a-ticket"]'))).toContain('84% agreed over 150 tickets');
+    expect(text(el.querySelector('.rt-row[href$="reopen-a-ticket"]'))).toContain('84% agreed over 150 runs');
     // Retired stays behind its toggle until the person opens it.
     expect(el.textContent).not.toContain('Label a printer ticket');
     const toggle = el.querySelector('.rt-toggle')!;
@@ -327,7 +327,7 @@ describe('the other standings', () => {
     await settle();
     expect(text(el.querySelector('h1'))).toBe('Escalate a VPN outage');
     const card = el.querySelector('.rt-card')!;
-    expect(text(card.querySelector('h3'))).toBe('Proposed from 14 tickets');
+    expect(text(card.querySelector('h3'))).toBe('Proposed from 14 runs');
     expect([...card.querySelectorAll('button')].map(text)).toEqual(['Retire', 'Rehearse']);
     // Both moves sit on the card, so the header has no More.
     expect(el.querySelector('.rt-more')).toBeNull();
@@ -393,28 +393,29 @@ describe('the other standings', () => {
 });
 
 describe('the evidence', () => {
-  it('says what happened: the rehearsal per day, the past tickets, how sure it was, where it disagreed, what came back, and what it was made from', async () => {
+  it('says what happened: the rehearsal per day, the past runs, how sure it was, where it disagreed, what came back, and what it was made from', async () => {
     api = fakeApi(routes() as never);
     const el = mount(<RoutineMain agent="triage" name="acknowledge-a-new-ticket" tab="evidence" />);
     await settle();
     const heads = [...el.querySelectorAll('.rt-sec > h2')].map((h) => (h.firstChild!.textContent || '').trim());
-    expect(heads).toEqual(['Rehearsal', 'Past tickets', 'How sure it was', 'Where it disagreed', 'Sent back', 'Made from']);
+    expect(heads).toEqual(['Rehearsal', 'Past runs', 'How sure it was', 'Where it disagreed', 'Sent back', 'Made from']);
     expect(el.querySelectorAll('.rt-chart .rt-bar')).toHaveLength(2);
     expect([...el.querySelectorAll('.rt-legend li')].map(text)).toEqual(['agreed with the agent 1,397', 'disagreed 35', 'handed to the agent 48']);
     // The chart is placed elements, with a table for a screen reader.
     expect(el.querySelector('.rt-chart')!.getAttribute('aria-hidden')).toBe('true');
     expect(el.querySelectorAll('table.sr tbody tr')).toHaveLength(2);
-    expect(text(el.querySelector('#rt-past')!.nextElementSibling)).toBe('212 of 212 past tickets, handled the same way');
+    expect(text(el.querySelector('#rt-past')!.nextElementSibling)).toBe('212 of 212 past runs, handled the same way');
     expect(el.textContent).not.toMatch(/matched/i);
-    // The workbench keeps no list of the past tickets yet, so the line has no key.
-    expect(keyNamed(el, 'Open the tickets')).toBeUndefined();
+    // The workbench keeps no list of the past runs yet, so the line has no key.
+    expect(keyNamed(el, 'Open the runs')).toBeUndefined();
     expect([...el.querySelectorAll('.rt-sure tbody tr')].map(text)).toEqual(['95% sure or more 1,201 98.4% of the time', '85% to 95% sure 231 93.1% of the time', 'under 85% sure 48 handed to the agent']);
     expect(el.querySelectorAll('.rt-disagreed tbody tr')).toHaveLength(5);
     expect(text(el.querySelector('.rt-disagreed tbody tr'))).toBe('#480 VPN drops network 91% sure identity accepted');
-    expect(el.querySelector('.rt-disagreed tbody a')!.getAttribute('href')).toBe('/ui#run/run-0');
+    // The run of a disagreement opens in its chat on this page, not on the dashboard at /ui.
+    expect(el.querySelector('.rt-disagreed tbody a')!.getAttribute('href')).toBe('#chat/run-0');
     click(keyNamed(el, 'Show all'));
     expect(el.querySelectorAll('.rt-disagreed tbody tr')).toHaveLength(7);
-    expect(text(el.querySelector('#rt-made')!.parentElement)).toContain('212 tickets of triage');
+    expect(text(el.querySelector('#rt-made')!.parentElement)).toContain('212 runs of triage');
     expect(text(el.querySelector('#rt-made')!.parentElement)).toContain('Proposed by fw routine propose');
   });
 });

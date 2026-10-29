@@ -1102,8 +1102,9 @@ for the lab and the manager.
 
 Reading needs the right to view the agent, else 404. A move needs the
 right to edit it, else 403. The page offers the moves where `roles` of
-`GET /v1/whoami` names the person `owner` of the agent. A ticket links to
-its run on the page at `/ui`, as `/ui#run/<id>`, as a heart does.
+`GET /v1/whoami` names the person `owner` of the agent. A run of a
+disagreement links to its chat on this page, `#chat/<id>`, as a card of
+Work opens a run.
 
 A record. Only a routine that was signed off has `signedOff`. `source` and
 `routine.canary` show only with a value. The routine never carries a
@@ -1209,8 +1210,9 @@ The summary:
 
 The page keys a routine by `agent` and `routine.name`, and gives it the
 title of its name: `acknowledge-a-new-ticket` is `Acknowledge a new
-ticket`. It calls a run of a routine a ticket, as the words of section 5
-of `docs/ROUTINES.md` do. A field for a title can give a routine the words
+ticket`. It calls a run of a routine a run, because a routine belongs to
+a duty of any kind of work, and the word of one kind, such as ticket, is
+wrong for the others. A field for a title can give a routine the words
 that its name cannot hold. A field for the noun of the work of an agent
 can give each agent its own word.
 
@@ -1923,12 +1925,13 @@ page never calls `GET /v1/knowhow/runs`, which is for the kernel.
 | `PUT /v1/knowhow/notes/{agent}/{scope}/{name}?principal=` | `{"text", "ifHash", "sources"}`, with the sources of the note that the page read. The server takes `by` from the person. The answer is `{"note", "waiting"}`. A write that waits for a person answers 202 with `waiting`. A write by the access token of the fleet waits under the switch. The page then says `The change waits for a decision in What it learned.` A 412 reads the note again. The page shows the newer text above the draft, and the next Save sends the newer hash. |
 | `DELETE /v1/knowhow/notes/{agent}/{scope}/{name}?principal=&ifHash=` | Put away. The answer is 200 with `{"note"}`, or 202 with `waiting`. A 412 reads the note again. |
 | `GET /v1/knowhow/journal?agent=<name>&limit=50&before=<id>` | `{"agent", "entries": [<entry>]}`, newest first. `before` is the public id of the oldest entry that the page holds. A full page of 50 entries offers Show older. |
-| `POST /v1/knowhow/journal/{id}/undo` | No body. The answer is `{"entry", "undone"}`. The page offers Undo on an entry with `undo` and without `undoneBy`. A 409 means that a later change touched the note or the routine, or that the entry was taken back already. The page says so under the entry. |
+| `POST /v1/knowhow/journal/{id}/undo` | No body. The answer is `{"entry", "undone"}`. The page offers Undo on an entry with `undo` and without `undoneBy`, and never on an entry `out-of-date`: such an undo would make the agent trust the note over its source again. A 409 means that a later change touched the note or the routine, or that the entry was taken back already. The page says so under the entry. A 409 with `outOfDate: true` means that the note went out of date since. The page then says `This note went out of date since. Edit it or put it away in Notes.`, with Notes as a link to the tab. |
 | `GET` and `PUT /v1/knowhow/settings/{agent}` | `{"agent", "askFirst", "review": {"on", "agent", "every", "reason"}}`. The PUT sends `{"askFirst"}`. With `review.on` false, the header says the reason, such as `The after-work review is off: no agent is set.` |
 | `GET /v1/knowhow/waiting?agent=<name>` | `{"agent", "waiting": [<change>]}`. A change holds the fields of an entry without `undo`, with `text`, `sources`, and `pin`. |
 | `GET /v1/knowhow/waiting` | **Added to the workbench** for the page: without `agent`, `{"waiting": [<change>]}` lists the changes of every agent that the person can view and read. The list of agents reads it once to mark the agents that need you. |
 | `POST /v1/knowhow/waiting/{id}` | `{"keep": true}` for Keep and `{"keep": false}` for Not now. The answer is `{"kept", "entry"}`. Not now drops the change, and a new note that waited is put away. A 409 means that the note changed since. The change stays until a person drops it, and a quiet line says so above the cards. |
 | `GET /v1/knowhow/summary?agent=<name>&days=7` | See below. |
+| `POST /v1/knowhow/review/{agent}` | **Added to the workbench**: starts the after-work review of the agent now. No body. 202 with `{"agent", "started": true, "run", "profile"}`, or 200 with `started: false` and `reason` when the agent has nothing to review. The header offers it to an owner as Review now while `review.on`, and says `The after-work review of <agent> started. What it keeps shows here.` or the reason. Without a review profile, 409 with the reason. |
 
 The summary of `summary.go`:
 
@@ -1958,8 +1961,20 @@ person changes the notes of their own principal with the operator role.
 The agent notes and the notes of a duty need the owner role, and so does
 a routine. The page offers Edit and Put away on the notes of the person:
 their own scope, and a note that they wrote in a scope that they can
-change. It offers Undo and Keep on a change of a note or a routine that
-the person can change. Only an owner sees the switch.
+change. It also offers them on a note that went out of date, in a scope
+that the person can change, because such a note has no undo: the owner
+corrects it. The server gives the source that changed its version of now
+on such a correction. It offers Undo and Keep on a change of a note or a
+routine that the person can change. Only an owner sees the switch and
+Review now.
+
+A run of an entry, of a change, or of a source opens in its chat on this
+page, `#chat/<id>`, as a card of Work opens a run, never on the page at
+`/ui`. A source page links to the wiki only for a person who may read it:
+an admin, the token of the fleet, or an operator or an owner of an agent
+(`operates` of `Shell.tsx`). For anyone else, such as a viewer of every
+agent, the page names the source in words, with no link that the wiki
+would refuse.
 
 A 404 whose detail starts with `Know-how is off` means that the server
 keeps no know-how. The place then says `Know-how is off on this server.`,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { KnowhowSummary, NoteItem } from '../api/knowhow';
-import { byWords, canDecide, canEditNote, conflictWords, entrySentence, figuresOf, groupNotes, heldBackLine, isMine, labelOf, moneyPair, noteTitle, runLinks, sourceOf, undoRefusal, usesWords, waitSentence } from './knowhow';
+import { byWords, canDecide, canEditNote, canUndo, conflictWords, entrySentence, figuresOf, groupNotes, heldBackLine, isMine, labelOf, moneyPair, noteTitle, runLinks, sourceOf, undoRefusal, undoRefusalOf, usesWords, waitSentence } from './knowhow';
 
 const ME = { subject: 'alice@example.com', name: 'Alice' };
 
@@ -43,10 +43,16 @@ describe('the words of a note', () => {
     expect(isMine('agent', ME)).toBe(false);
   });
 
-  it('says each kind of source, with the address that opens it', () => {
-    expect(sourceOf('run:01K9')).toEqual({ kind: 'run', words: 'a run', href: '/ui#run/01K9' });
+  it('says each kind of source, with the address that opens it on this page', () => {
+    expect(sourceOf('run:01K9')).toEqual({ kind: 'run', words: 'a run', href: '#chat/01K9' });
     expect(sourceOf('page:agents/triage/labels.md')).toEqual({ kind: 'page', words: 'the page agents/triage/labels.md', href: '#pages/agents/triage/labels.md' });
     expect(sourceOf('item:gitea/issue/42')).toEqual({ kind: 'item', words: 'Gitea issue 42', href: '' });
+  });
+
+  it('gives a page no address for a person whom the wiki refuses', () => {
+    expect(sourceOf('page:launch/quillwork-3.md', { wiki: false })).toEqual({ kind: 'page', words: 'the page launch/quillwork-3.md', href: '' });
+    expect(sourceOf('page:launch/quillwork-3.md', { wiki: true }).href).toBe('#pages/launch/quillwork-3.md');
+    expect(sourceOf('run:01K9', { wiki: false }).href).toBe('#chat/01K9');
   });
 
   it('says how often runs used a note', () => {
@@ -81,6 +87,18 @@ describe('who may change what, as access.go of the workbench decides', () => {
     expect(canEditNote({ scope: { kind: 'agent' }, by: 'person:alice@example.com' }, ME, 'operator')).toBe(false);
     // The page offers no key on a note that the person did not write, outside their own scope.
     expect(canEditNote({ scope: { kind: 'agent' }, by: 'review' }, ME, 'owner')).toBe(false);
+    // An owner corrects a note of the agent or of a duty that went out of date, and an operator does not.
+    expect(canEditNote({ scope: { kind: 'agent' }, by: 'agent', state: 'out-of-date' }, ME, 'owner')).toBe(true);
+    expect(canEditNote({ scope: { kind: 'principal', principal: 'duty:sweep' }, by: 'review', state: 'out-of-date' }, ME, 'owner')).toBe(true);
+    expect(canEditNote({ scope: { kind: 'agent' }, by: 'agent', state: 'out-of-date' }, ME, 'operator')).toBe(false);
+  });
+
+  it('offers no undo of a move to out of date, which would make the agent trust the note over its source', () => {
+    const subject = { note: 'a.md', scope: 'agent' as const };
+    expect(canUndo({ what: 'learned', subject, undo: { revision: 0 } }, ME, 'owner')).toBe(true);
+    expect(canUndo({ what: 'out-of-date', subject, undo: { revision: 3 } }, ME, 'owner')).toBe(false);
+    expect(canUndo({ what: 'learned', subject, undo: { revision: 0 }, undoneBy: 'x' }, ME, 'owner')).toBe(false);
+    expect(canUndo({ what: 'learned', subject, undo: { revision: 0 } }, ME, 'operator')).toBe(false);
   });
 
   it('lets an operator undo and decide a change of their own notes, and only an owner any other change', () => {
@@ -113,10 +131,12 @@ describe('the sentences of the journal and of a change that waits', () => {
     expect(conflictWords({ note: 'x.md' })).toBe('This note changed since. Read it again.');
     expect(conflictWords({ routine: 'x' })).toBe('This routine changed since. Read it again.');
     expect(undoRefusal({ note: 'x.md' })).toBe('A later change touched this note. Take that one back first.');
+    expect(sentence(undoRefusalOf({ note: 'x.md' }, false))).toBe('A later change touched this note. Take that one back first.');
+    expect(undoRefusalOf({ note: 'x.md' }, true)).toEqual({ head: 'This note went out of date since. Edit it or put it away in ', name: 'Notes', tail: '.' });
   });
 
-  it('links the runs of an entry', () => {
-    expect(runLinks(['r1'])).toEqual([{ label: 'The run', href: '/ui#run/r1', run: 'r1' }]);
+  it('links the runs of an entry in their chat on this page', () => {
+    expect(runLinks(['r1'])).toEqual([{ label: 'The run', href: '#chat/r1', run: 'r1' }]);
     expect(runLinks(['r1', 'r2']).map((l) => l.label)).toEqual(['Run 1', 'Run 2']);
     expect(runLinks(undefined)).toEqual([]);
   });

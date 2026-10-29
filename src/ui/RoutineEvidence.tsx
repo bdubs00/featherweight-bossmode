@@ -1,13 +1,13 @@
 // The Evidence tab of a routine: what happened, never why. The rehearsal
 // as bars per day of agreed, disagreed, and handed to the agent, with the
-// three totals. Then the past tickets of the replay, how sure the routine
+// three totals. Then the past runs of the replay, how sure the routine
 // was, where it disagreed and what happened afterward, what came back,
 // and what the routine was made from.
 
 import { useState } from 'preact/hooks';
 import type { RoutineRecord } from '../api/routines';
 import { barsOf, bandRows, countsOf, dayLabel, disagreedOf, num, pct0, questionKeys, questionShort, units, verificationWords } from '../lib/routines';
-import { runHref } from './Profile';
+import { runHref } from '../lib/knowhow';
 import { Button, Chip, Help } from './primitives';
 
 /** The disagreements that the tab shows before Show all. */
@@ -81,20 +81,20 @@ function Rehearsal({ rec }: { rec: RoutineRecord }) {
 }
 
 /**
- * PastTickets is the replay over past runs: how many the routine handled
+ * PastRuns is the replay over past runs: how many the routine handled
  * the same way. The workbench keeps no list of those runs yet, so the line
  * has no key to open them.
  */
-function PastTickets({ rec }: { rec: RoutineRecord }) {
+function PastRuns({ rec }: { rec: RoutineRecord }) {
   const r = rec.evidence && rec.evidence.replay;
   if (!r || !r.total) return null;
   return (
     <section class="rt-sec" aria-labelledby="rt-past">
       <h2 class="t-sub rt-sec-head" id="rt-past">
-        Past tickets
+        Past runs
       </h2>
       <p>
-        {num(r.matched)} of {r.total === 1 ? '1 past ticket' : num(r.total) + ' past tickets'}, handled the same way
+        {num(r.matched)} of {r.total === 1 ? '1 past run' : num(r.total) + ' past runs'}, handled the same way
       </p>
     </section>
   );
@@ -115,13 +115,13 @@ function HowSure({ rec }: { rec: RoutineRecord }) {
     <section class="rt-sec" aria-labelledby="rt-sure">
       <h2 class="t-sub rt-sec-head" id="rt-sure">
         How sure it was
-        <Help label="How it counts">Each answer of the routine comes with how sure it was. Each row counts the tickets at that level, and how often the agent chose the same answer.</Help>
+        <Help label="How it counts">Each answer of the routine comes with how sure it was. Each row counts the runs at that level, and how often the agent chose the same answer.</Help>
       </h2>
       <table class="rt-table rt-sure">
         <thead>
           <tr>
             <th scope="col">It said</th>
-            <th scope="col">Tickets</th>
+            <th scope="col">Runs</th>
             <th scope="col">It was right</th>
           </tr>
         </thead>
@@ -139,7 +139,7 @@ function HowSure({ rec }: { rec: RoutineRecord }) {
                 <th scope="row" data-label="It said">
                   {b.words}
                 </th>
-                <td data-label="Tickets">{num(b.runs)}</td>
+                <td data-label="Runs">{num(b.runs)}</td>
                 <td data-label="It was right" class={b.handed ? 'muted' : undefined}>
                   {b.handed ? 'handed to the agent' : b.right ? b.right + ' of the time' : ''}
                 </td>
@@ -168,7 +168,7 @@ function Disagreed({ rec }: { rec: RoutineRecord }) {
       <table class="rt-table rt-disagreed">
         <thead>
           <tr>
-            <th scope="col">Ticket</th>
+            <th scope="col">Run</th>
             <th scope="col">The routine said</th>
             <th scope="col">The agent chose</th>
             <th scope="col">Afterward</th>
@@ -179,8 +179,8 @@ function Disagreed({ rec }: { rec: RoutineRecord }) {
             const diff = disagreedOf(d);
             return (
               <tr>
-                <th scope="row" data-label="Ticket">
-                  <a href={runHref({ run: d.run })}>{d.input}</a>
+                <th scope="row" data-label="Run">
+                  <a href={runHref(d.run)}>{d.input}</a>
                 </th>
                 <td data-label="The routine said">
                   {diff.map((a) => (
@@ -214,7 +214,7 @@ function Disagreed({ rec }: { rec: RoutineRecord }) {
   );
 }
 
-/** SentBack counts the tickets that came back rejected: where the routine acted, and where it agreed with the agent. */
+/** SentBack counts the runs that came back rejected: where the routine acted, and where it agreed with the agent. */
 function SentBack({ rec }: { rec: RoutineRecord }) {
   const sb = (rec.evidence && rec.evidence.sentBack) || { applied: 0, agreed: 0 };
   const total = (sb.applied || 0) + (sb.agreed || 0);
@@ -268,7 +268,7 @@ export function RoutineEvidence({ rec }: { rec: RoutineRecord }) {
   return (
     <>
       <Rehearsal rec={rec} />
-      <PastTickets rec={rec} />
+      <PastRuns rec={rec} />
       <HowSure rec={rec} />
       <Disagreed rec={rec} />
       <SentBack rec={rec} />

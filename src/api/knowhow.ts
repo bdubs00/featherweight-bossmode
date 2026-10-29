@@ -178,6 +178,15 @@ export interface KnowhowSummary {
   compare: Compare;
 }
 
+/** What a start of the after-work review of one agent did: its run, or the reason why no run started. */
+export interface ReviewNow {
+  agent: string;
+  started: boolean;
+  run?: string;
+  profile?: string;
+  reason?: string;
+}
+
 /** The answer of a write of a note: the note without its text, and the change that waits for a person when the write waits (202). */
 export interface WriteAnswer {
   note?: NoteItem | null;
@@ -231,4 +240,6 @@ export const knowhowApi = {
   /** decide keeps a waiting change, or drops it. A target that changed since answers 409, and the change stays until a person drops it. */
   decide: (id: string, keep: boolean) => call<unknown>('/v1/knowhow/waiting/' + enc(id), { method: 'POST', body: { keep } }),
   summary: (agent: string, days = 7) => call<KnowhowSummary>('/v1/knowhow/summary' + query({ agent, days })),
+  /** reviewNow starts the after-work review of an agent now, for an owner. Without a review profile it answers 409 with the reason. */
+  reviewNow: (agent: string) => call<ReviewNow>('/v1/knowhow/review/' + enc(agent), { method: 'POST' }),
 };

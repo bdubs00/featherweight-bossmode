@@ -1010,9 +1010,9 @@ The work:
 - Steps. A routine that needs you opens on the card of its sign-off. The
   card has the amber light, three figures, the Note field of the decision
   card, and two keys: Not yet and Sign off. The first figure gives the
-  share with the tickets that it counts, such as `97.6% of 1,432`, so the
+  share with the runs that it counts, such as `97.6% of 1,432`, so the
   person sees the size of the sample beside the share. A proposed routine opens on a
-  card with the number of tickets that it comes from, and the keys Retire
+  card with the number of runs that it comes from, and the keys Retire
   and Rehearse. After a sign-off, the card turns quiet and says Signed off,
   with who and when. Not yet sends nothing. The card turns into the quiet
   line Kept for later for this visit of the routine, and the row keeps
@@ -1031,7 +1031,7 @@ The work:
   per day out of placed elements: agreed in ink, disagreed in a hatch of
   `--muted` on `--paper`, and handed to the agent in `--led-grey`. A gap of
   paper parts the fills. The legend gives the three totals, and a table
-  gives each day to a screen reader. Then Past tickets, How sure it was in
+  gives each day to a screen reader. Then Past runs, How sure it was in
   words, Where it disagreed with what happened afterward, Sent back, and
   Made from. Made from lives on this tab only. How sure it was joins the
   bands under the mark of a question in one row, handed to the agent.
@@ -1041,7 +1041,7 @@ The work:
   way, under the line `Not yet signed off`.
 - The details pane. The agent with its chip and the key Profile, its mark,
   its tagline, and its week. This week is a bar of the runs by routines, by
-  the agent, and with a person, with the three counts. Per ticket gives the
+  the agent, and with a person, with the three counts. Per run gives the
   cost of a run by a routine and by the agent. Sent back counts the week.
   The pane never repeats a figure of the routine, and never says who signed
   it off.
@@ -1061,7 +1061,7 @@ The rules of the owner for this screen, and how the screen keeps them:
 | The person has little time | A routine that needs you opens on its card, and the card has two keys. |
 | No explanation in the chrome | The card has no sentence. The definitions sit behind the question marks of What it decides and How sure it was. |
 | One name through the flow | The key says Sign off, the quiet card says Signed off, and the row says live. |
-| No word matched | Past tickets reads `212 of 212 past tickets, handled the same way`. |
+| No word matched | Past runs reads `212 of 212 past runs, handled the same way`. |
 | Attractive scrollbars | Section 4.7, for every pane of the page. |
 
 Left out, and why:
@@ -1072,9 +1072,9 @@ Left out, and why:
   alone.
 - A sign-off before a routine is ready. The moves allow it, but the page
   offers Sign off only on the card of a routine that needs you.
-- Open the tickets. The replay of the workbench keeps no list of the past
-  tickets, so the line of Past tickets has no key until a later change
-  adds the list.
+- Open the runs. The replay of the workbench keeps no list of the past
+  runs, so the line of Past runs has no key until a later change adds the
+  list.
 - New routine. A routine comes from `fw routine propose` or from an agent,
   and the page has no editor of its body. An empty place says `No routine
   yet.` with no key.
@@ -1381,7 +1381,10 @@ The work:
   does not own the agent gets no switch. For that person, a line says `It
   asks an owner before it keeps what it learns.` while the switch is on.
   While the after-work review is off, a line gives the reason of the
-  server, such as `The after-work review is off: no agent is set.`
+  server, such as `The after-work review is off: no agent is set.` While
+  it is on, an owner has the quiet key Review now beside the switch. It
+  starts the review of the agent at once, and the notice of the page says
+  that it started, or why nothing needs a review.
 - The rule of 20. The server applies it to the held-back runs and words
   the line. Under 20, the line says `Not enough held-back runs yet.` The
   page keeps the rule for its own figures. Under 20 runs, the share done
@@ -1400,21 +1403,30 @@ The work:
 - What it learned. The journal, newest first, under a quiet heading per
   day. An entry holds its clock time and its sentence, with the name of
   its note or routine in bold. Under them come its reason, who made it,
-  and links to its runs.
+  and links to its runs. A run opens in its chat on this page, as a card
+  of Work opens it.
   An entry that the server can take back has Undo, once. Undo shows to a
-  person who can change its note or routine. A 409
+  person who can change its note or routine. An entry that says a note
+  went out of date has no Undo: it would make the agent trust the note
+  over its source again. A 409
   says under the entry `A later change touched this note. Take that one
-  back first.` An undo that works puts `Undone:` and the sentence in the
-  notice of the page. `Show older` reads the next 50 entries.
+  back first.` When the note went out of date since, it says `This note
+  went out of date since. Edit it or put it away in Notes.`, with Notes as
+  a link to the tab. An undo that works puts `Undone:` and the sentence in
+  the notice of the page. `Show older` reads the next 50 entries.
 - Notes. The notes in groups by scope: `Your notes`, `Agent notes`, then
   each duty. Inside a group, a note that is out of date comes first. A row
   holds the first line of the note and its label: `checked` in green, `out
   of date` in amber that holds still, or `resting` in grey. The meta line
   holds its title, who wrote it, its time, and how often runs used it. A
   row opens in place: the text, the source that put it out of date with
-  its link, and the sources. The notes of the person have Edit and Put
-  away: an operator changes the notes of their own scope, and an owner
-  also a note that they wrote for the agent. A change that waits for a
+  its link, and the sources. A source page is a link only for a person
+  who may read the wiki; for anyone else it is words. The notes of the
+  person have Edit and Put away: an operator changes the notes of their
+  own scope, and an owner also a note that they wrote for the agent. An
+  owner also corrects a note of the agent or of a duty that went out of
+  date, with the same Edit and Put away, because such a note has no
+  undo. A change that waits for a
   decision (202) says so in the notice of the page. A 412 reads the note
   again and shows its newer text above the
   draft, which stays. A quiet line says `This note changed since. Read it

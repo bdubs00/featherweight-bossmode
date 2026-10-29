@@ -86,7 +86,7 @@ describe('the meta line of a row', () => {
 
   it('says what a routine that needs you rehearsed', () => {
     const r = rec('rehearsing', { ready: true, evidence: ev([d(1, { decided: 1000, acted: 950, agreed: 940, disagreed: 10, handed: 50 }), d(0, { decided: 480 })]) });
-    expect(metaOf(r, NOW)).toBe('triage, rehearsed 1,480 tickets');
+    expect(metaOf(r, NOW)).toBe('triage, rehearsed 1,480 runs');
   });
 
   it('says what a live routine handled over the last seven days', () => {
@@ -95,9 +95,9 @@ describe('the meta line of a row', () => {
     expect(weekOf(r.evidence!.days, NOW)).toBe(96);
   });
 
-  it('says how often a rehearsing routine agreed over the tickets that it would have acted on', () => {
+  it('says how often a rehearsing routine agreed over the runs that it would have acted on', () => {
     const r = rec('rehearsing', { evidence: ev([d(1, { decided: 180, acted: 150, agreed: 126, disagreed: 24, handed: 30 })]) });
-    expect(metaOf(r, NOW)).toBe('triage, 84% agreed over 150 tickets');
+    expect(metaOf(r, NOW)).toBe('triage, 84% agreed over 150 runs');
   });
 
   it('says when a proposed, paused, or retired routine moved, and only the agent before its evidence loads', () => {
@@ -161,8 +161,8 @@ describe('the figures and the evidence', () => {
   });
 
   it('writes counts, shares, and costs in plain figures', () => {
-    expect(units(1)).toBe('1 ticket');
-    expect(units(1480)).toBe('1,480 tickets');
+    expect(units(1)).toBe('1 run');
+    expect(units(1480)).toBe('1,480 runs');
     expect(pct(0.84)).toBe('84%');
     expect(pct(1397 / 1432)).toBe('97.6%');
     expect(money(0.001)).toBe('$0.001');
@@ -219,7 +219,7 @@ describe('the body of a routine', () => {
     expect(text).toContain('- Which team owns the ticket? `network`, `identity`, `endpoint`, or `other`. It acts when it is 85% sure, not other.');
     expect(text).toContain('1. Add labels, with the answers team. `gitea.issue_write`');
     expect(text).toContain('- Get issue: holds `team/…`, and not `status/new`. `gitea.issue_read`');
-    expect(text).toContain('From 212 tickets of triage');
+    expect(text).toContain('From 212 runs of triage');
     expect(text).toContain('Proposed by `fw routine propose`');
     expect(text).not.toMatch(/·|→|;/);
   });

@@ -30,11 +30,12 @@ export function money(x: number): string {
 }
 
 /**
- * The page calls a run of a routine a ticket, in the words of
- * docs/ROUTINES.md. A field of the record that names the noun of the work
- * of an agent would let another agent say its own word.
+ * The page calls a run of a routine a run. A routine belongs to a duty of
+ * any kind of work, so the word of one kind, such as ticket, would be
+ * wrong for the others. A field of the record that names the noun of the
+ * work of an agent would let an agent say its own word.
  */
-export const units = (n: number): string => (n === 1 ? '1 ticket' : num(n) + ' tickets');
+export const units = (n: number): string => (n === 1 ? '1 run' : num(n) + ' runs');
 
 /* ---------- the status ---------- */
 
@@ -152,7 +153,7 @@ function figureOf(r: RoutineRecord, now: number): string {
   return m ? since(m.at, now) : '';
 }
 
-/** The three figures of the sign-off card. agreed gives the share with the tickets that it counts, such as 97.6% of 1,432. */
+/** The three figures of the sign-off card. agreed gives the share with the runs that it counts, such as 97.6% of 1,432. */
 export interface Figures {
   agreed: string;
   handed: number;

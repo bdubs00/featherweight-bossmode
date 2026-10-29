@@ -1,9 +1,11 @@
 // The tab Notes of the Know-how place: the notes of an agent and of its
 // duties, grouped by scope, each with its label checked, out of date, or
 // resting. A note opens in place with its text and its sources. A person
-// edits and puts away the notes that they wrote. A note that changed since
-// the person read it answers 412: the page reads it again and says so in
-// place, and the draft stays.
+// edits and puts away the notes that they wrote, and an owner corrects a
+// note that went out of date the same way, because such a note has no
+// undo. A note that changed since the person read it answers 412: the page
+// reads it again and says so in place, and the draft stays. A source page
+// is a link only for a person who may read the wiki.
 
 import { useEffect, useState } from 'preact/hooks';
 import { ApiError } from '../api/client';
@@ -14,6 +16,7 @@ import { since } from '../lib/words';
 import { loadNote, loadNotes, putAway, saveNote, useKnowhow } from '../state/knowhow';
 import { useSelect } from '../state/store';
 import { showError, showSaid } from './notice';
+import { operates } from './Shell';
 import { Button, Chip, Field, Led, LineLed, TextArea } from './primitives';
 
 /** WAITS says that a change waits for a person, as a write by the access token of the fleet does under the switch (202). */
@@ -82,6 +85,8 @@ function NoteBody({ n, id }: { n: NoteItem; id: string }) {
   const rec = useKnowhow((s) => s.notes[key]);
   const me = useSelect((s) => (s.me ? s.me.principal : null));
   const role = useSelect((s) => (s.me && s.me.roles ? s.me.roles[n.agent] : undefined));
+  // A page of the wiki is a link only for a person whom the wiki lets read it.
+  const wiki = useSelect((s) => operates(s.me));
   const [failed, setFailed] = useState('');
   const [draft, setDraft] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -97,7 +102,7 @@ function NoteBody({ n, id }: { n: NoteItem; id: string }) {
       </div>
     );
   }
-  // The own notes of the person, as the server lets them change: their own scope with the operator role, and a note that they wrote where they may change its scope.
+  // The notes that the person may change, as the server lets them: their own scope with the operator role, and a note that they wrote or that went out of date where they may change its scope.
   const mine = canEditNote(rec, me, role);
   const editing = draft !== null;
   const conflict = (e: unknown): boolean => {
@@ -140,8 +145,8 @@ function NoteBody({ n, id }: { n: NoteItem; id: string }) {
         </p>
       )}
       {(!editing || changed) && <p class="kh-text">{rec.text}</p>}
-      {rec.outOfDate && rec.outOfDate.source && <OutOfDate rec={rec} />}
-      <Sources rec={rec} />
+      {rec.outOfDate && rec.outOfDate.source && <OutOfDate rec={rec} wiki={wiki} />}
+      <Sources rec={rec} wiki={wiki} />
       {editing ? (
         <>
           <Field label="Text">
@@ -180,8 +185,8 @@ function NoteBody({ n, id }: { n: NoteItem; id: string }) {
 }
 
 /** OutOfDate says since when a note is out of date, and the source that changed. */
-function OutOfDate({ rec }: { rec: NoteRecord }) {
-  const src = sourceOf(rec.outOfDate!.source);
+function OutOfDate({ rec, wiki }: { rec: NoteRecord; wiki: boolean }) {
+  const src = sourceOf(rec.outOfDate!.source, { wiki });
   const when = rec.outOfDate!.since ? dateWords(rec.outOfDate!.since) : '';
   return (
     <p class="kh-ood">
@@ -194,8 +199,8 @@ function OutOfDate({ rec }: { rec: NoteRecord }) {
 }
 
 /** Sources lists where a note came from: runs, pages, and items of a source. Several runs read run 1, run 2, and so on. */
-function Sources({ rec }: { rec: NoteRecord }) {
-  const list = (rec.sources || []).map((s) => sourceOf(s.ref));
+function Sources({ rec, wiki }: { rec: NoteRecord; wiki: boolean }) {
+  const list = (rec.sources || []).map((s) => sourceOf(s.ref, { wiki }));
   if (!list.length) return null;
   const runs = list.filter((s) => s.kind === 'run').length;
   let n = 0;
