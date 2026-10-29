@@ -6,7 +6,7 @@ const ME = { subject: 'alice@example.com', name: 'Alice' };
 
 const sentence = (s: { head: string; name: string; tail: string }) => s.head + s.name + s.tail;
 
-/** SUMMARY is the answer of summary.go of the workbench for triage: 400 runs, 20 of them held back, and the line of the server. */
+/** SUMMARY is the answer of summary.go of the workbench for triage: 400 runs, 20 of them comparison runs, and the line of the server. */
 const SUMMARY: KnowhowSummary = {
   agent: 'triage',
   days: 7,
@@ -15,7 +15,7 @@ const SUMMARY: KnowhowSummary = {
   notesCorrected: 3,
   normal: { runs: 380, doneWell: 346, byRoutine: 140, costPerJobUsd: 0.0196 },
   heldBack: { runs: 20, doneWell: 16, byRoutine: 0, costPerJobUsd: 0.035 },
-  compare: { enough: true, heldBack: 20, normal: 300, oneIn: 16, doneWellWithout: 0.8, doneWellWith: 0.91, line: 'Held back 1 in 16 runs. Done well: 80% without what it learned, 91% with it.' },
+  compare: { enough: true, heldBack: 20, normal: 300, oneIn: 16, doneWellWithout: 0.8, doneWellWith: 0.91, line: 'Comparison runs: 1 in 16. Done well: 80% without what it learned, 91% with it.' },
 };
 
 describe('the words of a note', () => {
@@ -156,12 +156,12 @@ describe('the four numbers', () => {
   });
 
   it('takes the rule of 20 and the line from the server, and adds the cost per job of each kind', () => {
-    expect(heldBackLine(SUMMARY)).toBe('Held back 1 in 16 runs. Done well: 80% without what it learned, 91% with it. Cost per job: $0.04 without, $0.02 with.');
+    expect(heldBackLine(SUMMARY)).toBe('Comparison runs: 1 in 16. Done well: 80% without what it learned, 91% with it. Cost per job: $0.04 without, $0.02 with.');
     // The server says not enough, whatever the page could count.
-    expect(heldBackLine({ ...SUMMARY, compare: { enough: false, heldBack: 25, normal: 0, line: 'Not enough held-back runs yet.' } })).toBe('Not enough held-back runs yet.');
+    expect(heldBackLine({ ...SUMMARY, compare: { enough: false, heldBack: 25, normal: 0, line: 'Not enough comparison runs yet.' } })).toBe('Not enough comparison runs yet.');
     // A line that the server leaves out is worded from its shares.
     expect(heldBackLine({ ...SUMMARY, heldBack: { ...SUMMARY.heldBack, costPerJobUsd: 0.021 }, compare: { ...SUMMARY.compare, line: '' } })).toBe(
-      'Held back 1 in 16 runs. Done well: 80% without what it learned, 91% with it. Cost per job: $0.021 without, $0.020 with.',
+      'Comparison runs: 1 in 16. Done well: 80% without what it learned, 91% with it. Cost per job: $0.021 without, $0.020 with.',
     );
   });
 

@@ -16,7 +16,7 @@ const SUMMARY = {
   notesCorrected: 3,
   normal: { runs: 380, doneWell: 346, byRoutine: 140, costPerJobUsd: 0.02 },
   heldBack: { runs: 20, doneWell: 16, byRoutine: 0, costPerJobUsd: 0.04 },
-  compare: { enough: true, heldBack: 20, normal: 300, oneIn: 16, doneWellWithout: 0.8, doneWellWith: 0.91, line: 'Held back 1 in 16 runs.' },
+  compare: { enough: true, heldBack: 20, normal: 300, oneIn: 16, doneWellWithout: 0.8, doneWellWith: 0.91, line: 'Comparison runs: 1 in 16.' },
 };
 /** A public id of the workbench: an id that starts with its time, and the agent in base64url. */
 const pid = (n: number) => '01K8' + String(n).padStart(22, '0') + '-dHJpYWdl';

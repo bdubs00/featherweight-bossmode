@@ -20,7 +20,7 @@ const face = (agent: string, displayName: string, tagline: string) => ({ agent, 
 
 const at = (minutesAgo: number) => new Date(Date.now() - minutesAgo * 60000).toISOString();
 
-/** The answer of summary.go of the workbench for triage: 400 runs, 20 held back, and the line of the server. */
+/** The answer of summary.go of the workbench for triage: 400 runs, 20 of them comparison runs, and the line of the server. */
 const SUMMARY: KnowhowSummary = {
   agent: 'triage',
   days: 7,
@@ -29,9 +29,9 @@ const SUMMARY: KnowhowSummary = {
   notesCorrected: 3,
   normal: { runs: 380, doneWell: 346, byRoutine: 140, costPerJobUsd: 0.02 },
   heldBack: { runs: 20, doneWell: 16, byRoutine: 0, costPerJobUsd: 0.04 },
-  compare: { enough: true, heldBack: 20, normal: 300, oneIn: 16, doneWellWithout: 0.8, doneWellWith: 0.91, line: 'Held back 1 in 16 runs. Done well: 80% without what it learned, 91% with it.' },
+  compare: { enough: true, heldBack: 20, normal: 300, oneIn: 16, doneWellWithout: 0.8, doneWellWith: 0.91, line: 'Comparison runs: 1 in 16. Done well: 80% without what it learned, 91% with it.' },
 };
-/** Identity desk held back 4 runs, so the server says that there are not enough. */
+/** Identity desk has 4 comparison runs, so the server says that there are not enough. */
 const FEW: KnowhowSummary = {
   ...SUMMARY,
   agent: 'identity-desk',
@@ -39,7 +39,7 @@ const FEW: KnowhowSummary = {
   doneByRoutines: { runs: 60, byRoutine: 12, share: 0.2 },
   normal: { runs: 60, doneWell: 50, byRoutine: 12, costPerJobUsd: 0.03 },
   heldBack: { runs: 4, doneWell: 3, byRoutine: 0, costPerJobUsd: 0.05 },
-  compare: { enough: false, heldBack: 4, normal: 30, line: 'Not enough held-back runs yet.' },
+  compare: { enough: false, heldBack: 4, normal: 30, line: 'Not enough comparison runs yet.' },
   notesCorrected: 0,
 };
 
@@ -151,7 +151,7 @@ describe('the agents', () => {
 });
 
 describe('the header of an agent', () => {
-  it('shows the four numbers of the last 7 days, the held-back line, and the switch, under three tabs', async () => {
+  it('shows the four numbers of the last 7 days, the comparison line, and the switch, under three tabs', async () => {
     api = fakeApi(routes({ 'PUT /v1/knowhow/settings/triage': { ...SETTINGS, askFirst: false } }) as never);
     const el = mount(<KnowhowMain agent="triage" tab="learned" />);
     await settle();
@@ -169,7 +169,7 @@ describe('the header of an agent', () => {
       ['37% of 380', 'done by routines'],
       ['3', 'notes corrected'],
     ]);
-    expect(text(head.querySelector('.kh-held'))).toBe('Held back 1 in 16 runs. Done well: 80% without what it learned, 91% with it. Cost per job: $0.04 without, $0.02 with.');
+    expect(text(head.querySelector('.kh-held'))).toBe('Comparison runs: 1 in 16. Done well: 80% without what it learned, 91% with it. Cost per job: $0.04 without, $0.02 with.');
     // The after-work review runs, so no line says otherwise.
     expect(head.querySelector('.kh-review')).toBeNull();
     const sw = head.querySelector('input[role="switch"]') as HTMLInputElement;
@@ -219,11 +219,11 @@ describe('the header of an agent', () => {
     expect(el.querySelector('.kh-notes')).not.toBeNull();
   });
 
-  it('shows no percentage while the server says that too few runs were held back, and says when the after-work review is off', async () => {
+  it('shows no percentage while the server says that there are too few comparison runs, and says when the after-work review is off', async () => {
     api = fakeApi(routes({ 'GET /v1/knowhow/settings/identity-desk': { agent: 'identity-desk', askFirst: false, review: { on: false, reason: 'The after-work review is off: no agent is set.' } } }) as never);
     const el = mount(<KnowhowMain agent="identity-desk" tab="learned" />);
     await settle();
-    expect(text(el.querySelector('.kh-held'))).toBe('Not enough held-back runs yet.');
+    expect(text(el.querySelector('.kh-held'))).toBe('Not enough comparison runs yet.');
     expect(text(el.querySelector('.kh-figs > div'))).toBe('cost per job, about the same $0.03');
     expect(text(el.querySelector('.kh-review'))).toBe('The after-work review is off: no agent is set.');
     expect(el.querySelector('.kh-waiting')).toBeNull();

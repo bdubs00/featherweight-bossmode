@@ -1,7 +1,7 @@
 // The words and the figures of the Know-how place, as pure functions: the
 // title of a note, its label, its sources, who wrote it, the sentence of an
 // entry of the journal and of a change that waits, the four numbers of a
-// week, and the line that compares the held-back runs with the others.
+// week, and the line that compares the comparison runs with the others.
 // The words of section 2 of docs/KNOWHOW.md of the kernel are the only
 // words on the screen.
 
@@ -11,7 +11,7 @@ import { isMe, whoName, type Me } from './lines';
 import { hrefOf } from './route';
 import { money, num, titleOf } from './routines';
 
-/** The fewest runs from which the page shows a share or a change in percent. The server keeps the same rule for the held-back runs. */
+/** The fewest runs from which the page shows a share or a change in percent. The server keeps the same rule for the comparison runs. */
 export const HELD_BACK_MIN = 20;
 
 /** noteTitle is the title of a note from its name: gotchas/gitea-labels.md is Gitea labels. */
@@ -331,17 +331,19 @@ export function figuresOf(s: KnowhowSummary): Figures {
 }
 
 /**
- * heldBackLine compares the runs that got none of what the agent learned
- * with the others. The server says whether there are enough held-back
- * runs (the rule of 20) and words the line. With enough, the page adds the
- * cost per job of each kind.
+ * heldBackLine compares the comparison runs, which go without what the
+ * agent learned, with the others: 1 in 20 runs of a job go without it, so
+ * the person can see what learning is worth. The server says whether there
+ * are enough comparison runs (the rule of 20) and words the line. With
+ * enough, the page adds the cost per job of each kind. The answer keeps the
+ * old name heldBack for the counts of those runs.
  */
 export function heldBackLine(s: KnowhowSummary): string {
   const c = s.compare;
-  if (!c || !c.enough) return (c && c.line) || 'Not enough held-back runs yet.';
+  if (!c || !c.enough) return (c && c.line) || 'Not enough comparison runs yet.';
   const line =
     c.line ||
-    `Held back 1 in ${c.oneIn} runs. Done well: ${pct(c.doneWellWithout || 0)} without what it learned, ${pct(c.doneWellWith || 0)} with it.`;
+    `Comparison runs: 1 in ${c.oneIn}. Done well: ${pct(c.doneWellWithout || 0)} without what it learned, ${pct(c.doneWellWith || 0)} with it.`;
   const h = s.heldBack;
   const n = s.normal;
   if (!h || !n || !h.runs || !n.runs) return line;

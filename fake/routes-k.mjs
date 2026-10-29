@@ -20,7 +20,7 @@
 //   GET    /v1/knowhow/waiting?agent=                    {"waiting": [change]}. Without agent, every agent that the person views.
 //   POST   /v1/knowhow/waiting/{id}                      {"keep"}: {"kept", "entry"}. A change whose note changed since
 //                                                        answers 409 and stays until a person drops it.
-//   GET    /v1/knowhow/summary?agent=&days=7             the four numbers, split into normal and held-back runs, and the line
+//   GET    /v1/knowhow/summary?agent=&days=7             the four numbers, split into normal runs and comparison runs, and the line
 //   POST   /v1/knowhow/review/{agent}                    for an owner: {"agent", "started": false, "reason"}. The fake starts no run.
 //
 // An id of an entry or of a change is public: <id>-<agent in base64url>.
@@ -30,8 +30,8 @@
 // changes wait, a new note and a change to a note that changed since. Its
 // journal holds a routine that stepped back, a note that went out of date
 // after a change to its page, and a learned note whose undo meets that
-// later change. Triage held back 95 runs, so its line compares; Identity
-// desk held back 6, so its line says that there are not enough yet. alice
+// later change. Triage has 95 comparison runs, so its line compares; Identity
+// desk has 6, so its line says that there are not enough yet. alice
 // keeps notes of her own with triage, which she owns, and with ops, which
 // she runs as an operator, and she can edit and put away both.
 
@@ -298,7 +298,7 @@ const RUNS = {
   migrator: { normal: [64, 51, 0, 0.41], heldBack: [0, 0, 0, 0], compared: 0, comparedWell: 0, before: 0.47, corrected: 2 },
 };
 
-/** summaryOf words the summary of an agent as summary.go does: the trend is flat within 5%, and the line compares from 20 held-back runs. */
+/** summaryOf words the summary of an agent as summary.go does: the trend is flat within 5%, and the line compares from 20 comparison runs. */
 function summaryOf(agent, days) {
   const r = RUNS[agent] || { normal: [0, 0, 0, 0], heldBack: [0, 0, 0, 0], compared: 0, comparedWell: 0, before: null, corrected: 0 };
   const split = ([runs, doneWell, byRoutine, cost]) => ({ runs, doneWell, byRoutine, costPerJobUsd: cost });
@@ -311,7 +311,7 @@ function summaryOf(agent, days) {
     const d = (usd - r.before) / r.before;
     Object.assign(costPerJob, { previousUsd: r.before, trend: runs === 0 ? '' : d <= -0.05 ? 'down' : d >= 0.05 ? 'up' : 'flat' });
   }
-  const compare = { enough: false, heldBack: heldBack.runs, normal: r.compared, line: 'Not enough held-back runs yet.' };
+  const compare = { enough: false, heldBack: heldBack.runs, normal: r.compared, line: 'Not enough comparison runs yet.' };
   if (heldBack.runs >= 20 && r.compared > 0) {
     const without = heldBack.doneWell / heldBack.runs;
     const withIt = r.comparedWell / r.compared;
@@ -321,7 +321,7 @@ function summaryOf(agent, days) {
       oneIn,
       doneWellWithout: without,
       doneWellWith: withIt,
-      line: `Held back 1 in ${oneIn} runs. Done well: ${Math.round(without * 100)}% without what it learned, ${Math.round(withIt * 100)}% with it.`,
+      line: `Comparison runs: 1 in ${oneIn}. Done well: ${Math.round(without * 100)}% without what it learned, ${Math.round(withIt * 100)}% with it.`,
     });
   }
   const since = new Date(Date.now() - days * 86400000).toISOString();

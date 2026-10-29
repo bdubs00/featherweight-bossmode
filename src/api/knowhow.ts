@@ -154,7 +154,7 @@ export interface RunSplit {
   costPerJobUsd: number;
 }
 
-/** The line with and without what it learned. The shares are absent while fewer than 20 runs were held back. */
+/** The line with and without what it learned. The shares are absent while there are fewer than 20 comparison runs. heldBack keeps the old name of the count of the comparison runs. */
 export interface Compare {
   enough: boolean;
   heldBack: number;
@@ -165,7 +165,7 @@ export interface Compare {
   line: string;
 }
 
-/** The four numbers of an agent over its last days, split into normal and held-back runs. */
+/** The four numbers of an agent over its last days, split into normal runs and comparison runs (heldBack, the old name). */
 export interface KnowhowSummary {
   agent: string;
   days: number;

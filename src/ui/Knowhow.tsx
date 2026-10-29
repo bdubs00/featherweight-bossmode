@@ -1,7 +1,7 @@
 // The Know-how place: what each agent learns on the job. The list pane
 // holds the agents, the picker of the place, with the agents that need
 // you first. The main pane holds one agent: the four numbers of its last
-// 7 days with the line of the held-back runs, the switch Ask me before it
+// 7 days with the line of the comparison runs, the switch Ask me before it
 // keeps what it learns, and the tabs What it learned, Notes, and Routines.
 // The changes that wait for a person show as cards on top of What it
 // learned, as the routines that need a sign-off show in Routines, and
@@ -263,7 +263,7 @@ function KnowhowView({ agent, tab: asked }: { agent: string; tab: KnowhowTab }) 
 
 /**
  * Head is the header of the place for one agent: the four numbers of its
- * last 7 days, the line that compares the held-back runs with the others,
+ * last 7 days, the line that compares the comparison runs with the others,
  * and the switch Ask me before it keeps what it learns. A person who does
  * not own the agent gets no switch, and a line says when it is on. While
  * the after-work review runs, an owner starts it now with Review now; the
