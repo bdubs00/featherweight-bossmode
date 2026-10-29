@@ -21,7 +21,7 @@ describe('the typing line', () => {
 
   it('takes the phrase from the queue, the step of the run, or the tool of the live stream', () => {
     expect(typingPhrase({ state: 'queued', activity: null })).toBe('Waiting for a worker');
-    expect(typingPhrase({ state: 'running', activity: { turn: 2, phrase: 'Thinking in turn 2', since: '' } })).toBe('Thinking in turn 2');
+    expect(typingPhrase({ state: 'running', activity: { turn: 2, phrase: 'Thinking in turn 2', since: '' } })).toBe('Thinking');
     expect(typingPhrase({ state: 'running', activity: null }, { text: '', tool: 'front.recall', busy: false })).toBe('Working: recall');
     expect(typingPhrase({ state: 'running', activity: null })).toBe('');
     expect(typingPhrase(undefined)).toBe('');

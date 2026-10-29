@@ -83,8 +83,15 @@ export function askWords(d: Decision): string {
   return verb + '?';
 }
 
-/** oneLine is the first line of a text, plain, in the words of the page. */
-export const oneLine = (s: string): string => pageWords(excerpt(plainText(String(s || '').split(/\n/).find((l) => l.trim() && !/^#+\s*$/.test(l.trim())) || '').replace(/\s+/g, ' ').trim(), 120));
+/** oneLine is the first line of a text that says something, plain, in the words of the page: a heading counts only when no other line is there. */
+export const oneLine = (s: string): string => {
+  const lines = String(s || '')
+    .split(/\n/)
+    .map((l) => l.trim())
+    .filter((l) => l && !/^#+$/.test(l) && !/^[-*_=`]{3,}$/.test(l));
+  const first = lines.find((l) => !/^#/.test(l)) || lines[0] || '';
+  return pageWords(excerpt(plainText(first).replace(/^[-*+]\s+/, '').replace(/\s+/g, ' ').trim(), 120));
+};
 
 const ms = (iso: string | undefined): number => {
   const t = new Date(iso || '').getTime();

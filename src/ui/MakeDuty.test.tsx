@@ -32,10 +32,10 @@ afterEach(() => {
   if (api) api.restore();
 });
 
-/** makeDuty opens the menu More of a header and picks Make this a duty. */
+/** makeDuty opens the menu More of a header and picks Make this a duty, which the Manager calls Make this a job. */
 function makeDuty(el: HTMLElement): void {
   click(el.querySelector('.pane-head button[aria-label="More"]'));
-  click([...el.querySelectorAll('[role="menuitem"]')].find((x) => x.textContent === 'Make this a duty'));
+  click([...el.querySelectorAll('[role="menuitem"]')].find((x) => x.textContent === 'Make this a duty' || x.textContent === 'Make this a job'));
 }
 
 describe('Make this a duty', () => {

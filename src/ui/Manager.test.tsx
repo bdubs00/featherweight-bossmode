@@ -52,7 +52,7 @@ describe('the manager', () => {
     await settle();
     // The manager types: its face and the three dots sit at the foot of the thread, and the sentence names it.
     expect(el.querySelector('.typing .typing-dots')).not.toBeNull();
-    expect(el.querySelector('.typing .sr')!.textContent).toBe('manager is working.');
+    expect(el.querySelector('.typing .sr')!.textContent).toBe('Manager is working.');
     expect(runReads()).toBe(0);
     await act(async () => {
       await vi.advanceTimersByTimeAsync(POLL_MS);
@@ -101,7 +101,7 @@ describe('the manager', () => {
     const el = mount(<Manager />);
     await settle();
     expect(el.querySelector('.typing .typing-words')!.textContent).toBe('Waking up');
-    expect(el.querySelector('.typing .sr')!.textContent).toBe('manager is working: Waking up');
+    expect(el.querySelector('.typing .sr')!.textContent).toBe('Manager is working: Waking up');
     const reads = () => api.calls.filter((c) => c.path === '/v1/runs/run-w').length;
     await act(async () => {
       await vi.advanceTimersByTimeAsync(POLL_MS);
@@ -141,7 +141,7 @@ describe('the manager', () => {
     const el = mount(<Manager fresh />);
     await settle();
     expect(el.querySelector('#manager-title')!.textContent).toContain('New conversation');
-    expect(el.querySelector('.thread-empty')!.textContent).toBe('Ask about the fleet, or ask for a team.');
+    expect(el.querySelector('.thread-empty')!.textContent).toBe('Ask for work, or ask about your agents. The Manager opens a channel and puts agents on it.');
     // A new conversation puts the focus in the message box.
     await vi.waitFor(() => expect(document.activeElement).toBe(el.querySelector('#composer')));
     typeIn(el.querySelector('#composer'), 'Hello');

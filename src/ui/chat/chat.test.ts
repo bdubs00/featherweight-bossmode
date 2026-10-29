@@ -283,3 +283,37 @@ describe('Needs you from the one count of the front', () => {
     expect(rows.map((r) => r.key)).toEqual(['k:triage.01']);
   });
 });
+
+describe('the words of round 3', () => {
+  it('names a person, never a bare id or the word token', async () => {
+    const { personName } = await import('../../lib/words');
+    expect(personName('token')).toBe('Admin token');
+    expect(personName('fd1e8a14-ac12-5a00-b4d6-bb6e50d15c10')).toBe('Someone');
+    expect(personName('fd1e8a14-ac12-5a00-b4d6-bb6e50d15c10', 'Dana Reyes')).toBe('Dana Reyes');
+    expect(personName('ann@example.com')).toBe('ann');
+  });
+  it('names an agent of a channel by both names only where they differ', async () => {
+    const { memberName, agentLine } = await import('./Members');
+    expect(memberName('author', 'Net Auditor', 'net-auditor')).toBe('author (Net Auditor)');
+    expect(memberName('migrator-2', 'Migrator', 'migrator')).toBe('migrator-2');
+    expect(agentLine('a', { a: { tagline: 'Reads every line twice.' } }, null)).toBe('Reads every line twice.');
+    expect(agentLine('b', {}, [{ name: 'b', description: 'Writes notes.\nYou are a writer who...' }])).toBe('Writes notes.');
+  });
+  it('keeps the cost line of Make this a job to the agent that runs it, and one sentence of a task', async () => {
+    const { basisWords, shortTask } = await import('./MakeJob');
+    const plan = { cost: { basis: 'Runs of Docs Scribe in the last 30 days cost under $0.01. The job spends nothing of its own.' }, members: [{ handle: 'collector', agent: 'collector', name: 'Collector' }], who: [] } as never;
+    expect(basisWords(plan, 'collector')).toBe('The job spends nothing of its own.');
+    expect(shortTask('Read the pages. Then write a table.')).toBe('Read the pages.');
+  });
+  it('says what a conversation with the Manager cost', async () => {
+    const { spendWords } = await import('../Manager');
+    expect(spendWords({ usage: { costUSD: 0.08 } })).toBe('This conversation cost $0.08 so far.');
+    expect(spendWords({})).toBe('This conversation has no price yet.');
+  });
+  it('previews the last post of a channel with its sender', async () => {
+    const { previewOf } = await import('./Sidebar');
+    const ch = { seqs: [1, 2, 3], bySeq: { 1: { from: { kind: 'agent', handle: 'scribe' }, text: '## Notes\nDraft one is up.' }, 2: { from: { kind: 'person', name: 'me@x' }, text: 'Thanks' }, 3: { from: { kind: 'system' }, text: 'scribe went to sleep.' } } } as never;
+    expect(previewOf(ch, 'me@x')).toBe('You: Thanks');
+    expect(previewOf({ seqs: [1], bySeq: { 1: { from: { kind: 'agent', handle: 'scribe' }, text: '## Notes\nDraft one is up.' } } } as never, '')).toBe('scribe: Draft one is up.');
+  });
+});

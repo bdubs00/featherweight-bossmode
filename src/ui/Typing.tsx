@@ -27,7 +27,8 @@ export const TYPING_FACES = 3;
  */
 export function typingPhrase(run: Pick<Run, 'state' | 'activity'> | undefined | null, live?: LiveAnswer): string {
   if (run && run.state === 'queued') return 'Waiting for a worker';
-  if (run && run.activity && run.activity.phrase) return run.activity.phrase;
+  // The turn of the model is a word of the machine: Thinking in turn 2 reads Thinking.
+  if (run && run.activity && run.activity.phrase) return run.activity.phrase.replace(/\s+in turn \d+\.?$/i, '');
   if (live && live.tool) return 'Working: ' + toolWord(live.tool);
   return '';
 }

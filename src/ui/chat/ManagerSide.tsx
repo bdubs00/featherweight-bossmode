@@ -6,6 +6,8 @@ import { useSelect } from '../../state/store';
 import { loadManagerChats } from '../../state/actions';
 import { managerRunOf } from '../../state/reducer';
 import { chatTitle } from '../../lib/chat';
+import { costText } from '../../lib/cost';
+import { spendWords } from '../Manager';
 import { Glyph } from '../icons';
 import { Button } from '../primitives';
 import { chatHref } from './route';
@@ -19,6 +21,13 @@ export function ManagerSide() {
   const ids = useSelect((s) => s.managerChats.ids);
   const runs = useSelect((s) => s.runs);
   const current = useSelect(managerRunOf);
+  const open = useSelect((s) => (current ? s.runs[current] : undefined));
+  // The cap of each run of the Manager, from its profile, where the server says it.
+  const cap = useSelect((s) => {
+    const m = s.config && s.config.manager ? (s.agents || []).find((a) => a.name === s.config!.manager!.agent) : undefined;
+    const b = m ? (m as { budget?: { maxCostUSD?: number } }).budget : undefined;
+    return b && typeof b.maxCostUSD === 'number' ? b.maxCostUSD : null;
+  });
   const list = useMemo(
     () =>
       ids
@@ -45,6 +54,16 @@ export function ManagerSide() {
       <div class="cf-members-scroll">
         <section class="cf-msec">
           <p class="cf-mrow-line">{(face && face.tagline) || 'Ask it for work. It opens a channel and puts agents on it.'}</p>
+          <dl class="cf-facts cf-mgr-cost">
+            <dt>Cap per run</dt>
+            <dd>{cap !== null ? costText(cap) : 'The server does not say.'}</dd>
+            {open && (
+              <>
+                <dt>This one</dt>
+                <dd>{spendWords(open)}</dd>
+              </>
+            )}
+          </dl>
         </section>
         {opened.length > 0 && (
           <section class="cf-msec" aria-labelledby="cf-mgr-opened">

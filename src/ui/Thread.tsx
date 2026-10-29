@@ -120,7 +120,7 @@ export function StepsFold({ steps }: { steps: Step[] }) {
     <div class="tfold">
       <div class="tline">
         <button type="button" class="tfold-key" aria-expanded={open} onClick={() => setOpen(!open)}>
-          {steps.length === 1 ? 'Took 1 step' : `Took ${steps.length} steps`}
+          {open ? 'Hide the steps' : steps.length === 1 ? 'Show the step it took' : `Show the ${steps.length} steps it took`}
         </button>
         <When at={steps[steps.length - 1].at} />
       </div>

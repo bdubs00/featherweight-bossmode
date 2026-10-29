@@ -41,6 +41,7 @@ import { FollowBox, Msg, Quiet } from './Thread';
 import { useLiveAnswer } from './Live';
 import { Typing, typingPhrase } from './Typing';
 import { ARCHIVED_LINE, answerSeqs, lastSeq, works } from '../lib/chat';
+import { costText } from '../lib/cost';
 
 export { POLL_MS };
 
@@ -271,6 +272,13 @@ export function ManagerList({ run, fresh }: { run?: string; fresh?: boolean }) {
   );
 }
 
+/** spendWords says what a conversation with the Manager cost so far, or that the server put no price on it. */
+export function spendWords(run: Pick<Run, 'usage'>): string {
+  const usd = run.usage && typeof run.usage.costUSD === 'number' ? run.usage.costUSD : null;
+  if (usd === null || (usd === 0 && run.usage && run.usage.unpricedTokens)) return 'This conversation has no price yet.';
+  return 'This conversation cost ' + costText(usd) + ' so far.';
+}
+
 export function Manager({ run: routeRun, fresh }: { run?: string; fresh?: boolean } = {}) {
   const config = useSelect((s) => s.config);
   const me = useSelect((s) => (s.me && s.me.principal ? s.me.principal.subject : ''));
@@ -378,6 +386,8 @@ export function Manager({ run: routeRun, fresh }: { run?: string; fresh?: boolea
         </Msg>
       )}
       {stopped && <Quiet tone="grey">{archived ? ARCHIVED_LINE : 'Stopped. Your next message starts a new conversation.'}</Quiet>}
+      {/* What the conversation cost, under its newest answer, so a person sees the price of each ask. */}
+      {run && !works(run) && t.items.some((x) => x.kind === 'assistant') && <Quiet>{spendWords(run)}</Quiet>}
     </>
   );
 
@@ -393,12 +403,12 @@ export function Manager({ run: routeRun, fresh }: { run?: string; fresh?: boolea
         actions={
           runId ? (
             // A conversation becomes a duty that asks the manager the same again.
-            <Menu label="More" items={[{ label: 'Make this a duty', onSelect: () => go({ place: 'duties', fresh: true, seed: { agent, act: 'manager', message: askOfRun(run, t.items) } }) }]} />
+            <Menu label="More" items={[{ label: 'Make this a job', onSelect: () => go({ place: 'duties', fresh: true, seed: { agent, act: 'manager', message: askOfRun(run, t.items) } }) }]} />
           ) : undefined
         }
       />
-      <FollowBox end={end} foot={typing ? <Typing who={[{ agent, name: agent }]} phrase={waking ? 'Waking up' : typingPhrase(run, live)} /> : null}>
-        {!runId && !sent ? <p class="thread-empty">Ask about the fleet, or ask for a team.</p> : (
+      <FollowBox end={end} foot={typing ? <Typing who={[{ agent, name: 'Manager' }]} phrase={waking ? 'Waking up' : typingPhrase(run, live)} /> : null}>
+        {!runId && !sent ? <p class="thread-empty">Ask for work, or ask about your agents. The Manager opens a channel and puts agents on it.</p> : (
           <Conversation
             run={run}
             result={res}

@@ -168,6 +168,8 @@ export function lastWords(d: Duty): string {
   if (r.state === 'completed') return 'last done';
   if (r.state === 'failed') return 'last failed';
   if (r.state === 'retrying') return 'trying again';
+  // A skip says why, such as the last run still worked.
+  if (r.state === 'skipped') return r.reason ? 'skipped: ' + oneLine(r.reason).replace(/\.$/, '').replace(/^./, (x) => x.toLowerCase()) : 'skipped';
   if (r.state === 'running' || r.state === 'queued') return 'running';
   if (r.state === 'input-required') return 'needs you';
   return r.state ? 'last ' + r.state.replace(/-/g, ' ') : '';

@@ -1557,3 +1557,26 @@ a.cf-mrow:hover .cf-mrow-top strong {
   flex: 1;
   min-width: 0;
 }
+
+/* ---------- round 3: Make this a job ---------- */
+/* The agents of the channel stand one under the other, each with one line of its task, so no choice runs into the next. */
+.cf-makejob .choices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+.cf-makejob .choice {
+  min-width: 0;
+}
+.cf-makejob .choice .t-meta {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cf-makejob .cf-readback dd {
+  overflow-wrap: anywhere;
+}
+.cf-mgr-cost {
+  margin-top: var(--s-3);
+}

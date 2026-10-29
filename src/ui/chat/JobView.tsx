@@ -80,7 +80,7 @@ function RunPost({ d, r }: { d: Duty; r: DutyRun }) {
           {r.run && (
             <>
               {' · '}
-              <a href={chatHref({ view: 'run', id: r.run })}>Open the run</a>
+              <a href={chatHref({ view: 'run', id: r.run })}>Open the task</a>
             </>
           )}
         </p>

@@ -91,7 +91,7 @@ interface Panes {
 }
 
 /** The names of the older places in the title of the tab. */
-const OLD_TITLES: Partial<Record<Place, string>> = { wiki: 'Library', skills: 'Library', duties: 'Job', fleet: 'Agents', results: 'Results', account: 'Settings', knowhow: 'Agent' };
+const OLD_TITLES: Partial<Record<Place, string>> = { wiki: 'Library', skills: 'Library', duties: 'Job', fleet: 'Agents', results: 'Results', account: 'Settings', knowhow: 'Agent', bridges: 'Channels', manager: 'Manager', chat: 'Task', activity: 'Needs you', work: 'Home' };
 
 function panesOf(r: ChatRoute, bridgeTitle: (id: string) => string, onReach: () => void): Panes {
   switch (r.view) {
