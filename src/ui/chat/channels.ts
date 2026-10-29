@@ -74,6 +74,28 @@ export function peopleWords(operator: string, me: string, display?: string): str
   return (display || personName(operator)).split(/\s+/)[0] + ', you';
 }
 
+/**
+ * peopleOf lists the people of a channel: the person who opened it, the
+ * people who posted in the part of the channel that the page read, and you,
+ * each once, with the name that a post gave.
+ */
+export function peopleOf(operator: string, me: string, entries: { from: { kind: string; name?: string; display?: string } }[]): { subject: string; display?: string }[] {
+  const out: { subject: string; display?: string }[] = [];
+  const add = (subject: string | undefined, display?: string) => {
+    if (!subject) return;
+    const had = out.find((p) => p.subject === subject);
+    if (had) {
+      if (!had.display && display) had.display = display;
+      return;
+    }
+    out.push({ subject, display });
+  };
+  add(operator);
+  for (const e of entries) if (e.from.kind === 'person') add(e.from.name, e.from.display);
+  add(me);
+  return out;
+}
+
 /** jobsOf lists the repeating jobs of a channel: the duties that post in it. */
 export function jobsOf(id: string, duties: Duty[] | null | undefined): Duty[] {
   return (duties || []).filter((d) => d.do && d.do.post && d.do.post.bridge === id);

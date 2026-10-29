@@ -197,3 +197,16 @@ describe('the lines of a channel', () => {
     expect(lineText('tester lost its worker')).toBe('tester lost its run');
   });
 });
+
+describe('the people of a channel', () => {
+  it('lists the person who opened it, the people who posted, and you, each once', async () => {
+    const { peopleOf } = await import('./channels');
+    const got = peopleOf('ann@example.com', 'me@example.com', [
+      { from: { kind: 'agent' } },
+      { from: { kind: 'person', name: 'bob@example.com', display: 'Bob' } },
+      { from: { kind: 'person', name: 'ann@example.com', display: 'Ann' } },
+      { from: { kind: 'person', name: 'me@example.com' } },
+    ]);
+    expect(got).toEqual([{ subject: 'ann@example.com', display: 'Ann' }, { subject: 'bob@example.com', display: 'Bob' }, { subject: 'me@example.com', display: undefined }]);
+  });
+});

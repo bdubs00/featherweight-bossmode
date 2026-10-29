@@ -3,11 +3,12 @@
 // of the channel and its composer (Channel.tsx). A channel is a bridge of the
 // API; the page never says so.
 
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useMemo, useState } from 'preact/hooks';
 import { ApiError } from '../../api/client';
 import { store, useSelect } from '../../state/store';
 import { loadBridge, loadChannel, markRead, patchBridge } from '../../state/actions';
-import { membersOf } from '../../state/reducer';
+import { entriesOf, membersOf } from '../../state/reducer';
+import { peopleOf } from './channels';
 import { personName } from '../../lib/words';
 import { attempt, showSaid } from '../notice';
 import { Confirm, Empty } from '../common';
@@ -55,14 +56,15 @@ function Faces({ id }: { id: string }) {
   const me = useSelect((s) => (s.me && s.me.principal ? s.me.principal.subject : ''));
   const meName = useSelect((s) => (s.me && s.me.principal ? s.me.principal.name : undefined));
   const agents = membersOf(roster).filter((m) => m && !m.fired);
-  const people = [operator, me].filter((p, i, all) => p && all.indexOf(p) === i);
+  const channel = useSelect((s) => s.channels[id]);
+  const people = useMemo(() => peopleOf(operator, me, entriesOf(channel)), [operator, me, channel]);
   return (
     <a class="cf-faces" href={chatHref({ view: 'channel', id, tab: 'posts', members: true })} title="Members" aria-label={agents.length + (agents.length === 1 ? ' agent' : ' agents') + ' and ' + people.length + (people.length === 1 ? ' person' : ' people')}>
       {agents.slice(0, 5).map((m) => (
         <Mark agent={m.agent} size={20} />
       ))}
       {people.map((p) => (
-        <Avatar subject={p} display={p === me ? meName : personName(p)} size={20} />
+        <Avatar subject={p.subject} display={p.subject === me ? meName : p.display || personName(p.subject)} size={20} />
       ))}
     </a>
   );

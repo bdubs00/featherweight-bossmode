@@ -18,7 +18,8 @@ import { canSeat } from '../../lib/agents';
 import { attempt, showSaid } from '../notice';
 import { Glyph } from '../icons';
 import { Avatar, Button, Led, Mark } from '../primitives';
-import { agentStatus, jobsOf, nowWords, pageWords } from './channels';
+import { agentStatus, jobsOf, nowWords, pageWords, peopleOf } from './channels';
+import { entriesOf } from '../../state/reducer';
 import { agentNameOf } from './data';
 import { Clock } from './Sidebar';
 import { MakeJob } from './MakeJob';
@@ -144,10 +145,12 @@ export function Members({ id }: { id: string }) {
   const duties = useDuties((s) => s.list);
   const [edit, setEdit] = useState(false);
   const agents = useMemo(() => membersOf(roster).filter((m) => m && !m.fired), [roster]);
+  const channel = useSelect((s) => s.channels[id]);
+  const entries = useMemo(() => entriesOf(channel), [channel]);
   const jobs = useMemo(() => jobsOf(id, duties), [id, duties]);
   if (!b) return null;
   const closed = b.state === 'closed';
-  const people = [b.operator, me].filter((p, i, all) => p && all.indexOf(p) === i);
+  const people = peopleOf(b.operator, me, entries);
   return (
     <section class="cf-members" aria-labelledby="cf-members-h">
       <header class="cf-head cf-head-right">
@@ -207,17 +210,21 @@ export function Members({ id }: { id: string }) {
             <span>People</span>
             <span class="cf-sec-n">{people.length}</span>
           </h3>
-          {people.map((p) => (
-            <div class="cf-mrow">
-              <Avatar subject={p} display={p === me ? meName : personName(p)} size={32} />
-              <span class="cf-mrow-main">
-                <span class="cf-mrow-top">
-                  <strong>{p === me ? meName || personName(p) : personName(p)}</strong>
+          {people.map((p) => {
+            const name = p.subject === me ? meName || personName(p.subject) : p.display || personName(p.subject);
+            const part = [p.subject === b.operator ? 'Asked for this' : '', p.subject === me ? 'you' : ''].filter(Boolean).join(', ');
+            return (
+              <div class="cf-mrow">
+                <Avatar subject={p.subject} display={name} size={32} />
+                <span class="cf-mrow-main">
+                  <span class="cf-mrow-top">
+                    <strong>{name}</strong>
+                  </span>
+                  {part && <span class="cf-mrow-line">{part}</span>}
                 </span>
-                <span class="cf-mrow-line">{[p === b.operator ? 'Asked for this' : '', p === me ? 'you' : ''].filter(Boolean).join(', ')}</span>
-              </span>
-            </div>
-          ))}
+              </div>
+            );
+          })}
         </section>
         <JobsHere id={id} jobs={jobs} />
         <Files id={id} />
