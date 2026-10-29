@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { ApiError } from '../api/client';
 import type { JournalEntry, WaitingChange } from '../api/knowhow';
 import type { Agent } from '../api/types';
-import { byWords, canDecide, canUndo, conflictWords, entrySentence, figuresOf, heldBackLine, runLinks, undoRefusalOf, waitSentence, type Role, type Sentence } from '../lib/knowhow';
+import { byWords, canDecide, canUndo, conflictWords, entrySentence, figuresOf, heldBackLine, runLinks, switchByWords, undoRefusalOf, waitSentence, type Role, type Sentence } from '../lib/knowhow';
 import { go, hrefOf, type KnowhowTab } from '../lib/route';
 import { statusOf } from '../lib/routines';
 import { clock, dayWords } from '../lib/words';
@@ -264,7 +264,8 @@ function KnowhowView({ agent, tab: asked }: { agent: string; tab: KnowhowTab }) 
 /**
  * Head is the header of the place for one agent: the four numbers of its
  * last 7 days, the line that compares the comparison runs with the others,
- * and the switch Ask me before it keeps what it learns. A person who does
+ * and the switch Ask me before it keeps what it learns, with who turned it
+ * last. A person who does
  * not own the agent gets no switch, and a line says when it is on. While
  * the after-work review runs, an owner starts it now with Review now; the
  * server says when the agent has nothing to review. While it is off, a
@@ -275,6 +276,8 @@ function Head({ agent, owner, name }: { agent: string; owner: boolean; name: str
   const settings = useKnowhow((s) => s.agents[agent] && s.agents[agent].settings);
   const review = settings && settings.review;
   const error = useKnowhow((s) => (s.agents[agent] && s.agents[agent].errors.summary) || '');
+  const me = useMe();
+  const switched = switchByWords(settings, me);
   const [busy, setBusy] = useState(false);
   const f = summary ? figuresOf(summary) : null;
   const turn = async (on: boolean) => {
@@ -336,6 +339,7 @@ function Head({ agent, owner, name }: { agent: string; owner: boolean; name: str
         </div>
       )}
       {!owner && settings && settings.askFirst && <p class="t-meta kh-asks">It asks an owner before it keeps what it learns.</p>}
+      {settings && switched && <p class="t-meta kh-switch-by">{switched}</p>}
       {review && !review.on && <p class="t-meta kh-review">{review.reason || 'The after-work review is off: no agent is set.'}</p>}
     </section>
   );
