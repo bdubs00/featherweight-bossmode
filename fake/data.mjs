@@ -385,7 +385,7 @@ function channelOne(b) {
     list.push(e);
     return e;
   };
-  push(sys('opened'), 'alice opened the bridge with 5 members.');
+  push(sys('opened'), 'alice opened the channel with 5 members');
   push(sys('started'), 'migrator-1 started: Migrate the cron module to an Ansible role.', { mirrors: { run: 'run-migrator-1', seq: 1, type: 'fw.run.queued' } });
   push(sys('started'), 'migrator-2 started: Migrate the nginx module to an Ansible role.', { mirrors: { run: 'run-migrator-2', seq: 1, type: 'fw.run.queued' } });
   push(sys('started'), 'reviewer started: Review each role against its Puppet manifest.', { mirrors: { run: 'run-reviewer', seq: 1, type: 'fw.run.queued' } });
@@ -454,7 +454,7 @@ function channelTwo(b) {
     return e;
   };
   push({ kind: 'agent', handle: 'manager', run: 'run-manager-1' }, 'I opened this channel and put two agents on it. **scribe** drafts the notes of 2.4 from the merged pull requests, and **reviewer-2** checks each note against its pull request.');
-  push(sys('opened'), 'manager opened the bridge for alice, with 2 members.');
+  push(sys('opened'), 'the manager for alice opened the channel with 2 members');
   push(sys('started'), 'scribe started: Draft the release notes of 2.4 from the merged changes.', { mirrors: { run: 'run-scribe', seq: 1, type: 'fw.run.queued' } });
   push(sys('started'), 'reviewer-2 started: Check each note against its pull request.', { mirrors: { run: 'run-reviewer-2', seq: 1, type: 'fw.run.queued' } });
   push(agent('scribe'), 'I found 23 merged pull requests since 2.3. I group them as features, fixes, and changes that need an action.');

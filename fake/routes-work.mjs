@@ -239,7 +239,7 @@ export function board(S, me, { days = 7, all = false } = {}) {
     }
     // A team that a person checked with Looks right closed as accepted.
     if (b.state === 'closed') parts.push({ stage: 'done', reason: b.verdict === 'accepted' ? 'Accepted.' : 'Closed.', since: b.closedAt || last, verdict: b.verdict || 'unchecked' });
-    if (!parts.length) parts.push({ stage: 'stopped', reason: 'No seat.', since: last });
+    if (!parts.length) parts.push({ stage: 'stopped', reason: 'The channel has no agent.', since: last });
     card.agents = [...new Set(card.agents)].sort();
     cards.push(settle(card, parts, me));
   }
@@ -406,7 +406,7 @@ export function register({ on, refuse, readJson, S, now, AGENTS, admin, viewerOf
     const who = c.person.name.toLowerCase();
     if (verdict === 'up') {
       Object.assign(b, { state: 'closed', closedAt: now(), verdict: 'accepted' });
-      system(b.id, 'closed', `${who} checked the result and closed the bridge as accepted.`);
+      system(b.id, 'closed', `${who} said that the result looks right and closed the channel`);
       return { bridge: b.id, reaction: 'up', followUp: false, closed: true };
     }
     const seats = b.members.filter((m) => !m.fired);

@@ -93,8 +93,8 @@ function puppet(S) {
       failed + 1,
       0,
       entry(at, system, 'alice added reviewer-2: Review the logrotate role', { event: 'joined', mirrors: { run: 'run-a-reviewer-2', seq: 1, type: 'fw.run.queued' } }),
-      entry(at, system, 'alice fired scribe.', { event: 'fired' }),
-      entry(at, system, 'migrator-1 changed the plan of the bridge.', { event: 'changed', page: 'bridges/br-puppet/plan.md' }),
+      entry(at, system, 'alice took scribe off the channel', { event: 'fired' }),
+      entry(at, system, 'migrator-1 changed the plan of the channel.', { event: 'changed', page: 'bridges/br-puppet/plan.md' }),
     );
   }
 
@@ -203,7 +203,7 @@ function logrotate(S) {
   S.channels.set(
     id,
     renumber([
-      entry(ago(41), system, 'alice opened the bridge with 5 members.', { event: 'opened' }),
+      entry(ago(41), system, 'alice opened the channel with 5 members', { event: 'opened' }),
       entry(ago(41), system, 'migrator started: Migrate the logrotate module to an Ansible role.', { event: 'started', mirrors: { run: 'run-lr-migrator', seq: 1, type: 'fw.run.queued' } }),
       entry(ago(41), system, 'tester started: Run molecule for the logrotate role.', { event: 'started', mirrors: { run: 'run-lr-tester', seq: 1, type: 'fw.run.queued' } }),
       entry(ago(36), system, 'writer started: Write the runbook of the logrotate role in the wiki.', { event: 'started', mirrors: { run: 'run-lr-writer', seq: 1, type: 'fw.run.queued' } }),
@@ -238,9 +238,9 @@ function closedNotes(S) {
   S.channels.set(
     id,
     renumber([
-      entry(ago(3100), system, 'alice opened the bridge with 2 members.', { event: 'opened' }),
+      entry(ago(3100), system, 'alice opened the channel with 2 members', { event: 'opened' }),
       entry(ago(3000), agent('scribe', 'run-n23-scribe'), 'The notes of 2.3 are in the wiki.'),
-      entry(ago(2900), system, 'alice closed the bridge. Nothing was canceled.', { event: 'closed' }),
+      entry(ago(2900), system, 'alice closed the channel', { event: 'closed' }),
     ]),
   );
   S.reads.set(id + '|' + ALICE, 3);
@@ -272,7 +272,7 @@ function launchEmail(S) {
   S.channels.set(
     id,
     renumber([
-      entry(ago(100), system, 'alice opened the bridge with 2 members.', { event: 'opened' }),
+      entry(ago(100), system, 'alice opened the channel with 2 members', { event: 'opened' }),
       entry(ago(80), agent('writer', 'run-launch-writer'), 'The draft is in the wiki: `launch/pricing-email.md`. It leads with the new free tier, then the two paid plans.'),
       entry(ago(70), agent('reviewer', 'run-launch-reviewer'), '@writer the draft reads well. One fix: say the date that the prices change. With that, it is ready.', { to: ['writer'] }),
       entry(ago(66), agent('writer', 'run-launch-writer'), 'Done: the prices change on November 15. The draft is ready for alice.'),

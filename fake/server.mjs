@@ -458,7 +458,7 @@ function fanOut(bridgeId, e) {
   for (const h of e.to || []) {
     const m = b.members.find((x) => x.handle === h);
     const how = m && stoppedRun(m);
-    if (how) system(bridgeId, 'failed', `${h} got no message, because its newest run ${how}. Seat it again with a new task.`);
+    if (how) system(bridgeId, 'failed', `${h} got no message, because its newest run ${how}. Give it a new task to start it again.`);
   }
   const active = b.members.filter((m) => !m.fired && !m.muted && !stoppedRun(m));
   const to = e.to && e.to.length ? active.filter((m) => e.to.includes(m.handle)) : active.slice(0, 2);
@@ -887,7 +887,7 @@ function openBridge(body, person) {
   b.members = members.map((m) => seat(id, m, person.subject));
   S.bridges.set(id, b);
   S.channels.set(id, []);
-  system(id, 'opened', `${person.name.toLowerCase()} opened the bridge with ${b.members.length} member${b.members.length === 1 ? '' : 's'}.`);
+  system(id, 'opened', `${person.name.toLowerCase()} opened the channel with ${b.members.length} member${b.members.length === 1 ? '' : 's'}`);
   for (const m of b.members) {
     publish('bridge.member', { bridge: id, member: m });
     system(id, 'started', `${m.handle} started: ${m.task}`, { mirrors: { run: m.runs[0], seq: 1, type: 'fw.run.queued' } });
@@ -922,7 +922,7 @@ on('PATCH', '/v1/bridges/([^/]+)', async (c, id) => {
   if (body.state === 'closed' && b.state !== 'closed') {
     b.state = 'closed';
     b.closedAt = now();
-    system(id, 'closed', `${c.person.name.toLowerCase()} closed the bridge. Nothing was canceled.`);
+    system(id, 'closed', `${c.person.name.toLowerCase()} closed the channel`);
     if (b.delegation.report) {
       setTimeout(() => {
         const p = `bridges/${id}/report.md`;
@@ -933,9 +933,9 @@ on('PATCH', '/v1/bridges/([^/]+)', async (c, id) => {
   } else if (body.state === 'open' && b.state !== 'open') {
     b.state = 'open';
     b.closedAt = null;
-    system(id, 'reopened', `${c.person.name.toLowerCase()} opened the bridge again.`);
+    system(id, 'reopened', `${c.person.name.toLowerCase()} reopened the channel`);
   } else if (body.delegation || body.caps || body.title !== undefined) {
-    system(id, 'changed', `${c.person.name.toLowerCase()} changed the settings of the bridge.`);
+    system(id, 'changed', `${c.person.name.toLowerCase()} changed the settings of the channel`);
   }
   return record(b, c.person.subject);
 });
@@ -1077,8 +1077,8 @@ on('DELETE', '/v1/bridges/([^/]+)/members/([^/]+)', (c, id, handle) => {
     }
   }
   setMember(id, m, { fired: true, muted: true, presence: 'fired', activity: null });
-  dropCards(id, m.runs, 'the seat was fired, so the run stopped waiting.');
-  system(id, 'fired', `${c.person.name.toLowerCase()} fired ${m.handle}. Its Task stays in its pool.`);
+  dropCards(id, m.runs, 'the agent left the channel, so the run stopped waiting.');
+  system(id, 'fired', `${c.person.name.toLowerCase()} took ${m.handle} off the channel`);
   return m;
 });
 on('PATCH', '/v1/bridges/([^/]+)/members/([^/]+)', async (c, id, handle) => {
