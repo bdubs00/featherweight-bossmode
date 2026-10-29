@@ -1355,7 +1355,7 @@ export interface InboxItem {
  * allow and deny (POST /v1/runs/{id}/approvals/{approval}), and keep and refuse
  * (POST /v1/knowhow/waiting/{id}).
  */
-export type InboxAction = 'looks-right' | 'needs-work' | 'answer' | 'decline' | 'allow' | 'deny' | 'keep' | 'refuse' | 'run-again' | 'pause';
+export type InboxAction = 'looks-right' | 'needs-work' | 'answer' | 'decline' | 'allow' | 'deny' | 'keep' | 'refuse' | 'run-again' | 'pause' | 'resume' | 'let-go';
 
 /* ---------- notifications ---------- */
 

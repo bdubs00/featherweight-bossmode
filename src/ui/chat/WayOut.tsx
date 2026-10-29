@@ -266,33 +266,48 @@ function LetGo({ card }: { card: WorkCard }) {
  * server names none, and the page offers both.
  */
 export function FailedJob({ duty }: { duty: string }) {
-  const item = useDuties((s) => (s.inbox || []).find((it) => it.kind === 'failure' && it.duty === duty));
+  const item = useDuties((s) => (s.inbox || []).find((it) => (it.kind === 'failure' || it.kind === 'paused') && it.duty === duty));
   const answered = useAnswered();
   const [busy, setBusy] = useState(false);
   if (!item) return null;
   const done = answered.find((a) => a.duty === duty && a.kind === 'dismiss');
   if (done) return <Done words={done.words} at={done.at} />;
-  const acts = item.actions && item.actions.length ? item.actions : ['run-again', 'pause'];
-  const act = async (what: 'run-again' | 'pause') => {
+  const paused = item.kind === 'paused';
+  const acts: string[] = item.actions && item.actions.length ? item.actions : paused ? ['resume', 'run-again'] : ['run-again', 'pause'];
+  const words: Record<string, string> = { 'run-again': 'You ran it again', pause: 'You paused the job', resume: 'You resumed the job', 'let-go': 'You let it go' };
+  const act = async (what: string) => {
     if (busy) return;
     setBusy(true);
     try {
       if (what === 'run-again') await runDutyNow(duty);
-      else await pauseDuty(duty, true);
-      markAnswered({ kind: 'dismiss', duty, run: item.run || undefined, words: what === 'run-again' ? 'You ran it again' : 'You paused the job' });
+      else if (what === 'pause') await pauseDuty(duty, true);
+      else if (what === 'resume') await pauseDuty(duty, false);
+      else if (what === 'let-go' && item.card) await api.letGo(item.card);
+      markAnswered({ kind: 'dismiss', duty, run: item.run || undefined, words: words[what] || 'Done' });
     } catch (e) {
       showError(e);
     }
     setBusy(false);
   };
+  const why = pageWords(String(item.summary || item.text || '').replace(/^The job \S+(?: paused itself)?:\s*/, ''));
   return (
     <div class="cf-wayout cf-stopped">
-      <p class="cf-wayout-head">Failed</p>
-      <p>{pageWords(String(item.text || '').replace(/^The job \S+:\s*/, '')) || 'Its last run failed.'}</p>
+      <p class="cf-wayout-head">{paused ? 'Paused itself' : 'Failed'}</p>
+      <p>{why || (paused ? 'The job paused itself.' : 'Its last run failed.')}</p>
       <div class="cf-wayout-keys">
+        {acts.includes('let-go') && item.card && (
+          <Button size="s" aria-disabled={busy || undefined} onClick={() => act('let-go')}>
+            Let it go
+          </Button>
+        )}
         {acts.includes('pause') && (
           <Button size="s" aria-disabled={busy || undefined} aria-label={'Pause ' + dutyLabel(duty)} onClick={() => act('pause')}>
             Pause
+          </Button>
+        )}
+        {acts.includes('resume') && (
+          <Button size="s" aria-disabled={busy || undefined} aria-label={'Resume ' + dutyLabel(duty)} onClick={() => act('resume')}>
+            Resume
           </Button>
         )}
         {acts.includes('run-again') && (

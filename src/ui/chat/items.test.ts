@@ -68,3 +68,22 @@ describe('Needs you from the items of the front', () => {
     expect(puppet.line).toBe('Asks first · Migrate the remaining Puppet modules · migrator-2 · $0.70');
   });
 });
+
+describe('a paused job that the server counts', () => {
+  const paused: InboxItem = { kind: 'paused', run: '', approval: '', duty: 'monthly-migration', agent: 'writer', bridge: '', text: 'The job monthly-migration paused itself: three runs in a row failed.', since: at, card: card('duty:monthly-migration'), actions: ['resume', 'run-again', 'let-go'] };
+
+  it('is a row of the kind paused that opens the job, with its ways out', () => {
+    const rows = needsOfItems(input, [paused]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].kind).toBe('paused');
+    expect(rows[0].head).toBe('Three runs in a row failed.');
+    expect(rows[0].href).toContain('monthly-migration');
+    expect(rows[0].actions).toEqual(['resume', 'run-again', 'let-go']);
+  });
+
+  it('is no row while the server does not count it', () => {
+    const rows = needsOfItems(input, [{ ...paused, card: undefined, actions: undefined }]);
+    expect(rows).toHaveLength(0);
+  });
+});
+
