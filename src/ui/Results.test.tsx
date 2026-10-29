@@ -110,7 +110,12 @@ describe('Results', () => {
     expect(text).toContain('4 of 12');
     expect(text).toContain('8 unchecked');
     expect(text).toContain('at least $1.50');
-    expect(text).toContain('2 runs without a price');
+    expect(text).toContain('2 runs of unknown cost');
+    // The words of the page: job and agent, never line, pool, or worker.
+    expect(box.querySelector('#rs-lines')!.textContent).toBe('Work by job and agent');
+    expect([...box.querySelectorAll('thead th')][0].textContent).toBe('Job or agent');
+    expect([...box.querySelectorAll('tbody th .t-meta')].map((x) => x.textContent)).toEqual(['agent', 'job']);
+    expect(text).not.toMatch(/\b(Lines? of work|duty|pool|worker|seat|bridge|without a price)\b/i);
     // The inbox holds nothing for this person, so the open wait names no "you".
     expect(text).toContain('1 waiting for a person');
     expect(text).not.toContain('waiting for you');
@@ -244,7 +249,7 @@ describe('Results', () => {
     act(() => tile.querySelector<HTMLButtonElement>('.help-key')!.click());
     const said = tile.textContent || '';
     expect(said).toContain('A heart keeps a result on the wiki, and it is no check.');
-    expect(said).toContain('A done check that only reads a file does not count');
+    expect(said).toContain('A done check that only reads a file or the answer, and looks for nothing in it, does not count');
     expect(said).not.toContain('a thumb or a heart');
   });
 
@@ -254,6 +259,8 @@ describe('Results', () => {
     await flush();
     const done = box.querySelector('tbody td.num')!;
     expect(done.textContent).toBe('3 1 failed 1 stopped 1 lost');
+    // A lost task says why in its own words, never with pool or worker.
+    expect(done.querySelector('.rs-failed[title]')!.getAttribute('title')).toBe('Stopped because the agent that held it was replaced.');
   });
 
   it('says one action of a person in the singular', async () => {
@@ -268,8 +275,8 @@ describe('Results', () => {
       const b = mount(<>{n}</>);
       return b.textContent;
     };
-    expect(text(<LineSpend usd={0} unpriced={39} />)).toBe('no price');
-    expect(text(<LineSpend usd={0.004} unpriced={3} />)).toBe('under $0.01, more without a price');
+    expect(text(<LineSpend usd={0} unpriced={39} />)).toBe('unknown cost');
+    expect(text(<LineSpend usd={0.004} unpriced={3} />)).toBe('under $0.01, and more of unknown cost');
     expect(text(<LineSpend usd={0.27} unpriced={60} />)).toBe('at least$0.27');
     expect(text(<LineSpend usd={0.002} unpriced={60} each />)).toBe('unknown');
     expect(text(<LineSpend usd={0.04} unpriced={0} each />)).toBe('$0.04');

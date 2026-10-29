@@ -263,6 +263,8 @@ function sentence(a) {
   s += `the agents finished ${plural(a.work.done, 'task', 'tasks')}`;
   if (a.work.failed + a.work.stopped) s += `, and ${a.work.failed + a.work.stopped} failed or stopped`;
   s += '.';
+  // The words of the server (value/fold.go, sentence): no pool, no worker, and no tokens without a price.
+  if (a.work.lost) s += a.work.lost === 1 ? ' 1 task stopped because the agent that held it was replaced.' : ` ${a.work.lost} tasks stopped because the agents that held them were replaced.`;
   if (a.work.done) {
     s += ` People accepted ${a.checks.accepted} and sent back ${a.checks.sentBack}. A done check passed for ${a.checks.checked}. ${a.checks.unchecked} ${a.checks.unchecked === 1 ? 'is' : 'are'} unchecked.`;
     s += ` ${a.people.noPerson} of the ${a.work.done} finished without an action of a person.`;
@@ -271,7 +273,7 @@ function sentence(a) {
   s += ` The work cost ${a.spend.atLeast ? 'at least ' : ''}$${a.spend.usd.toFixed(2)}`;
   if (a.work.done) s += `, $${a.spend.perDone.toFixed(2)} for each finished task`;
   s += '.';
-  if (a.spend.unpriced) s += ` ${plural(a.spend.unpriced, 'run has', 'runs have')} tokens without a price.`;
+  if (a.spend.unpriced) s += a.spend.unpriced === 1 ? ' The cost of 1 run is unknown, because its model has no price.' : ` The cost of ${a.spend.unpriced} runs is unknown, because their model has no price.`;
   if (a.estimated) s += ` At the estimates of people, the finished work of ${plural(a.estimated.lines, 'line', 'lines')} would take a person ${duration(a.estimated.minutes * 60)}.`;
   if (a.partial) s += ` ${plural(a.unknown, 'task has', 'tasks have')} no record of the actions of people.`;
   return s;
