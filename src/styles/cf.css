@@ -1580,3 +1580,7 @@ a.cf-mrow:hover .cf-mrow-top strong {
 .cf-mgr-cost {
   margin-top: var(--s-3);
 }
+/* In a head, only the title gives up its room: a status word, the faces, and the tabs keep theirs. */
+.cf-head > :not(.cf-titles):not(.cf-title):not(.grow) {
+  flex-shrink: 0;
+}

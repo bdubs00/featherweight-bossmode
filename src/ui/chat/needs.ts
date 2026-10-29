@@ -112,15 +112,22 @@ const ACTION: Record<NeedKind, string> = {
 
 const same = (a: string, b: string): boolean => a.trim().toLowerCase() === b.trim().toLowerCase();
 
-/** lineOf joins the second line of a row: the action, then each part that the title and the parts before it do not hold already. */
+/**
+ * lineOf joins the second line of a row: the action, then each part that
+ * the title and the parts before it do not name already. A part counts as
+ * named when the title is that part, starts with it, or holds a long name
+ * whole, such as the name of a channel. A short name inside the title, such
+ * as the agent backup in Restore the backup, still shows.
+ */
 export function lineOf(head: string, parts: string[]): string {
   const out: string[] = [];
-  const h = head.toLowerCase();
+  const h = head.trim().toLowerCase();
   for (const p of parts) {
     const t = (p || '').trim();
     if (!t) continue;
+    const l = t.toLowerCase();
     if (out.some((x) => same(x, t))) continue;
-    if (out.length > 0 && h.includes(t.toLowerCase())) continue;
+    if (out.length > 0 && (h === l || h.startsWith(l + ' ') || h.startsWith(l + ':') || (l.length >= 12 && h.includes(l)))) continue;
     out.push(t);
   }
   return out.join(' · ');
@@ -162,8 +169,12 @@ function rowOf(i: NeedsInput, r: InboxRow, c?: WorkCard): NeedRow {
   const make = (kind: NeedKind, head: string, parts: string[] = [where, who, cost]): NeedRow => ({ ...base, kind, head, line: lineOf(head, [ACTION[kind], ...parts]) });
   const summary = c && c.summary ? oneLine(c.summary) : '';
   switch (r.kind) {
-    case 'decision':
-      return make('asks', summary || (r.decision ? askWords(r.decision) : oneLine(r.reason || '') || 'It asks before it acts.'));
+    case 'decision': {
+      // A decision whose call the page has not read says only its verb, such as Allow?; the title of its task says more.
+      const asked = r.decision ? askWords(r.decision) : '';
+      const bare = !asked || /^[A-Z][a-z]*( [a-z]+)?\?$/.test(asked);
+      return make('asks', summary || (bare && c ? c.title : asked) || oneLine(r.reason || '') || 'It asks before it acts.');
+    }
     case 'question':
       return make('question', summary || (r.decision ? askWords(r.decision) : oneLine(r.reason || '')) || 'It has a question for you.');
     case 'asked':

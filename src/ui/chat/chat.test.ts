@@ -317,3 +317,16 @@ describe('the words of round 3', () => {
     expect(previewOf({ seqs: [1], bySeq: { 1: { from: { kind: 'agent', handle: 'scribe' }, text: '## Notes\nDraft one is up.' } } } as never, '')).toBe('scribe: Draft one is up.');
   });
 });
+
+describe('a decision whose call the page has not read', () => {
+  it('takes the title of its task', () => {
+    const rows = needsOfCount(
+      input({
+        cards: [card({ id: 'r', title: 'Restore the backup of last night', links: { run: 'r9', approval: 'ap' } })],
+        rows: [row({ key: 'd:r9/ap', run: 'r9', agent: 'backup', handle: 'backup', decision: { run: 'r9', id: 'ap', label: 'Allow', state: 'pending' } })],
+      }),
+    );
+    expect(rows[0].head).toBe('Restore the backup of last night');
+    expect(rows[0].line).toBe('Asks first · backup');
+  });
+});

@@ -59,7 +59,7 @@ function CardRow({ c, meta }: { c: WorkCard; meta: preact.ComponentChildren }) {
         <span class="cf-today-main">
           <strong>{c.summary ? oneLine(c.summary) : c.title}</strong>
           <span class="cf-today-meta">
-            {[c.summary && c.summary.trim() !== c.title.trim() ? c.title : '', agent ? agentNameOf({ faces }, agent) : ''].filter(Boolean).join(' · ')}
+            {[c.summary && c.summary.trim() !== c.title.trim() ? c.title : '', agent ? agentNameOf({ faces }, agent) : ''].filter(Boolean).join(' · ')}{' '}
             {meta}
           </span>
         </span>
