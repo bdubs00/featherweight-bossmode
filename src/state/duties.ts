@@ -8,13 +8,14 @@
 // It also keeps what the front serves now for the editor, GET
 // /v1/duties/options, the shared channels of the operator from GET
 // /v1/notifications, and the items of GET /v1/inbox that Activity shows
-// beside the bridges: the failures and the paused duties. The count on the
-// app bar counts these items too, so the page reads them on every place.
+// beside the bridges: the failures and the paused duties. The inbox also
+// answers the one count of the work that needs the person, which the count
+// on the app bar shows, so the page reads it on every place.
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { api } from '../api/routes';
 import { ApiError } from '../api/client';
-import type { Duty, DutyOptions, DutyRecord, DutyStarted, InboxItem, SharedChannel } from '../api/types';
+import type { Duty, DutyOptions, DutyRecord, DutyStarted, InboxItem, SharedChannel, Waiting } from '../api/types';
 import { store } from './store';
 import { dutyTitle, rememberDuties } from '../lib/duties';
 
@@ -35,11 +36,13 @@ export interface DutiesState {
   options: DutyOptions | null;
   /** The items of GET /v1/inbox, or null before the first read. */
   inbox: InboxItem[] | null;
+  /** The one count of the work that needs the person, from GET /v1/inbox, or null before the read and from an older front. */
+  waiting: Waiting | null;
   /** The shared channels of the operator that a duty can name, or null before the read. */
   shared: SharedChannel[] | null;
 }
 
-const initial: DutiesState = { list: null, paused: false, byName: {}, gone: {}, error: '', off: false, options: null, inbox: null, shared: null };
+const initial: DutiesState = { list: null, paused: false, byName: {}, gone: {}, error: '', off: false, options: null, inbox: null, waiting: null, shared: null };
 
 /**
  * FALLBACK is what an older front serves, which has no route of the
@@ -278,10 +281,10 @@ export function loadInbox(): Promise<void> {
     inboxing = api
       .inbox()
       .then(
-        (items) => set({ ...state, inbox: items }),
+        (r) => set({ ...state, inbox: r.items, waiting: r.waiting || null }),
         (e) => {
           // A front without the route has no item. Another failure keeps the items that the page holds, or none.
-          if ((e instanceof ApiError && (e.status === 404 || e.status === 501)) || !state.inbox) set({ ...state, inbox: [] });
+          if ((e instanceof ApiError && (e.status === 404 || e.status === 501)) || !state.inbox) set({ ...state, inbox: [], waiting: null });
         },
       )
       .finally(() => (inboxing = null));

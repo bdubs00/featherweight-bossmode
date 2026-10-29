@@ -860,6 +860,23 @@ button.liked-more {
 .prof-skill-list a {
   color: var(--ink);
 }
+/* The checks of done of an agent, and the warning of a weak check under it. */
+.prof-done {
+  margin: var(--s-2) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--t-control);
+  line-height: var(--t-control-lh);
+}
+.prof-done li + li {
+  margin-top: var(--s-2);
+}
+.prof-weak {
+  margin: var(--s-1) 0 0;
+  font-size: var(--t-meta);
+  line-height: var(--t-meta-lh);
+  color: var(--muted);
+}
 .liked-asked {
   font-size: var(--t-meta);
   line-height: var(--t-meta-lh);

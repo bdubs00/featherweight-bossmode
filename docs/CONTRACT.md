@@ -1592,7 +1592,12 @@ The page treats an archived run as a run that ended:
 
 A front that serves the routes of this section and of section 20 sends
 `work: true` in `GET /v1/bossmode`. The page then shows the places Work and
-Results and opens on Work. Without it, the page is the page of before.
+Results. It opens on Work, the home, for a person who can start work: an
+admin, a person who can create agents, a person with the role owner or
+operator on an agent, the static token, and a person whose roles name no
+agent. A person who can only view, such as a sponsor, opens on Results.
+An address that names a place keeps it. Without `work`, the page is the
+page of before.
 
 | Route | What the page does with it |
 |---|---|
@@ -1619,12 +1624,32 @@ The board:
   stage. The page only shows it.
 - `review`: the run ended well, and its owner asked to check each result.
   The run carries the metadata `workbench.review` = `1`, or its duty has
-  `review: true`. The card leaves review on the first reaction.
-- **New:** `verdict` of a done card: `accepted` (a thumb up or a heart),
+  `review: true`. The card leaves review on the first thumb. A heart keeps
+  a result on the wiki, and it is no check. To check and Done show the
+  newest card first.
+- **New:** `verdict` of a done card: `accepted` (a thumb up),
   `checked` (the done check of the agent passed, `done: checked` from the
-  kernel), `sent-back` (a thumb down), or `unchecked`. The page shows the
+  kernel, and the pass was not weak: a check that only reads a file is no
+  check), `sent-back` (a thumb down), or `unchecked`. The page shows the
   word beside a light: green for accepted and checked, red for sent back,
   and grey for unchecked.
+- **Merge A:** `waiting` of the board is the one count of the work that
+  needs the person: `{"count", "needsYou", "toCheck", "notes"}`. `needsYou`
+  and `toCheck` are the cards of Needs you and To check whose `next` is
+  `you`, and `notes` the notes of Know-how that wait for the person to keep
+  them. `count` is their sum. `GET /v1/inbox` answers the same `waiting`.
+  The count of the app bar, the head of Activity, the line on top of Work,
+  and Results read it, so they never disagree. A front that answers none
+  leaves the page to count the rows of Activity, as before. The line on top
+  of Work names the notes, `2 notes wait for you`, and opens Know-how.
+- **Merge A:** `done` of the board counts the done cards that completed,
+  without the canceled cards and the cards that were let go, as Results
+  counts done tasks. The head of Done shows it, with the label `130 done,
+  44 canceled or let go`.
+- **Merge A:** a card that stopped seven days ago and that nobody moved
+  lets itself go: it is in Done with `let-go` and the reason `It stopped 7
+  days ago and nobody moved it, so it let itself go.`. A reason of a card
+  never says worker: a lost part says `The agent that held it is gone.`.
 - **New:** `waiting` also holds the start that comes next of a duty of the
   caller, with `since` at that start. The page then shows the time of the
   start, not an age.
@@ -1671,8 +1696,14 @@ A plan:
 - The plan never names a cost. `cost.basis` says what runs of the agent
   cost, and `runsPerMonth` lets the page say the most a month can cost.
   Start stays refused until the person types a cost.
-- A duty that the plan makes has `whileAway.decider` `nobody`. When the
-  words ask to see the work, such as show me, the duty has `review: true`
+- A duty that the plan makes takes the default of every duty while the
+  person is away: `whileAway` `{"decider": "nobody", "timeout": "2h",
+  "then": "deny"}`. New duty starts from the same default, and the page
+  keeps the manager only for a duty that names it. **Merge A:** `away` of
+  a plan of the kind `repeat` says it in words, and the readback shows it
+  in the row While you are away, after You hear of it. An older front
+  sends no `away`, and the page words `whileAway` of the duty itself. When
+  the words ask to see the work, such as show me, the duty has `review: true`
   and a run has the metadata `workbench.review` = `1`.
 - **New for the duties:** `notify.result` (who hears of each result) and
   `notify.resultWhen` (`always` or `found`), and `review`. The editor of a
@@ -1706,6 +1737,11 @@ The page chose these where the contract left a choice:
   line with an amber light says `One run can cost $0.14. The task stops at
   your limit.`, or for a team `The whole team can cost $0.50. The task
   stops at your limit.`. The line is a warning. Start still works.
+- **A cost below one cent.** Whatever the basis says, a typed cost below
+  $0.01, such as 0.001, shows the line `That is less than one cent. A run
+  stops at such a limit almost at once. Say at least 0.01.` as the person
+  types, and Start refuses it with the same words. A basis of `under $0.01`
+  gives no low bound, so this line is the only warning there.
 - **A found result in Activity.** The page knows a found result by the
   end of its item text, `: it found something.`. Its card then says `It
   found something.` above the task.
@@ -1750,9 +1786,24 @@ The value:
 - A task is a run without a parent that is no branch, no check run, and no
   run of the manager or of the quick chat. The JSON keeps the key
   `pieces`.
-- `checks` splits the done tasks by their verdict: the first thumb, heart,
-  or receipt of a person, then the done check of the agent. A grade of a
-  model is no verdict.
+- `checks` splits the done tasks by their verdict: the newest thumb or
+  receipt of a person, as on the board, then the done check of the agent.
+  A grade of a model is no verdict, and a heart is none either. A run that
+  continues a conversation is a part of its task, as on the board.
+- `checked` needs a done check that looked at the work: a pass that the
+  kernel marks weak, such as a check that only reads a file, is unchecked.
+  The profile of an agent says so under How it knows it is done, beside
+  each such check: `This check only reads a file and looks for nothing in
+  it, so a run that did nothing passes it. Results does not count such a
+  run as checked. Name what the file must hold.`. The rule of the page: a
+  check whose tool only reads a file (`files`, `memory`, or the text editor
+  with the command `view` or `read`, or a tool named such as `read_file`)
+  and that names no `contains` and no `lacks`. The page has no editor of
+  the checks, so the warning shows where the owner reads them.
+- The figures `N to check` and `N waiting for you` are the parts of the
+  one count of the work that needs the person (section 19): `toCheck`, and
+  `needsYou` with `notes`. Each links the first row of its kind in
+  Activity.
 - **New:** `checked` counts the done tasks whose `fw.run.finished` carries
   `done: checked`. An older front leaves it out, and the page counts it as
   0. The figure Checked adds accepted, checked, and sent back. The bar
@@ -1776,6 +1827,20 @@ of the kind `result`:
 - Activity shows a row with the light `to check`, and the app bar counts
   it, as it needs a person. The main pane shows the answer of the run, a
   link to the run, Needs work, and Looks right.
+- **Merge A:** a team whose agents finished is an item of the kind
+  `result` with `bridge` and no `run`. Activity shows it as a row to check
+  with the name of the team, and its newest message is the result: the
+  team has no row of a message, and no key Done. The main pane shows that
+  message, Open the team, Needs work, and Looks right, which go to
+  `POST /v1/work/review` with the bridge, as on the board.
+- **Merge A:** a note of Know-how that waits for the person under ask first
+  is an item of the kind `note`, with `agent`, `run`, `note` (the id of the
+  waiting change), and a text such as `triage wrote a note, ports.md. Keep
+  it?`. Activity shows a row that needs you. Its card opens what the agent
+  learned, `#knowhow/<agent>`, where Keep this? decides it.
+- **Merge A:** a question of a seat that the front calls `gone` makes no
+  row: nobody can move the seat by an answer, and the board shows it
+  stopped and lost.
 - Looks right sends `POST /v1/runs/{id}/reactions` with
   `{"seq": 0, "reaction": "up"}`.
 - Needs work opens a note. Send back refuses an empty note and a note past
@@ -1785,14 +1850,14 @@ of the kind `result`:
   the verdict counts. After a thumb down with a note, the front sends the
   note to the agent as a follow-up message. The run then works again, and
   its new answer is a new result to check.
-- The item leaves the inbox on the first reaction.
+- The item leaves the inbox on the first thumb. A heart is no check.
 - **Round 2.** The history of a duty says the verdict of each result where
   the page knows one, with these words:
 
   | Word | Light | When |
   |---|---|---|
   | `to check` | amber, still | The run has an item of the kind `result`, or it carries `workbench.review` and has no reaction yet. |
-  | `accepted` | green | A thumb up or a heart. A run that a person sent back and accepted after its new answer reads accepted. |
+  | `accepted` | green | A thumb up. A run that a person sent back and accepted after its new answer reads accepted. |
   | `sent back` | red | A thumb down. |
   | `unchecked` | grey | The duty has `review`, and nobody checked the result. |
  The page reads the runs of the 10 newest lines, from the

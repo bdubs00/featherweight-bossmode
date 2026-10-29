@@ -279,7 +279,8 @@ export function register({ on, refuse, readJson, S, FLEET, port }) {
           when: { schedule: when.schedule },
           do: { ask: { message } },
           limits: { budget: {}, overlap: 'skip', catchUp: '6h' },
-          whileAway: { decider: 'nobody', timeout: '24h', then: 'deny' },
+          // The default of every duty while the person is away, as New duty has it: nobody decides.
+          whileAway: { decider: 'nobody', timeout: '2h', then: 'deny' },
           ...(check ? { review: true } : {}),
           notify: { failure: ['owner'], needsYou: ['owner'], result: tell === 'failures' ? [] : ['owner'], resultWhen: tell === 'found' ? 'found' : 'always' },
         },
@@ -298,6 +299,7 @@ export function register({ on, refuse, readJson, S, FLEET, port }) {
       others: [...faces.values()].filter((f) => known(f.agent) && f.agent !== 'chat').map((f) => ({ agent: f.agent, name: f.displayName })),
       when: when ? { said: when.said, readback: readbackOf(when.schedule), next: nextOf(when.schedule, 3) } : { readback: 'Now, once.', next: [] },
       cost, asks, quiet, tell, result, gaps, problems, start, open,
+      ...(kind === 'repeat' ? { away: 'Nobody decides a question for you. After 2 hours without an answer, the answer is no.' } : {}),
     };
   });
 }

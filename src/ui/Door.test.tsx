@@ -4,7 +4,7 @@ import { act } from 'preact/test-utils';
 import type { TaskPlan } from '../api/types';
 import { fakeFetch } from './testkit-b';
 import { morePlaces, placesOf } from './Shell';
-import { Door, costOf, dutyOfPlan, lowWords, monthWords, startPlan } from './Door';
+import { Door, centWords, costOf, dutyOfPlan, lowWords, monthWords, startPlan } from './Door';
 import { doorDuty } from '../state/doorplan';
 
 let box: HTMLElement | null = null;
@@ -75,6 +75,32 @@ describe('the cost of a plan', () => {
     expect(lowWords(plan({ kind: 'team', cost: { basis: '', per: 'bridge', runsPerMonth: 1, low: 0.5 } }), 0.1)).toBe('The whole team can cost $0.50. The task stops at your limit.');
     // No run with a price: no low, and no warning.
     expect(lowWords(plan(), 0.01)).toBe('');
+  });
+  it('warns below one cent as the person types, whatever the basis says, and Start refuses it (plan A12)', async () => {
+    expect(centWords('0.001')).toBe('That is less than one cent. A run stops at such a limit almost at once. Say at least 0.01.');
+    expect(centWords('$0.005')).not.toBe('');
+    expect(centWords('0')).not.toBe('');
+    expect(centWords('0.01')).toBe('');
+    expect(centWords('0.5')).toBe('');
+    expect(centWords('')).toBe('');
+    expect(centWords('abc')).toBe('');
+    // The basis says under a cent, so it gives no low bound, and the box still warns.
+    const f = fakeFetch([['POST', /\/v1\/work\/plan$/, () => plan({ cost: { basis: 'Runs of Writer cost under $0.01 to $0.09 in the last 30 days.', per: 'run', runsPerMonth: 4, low: 0.001, high: 0.09 } })]]);
+    restore = f.restore;
+    const el = mount(<Door />);
+    act(() => [...el.querySelectorAll('button')].find((b) => b.textContent === 'A weekly summary of competitors')!.click());
+    act(() => [...el.querySelectorAll('button')].find((b) => b.textContent === 'Read it back')!.click());
+    await settle();
+    const cost = el.querySelector('.rb-money input') as HTMLInputElement;
+    act(() => {
+      cost.value = '0.001';
+      cost.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(el.querySelector('.rb-low')!.textContent).toContain('That is less than one cent.');
+    act(() => [...el.querySelectorAll('button')].find((b) => b.textContent === 'Start')!.click());
+    await settle();
+    expect(el.querySelector('.field-error')!.textContent).toContain('That is less than one cent.');
+    expect(f.calls.some((c) => c.method === 'PUT')).toBe(false);
   });
   it('hands the editor the whole duty of a plan, with the cost that the person typed', () => {
     const d = dutyOfPlan(plan(), 0.3)!;
@@ -240,7 +266,10 @@ describe('Door', () => {
     act(() => [...el.querySelectorAll('button')].find((b) => b.textContent === 'Read it back')!.click());
     await settle();
     const rows = [...el.querySelectorAll('.rb dt')].map((d) => d.textContent);
-    expect(rows).toEqual(['Who', 'When', 'It asks you', 'It stays quiet', 'You hear of it', 'The result', 'It cannot', 'What it can cost']);
+    expect(rows).toEqual(['Who', 'When', 'It asks you', 'It stays quiet', 'You hear of it', 'While you are away', 'The result', 'It cannot', 'What it can cost']);
+    // One default while you are away, the default of New duty too (plan A9).
+    const away = [...el.querySelectorAll('.rb-row')].find((r) => r.querySelector('dt')!.textContent === 'While you are away')!;
+    expect(away.querySelector('dd')!.textContent).toBe('Nobody decides a question for you. After 2 hours without an answer, the answer is no.');
     const next = [...el.querySelectorAll('.rb p.t-meta')].find((p) => (p.textContent || '').startsWith('Next:'))!;
     expect(next.textContent!.split('; ')).toHaveLength(2);
   });

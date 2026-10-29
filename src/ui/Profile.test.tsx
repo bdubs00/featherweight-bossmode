@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'preact/test-utils';
-import { KeepField, Profile, forgetProfileReads } from './Profile';
+import { DoneSec, KeepField, Profile, forgetProfileReads } from './Profile';
 import { FLEET, fakeFetch, mount, seedFleet, unmountAll, type Call } from './testkit-b';
 import { forgetProfiles } from '../state/profiles';
 import { store } from '../state/store';
@@ -456,5 +456,31 @@ describe('the profile', () => {
     await vi.waitFor(() => expect(el.querySelector('.worker-starting')).not.toBeNull());
     expect(el.querySelector('.worker-starting')!.textContent).toBe('Its worker is starting.');
     expect(el.querySelector('.worker-gaps')).toBeNull();
+  });
+});
+
+describe('how an agent knows it is done', () => {
+  it('lists the checks of done, and warns of a check that only reads a file, which Results does not count (plan 4.4)', () => {
+    const el = mount(
+      <DoneSec
+        agent="checker"
+        done={{
+          checks: [
+            { name: 'the note exists', tool: 'files', input: '{"command":"view","path":"report.txt"}' },
+            { name: 'the note says READY', tool: 'files', input: '{"command":"view","path":"report.txt"}', contains: ['READY'] },
+          ],
+        }}
+      />,
+    );
+    const items = [...el.querySelectorAll('.prof-done li')];
+    expect(items.map((li) => li.querySelector('span')!.textContent)).toEqual(['the note exists', 'the note says READY']);
+    expect(items[0].querySelector('.prof-weak')!.textContent).toContain('a run that did nothing passes it');
+    expect(items[1].querySelector('.prof-weak')).toBeNull();
+    expect(el.querySelector('h3')!.textContent).toBe('How it knows it is done');
+  });
+
+  it('shows nothing for a profile without checks', () => {
+    const el = mount(<DoneSec agent="checker" done={{ checks: [] }} />);
+    expect(el.querySelector('.prof-done')).toBeNull();
   });
 });

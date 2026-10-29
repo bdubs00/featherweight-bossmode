@@ -62,11 +62,13 @@ describe('Results', () => {
   let restore = () => {};
   let estimate: { minutes: number; by: string; at: string } | undefined;
   let inbox: unknown[] = [];
+  let waiting: unknown = null;
   let over: Partial<Value> = {};
   const valueCalls = () => calls.filter((c) => c.path.startsWith('/v1/value'));
   beforeEach(() => {
     estimate = undefined;
     inbox = [];
+    waiting = null;
     over = {};
     forgetDuties();
     try {
@@ -75,7 +77,7 @@ describe('Results', () => {
       // No storage in this run.
     }
     const f = fakeFetch([
-      ['GET', /^\/v1\/inbox$/, () => ({ items: inbox })],
+      ['GET', /^\/v1\/inbox$/, () => ({ items: inbox, ...(waiting ? { waiting } : {}) })],
       ['GET', /^\/v1\/value\?days=(7|30|90)$/, () => {
         const days = Number(/days=(\d+)/.exec(valueCalls()[valueCalls().length - 1].path)![1]);
         const v = value(days, over);
@@ -218,6 +220,32 @@ describe('Results', () => {
     const wait = [...box.querySelectorAll('a.rs-now')].find((a) => a.textContent === '1 waiting for you')!;
     expect(wait.getAttribute('href')).toBe('#activity/d%3Arun-restore/ap-restore');
     expect(box.textContent).not.toContain('waiting for a person');
+  });
+
+  it('reads the one count of the front, the number of the app bar and of Work, and links the rows of Activity (plan A7)', async () => {
+    inbox = [
+      { kind: 'approval', run: 'run-restore', approval: 'ap-restore', duty: 'nightly', agent: 'backup', bridge: '', text: 'backup waits for your answer.', since: '2026-10-27T11:00:00Z' },
+      { kind: 'result', run: 'run-notes', approval: '', duty: 'nightly', agent: 'reviewer', bridge: '', text: 'Notes are ready to check.', since: '2026-10-27T11:00:00Z' },
+    ];
+    // The front counts a team to check and a note that waits, which this read of Activity does not list.
+    waiting = { count: 5, needsYou: 1, toCheck: 2, notes: 2 };
+    const box = mount(<Results />);
+    await flush();
+    expect([...box.querySelectorAll('a.rs-now')].map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
+      ['2 to check', '#activity/v%3Arun-notes'],
+      ['3 waiting for you', '#activity/d%3Arun-restore/ap-restore'],
+    ]);
+  });
+
+  it('says that a heart and a check that only reads a file are no check (plan 4.2 and 4.4)', async () => {
+    const box = mount(<Results />);
+    await flush();
+    const tile = [...box.querySelectorAll('.rs-tile')].find((t) => t.querySelector('h2')!.textContent === 'Checked')!;
+    act(() => tile.querySelector<HTMLButtonElement>('.help-key')!.click());
+    const said = tile.textContent || '';
+    expect(said).toContain('A heart keeps a result on the wiki, and it is no check.');
+    expect(said).toContain('A done check that only reads a file does not count');
+    expect(said).not.toContain('a thumb or a heart');
   });
 
   it('names failed, stopped, and lost tasks of a line apart', async () => {

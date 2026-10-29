@@ -22,7 +22,7 @@ import type {
   FaceMeta,
   FileView,
   Fleet,
-  InboxItem,
+  Inbox,
   WorkBoard,
   RunBudget,
   TeamVerdict,
@@ -341,7 +341,7 @@ export const api = {
   planTask: (words: string, agent?: string, tell?: TaskTell) =>
     dutyCall<TaskPlan>('/v1/work/plan', { method: 'POST', body: { words, ...(agent ? { agent } : {}), ...(tell ? { tell } : {}) } }),
   /** inbox lists what needs the person: approvals, questions, failures, and paused duties. */
-  inbox: () => call<{ items: InboxItem[] }>('/v1/inbox').then((r) => (r && r.items) || []),
+  inbox: () => call<Inbox>('/v1/inbox').then((r): Inbox => ({ items: (r && r.items) || [], ...(r && r.waiting ? { waiting: r.waiting } : {}) })),
   /** work reads the board of the work: one card per piece of work, from the request to its end. */
   work: (q: { days?: number; all?: boolean } = {}) => call<WorkBoard>('/v1/work' + query({ days: q.days, all: q.all ? 'true' : undefined })),
   /**

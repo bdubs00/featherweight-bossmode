@@ -37,7 +37,7 @@ const BOARD: WorkBoard = {
   cards: [
     card('w', 'working', { next: 'agent' }),
     card('b', 'needs-you', { kind: 'bridge', next: 'you', reason: 'scribe asks: Who reads it?', links: { bridge: 'br-1', run: 'run-x', approval: '' }, parts: { needsYou: 1, review: 1, total: 2 } }),
-    card('l', 'stopped', { next: 'you', lost: true, reason: 'Its worker was replaced before it ended, so it cannot go on.' }),
+    card('l', 'stopped', { next: 'you', lost: true, reason: 'The agent that held it is gone.' }),
     card('d', 'done', { kind: 'duty', from: { kind: 'duty', name: 'nightly', via: 'schedule' }, links: { duty: 'nightly', run: 'run-d' }, verdict: 'checked' }),
     card('a', 'done', { verdict: 'sent-back' }),
     card('r', 'review', { kind: 'duty', next: 'you', from: { kind: 'duty', name: 'notes', via: 'schedule' }, links: { duty: 'notes', run: 'run-r' } }),
@@ -173,7 +173,7 @@ describe('the board of the work', () => {
   });
 
   it('names a card for a screen reader with its stage, whose move it is, and lost', () => {
-    expect(labelOfCard(BOARD.cards[2])).toBe('Title of l, Stopped, your move, lost, Its worker was replaced before it ended, so it cannot go on.');
+    expect(labelOfCard(BOARD.cards[2])).toBe('Title of l, Stopped, your move, lost, The agent that held it is gone.');
     expect(labelOfCard(BOARD.cards[3])).toBe('Title of d, checked');
     expect(labelOfCard(card('c', 'working', { title: 'Write the email, have it reviewed,' }))).toBe('Write the email, have it reviewed, Working');
   });
@@ -197,6 +197,31 @@ describe('the board of the work', () => {
       const el = mount(<Work />);
       await settle();
       expect(el.querySelector('.work-glance')!.textContent).toBe('Nothing waits for you.1 working');
+    } finally {
+      f.restore();
+    }
+  });
+
+  it('names the notes of Know-how that wait for the person, the third part of the one count (plan A17)', async () => {
+    const f = fakeFetch([['GET', /^\/v1\/work/, () => ({ ...BOARD, waiting: { count: 4, needsYou: 1, toCheck: 1, notes: 2 } })]]);
+    try {
+      const el = mount(<Work />);
+      await settle();
+      const glance = el.querySelector('.work-glance') as HTMLElement;
+      expect([...glance.querySelectorAll('button, a')].map((b) => b.textContent)).toEqual(['1 task needs you', '1 to check', '1 stopped', '1 working', '2 notes wait for you']);
+      expect(glance.querySelector('a')!.getAttribute('href')).toBe('#knowhow');
+    } finally {
+      f.restore();
+    }
+  });
+
+  it('counts in the head of Done the done tasks as Results does, without the canceled cards and the cards let go (plan A13)', async () => {
+    const f = fakeFetch([['GET', /^\/v1\/work/, () => ({ ...BOARD, done: 1 })]]);
+    try {
+      const el = mount(<Work />);
+      await settle();
+      const chip = el.querySelector('.lane-done .chip') as HTMLElement;
+      expect(chip.querySelector('.sr')!.textContent).toBe('1 done, 1 canceled or let go');
     } finally {
       f.restore();
     }
