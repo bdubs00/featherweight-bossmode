@@ -416,7 +416,7 @@ function eventWords(e) {
   const who = e.agent || '';
   switch (e.kind) {
     case 'bridge.closed':
-      return who ? `When a bridge of ${who} closes.` : 'When a bridge closes.';
+      return who ? `When a channel of ${who} closes.` : 'When a channel closes.';
     case 'run.failed':
       return who ? `When a run of ${who} fails.` : 'When a run of an agent fails.';
     case 'question.waiting':
@@ -801,7 +801,7 @@ export function register({ on, refuse, readJson, now, AGENTS, admin, S, publish 
     // A duty that posts in a bridge or opens one starts no run of an agent: the answer names an empty run, and the history says what it did.
     if (d.do.post || d.do.open) {
       const bridge = d.do.post ? S.bridges.get(d.do.post.bridge) : null;
-      d.history.unshift({ at, slot: at, run: '', state: 'completed', reason: d.do.post ? 'Posted in ' + (bridge ? bridge.title : 'the bridge') + '.' : 'Opened a bridge from the playbook ' + d.do.open.playbook + '.' });
+      d.history.unshift({ at, slot: at, run: '', state: 'completed', reason: d.do.post ? 'Posted in the channel ' + (bridge ? bridge.title : d.do.post.bridge) + '.' : 'Opened a channel from the playbook ' + d.do.open.playbook + '.' });
       c.status = 202;
       return { run: '' };
     }
@@ -1095,8 +1095,8 @@ export function register({ on, refuse, readJson, now, AGENTS, admin, S, publish 
     const items = [];
     for (const d of D.values()) {
       const last = d.history[0];
-      if (d.paused) items.push({ kind: 'paused', run: '', approval: '', duty: d.name, agent: d.agent, bridge: '', text: (d.state && d.state.pausedReason) || 'Someone paused this duty.', since: last ? last.at : now() });
-      else if (last && last.state === 'failed') items.push({ kind: 'failure', run: last.run || '', approval: '', duty: d.name, agent: d.agent, bridge: '', text: last.reason || 'The run failed.', since: last.at });
+      if (d.paused) items.push({ kind: 'paused', run: '', approval: '', duty: d.name, agent: d.agent, bridge: '', text: d.state && d.state.pausedReason ? 'The job ' + d.name + ' paused itself: ' + d.state.pausedReason : 'Someone paused the job ' + d.name + '.', since: last ? last.at : now() });
+      else if (last && last.state === 'failed') items.push({ kind: 'failure', run: last.run || '', approval: '', duty: d.name, agent: d.agent, bridge: '', text: last.reason ? 'The job ' + d.name + ': ' + last.reason : 'A run of the job ' + d.name + ' failed.', since: last.at });
       const run = last && last.run ? S.runs.get(last.run) : null;
       if (run && run.state === 'input-required' && run.pending) items.push({ kind: run.pending.schema ? 'question' : 'approval', run: run.id, approval: run.pending.id, duty: d.name, agent: d.agent, bridge: '', text: d.agent + ' waits for your answer.', since: last.at });
     }

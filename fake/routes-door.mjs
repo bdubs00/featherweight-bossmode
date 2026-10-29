@@ -290,7 +290,7 @@ export function register({ on, refuse, readJson, S, FLEET, port }) {
     const round = (n) => Math.round(n * 100) / 100;
     const cost = {
       basis: basis
-        ? `Runs of ${nameOf(faces, agent)} cost ${money(basis.lo)} to ${money(basis.hi)} in the last 30 days.` + (kind === 'team' ? ' The team stops at your limit.' : '')
+        ? `Runs of ${nameOf(faces, agent)} cost ${money(basis.lo)} to ${money(basis.hi)} in the last 30 days.` + (kind === 'team' ? ' The channel stops at your limit.' : '')
         : agent ? `No run of ${nameOf(faces, agent)} has a price yet.` : '',
       per: kind === 'team' ? 'bridge' : 'run',
       runsPerMonth: when ? perMonth(when.schedule) : 1,
@@ -317,7 +317,7 @@ export function register({ on, refuse, readJson, S, FLEET, port }) {
     // What the system cannot do for these words, said before the start.
     const gaps = [];
     if (/\be-?mail\b/.test(w) && /\b(send|goes out|go out)\b/.test(w)) gaps.push('No agent here can send email. After your OK, you send it.');
-    if (/\b(competitors?|web ?sites?|online)\b/.test(w)) gaps.push(`${nameOf(faces, agent || 'writer')} reads only the sites that its workers may reach. The person who runs the server adds a site.`);
+    if (/\b(competitors?|web ?sites?|online)\b/.test(w)) gaps.push(`${nameOf(faces, agent || 'writer')} reads only the sites that it may reach. The person who runs the server adds a site.`);
     if (agent && !faces.has(agent)) gaps.push(`No agent ${agent} exists yet.`);
 
     // The record that Start sends to a route that exists.

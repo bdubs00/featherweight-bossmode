@@ -223,7 +223,7 @@ message that asks when the person answers it.
 default. **New.** `caps.maxTurns` bounds the turns of every run of the
 bridge together, 1000 by default, because each message gives a seat its
 allowance again (section 5.4). Past it, nothing fans out until a person
-raises the cap, and the channel says `The bridge reached its cap of <n>
+raises the cap, and the channel says `The channel reached its cap of <n>
 turns`. A record of an older workbench answers the default. The answer is 201 with the record and its members. A handle is
 lower-case letters, digits, dots, dashes, and underscores, at most 32.
 
@@ -355,9 +355,16 @@ The plan gives the entry. The page reads four more fields:
   - A delivery that fails for good posts `event: failed`.
   - The fleet that lost the run of a seat, as after a roll of its workers,
     posts `event: lost` once per seat. Its text is `<handle> lost its run
-    <id>: no worker of the fleet holds it`.
+    <id>: the fleet no longer holds it`.
   - A later front writes each line as one fact with no advice and no end
     mark, such as `<handle> went to sleep`. The page reads both forms.
+  - A front of the chat-first page says channel and agent in its lines,
+    such as `<name> opened the channel with <n> members`, `<name> closed the
+    channel`, `<name> reopened the channel`, `<name> took <handle> off the
+    channel`, `<name> started <handle> again on its task: <task>`, `The
+    server failed to start <handle>: <error>`, and `The channel reached its
+    cap of <n> messages`, where an older front said bridge, fired, and
+    seated. The page reads both words (`src/lib/lines.ts`).
   - A later front writes a decision as `<decider> allowed <handle>'s
     command`, or `denied`, and also `file change` or `call of <tool>` in
     place of `command`. A note adds `, with the note: <note>`. A question
