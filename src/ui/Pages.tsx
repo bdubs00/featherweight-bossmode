@@ -5,6 +5,7 @@
 // without .md, a new page gets .md when the person leaves it out, and
 // _index.md, which the wiki writes on its own, has no Edit.
 
+import type { ComponentChildren } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { ApiError } from '../api/client';
 import { api } from '../api/routes';
@@ -21,13 +22,13 @@ import { SAID_MS, attempt, showError, showSaid, showUndo } from './notice';
 import { Confirm, Markdown, Menu } from './common';
 import { keyWords, useCoarse } from './Composer';
 import { Glyph } from './icons';
-import { Button, Card, Chip, Command, Field, Find, Input, PaneHeader, TextArea } from './primitives';
+import { Button, Card, Chip, Command, Field, Find, Input, PaneHeader, TextArea, type Back } from './primitives';
 
-/** byName names the writer of a page: a person, an agent, a run, the fleet token, or bossmode. */
+/** byName names the writer of a page: a person, an agent, a run, the static token as Admin token, or bossmode. */
 export function byName(by: string): string {
   if (by.startsWith('agent:')) return by.slice(6);
   if (by.startsWith('run:')) return 'run ' + by.slice(4);
-  if (by === 'token') return 'the fleet token';
+  if (by === 'token') return 'Admin token';
   if (by === 'bossmode') return 'bossmode';
   return personName(by);
 }
@@ -182,7 +183,7 @@ export function RemovedPages() {
 }
 
 /** Since is a short meta of a moment, with the full time in a tooltip. */
-function Since({ at }: { at: string }) {
+export function Since({ at }: { at: string }) {
   const d = new Date(at);
   if (isNaN(d.getTime())) return null;
   return (
@@ -192,16 +193,25 @@ function Since({ at }: { at: string }) {
   );
 }
 
-function PageRow({ p, current }: { p: PageMeta; current?: string }) {
+/**
+ * PageRow is one page of a list: its title, and under it its name and its
+ * age. The Files tab of the Library (src/ui/chat/LibraryView.tsx) gives it
+ * its own address, title, and second line.
+ */
+export function PageRow({ p, current, href, title, meta }: { p: PageMeta; current?: string; href?: string; title?: string; meta?: ComponentChildren }) {
   const on = p.path === current;
   const name = pageName(p.path);
   return (
     <div role="listitem">
-      <a class={'wrow' + (on ? ' sel' : '')} href={hrefOf({ place: 'pages', path: p.path, mode: 'read' })} data-item aria-current={on ? 'page' : undefined}>
-        <span class="t-sub clip">{p.title || name}</span>
+      <a class={'wrow' + (on ? ' sel' : '')} href={href || hrefOf({ place: 'pages', path: p.path, mode: 'read' })} data-item aria-current={on ? 'page' : undefined}>
+        <span class="t-sub clip">{title || p.title || name}</span>
         <span class="meta">
-          <span>{name}</span>
-          <Since at={p.at} />
+          {meta || (
+            <>
+              <span>{name}</span>
+              <Since at={p.at} />
+            </>
+          )}
         </span>
       </a>
     </div>
@@ -369,7 +379,12 @@ function Parts({ page, tags, brief, n }: { page: Page; tags: string[]; brief?: b
   );
 }
 
-export function PageView({ path, version }: { path: string; version?: number }) {
+/**
+ * PageView reads a page: its title, History and Edit, its version line, and
+ * its text. back names where its back key leads on a narrow window, and
+ * lead is a line over the text, such as the channel that wrote the page.
+ */
+export function PageView({ path, version, back: backTo, lead }: { path: string; version?: number; back?: Back; lead?: ComponentChildren }) {
   const meta = useSelect((s) => s.pages.byPath[path]);
   const [page, setPage] = useState<Page | null>(null);
   const [missing, setMissing] = useState(false);
@@ -413,7 +428,7 @@ export function PageView({ path, version }: { path: string; version?: number }) 
   const numbers = useMemo(() => pageNumbers(versions || []), [versions]);
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
-  const back = { href: '#pages', label: 'Wiki', to: 'list' as const };
+  const back = backTo || { href: '#pages', label: 'Wiki', to: 'list' as const };
   const removedNow = !!versions && versions.length > 0 && !!versions[0].deleted;
   if (missing) {
     return (
@@ -532,6 +547,7 @@ export function PageView({ path, version }: { path: string; version?: number }) 
         ) : (
           <>
             <Parts page={page} tags={fm!.tags} brief={!!version} n={n} />
+            {lead}
             {/* The page of the hearts of an agent shows its headings in the words of the page, with channel and no id. */}
             <Markdown text={withoutTitle(isLearnedPath(path) ? learnedPageText(fm!.body) : fm!.body, title)} base={path} class="article" />
           </>
