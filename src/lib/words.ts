@@ -5,12 +5,23 @@ import type { Bridge, Decision, ResultDecision, Run, Sender } from '../api/types
 /** cap gives a text a capital first letter. */
 export const cap = (s: string): string => (s ? s[0].toUpperCase() + s.slice(1) : s);
 
-/** personName is the short name of a subject: the part before an @. */
+/** UUID matches a subject that is an id with no name in it, which the page never shows. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * personName is the short name of a subject: the name that the server gives,
+ * else the part before an @. The static token of the server reads Admin
+ * token, and a subject that is a bare id reads Someone, since an id names
+ * nobody that a person knows.
+ */
 export function personName(subject: string | undefined, display?: string): string {
-  if (display) return display;
+  if (display && !UUID.test(display.trim())) return display;
   if (!subject) return 'someone';
-  const at = subject.indexOf('@');
-  return at > 0 ? subject.slice(0, at) : subject;
+  const s = subject.trim();
+  if (s === 'token' || s.toLowerCase() === 'the token of the fleet') return 'Admin token';
+  if (UUID.test(s)) return 'Someone';
+  const at = s.indexOf('@');
+  return at > 0 ? s.slice(0, at) : s;
 }
 
 /** senderName names the sender of a channel entry. */
@@ -21,11 +32,11 @@ export function senderName(s: Sender): string {
   return 'bossmode';
 }
 
-/** clock is the time of day of a moment, such as 14:05. */
+/** clock is the time of day of a moment, such as 3:20 AM, with the hour as the person reads it, never with a leading zero. */
 export function clock(iso: string): string {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return '';
-  return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 }
 
 /** dayWords names the day of a moment: Today, Yesterday, or the date. */

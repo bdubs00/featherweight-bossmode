@@ -191,17 +191,18 @@ function Account({ onSignOut, onReach }: { onSignOut: () => void; onReach: () =>
   const choice = useChoice();
   const token = isToken(me && me.principal);
   const subject = (me && me.principal && me.principal.subject) || '';
-  const name = token ? 'You' : (me && me.principal && (me.principal.name || personName(subject))) || 'You';
+  // The static token of the server reads Admin token, with the initials AT.
+  const name = token ? 'Admin token' : (me && me.principal && (me.principal.name || personName(subject))) || 'You';
   return (
     <Pop
       label={token ? 'Your account' : name + ', account'}
       keyClass="cf-account"
       align="end"
-      keyBody={<Avatar subject={subject || 'you'} display={me && me.principal ? me.principal.name : undefined} size={32} />}
+      keyBody={<Avatar subject={subject || 'you'} display={token ? 'Admin token' : me && me.principal ? me.principal.name : undefined} size={32} />}
       head={
         <>
           <div class="t-sub clip">{name}</div>
-          <div class="t-meta clip">{token ? 'Signed in with an access token' : subject}</div>
+          <div class="t-meta clip">{token ? 'Full access to this server' : subject}</div>
         </>
       }
       items={[

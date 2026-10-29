@@ -21,7 +21,7 @@ describe('lineWords', () => {
   it('words a decision with the person, and keeps the note on the card', () => {
     expect(line('decided', 'the token of the fleet denied the call of migrator-1, with the note: No remote is set; keep the commit local..')).toEqual({ text: "You denied migrator-1's command" });
     expect(lineWords({ event: 'decided', text: 'alice@example.com allowed the call of migrator-2.' }, TOKEN)).toEqual({ text: "alice allowed migrator-2's command" });
-    expect(lineWords({ event: 'decided', text: 'the token of the fleet allowed the call of migrator-2.' }, ALICE)).toEqual({ text: "token allowed migrator-2's command" });
+    expect(lineWords({ event: 'decided', text: 'the token of the fleet allowed the call of migrator-2.' }, ALICE)).toEqual({ text: "Admin token allowed migrator-2's command" });
     expect(lineWords({ event: 'decided', text: 'alice answered the question of reviewer: Yes.' }, ALICE)).toEqual({ text: 'You answered reviewer' });
     expect(lineWords({ event: 'decided', text: 'bob@example.com declined the question of reviewer.' }, ALICE)).toEqual({ text: "bob declined reviewer's question" });
   });
@@ -70,7 +70,7 @@ describe('the plain facts of a later front', () => {
   it('words a decision on a command, a file change, or the call of a tool, and leaves the note on the card', () => {
     expect(line('decided', "token denied migrator-1's command, with the note: No remote is set")).toEqual({ text: "You denied migrator-1's command" });
     expect(lineWords({ event: 'decided', text: "alice@example.com allowed migrator-2's command" }, TOKEN)).toEqual({ text: "alice allowed migrator-2's command" });
-    expect(lineWords({ event: 'decided', text: "token allowed migrator-2's file change" }, ALICE)).toEqual({ text: "token allowed migrator-2's file change" });
+    expect(lineWords({ event: 'decided', text: "token allowed migrator-2's file change" }, ALICE)).toEqual({ text: "Admin token allowed migrator-2's file change" });
     expect(lineWords({ event: 'decided', text: "alice@example.com denied writer's call of front.pages_write, with the note: Not yet" }, ALICE)).toEqual({ text: "You denied writer's call of pages_write" });
     expect(lineWords({ event: 'decided', text: "bob@example.com allowed writer's call of github.create_pr" }, ALICE)).toEqual({ text: "bob allowed writer's call of github.create_pr" });
   });
@@ -78,7 +78,7 @@ describe('the plain facts of a later front', () => {
   it('words an answer and a declined question, with the decider as You where it is the person', () => {
     expect(lineWords({ event: 'decided', text: "alice@example.com answered reviewer's question: Yes" }, ALICE)).toEqual({ text: 'You answered reviewer' });
     expect(lineWords({ event: 'decided', text: "token declined scribe's question, with the note: Later" }, TOKEN)).toEqual({ text: "You declined scribe's question" });
-    expect(lineWords({ event: 'decided', text: "token declined scribe's question" }, ALICE)).toEqual({ text: "token declined scribe's question" });
+    expect(lineWords({ event: 'decided', text: "token declined scribe's question" }, ALICE)).toEqual({ text: "Admin token declined scribe's question" });
   });
 
   it('says that a seat lost its worker, with the id of the run in the tooltip, and names the run', () => {
@@ -93,8 +93,8 @@ describe('the plain facts of a later front', () => {
       ['started', 'migrator-1 woke up', 'migrator-1 woke up'],
       ['asleep', 'reviewer went to sleep', 'reviewer went to sleep'],
       ['opened', 'alice@example.com opened the bridge with 3 members', 'You opened the team'],
-      ['closed', 'token closed the bridge', 'token closed the team'],
-      ['fired', 'token fired scribe', 'token fired scribe'],
+      ['closed', 'token closed the bridge', 'Admin token closed the team'],
+      ['fired', 'token fired scribe', 'Admin token fired scribe'],
       ['cap', 'The bridge reached its cap of 2000 messages', 'The team reached its cap of 2000 messages'],
       ['failed', 'migrator-1 failed: the model answered 529 three times', 'migrator-1 failed'],
       ['canceled', 'alice@example.com stopped the run of tester', 'You stopped tester'],
@@ -108,11 +108,11 @@ describe('the words of a front that says channel and agent', () => {
   it('reads the lines of a channel as it reads the lines of a bridge', () => {
     const cases: [string, string, string][] = [
       ['opened', 'alice@example.com opened the channel with 3 members', 'You opened the team'],
-      ['closed', 'token closed the channel', 'token closed the team'],
-      ['reopened', 'token reopened the channel', 'token reopened the team'],
-      ['fired', 'token took scribe off the channel', 'token fired scribe'],
+      ['closed', 'token closed the channel', 'Admin token closed the team'],
+      ['reopened', 'token reopened the channel', 'Admin token reopened the team'],
+      ['fired', 'token took scribe off the channel', 'Admin token fired scribe'],
       ['task', 'alice@example.com started writer again on its task: Write the notes', 'You seated writer again'],
-      ['changed', 'token changed the settings of the channel', 'token changed the settings'],
+      ['changed', 'token changed the settings of the channel', 'Admin token changed the settings'],
       ['failed', 'The server failed to start reviewer-2: no queue for the agent', 'reviewer-2 did not take the seat'],
       ['failed', 'The server failed to start reviewer-2 again: no queue for the agent', 'reviewer-2 did not take the seat'],
       ['failed', 'The manager did not get the ask to start reviewer-2: the run is gone', 'reviewer-2 did not take the seat'],

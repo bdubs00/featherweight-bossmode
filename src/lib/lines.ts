@@ -41,7 +41,7 @@ export function isMe(who: string | undefined, me: Me): boolean {
 export function whoName(who: string | undefined, me: Me, display?: string): string {
   if (isMe(who, me)) return 'You';
   const w = (who || '').trim();
-  if (w.toLowerCase() === TOKEN_WORDS) return 'token';
+  if (w.toLowerCase() === TOKEN_WORDS) return 'Admin token';
   if (w.toLowerCase() === 'somebody' || !w) return 'Someone';
   // A name that the backend writes as words, such as the front, starts the line with a capital.
   if (/^the /i.test(w)) return cap(w);
