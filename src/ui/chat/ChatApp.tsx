@@ -23,7 +23,7 @@ import { JobView, JobPane } from './JobView';
 import { RunView, RunSide } from './RunView';
 import { AgentView } from './AgentView';
 import { ManagerSide } from './ManagerSide';
-import { useNeeds } from './data';
+import { useNeedsCount } from './data';
 import { chatHref, focusOf, type ChatRoute } from './route';
 
 /** The width from which the sidebar and the stream show side by side. */
@@ -94,7 +94,7 @@ export function ChatApp({ route, notice, onSignOut }: { route: ChatRoute; notice
   const [reach, setReach] = useState(false);
   const bridges = useSelect((s) => s.bridges);
   const config = useSelect((s) => s.config);
-  const needs = useNeeds().length;
+  const needs = useNeedsCount();
   const three = useMedia(THREE);
   const focus = focusOf(route);
   const p = panesOf(route, (id) => (bridges.byId[id] ? bridges.byId[id].title : 'Channel'));

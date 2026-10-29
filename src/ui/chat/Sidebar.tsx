@@ -15,7 +15,7 @@ import { Glyph, Icon } from '../icons';
 import { Led, Mark } from '../primitives';
 import { Pop } from './Pop';
 import { agentCount, channelRow, shortTime, sortChannels, type ChannelRow } from './channels';
-import { agentNameOf, useNeeds } from './data';
+import { agentNameOf, useNeeds, useNeedsCount } from './data';
 import { chatHref, streamKey, type ChatRoute } from './route';
 import type { NeedRow } from './needs';
 
@@ -219,6 +219,7 @@ export function Sidebar({ route }: { route: ChatRoute }) {
   const config = useSelect((s) => s.config);
   const name = themeOf(config).name || 'Bossmode';
   const needs = useNeeds();
+  const needsCount = useNeedsCount();
   const { open, closed, loaded } = useChannelRows();
   const managerUnread = useManagerUnread().size;
   const duties = useDuties((s) => s.list);
@@ -264,11 +265,11 @@ export function Sidebar({ route }: { route: ChatRoute }) {
         ) : (
           <>
             {(filter === 'all' || managerUnread > 0) && <ManagerRow current={route.view === 'manager'} />}
-            {filter === 'all' && needs.length > 0 && (
+            {filter === 'all' && (needs.length > 0 || needsCount > 0) && (
               <section class="cf-sec cf-needs" aria-labelledby="cf-needs-h">
                 <h3 class="cf-sec-head" id="cf-needs-h">
                   <span>Needs you</span>
-                  <span class="cf-sec-n">{needs.length}</span>
+                  <span class="cf-sec-n">{needsCount}</span>
                 </h3>
                 {(allNeeds ? needs : needs.slice(0, NEEDS_SHOWN)).map((r) => (
                   <NeedRowView r={r} />
@@ -307,7 +308,5 @@ export function Sidebar({ route }: { route: ChatRoute }) {
   );
 }
 
-/** useNeedsCount is the count of Needs you, for the title of the tab. */
-export function useNeedsCount(): number {
-  return useNeeds().length;
-}
+/** useNeedsCount is the count of Needs you: the one count of the front, as the title of the tab and the badge of the older places show it. */
+export { useNeedsCount };

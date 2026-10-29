@@ -75,7 +75,9 @@ describe('Make this a job', () => {
     expect(el.textContent).not.toContain('The most one run can cost');
     expect(el.textContent).toContain('A post in the channel Release notes for 2.4 for each run');
     // A pick reads the plan back with that agent.
-    act(() => choices[1].dispatchEvent(new Event('change', { bubbles: true })));
+    act(() => {
+      choices[1].dispatchEvent(new Event('change', { bubbles: true }));
+    });
     await settle();
     const second = api.calls.filter((c) => c.method === 'POST')[1];
     expect((second.body as { handle?: string }).handle).toBe('reviewer-2');

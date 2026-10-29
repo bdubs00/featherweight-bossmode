@@ -10,11 +10,11 @@ import { knowhowApi, type WaitingChange } from '../../api/knowhow';
 import type { State } from '../../state/reducer';
 import type { WorkBoard } from '../../api/types';
 import { store, useSelect } from '../../state/store';
-import { useInboxRows } from '../../state/activity';
+import { useInboxRows, useWaiting as useOneCount } from '../../state/activity';
 import { useDuties, loadDuties } from '../../state/duties';
 import { dutyTitle } from '../../lib/duties';
 import { titleOfName } from '../../lib/duties';
-import { needsOf, type NeedRow } from './needs';
+import { needsOf, needsOfCount, type NeedRow } from './needs';
 
 /** A value that many views read, with the views that follow it. */
 function shared<T>(init: T) {
@@ -135,17 +135,22 @@ export function useAgentName(agent: string): string {
   return useSelect((s) => agentNameOf(s, agent));
 }
 
-/** useNeeds is the one list of Needs you, newest first. */
+/**
+ * useNeeds is the one list of Needs you, newest first: the rows of the one
+ * count of the front (GET /v1/inbox, waiting), or, from an older front that
+ * answers no count, the rows of the four reads of the page.
+ */
 export function useNeeds(): NeedRow[] {
   const cards = useBoard();
   const notes = useWaiting();
+  const count = useOneCount();
   const { rows } = useInboxRows();
   const faces = useSelect((s) => s.faces);
   const bridges = useSelect((s) => s.bridges);
   const list = useDuties((s) => s.list);
   return useMemo(
     () =>
-      needsOf({
+      (count ? needsOfCount : needsOf)({
         cards: cards ? cards.cards : null,
         rows,
         waiting: notes,
@@ -156,6 +161,17 @@ export function useNeeds(): NeedRow[] {
           return d ? dutyTitle(d) : name;
         },
       }),
-    [cards, notes, rows, faces, bridges, list],
+    [cards, notes, count, rows, faces, bridges, list],
   );
+}
+
+/**
+ * useNeedsCount is the count of Needs you: the one count of the front, the
+ * same number as the badge of the older places (useAttention), or the rows
+ * of the list from an older front.
+ */
+export function useNeedsCount(): number {
+  const count = useOneCount();
+  const rows = useNeeds();
+  return count ? count.count : rows.length;
 }

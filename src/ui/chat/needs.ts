@@ -1,12 +1,16 @@
-// Needs you: one row per thing that waits for the person, from four reads
-// that the page already makes. The board of the work (GET /v1/work) names
-// each task whose next move is the person's. The rows of the inbox
-// (src/state/inbox.ts, which also holds GET /v1/inbox) give a task its
-// decision, its question, or its failure. Know-how gives the notes that wait
-// to be kept. A row of the inbox that no task names, such as a paused job,
-// stands on its own. needsOf is the one function that the sidebar, its
-// count, and the title of the tab read, so the counts agree. When the
-// server counts the work that needs a person, needsOf reads that instead.
+// Needs you: one row per thing that waits for the person. The front counts
+// the work that needs the person once (GET /v1/inbox, waiting): the tasks of
+// the board in Needs you and in To check whose next move is the person's,
+// and the notes of Know-how that wait to be kept. needsOfCount builds the
+// rows of that count: one row per such task of the board (GET /v1/work),
+// with the words of its row of the inbox (src/state/inbox.ts), and one row
+// per item note of the inbox. The sidebar, the title of the tab, and the
+// badge of the older places show that count, so they agree.
+//
+// An older front answers no count. needsOf then builds the list from the
+// four reads that the page makes: the board, the rows of the inbox, the
+// notes of Know-how that wait, and the rows of the inbox that no task names,
+// such as a paused job, which stand on their own.
 
 import type { WaitingChange } from '../../api/knowhow';
 import type { Decision, WorkCard } from '../../api/types';
@@ -116,6 +120,8 @@ function rowOf(i: NeedsInput, r: InboxRow): NeedRow {
       return { ...base, kind: 'failed', head: 'Job failed: ' + (r.duty ? i.jobTitle(r.duty) : ''), line: oneLine(r.reason || '') };
     case 'duty-waits':
       return { ...base, kind: 'question', head: (who || 'A job') + ' waits for you', line: joined([oneLine(r.reason || ''), where]) };
+    case 'note':
+      return { ...base, kind: 'suggestion', head: (r.handle ? i.agentName(r.handle) : 'An agent') + ': Keep this note?', line: oneLine(r.reason || ''), href: r.handle ? chatHref({ view: 'agent', name: r.handle }) : base.href };
     default:
       return { ...base, kind: r.kind === 'stopped' ? 'stopped' : 'failed', head: (who || 'An agent') + (r.kind === 'stopped' ? ' stopped' : ' failed'), line: joined([oneLine(r.reason || ''), where]) };
   }
@@ -154,7 +160,9 @@ function suggestionRow(i: NeedsInput, w: WaitingChange): NeedRow {
  * note that waits.
  */
 export function needsOf(i: NeedsInput): NeedRow[] {
-  const rows = i.rows.filter(needsPerson);
+  // A note that the inbox names and that Know-how lists shows once, as a suggestion.
+  const listed = new Set(i.waiting.map((w) => w.id));
+  const rows = i.rows.filter((r) => needsPerson(r) && !(r.kind === 'note' && r.note && listed.has(r.note)));
   const used = new Set<string>();
   const out: NeedRow[] = [];
   const take = (r: InboxRow) => {
@@ -183,5 +191,38 @@ export function needsOf(i: NeedsInput): NeedRow[] {
   }
   for (const r of rows) if (!used.has(r.key)) take(r);
   for (const w of i.waiting) out.push(suggestionRow(i, w));
+  return out.sort((a, b) => ms(b.at) - ms(a.at));
+}
+
+/** counted reports whether a task of the board counts in the one count of the front: Needs you or To check, with the next move of the person. */
+const counted = (c: WorkCard): boolean => c.next === 'you' && (c.stage === 'needs-you' || c.stage === 'review');
+
+/**
+ * needsOfCount builds the rows of the one count of the front: one row per
+ * task of the board in Needs you or To check whose next move is the
+ * person's, with the words of the first row of the inbox that matches it,
+ * by its decision or its result, else by its channel, else by its job, and
+ * one row per note of the inbox that waits to be kept. A stopped task lets
+ * itself go and counts nowhere, and so does a row of the inbox that no task
+ * names. Newest first.
+ */
+export function needsOfCount(i: NeedsInput): NeedRow[] {
+  const rows = i.rows.filter(needsPerson);
+  const used = new Set<string>();
+  const out: NeedRow[] = [];
+  for (const c of i.cards || []) {
+    if (!counted(c)) continue;
+    const run = c.links.run || '';
+    const free = (r: InboxRow) => !used.has(r.key) && r.kind !== 'note';
+    const match =
+      rows.find((r) => free(r) && ((c.links.approval && r.key === 'd:' + run + '/' + c.links.approval) || (c.stage === 'review' && (r.key === 'v:' + run || (!!c.links.bridge && r.key === 'v:b:' + c.links.bridge))))) ||
+      (c.stage !== 'review' && c.links.bridge ? rows.find((r) => free(r) && r.bridge === c.links.bridge) : undefined) ||
+      (!c.links.bridge && c.links.duty ? rows.find((r) => free(r) && r.duty === c.links.duty && !r.bridge) : undefined);
+    if (match) {
+      used.add(match.key);
+      out.push(rowOf(i, match));
+    } else out.push(cardRow(i, c));
+  }
+  for (const r of rows) if (r.kind === 'note') out.push(rowOf(i, r));
   return out.sort((a, b) => ms(b.at) - ms(a.at));
 }

@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import type { Bridge, Member, WorkCard } from '../../api/types';
 import type { InboxRow } from '../../state/inbox';
 import { chatHref, focusOf, parseChat, type ChatRoute } from './route';
-import { askWords, needsOf, type NeedsInput } from './needs';
+import { askWords, needsOf, needsOfCount, type NeedsInput } from './needs';
 import { channelRow, lineText, openedWords, pageWords, peopleWords, sortChannels } from './channels';
 import { handleFor } from './Members';
 import { matches } from './TopBar';
@@ -208,5 +208,41 @@ describe('the people of a channel', () => {
       { from: { kind: 'person', name: 'me@example.com' } },
     ]);
     expect(got).toEqual([{ subject: 'ann@example.com', display: 'Ann' }, { subject: 'bob@example.com', display: 'Bob' }, { subject: 'me@example.com', display: undefined }]);
+  });
+});
+
+describe('Needs you from the one count of the front', () => {
+  it('gives one row per counted task and one per note that waits, and leaves out stopped tasks and rows that no task names', () => {
+    const rows = needsOfCount(
+      input({
+        cards: [
+          card({ id: 'a', since: '2026-10-28T10:01:00Z', links: { run: 'r1', approval: 'p1' } }),
+          card({ id: 'b', since: '2026-10-28T10:02:00Z', links: { bridge: 'br-1' } }),
+          card({ id: 'c', since: '2026-10-28T10:03:00Z', stage: 'review', links: { run: 'r3' } }),
+          card({ id: 'd', stage: 'stopped', links: { run: 'r4' } }),
+          card({ id: 'e', stage: 'working', next: 'agent' }),
+        ],
+        rows: [
+          row({ key: 'd:r1/p1', run: 'r1', agent: 'scribe', handle: 'scribe', decision: { run: 'r1', id: 'p1', label: 'Allow', tool: 'bash', input: { command: 'make test' }, state: 'pending' } }),
+          // Two agents of one channel wait: the count counts the task once, so the list does too.
+          row({ key: 'q:br-1/4', kind: 'asked', bridge: 'br-1', handle: 'scribe', agent: 'scribe' }),
+          row({ key: 'q:br-1/5', kind: 'asked', bridge: 'br-1', handle: 'reviewer-2', agent: 'reviewer' }),
+          row({ key: 'u:duty-paused/nightly', kind: 'duty-paused', status: 'limit', duty: 'nightly', reason: 'Three runs in a row failed.' }),
+          row({ key: 'n:triage.01', kind: 'note', handle: 'triage', note: 'triage.01', reason: 'triage wrote a note, ports.md. Keep it?', at: '2026-10-28T10:04:00Z' }),
+        ],
+      }),
+    );
+    expect(rows.map((r) => r.key + ' ' + r.kind).sort()).toEqual(['card:c check', 'd:r1/p1 asks', 'n:triage.01 suggestion', 'q:br-1/4 question']);
+    expect(rows[0].key).toBe('n:triage.01');
+    expect(rows[0].head).toBe('Triage: Keep this note?');
+  });
+  it('shows a note of the inbox once beside the notes of Know-how, from an older build of the list', () => {
+    const rows = needsOf(
+      input({
+        rows: [row({ key: 'n:triage.01', kind: 'note', handle: 'triage', note: 'triage.01', reason: 'Keep it?' })],
+        waiting: [{ id: 'triage.01', at: '2026-10-28T10:00:00Z', agent: 'triage', what: 'learned', subject: { note: 'ports.md' }, text: 'Port 22 is closed.', by: 'agent', pin: '' } as never],
+      }),
+    );
+    expect(rows.map((r) => r.key)).toEqual(['k:triage.01']);
   });
 });
