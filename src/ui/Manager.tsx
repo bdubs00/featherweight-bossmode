@@ -413,7 +413,7 @@ export function Manager({ run: routeRun, fresh }: { run?: string; fresh?: boolea
             run={run}
             result={res}
             t={t}
-            agentLabel={agent}
+            agentLabel="Manager"
             tail={tail}
             live={live}
             head={
