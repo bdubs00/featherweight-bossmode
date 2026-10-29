@@ -482,10 +482,11 @@ export function runLight(r: DutyRun | null | undefined): Light {
 /**
  * resultLight is the verdict of a result of a duty, for a run that ended
  * well: to check while it waits for a person (an item of the inbox, or a
- * run that asks for a check and has no reaction yet), accepted after a
- * thumb up or a heart, sent back after a thumb down, and unchecked for a
+ * run that asks for a check and has no thumb yet), accepted after a
+ * thumb up, sent back after a thumb down, and unchecked for a
  * duty that asks to check each result when nobody did. A run that a person
- * sent back and accepted after its new answer reads accepted. It answers
+ * sent back and accepted after its new answer reads accepted. A heart
+ * keeps a result on the wiki, and it is no verdict (plan 4.2). It answers
  * null where the page has no verdict to say, and the light of the run
  * stands.
  */
@@ -493,7 +494,7 @@ export function resultLight(r: DutyRun, run: Pick<Run, 'reactions' | 'metadata' 
   if (r.state !== 'completed' || !r.run) return null;
   if (toCheck) return { word: 'to check', tone: 'amber', still: true, label: 'The result waits for a person to check it: Looks right or Needs work.' };
   const re = (run && run.reactions) || {};
-  if ((re.up || 0) > 0 || (re.heart || 0) > 0) return { word: 'accepted', tone: 'green', label: 'A person said that the result looks right.' };
+  if ((re.up || 0) > 0) return { word: 'accepted', tone: 'green', label: 'A person said that the result looks right.' };
   if ((re.down || 0) > 0) return { word: 'sent back', tone: 'red', label: 'A person sent the result back with a note.' };
   if (run && run.state === 'completed' && run.metadata && run.metadata['workbench.review'] === '1') return { word: 'to check', tone: 'amber', still: true, label: 'The result waits for a person to check it: Looks right or Needs work.' };
   if (review && run) return { word: 'unchecked', tone: 'grey', label: 'Nobody checked this result.' };

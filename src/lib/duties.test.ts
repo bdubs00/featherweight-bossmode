@@ -34,6 +34,7 @@ import {
   whenFormOf,
   AWAY,
   awayWords,
+  resultLight,
   tellWords,
   checkTools,
   decidedWords,
@@ -596,5 +597,16 @@ describe('while you are away', () => {
     expect(awayWords({ decider: 'manager', timeout: '30m', then: 'cancel' })).toBe('The manager decides a question for you. After 30 minutes without an answer, the run stops.');
     expect(formOf({ ...duty(), whileAway: undefined }, 'UTC').decider).toBe('nobody');
     expect(formOf(duty(), 'UTC').decider).toBe('manager');
+  });
+});
+
+describe('the verdict of a result of a duty', () => {
+  const ended = { state: 'completed', run: 'run-1' } as Parameters<typeof resultLight>[0];
+  it('reads a thumb as a verdict, and a heart as none (plan 4.2)', () => {
+    expect(resultLight(ended, { state: 'completed', reactions: { up: 1 } }, false, true)!.word).toBe('accepted');
+    expect(resultLight(ended, { state: 'completed', reactions: { down: 1 } }, false, true)!.word).toBe('sent back');
+    // A heart keeps the result on the wiki. A duty that asks to check each result still says unchecked.
+    expect(resultLight(ended, { state: 'completed', reactions: { heart: 1 } }, false, true)!.word).toBe('unchecked');
+    expect(resultLight(ended, { state: 'completed', reactions: { heart: 1 }, metadata: { 'workbench.review': '1' } }, false, true)!.word).toBe('to check');
   });
 });
