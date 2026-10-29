@@ -337,9 +337,17 @@ export const api = {
   /** pauseAllDuties is the switch that pauses or resumes every duty, for an admin. */
   pauseAllDuties: (paused: boolean, reason?: string) => dutyCall<unknown>('/v1/duties', { method: 'PATCH', body: reason ? { paused, reason } : { paused } }),
 
-  /** planTask reads the words of a person back as a plan, before anything starts. agent and tell change the plan. */
-  planTask: (words: string, agent?: string, tell?: TaskTell) =>
-    dutyCall<TaskPlan>('/v1/work/plan', { method: 'POST', body: { words, ...(agent ? { agent } : {}), ...(tell ? { tell } : {}) } }),
+  /**
+   * planTask reads the words of a person back as a plan, before anything
+   * starts. agent and tell change the plan. channel makes the work of a
+   * channel a job that posts in it, run by the agent of the channel whose
+   * handle it names, else the first (Make this a job).
+   */
+  planTask: (words: string, agent?: string, tell?: TaskTell, channel?: { bridge: string; handle?: string }) =>
+    dutyCall<TaskPlan>('/v1/work/plan', {
+      method: 'POST',
+      body: { words, ...(agent ? { agent } : {}), ...(tell ? { tell } : {}), ...(channel ? { bridge: channel.bridge, ...(channel.handle ? { handle: channel.handle } : {}) } : {}) },
+    }),
   /** inbox lists what needs the person: approvals, questions, failures, and paused duties. */
   inbox: () => call<Inbox>('/v1/inbox').then((r): Inbox => ({ items: (r && r.items) || [], ...(r && r.waiting ? { waiting: r.waiting } : {}) })),
   /** work reads the board of the work: one card per piece of work, from the request to its end. */

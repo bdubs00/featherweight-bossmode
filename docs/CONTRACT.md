@@ -1604,7 +1604,7 @@ page of before.
 | Route | What the page does with it |
 |---|---|
 | `GET /v1/work?days=7&all=false` | The board under the door. The page reads it at the open of Work and every 30 seconds. It also reads it two seconds after a change of the store, after a start at the door, and after Looks right or Needs work. `all=true` comes from the key Everyone. `days` is 7, 30, or 90. The MCP tool `work` gives the same answer. |
-| `POST /v1/work/plan` | `{"words", "agent"?, "tell"?}`, with the header `X-Time-Zone`. Read it back sends the words. A change of Someone else sends `agent`, and a change of You hear of it sends `tell`. The answer is the plan below. A 400 `{"problems": ["words: ..."]}` shows under the door. The route starts nothing and saves nothing. The MCP tool `work_plan` gives the same answer. |
+| `POST /v1/work/plan` | `{"words", "agent"?, "tell"?}`, with the header `X-Time-Zone`. Read it back sends the words. A change of Someone else sends `agent`, and a change of You hear of it sends `tell`. The answer is the plan below. A 400 `{"problems": ["words: ..."]}` shows under the door. The route starts nothing and saves nothing. The MCP tool `work_plan` gives the same answer. Make this a job sends `bridge`, the channel, and `handle`, the agent of the channel that runs the job. The answer then holds `members`, the agents of the channel to pick from, `who[0].handle`, and `cost.per: "channel"`: the job posts in the channel to that agent (`start.duty.do.post`) and spends nothing of its own, so the dialog asks for no amount. |
 
 The board:
 

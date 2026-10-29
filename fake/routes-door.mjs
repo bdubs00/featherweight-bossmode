@@ -10,6 +10,9 @@
 //                         are dollars for the whole task: one run of the agent, or every
 //                         seat of a team, absent while no run of the agents has a price.
 //                         same names a duty of the person that does the same work.
+//                         With "bridge" and "handle" (Make this a job), the plan is a job
+//                         that posts in that channel to the picked agent: members lists
+//                         the agents of the channel, and cost.per is channel.
 //
 // The fake reads the words with rules, not with a model, so the same words
 // always give the same plan. A schedule comes from the grammar of the
@@ -151,6 +154,58 @@ const money = (n) => '$' + n.toFixed(2);
 const nameOf = (faces, a) => (faces.get(a) && faces.get(a).displayName) || a;
 
 export function register({ on, refuse, readJson, S, FLEET, port }) {
+  /**
+   * channelPlan is the plan of Make this a job: the work of a channel runs
+   * again on a schedule. Each run posts the words without the schedule in the
+   * channel to the picked agent, whose answer is the result, a post in the
+   * channel. A job that posts spends nothing of its own.
+   */
+  const channelPlan = async (c, body, words, zone) => {
+    const b = S.bridges.get(String(body.bridge));
+    if (!b) refuse(400, `bridge: No channel that you can see has the id ${body.bridge}`);
+    const faces = S.faces;
+    const members = b.members.filter((m) => !m.fired).map((m) => ({ handle: m.handle, agent: m.agent, name: nameOf(faces, m.agent), task: String(m.task || '').split('\n')[0] }));
+    const when = whenOf(words, zone);
+    const title = titleOf(words, when && when.said);
+    const problems = [];
+    if (!when) problems.push('when: Say how often the job runs, such as every Monday at 9:00.');
+    if (b.state !== 'open') problems.push(`bridge: The channel ${b.title} is closed. A job posts in a channel that stays open.`);
+    const handle = String(body.handle || '').replace(/^@/, '');
+    const m = handle ? members.find((x) => x.handle === handle) : members[0];
+    if (!members.length) problems.push('handle: This channel has no agent to run the job. Add an agent to the channel first.');
+    else if (!m) problems.push(`handle: ${handle} is no agent of the channel ${b.title}. Pick one of the list.`);
+    const said = when ? when.said : '';
+    const i = said ? words.toLowerCase().indexOf(said) : -1;
+    const message = (i >= 0 ? words.slice(0, i) + words.slice(i + said.length) : words).replace(/\s+/g, ' ').replace(/^[\s,;:-]+|[\s,;:-]+$/g, '').replace(/ \.$/, '') || words;
+    let start = {};
+    let open = '';
+    if (when && m) {
+      const taken = new Set((((await inner(c, '/v1/duties')) || {}).duties || []).map((d) => d.name));
+      let name = slug(title);
+      for (let n = 2; taken.has(name); n++) name = slug(title).slice(0, 36) + '-' + n;
+      start = {
+        duty: {
+          name, title, agent: m.agent,
+          when: { schedule: when.schedule },
+          do: { post: { bridge: b.id, to: [m.handle], message } },
+          limits: { overlap: 'skip', catchUp: '6h' },
+          notify: { failure: ['owner'], needsYou: ['owner'], result: [], resultWhen: 'always' },
+        },
+      };
+      open = '#duties/' + name;
+    }
+    return {
+      words, kind: when ? 'repeat' : 'once', title,
+      who: m ? [{ agent: m.agent, name: m.name, does: 'does it in the channel', handle: m.handle }] : [],
+      others: [], members,
+      when: when ? { said: when.said, readback: readbackOf(when.schedule), next: nextOf(when.schedule, 3) } : { readback: 'Now, once.', next: [] },
+      cost: { basis: m ? `The job spends nothing of its own: ${m.handle} spends from its budget in the channel.` : '', per: 'channel', runsPerMonth: when ? perMonth(when.schedule) : 1 },
+      asks: ['When it is not sure what you mean. The question waits for you in the channel'],
+      quiet: ['While it works', 'Each result: a post in the channel, and no message'],
+      tell: 'each', result: `A post in the channel ${b.title} for each run`, gaps: [], problems, start, open,
+    };
+  };
+
   const zoneOf = (c) => {
     const z = String(c.req.headers['x-time-zone'] || '');
     return z && zoneOk(z) ? z : 'UTC';
@@ -175,13 +230,14 @@ export function register({ on, refuse, readJson, S, FLEET, port }) {
 
   on('POST', '/v1/work/plan', async (c) => {
     const body = await readJson(c.req);
-    for (const k of Object.keys(body)) if (!['words', 'agent', 'tell'].includes(k)) refuse(400, `json: unknown field "${k}"`);
+    for (const k of Object.keys(body)) if (!['words', 'agent', 'tell', 'bridge', 'handle'].includes(k)) refuse(400, `json: unknown field "${k}"`);
     const words = String(body.words || '').replace(/\s+/g, ' ').trim();
     if (!words) refuse(400, 'Say what you need done.', { problems: ['words: Say what you need done.'] });
     if (words.length > 4000) refuse(400, 'Say it in at most 4000 characters.', { problems: ['words: Say it in at most 4000 characters.'] });
     const w = words.toLowerCase();
     const zone = zoneOf(c);
     const faces = S.faces;
+    if (body.bridge) return await channelPlan(c, body, words, zone);
     const known = (a) => faces.has(a) && a !== 'manager';
 
     const when = whenOf(words, zone);

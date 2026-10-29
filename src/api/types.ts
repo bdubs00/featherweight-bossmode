@@ -1549,6 +1549,16 @@ export interface PlanWho {
   does: string;
   /** The seats of this agent, for a team that splits the work. */
   count?: number;
+  /** The agent in the channel of a job that posts in a channel. */
+  handle?: string;
+}
+
+/** An agent of the channel of a plan with a channel, which the person picks from (Make this a job). */
+export interface PlanMember {
+  handle: string;
+  agent: string;
+  name: string;
+  task?: string;
 }
 
 /**
@@ -1570,7 +1580,7 @@ export interface TaskPlan {
    * all seats of a team. Both are absent while no run of the agents has a
    * price.
    */
-  cost: { basis: string; per: 'run' | 'bridge'; runsPerMonth: number; low?: number; high?: number };
+  cost: { basis: string; per: 'run' | 'bridge' | 'channel'; runsPerMonth: number; low?: number; high?: number };
   asks: string[];
   quiet: string[];
   tell: TaskTell;
@@ -1584,6 +1594,8 @@ export interface TaskPlan {
   open: string;
   /** A duty of the person that does the same work already. The page offers Open it beside Start. */
   same?: { duty: string; title: string };
+  /** The agents of the channel of a plan with a channel. An older front leaves it out. */
+  members?: PlanMember[];
 }
 
 /** The verdict of a check of a team: up closes the bridge with the verdict accepted, and down posts the note to every seat. */
