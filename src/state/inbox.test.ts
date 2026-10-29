@@ -261,3 +261,32 @@ describe('the items of the inbox of the duties', () => {
     expect(whole.decision!.tool).toBe('bash');
   });
 });
+describe('the inbox of the one count', () => {
+  it('leaves out the question of a seat that the front calls gone, as the board stops its card (plan A7)', () => {
+    const s = input();
+    s.rosters.b2 = roster([seat('asker', 'idle', { question: 7, gone: true }), seat('sleepy', 'needs-you', { question: 3 })]);
+    s.channels.b2 = channel([{ seq: 3, at: at(3), from: { kind: 'agent', handle: 'sleepy' }, text: 'Which host?', to: ['operator'], ask: { choices: ['a', 'b'] } }]);
+    expect(questionsOf(s.bridges[1], s.channels.b2, 'me@example.com', s.rosters.b2).map((q) => q.handle)).toEqual(['sleepy']);
+  });
+
+  it('makes a team whose agents finished one result to check, whose newest message is the result, with no row of a message (plan A10)', () => {
+    const s = input();
+    s.items = [{ kind: 'result', bridge: 'b1', agent: 'migrator', text: 'Bridge b1: the agents finished, and the result waits for a check.', since: at(42) }];
+    const rows = inboxRows(s);
+    expect(rows.some((r) => r.kind === 'message' && r.bridge === 'b1')).toBe(false);
+    const team = rows.find((r) => r.key === 'v:b:b1')!;
+    expect([team.kind, team.status, team.bridge, team.bridgeTitle, team.run, team.entry && team.entry.text]).toEqual(['result', 'needs-you', 'b1', 'Bridge b1', undefined, 'A new **note**.']);
+    expect(needsPerson(team)).toBe(true);
+    // A team whose channel the person read has no message to show, and still waits for a check.
+    s.bridges[0] = { ...s.bridges[0], unread: 0 };
+    expect(inboxRows(s).find((r) => r.key === 'v:b:b1')!.entry).toBeUndefined();
+  });
+
+  it('makes a note of Know-how that waits for the person a row that needs you (plan A17)', () => {
+    const s = input();
+    s.items = [{ kind: 'note', agent: 'triage', run: 'run-9', note: 'triage.01', text: 'triage wrote a note, ports.md. Keep it?', since: at(9) }];
+    const note = inboxRows(s).find((r) => r.kind === 'note')!;
+    expect([note.key, note.status, note.agent, note.note, note.reason, note.run]).toEqual(['n:triage.01', 'needs-you', 'triage', 'triage.01', 'triage wrote a note, ports.md. Keep it?', 'run-9']);
+    expect(keyAction('Enter', note)).toBe('open');
+  });
+});

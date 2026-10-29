@@ -26,13 +26,18 @@
 // questions of the runs of duties that sit on no bridge. Such a decision
 // reads its run, so its card names the call, as the board does. A result
 // of a duty that tells only of what it finds says that it found something.
+// A team whose agents finished is a result to check with the keys of the
+// board, Looks right and Needs work, never Done. A note of Know-how that
+// waits for the person opens what the agent learned, where Keep decides
+// it. The head counts the work that needs you with the one count of the
+// front, the number of the app bar, Work, and Results.
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { go, hrefOf, parseRoute } from '../lib/route';
 import { decisionTitle, excerpt, personName, plainText, senderName, since } from '../lib/words';
 import { briefOf, planOf } from '../lib/decision';
 import { answerQuestion, decide } from '../state/actions';
-import { useInboxRows, type InboxView } from '../state/activity';
+import { useInboxRows, useWaiting, type InboxView } from '../state/activity';
 import { ensureChannels, ensureEntries, ensureResults, ensureRuns } from '../state/fetchers';
 import { cardOf, keyAction, type InboxRow } from '../state/inbox';
 import { store, useSelect } from '../state/store';
@@ -420,6 +425,10 @@ function DutyChip({ name }: { name: string }) {
 
 /** openRow goes to the place of a row: the conversation of the seat, the channel of the bridge, or the duty of a row that sits on no bridge. */
 function openRow(r: InboxRow, focusComposer = false): void {
+  if (r.kind === 'note') {
+    go({ place: 'knowhow', agent: r.agent || undefined });
+    return;
+  }
   if (!r.bridge) {
     if (r.duty) go({ place: 'duties', name: r.duty });
     return;
@@ -460,6 +469,7 @@ const askedText = (text: string): string => {
 };
 
 function rowText(r: InboxRow): string {
+  if (r.kind === 'note') return r.reason || 'A note waits for you.';
   if (r.decision && r.kind === 'question') return (r.handle || '') + ' asks: ' + (r.decision.reason || 'A question for you');
   // A card from an item of the inbox knows no call: the words of the front say what it waits for.
   if (r.decision && !r.decision.tool && r.reason) return r.reason;
@@ -472,6 +482,9 @@ function rowText(r: InboxRow): string {
 
 function rowName(r: InboxRow): string {
   if (r.kind === 'message' && r.entry) return senderName(r.entry.from);
+  // A team to check names the team, and a note names its agent.
+  if (r.kind === 'result' && !r.run && r.bridge) return r.bridgeTitle || 'A team';
+  if (r.kind === 'note') return r.agent || 'An agent';
   // A row of a duty names its agent, as a row of a seat does, and its chip names the duty.
   if (r.kind === 'duty-failed' || r.kind === 'duty-paused' || r.kind === 'duty-waits' || r.kind === 'result') return r.agent || (r.duty ? dutyLabel(r.duty) : 'A duty');
   return r.handle || '';
@@ -575,6 +588,43 @@ function ResultCard({ r, name, rows }: { r: InboxRow; name: string; rows: InboxR
   );
 }
 
+/**
+ * TeamResultCard is the card of a team whose agents finished: its newest
+ * message, which is the result, a link to the team, and the two keys of
+ * the board, Looks right and Needs work (plan A10). Looks right closes the
+ * team as accepted, and Needs work posts the note to every agent of it.
+ */
+function TeamResultCard({ r, rows }: { r: InboxRow; rows: InboxRow[] }) {
+  const title = r.bridgeTitle || 'The team';
+  return (
+    <Card title={title} tone="amber" label={'The result of the team ' + title + ' to check'} actions={<ResultKeys bridge={r.bridge} title={title} primary onDone={() => afterResult(r, rows)} />}>
+      {r.entry ? <Markdown text={r.entry.text} refs headings={4} /> : <p class="inbox-said">{r.reason || 'The agents finished, and the result waits for a check.'}</p>}
+      <p>
+        <a href={hrefOf({ place: 'bridge', id: r.bridge, pane: 'none' })}>Open the team</a>
+      </p>
+    </Card>
+  );
+}
+
+/**
+ * NoteCard is the card of a note of Know-how that waits for you under ask
+ * first. It says what the agent wants to keep, and opens what the agent
+ * learned, where the card Keep this? shows the note and decides it.
+ */
+function NoteCard({ r }: { r: InboxRow }) {
+  return (
+    <Card title="A note waits for you" tone="amber" label={'A note of ' + (r.agent || 'an agent') + ' waits for you'}>
+      <p>{r.reason}</p>
+      <p class="t-meta">Until you keep it, the agent does not use it.</p>
+      <p>
+        <Button kind="primary" href={hrefOf({ place: 'knowhow', agent: r.agent || undefined })}>
+          Read it and decide
+        </Button>
+      </p>
+    </Card>
+  );
+}
+
 /** sameWords reports whether the task of a run only repeats its title, with case, spaces, and an end mark aside. */
 export function sameWords(input: string, title: string): boolean {
   const norm = (x: string) => plainText(x).toLowerCase().replace(/\s+/g, ' ').trim().replace(/[.!?:]+$/, '');
@@ -609,6 +659,8 @@ export function ActivityList({ item }: { item?: string }) {
   const picked = item || chosen;
   const shown = useShown(item, rows);
   const rosters = useSelect((s) => s.rosters);
+  // The one count of the work that needs you, the number of the app bar, Work, and Results.
+  const waiting = useWaiting();
   const list = useRoving<HTMLDivElement>({
     onEnter: (el) => {
       const r = rows.find((x) => x.key === el.getAttribute('data-key'));
@@ -683,8 +735,13 @@ export function ActivityList({ item }: { item?: string }) {
   };
   return (
     <section class="screen activity" aria-labelledby="activity-title" data-focus-own>
-      {/* The chip counts what the list shows. What needs you shows by its lights and by the count on the app bar, which counts the same rows less the new messages. */}
-      <PaneHeader id="activity-title" title="Activity" count={loaded ? rows.length : undefined} countLabel={rows.length === 1 ? '1 item' : rows.length + ' items'} />
+      {/* The chip says how much needs you, with the one count of the front, the number of the app bar, Work, and Results. An older front gives no count, and the chip then counts the rows. */}
+      <PaneHeader
+        id="activity-title"
+        title="Activity"
+        count={waiting ? waiting.count : loaded ? rows.length : undefined}
+        countLabel={waiting ? (waiting.count === 1 ? '1 needs you' : waiting.count + ' need you') : rows.length === 1 ? '1 item' : rows.length + ' items'}
+      />
       <div class="scroll" ref={list} onKeyDown={onKey}>
         <div class="inbox" role="list" aria-label="Activity">
           {/* Each row keeps its own element, so a row that leaves takes its focus with it, and a new row never inherits the focus of another. */}
@@ -790,6 +847,8 @@ export function ActivityMain({ item }: { item?: string }) {
             />
           )}
           {r.kind === 'result' && r.run && <ResultCard r={r} name={name} rows={rows} />}
+          {r.kind === 'result' && !r.run && r.bridge && <TeamResultCard r={r} rows={rows} />}
+          {r.kind === 'note' && <NoteCard r={r} />}
           {isDutyRow(r) && (
             <div class="inbox-stop">
               <p class="inbox-stop-line">

@@ -2,7 +2,9 @@
 // who pays for the agents and decides whether they are worth it. One pane:
 // the window, six figures, the done work by period with the verdicts of
 // people, and the lines of work. A result that waits for a check and a
-// task that waits for a person link to Activity, and the name of a line
+// task that waits for a person link to Activity, with the one count of the
+// work that needs the person, the number of the app bar and of Work. A
+// heart is no verdict, and a weak check of done is no check. The name of a line
 // opens its duty or its agent. Every figure is what the records hold: an
 // unchecked result shows as unchecked, a spend with unpriced tokens says
 // at least, and hours of a person show only from an estimate that names
@@ -16,7 +18,7 @@ import { costText } from '../lib/cost';
 import { hrefOf } from '../lib/route';
 import { personName } from '../lib/words';
 import { useSelect } from '../state/store';
-import { useInboxRows } from '../state/activity';
+import { useInboxRows, useWaiting } from '../state/activity';
 import { Face } from './common';
 import { Button, Help, Input, Led, PaneHeader, Tabs } from './primitives';
 
@@ -154,13 +156,18 @@ export function Results() {
 
 function Body({ v, onSaved }: { v: Value; onSaved: () => void }) {
   const unit: 'day' | 'week' = v.days <= 7 ? 'day' : 'week';
-  // The results that wait for a check of the person, as Activity lists them.
+  // The results that wait for a check of the person, and the decisions,
+  // questions, and notes that wait for this person, as Activity lists them.
+  // "Waiting for you" counts only these, never the waits of a task that the
+  // person cannot decide. The figures are the one count of the front (plan
+  // A7), and the rows of Activity give the links. An older front gives no
+  // count, and the rows count.
   const { rows } = useInboxRows();
-  const toCheck = rows.filter((r) => r.kind === 'result');
-  // The decisions and questions that wait for this person, as Activity
-  // lists them. "Waiting for you" counts only these, never the waits of a
-  // task that the person cannot decide.
-  const mine = rows.filter((r) => r.status === 'needs-you' && r.kind !== 'result');
+  const waiting = useWaiting();
+  const checkRows = rows.filter((r) => r.kind === 'result');
+  const waitRows = rows.filter((r) => r.status === 'needs-you' && r.kind !== 'result');
+  const toCheck = { n: waiting ? waiting.toCheck : checkRows.length, key: checkRows.length ? checkRows[0].key : '' };
+  const mine = { n: waiting ? waiting.needsYou + waiting.notes : waitRows.length, key: waitRows.length ? waitRows[0].key : '' };
   const measured = v.lead.measured > 0;
   return (
     <div class="rs">
@@ -200,7 +207,16 @@ function Nothing({ days }: { days: number }) {
   );
 }
 
-function Figures({ v, unit, toCheck, mine, measured, onSaved }: { v: Value; unit: 'day' | 'week'; toCheck: { key: string }[]; mine: { key: string }[]; measured: boolean; onSaved: () => void }) {
+/** Waits is a part of the one count of the work that needs the person, and the row of Activity that its link opens, or "" for Activity itself. */
+interface Waits {
+  n: number;
+  key: string;
+}
+
+/** activityHref opens the row of a part of the count, else Activity. */
+const activityHref = (w: Waits): string => (w.key ? hrefOf({ place: 'activity', item: w.key }) : '#activity');
+
+function Figures({ v, unit, toCheck, mine, measured, onSaved }: { v: Value; unit: 'day' | 'week'; toCheck: Waits; mine: Waits; measured: boolean; onSaved: () => void }) {
   return (
     <>
       <div class="rs-tiles">
@@ -218,12 +234,12 @@ function Figures({ v, unit, toCheck, mine, measured, onSaved }: { v: Value; unit
           label="Checked"
           figure={checkedOf(v.checks).toLocaleString()}
           unit={'of ' + v.work.done.toLocaleString()}
-          help="A result is checked when a person gave it a thumb or a heart, when a receipt of another system accepted or rejected it, or when the done check of the agent passed. The grade of a model does not count."
+          help="A result is checked when a person gave it a thumb, when a receipt of another system accepted or rejected it, or when the done check of the agent passed. A done check that only reads a file does not count, because a run that did nothing passes it. A heart keeps a result on the wiki, and it is no check. The grade of a model does not count either."
         >
           <Verdicts checks={v.checks} />
-          {toCheck.length > 0 && (
-            <a class="rs-now" href={hrefOf({ place: 'activity', item: toCheck[0].key })}>
-              <Led tone="amber" word={toCheck.length + ' to check'} />
+          {toCheck.n > 0 && (
+            <a class="rs-now" href={activityHref(toCheck)}>
+              <Led tone="amber" word={toCheck.n + ' to check'} />
             </a>
           )}
         </Tile>
@@ -254,9 +270,9 @@ function Figures({ v, unit, toCheck, mine, measured, onSaved }: { v: Value; unit
             {v.people.actions === 1 ? '1 action of a person' : v.people.actions.toLocaleString() + ' actions of people'}, {v.people.reworked} followed up after they ended
             {(v.people.handled || 0) > 0 && <>, {v.people.handled} {v.people.handled === 1 ? 'decision' : 'decisions'} without a named person</>}
           </p>
-          {mine.length > 0 ? (
-            <a class="rs-now" href={hrefOf({ place: 'activity', item: mine[0].key })}>
-              <Led tone="amber" word={mine.length + ' waiting for you'} />
+          {mine.n > 0 ? (
+            <a class="rs-now" href={activityHref(mine)}>
+              <Led tone="amber" word={mine.n + ' waiting for you'} />
             </a>
           ) : (
             v.people.waitingNow > 0 && <Led tone="grey" word={v.people.waitingNow + ' waiting for a person'} />

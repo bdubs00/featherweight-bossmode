@@ -616,6 +616,25 @@ export interface Agent {
   workerPolicy?: Rules | null;
   /** The switch of the packages of its workers, on a server with a package mirror. */
   workerPackages?: PackageSwitch | null;
+  /** The definition of done of the profile: the checks that the work of each run must pass. */
+  done?: DoneBlock | null;
+}
+
+/** One check of the definition of done of a profile: a tool call, and what its result must hold and must not hold. */
+export interface DoneCheck {
+  name?: string;
+  tool: string;
+  /** The input of the call, a JSON object as text. */
+  input?: string;
+  contains?: string[] | null;
+  lacks?: string[] | null;
+}
+
+/** The definition of done of a profile: the checks, the passes that end a run, and the time limit of one check in nanoseconds. */
+export interface DoneBlock {
+  checks?: DoneCheck[] | null;
+  attempts?: number;
+  timeout?: number;
 }
 
 /** The switch of the packages of the workers of an agent: on, and whether the agent can ask for a package. */
@@ -1249,11 +1268,18 @@ export interface DutyOptions {
 
 /** One item of GET /v1/inbox: what needs the person. kind is approval, question, failure, or paused. */
 export interface InboxItem {
-  /** result: a run whose owner asked to check each result, until a person reacts (docs/CONTRACT.md, section 21). */
-  kind: 'approval' | 'question' | 'failure' | 'paused' | 'result' | string;
+  /**
+   * result: a run whose owner asked to check each result, until a person
+   * gives it a thumb, or a team whose agents finished, with bridge and no
+   * run (docs/CONTRACT.md, section 21). note: a note of Know-how that
+   * waits for the person to keep it, under ask first.
+   */
+  kind: 'approval' | 'question' | 'failure' | 'paused' | 'result' | 'note' | string;
   run?: string;
   /** The id of the approval that the run waits for, or "" for a question of a seat in a bridge and for a failure or a paused duty. */
   approval?: string;
+  /** The id of the waiting change of a note, for POST /v1/knowhow/waiting/{id}. */
+  note?: string;
   duty?: string;
   agent?: string;
   bridge?: string;
@@ -1474,12 +1500,37 @@ export interface WorkLane {
   oldest?: string;
 }
 
+/**
+ * The one count of the work that needs the person, from the lanes of the
+ * board: the tasks in Needs you and in To check whose next move is the
+ * person's, and the notes of Know-how that wait for the person. count is
+ * their sum. The badge, Activity, Work, and Results read it, so they
+ * never disagree (docs/CONTRACT.md, section 19).
+ */
+export interface Waiting {
+  count: number;
+  needsYou: number;
+  toCheck: number;
+  notes: number;
+}
+
 /** GET /v1/work: the board of the work of the person. */
 export interface WorkBoard {
   sentence: string;
   lanes: WorkLane[];
   cards: WorkCard[];
   days: number;
+  /** The done cards that completed, without the canceled cards and the cards that were let go, as Results counts done tasks. An older front leaves it out. */
+  done?: number;
+  /** The one count of the work that needs the person. An older front leaves it out. */
+  waiting?: Waiting;
+}
+
+/** GET /v1/inbox: the items of Activity, and the one count of the work that needs the person. */
+export interface Inbox {
+  items: InboxItem[];
+  /** Absent from an older front, or when the board did not read. The page then counts the rows. */
+  waiting?: Waiting;
 }
 
 /* ---------- the door of the Work place ---------- */
@@ -1523,6 +1574,8 @@ export interface TaskPlan {
   asks: string[];
   quiet: string[];
   tell: TaskTell;
+  /** Who decides a question of a task that repeats while the person is away, in words. An older front leaves it out. */
+  away?: string;
   result: string;
   gaps: string[];
   problems: string[];

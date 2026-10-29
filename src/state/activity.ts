@@ -1,6 +1,8 @@
 // The rows of Activity as the page holds them, and the reads that fill
-// them. The list of Activity and the count on the app bar read the same
-// rows, so the two counts agree. The app bar shows on every place, so
+// them. The count on the app bar, the head of Activity, Work, and Results
+// read one count of the work that needs the person, which GET /v1/inbox
+// answers from the lanes of the board (useWaiting). An older front
+// answers none, and the count then counts the rows of Activity. The app bar shows on every place, so
 // these reads run on every place: the record of each open bridge, the
 // newest run of each seat that waits, failed, or rests, the run of a
 // question of a duty, and the items of GET /v1/inbox, again each minute.
@@ -8,7 +10,7 @@
 // channel and the results of the runs that wait.
 
 import { useEffect, useMemo } from 'preact/hooks';
-import type { Bridge, Member } from '../api/types';
+import type { Bridge, Member, Waiting } from '../api/types';
 import { seatPresence } from '../lib/status';
 import { followInbox, useDuties } from './duties';
 import { ensureRosters, ensureRuns, useEntries, useResults } from './fetchers';
@@ -80,9 +82,19 @@ export function useInboxRows(): InboxView {
   return { rows, open, loaded, settled: loaded && items !== null && asked };
 }
 
-/** useAttention is the count on the app bar: the rows of Activity that need you. */
+/** useWaiting is the one count of the work that needs the person, as the front answers it, or null before the read and from an older front. */
+export function useWaiting(): Waiting | null {
+  return useDuties((s) => s.waiting);
+}
+
+/**
+ * useAttention is the count on the app bar: the one count of the work that
+ * needs the person, the same number as Work and Results. A front that
+ * answers no count gives the rows of Activity that need you.
+ */
 export function useAttention(): number {
   const { rows, open } = useInboxRows();
   const rosters = useSelect((s) => s.rosters);
-  return attentionOf({ bridges: open, rosters }, rows);
+  const waiting = useWaiting();
+  return waiting ? waiting.count : attentionOf({ bridges: open, rosters }, rows);
 }

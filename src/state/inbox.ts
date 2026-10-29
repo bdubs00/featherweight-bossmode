@@ -3,8 +3,12 @@
 // message, across every open bridge, in the order of attention. The items
 // of GET /v1/inbox add a row for each failed run and each paused duty, and
 // for a question of a run of a duty that sits on no bridge. A question of
-// a bridge has its row already, so it never shows twice. The functions
-// here are pure, so the tests read them without a page.
+// a bridge has its row already, so it never shows twice. A team whose
+// agents finished is a result to check, as on the board, with the keys
+// Looks right and Needs work: its newest message is the result, and it has
+// no row of a message. A note of Know-how that waits for the person is a
+// row too. The functions here are pure, so the tests read them without a
+// page.
 
 import type { Bridge, Decision, Entry, InboxItem, Member, Result, Run } from '../api/types';
 import type { Channel, Roster } from './reducer';
@@ -18,7 +22,7 @@ import { seatPresence, type Facts } from '../lib/status';
  * the channel: it needs you, and it is no card, so you answer it in the
  * bridge.
  */
-export type InboxKind = 'decision' | 'question' | 'asked' | 'failed' | 'stopped' | 'limit' | 'message' | 'duty-failed' | 'duty-paused' | 'duty-waits' | 'result';
+export type InboxKind = 'decision' | 'question' | 'asked' | 'failed' | 'stopped' | 'limit' | 'message' | 'duty-failed' | 'duty-paused' | 'duty-waits' | 'result' | 'note';
 
 /** The statuses of the inbox, in the order of attention. A seat at its limit did nothing wrong, and it waits for you to continue it. */
 export const INBOX_ORDER = ['needs-you', 'error', 'limit', 'working', 'idle', 'asleep'] as const;
@@ -48,6 +52,8 @@ export interface InboxRow {
   seq?: number;
   /** The duty whose run the row is about, from the metadata workbench.duty of the run or from the item of the inbox. */
   duty?: string;
+  /** The id of the waiting change of a note, for a row of kind note. */
+  note?: string;
 }
 
 /** The key of the metadata of a run that names its duty. */
@@ -137,7 +143,8 @@ export function questionsOf(b: Bridge, ch: Channel | undefined, me: string, r: R
   const out: Question[] = [];
   for (const h of r!.order) {
     const m = r!.byHandle[h];
-    if (!m || m.fired || !m.question) continue;
+    // A seat that the front calls gone keeps its question, but nobody can move it by an answer: the board shows it stopped and lost.
+    if (!m || m.fired || m.gone || !m.question) continue;
     out.push({ handle: h, seq: m.question, entry: (ch && ch.bySeq[m.question]) || entries[b.id + '/' + m.question] });
   }
   return out.sort((x, y) => x.seq - y.seq);
@@ -200,6 +207,9 @@ function messageOf(b: Bridge, ch: Channel | undefined, me: string, asked: Set<nu
 /** inboxRows builds the rows of the inbox, not yet in order. A seat whose newest run the page has not read gives no row yet. */
 export function inboxRows(s: InboxInput): InboxRow[] {
   const rows: InboxRow[] = [];
+  // The teams whose result waits for a check, and the newest message of each, which is its result.
+  const checks = new Set((s.items || []).filter((it) => it.kind === 'result' && !it.run && it.bridge).map((it) => it.bridge!));
+  const results = new Map<string, Entry>();
   for (const b of s.bridges) {
     if (b.state !== 'open') continue;
     const roster = s.rosters[b.id];
@@ -234,7 +244,8 @@ export function inboxRows(s: InboxInput): InboxRow[] {
       rows.push({ key: 'q:' + b.id + '/' + q.seq, kind: 'asked', status: 'needs-you', bridge: b.id, bridgeTitle: b.title, handle: q.handle, agent: m ? m.agent : undefined, entry: q.entry, seq: q.seq, at: q.entry ? q.entry.at : '', toYou: true });
     }
     const e = messageOf(b, s.channels[b.id], s.me, asked);
-    if (e) {
+    if (e && checks.has(b.id)) results.set(b.id, e);
+    else if (e) {
       const handle = e.from.kind === 'agent' ? e.from.handle : undefined;
       const m = handle && roster ? roster.byHandle[handle] : undefined;
       rows.push({
@@ -251,7 +262,7 @@ export function inboxRows(s: InboxInput): InboxRow[] {
       });
     }
   }
-  return [...rows, ...itemRows(s, rows)];
+  return [...rows, ...itemRows(s, rows, results)];
 }
 
 /**
@@ -263,7 +274,7 @@ export function inboxRows(s: InboxInput): InboxRow[] {
  * an approval shows as a line that waits for its run. A failed run that a
  * row of a seat shows gives that row its duty instead.
  */
-function itemRows(s: InboxInput, seats: InboxRow[]): InboxRow[] {
+function itemRows(s: InboxInput, seats: InboxRow[], results: Map<string, Entry>): InboxRow[] {
   const out: InboxRow[] = [];
   const titles = new Map(s.bridges.map((b) => [b.id, b.title]));
   for (const it of s.items || []) {
@@ -279,9 +290,18 @@ function itemRows(s: InboxInput, seats: InboxRow[]): InboxRow[] {
       out.push({ ...where, key: 'u:' + it.kind + '/' + (duty || it.run || it.text || ''), kind: failed ? 'duty-failed' : 'duty-paused', status: failed ? 'error' : 'limit', reason: it.text || '', at: it.since || '' });
       continue;
     }
-    // A result to check: its owner asked to check each result. Looks right and Needs work end it.
+    // A result to check: its owner asked to check each result, or the agents of a team finished. Looks right and Needs work end it.
     if (it.kind === 'result') {
       if (it.run) out.push({ ...where, agent: it.agent || undefined, handle: it.agent || undefined, key: 'v:' + it.run, kind: 'result', status: 'needs-you', reason: it.text || '', at: it.since || '' });
+      else if (it.bridge) {
+        const e = results.get(it.bridge);
+        out.push({ ...where, key: 'v:b:' + it.bridge, kind: 'result', status: 'needs-you', reason: it.text || '', at: it.since || '', ...(e ? { entry: e } : {}) });
+      }
+      continue;
+    }
+    // A note of Know-how that waits for the person to keep it, under ask first.
+    if (it.kind === 'note') {
+      if (it.note) out.push({ ...where, handle: it.agent || undefined, key: 'n:' + it.note, kind: 'note', status: 'needs-you', note: it.note, reason: it.text || '', at: it.since || '' });
       continue;
     }
     // A question of a bridge has its row in the bridge.

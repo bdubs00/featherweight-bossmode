@@ -7,8 +7,12 @@
 // it is, who asked, why it stands where it stands, and since when. A card
 // whose next move is the person's says Your move, and a card that the
 // manager decides says Manager decides. A done card says its verdict:
-// accepted, checked, sent back, unchecked, or let go. Done shows its
-// newest cards and the key Show all. A card To check offers Looks right and
+// accepted, checked, sent back, unchecked, or let go. To check and Done
+// show their newest cards first, and Done shows its newest cards and the
+// key Show all. Its head counts the done tasks as Results does: a canceled
+// card and a card that was let go are no done task. The line on top also
+// names the notes of Know-how that wait for the person, the third part of
+// the one count of the work that needs the person. A card To check offers Looks right and
 // Needs work, also a team, whose check goes to its bridge. A stopped card
 // offers Let it go to the person whose move it is and to an owner of its
 // agent: the card then ends in Done. A person shows by the name beside the
@@ -265,7 +269,7 @@ function CardView({ c, now, onDecided }: { c: WorkCard; now: number; onDecided: 
   );
 }
 
-function LaneView({ stage, cards, count, oldest, now, onDecided }: { stage: WorkStage; cards: WorkCard[]; count: number; oldest?: string; now: number; onDecided: (stage: WorkStage) => void }) {
+function LaneView({ stage, cards, count, oldest, now, onDecided, head }: { stage: WorkStage; cards: WorkCard[]; count: number; oldest?: string; now: number; onDecided: (stage: WorkStage) => void; head?: { n: number; label: string } }) {
   const lane = LANES[stage];
   const id = 'lane-' + stage;
   // The lane is one stop of the Tab key. The arrows move between its cards.
@@ -280,8 +284,8 @@ function LaneView({ stage, cards, count, oldest, now, onDecided }: { stage: Work
           {/* An empty lane is a still grey light: a lit or breathing light says that something is there. */}
           <Led tone={count > 0 ? lane.tone : 'grey'} word={lane.word} still={stage !== 'needs-you' || count === 0} />
         </h3>
-        <Chip tone={stage === 'needs-you' && count > 0 ? 'amber' : 'plain'} label={count === 1 ? '1 task' : count + ' tasks'}>
-          {count}
+        <Chip tone={stage === 'needs-you' && count > 0 ? 'amber' : 'plain'} label={head ? head.label : count === 1 ? '1 task' : count + ' tasks'}>
+          {head ? head.n : count}
         </Chip>
         {oldest && Date.parse(oldest) <= now && stage !== 'done' && stage !== 'working' && (
           <time class="work-oldest" dateTime={oldest} title={'The oldest since ' + new Date(oldest).toLocaleString()}>
@@ -313,13 +317,19 @@ export function jumpTo(stage: WorkStage, scroll = true): void {
   to.focus({ preventScroll: scroll });
 }
 
-/** Glance is the line on top of Work: what waits for the person, and what works. Each part takes the focus to its lane. */
+/**
+ * Glance is the line on top of Work: what waits for the person, and what
+ * works. Each part takes the focus to its lane. The notes of Know-how that
+ * wait for the person open what the agents learned: with the tasks of
+ * Needs you and To check, they make the one count of the app bar.
+ */
 export function Glance({ board }: { board: WorkBoard }) {
   const parts = GLANCE.map((g) => {
     const l = board.lanes.find((x) => x.stage === g.stage);
     return { ...g, n: l ? (g.mine ? l.yours : l.count) : 0 };
   }).filter((p) => p.n > 0);
-  const waits = parts.some((p) => p.mine);
+  const notes = (board.waiting && board.waiting.notes) || 0;
+  const waits = parts.some((p) => p.mine) || notes > 0;
   return (
     <div class="work-glance" role="group" aria-label="At a glance">
       {!waits && <p class="t-meta">Nothing waits for you.</p>}
@@ -328,8 +338,20 @@ export function Glance({ board }: { board: WorkBoard }) {
           <Led tone={p.tone} word={p.words(p.n)} still />
         </Button>
       ))}
+      {notes > 0 && (
+        <Button kind="quiet" size="s" href={hrefOf({ place: 'knowhow' })}>
+          <Led tone="amber" word={notes === 1 ? '1 note waits for you' : notes + ' notes wait for you'} still />
+        </Button>
+      )}
     </div>
   );
+}
+
+/** doneWords is the head of the lane Done: the done tasks, as Results counts them, and the canceled cards and the cards that were let go beside them. */
+export function doneWords(board: Pick<WorkBoard, 'done'>, cards: number): { n: number; label: string } {
+  if (typeof board.done !== 'number') return { n: cards, label: cards === 1 ? '1 task' : cards + ' tasks' };
+  const rest = cards - board.done;
+  return { n: board.done, label: board.done + ' done' + (rest > 0 ? ', ' + rest + ' canceled or let go' : '') };
 }
 
 /** cardOfMade finds the card of what Start made: the card of its run or of its bridge, or the open card of its duty. */
@@ -410,7 +432,16 @@ export function WorkBoardView({
       )}
       <div class="work-board" onKeyDown={acrossLanes}>
         {board.lanes.map((l) => (
-          <LaneView key={l.stage} stage={l.stage} count={l.count} oldest={l.oldest} cards={board.cards.filter((c) => c.stage === l.stage)} now={now} onDecided={onDecided} />
+          <LaneView
+            key={l.stage}
+            stage={l.stage}
+            count={l.count}
+            oldest={l.oldest}
+            cards={board.cards.filter((c) => c.stage === l.stage)}
+            now={now}
+            onDecided={onDecided}
+            head={l.stage === 'done' ? doneWords(board, l.count) : undefined}
+          />
         ))}
       </div>
     </>
