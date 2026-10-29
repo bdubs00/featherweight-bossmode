@@ -479,6 +479,27 @@ describe('how an agent knows it is done', () => {
     expect(el.querySelector('h3')!.textContent).toBe('How it knows it is done');
   });
 
+  it('says what a check of the answer looks for, and warns of one that looks for nothing', () => {
+    const el = mount(
+      <DoneSec
+        agent="checker"
+        done={{
+          checks: [
+            { tool: 'answer', contains: ['READY'], lacks: ['TODO'] },
+            { name: 'the answer is not empty', tool: 'answer' },
+          ],
+        }}
+      />,
+    );
+    const items = [...el.querySelectorAll('.prof-done li')];
+    expect(items.map((li) => li.querySelector('span')!.textContent)).toEqual(['The answer', 'the answer is not empty']);
+    expect(items[0].querySelector('.prof-answer')!.textContent).toBe('Must hold \u201cREADY\u201d, and must not hold \u201cTODO\u201d.');
+    // A check of the answer that names words is strong, also for a run that changed nothing.
+    expect(items[0].querySelector('.prof-weak')).toBeNull();
+    expect(items[1].querySelector('.prof-answer')).toBeNull();
+    expect(items[1].querySelector('.prof-weak')!.textContent).toContain('every answer passes it');
+  });
+
   it('shows nothing for a profile without checks', () => {
     const el = mount(<DoneSec agent="checker" done={{ checks: [] }} />);
     expect(el.querySelector('.prof-done')).toBeNull();

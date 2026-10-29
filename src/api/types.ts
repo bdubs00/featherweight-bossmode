@@ -374,6 +374,8 @@ export interface Run {
   myTitle?: string;
   /** True when the caller deleted the conversation from the lists. The server keeps the run in its archive. */
   hidden?: boolean;
+  /** The definition of done of the run: the state of its latest pass of checks (fw.RunDone). A run without a definition of done has none. */
+  done?: RunDone | null;
 }
 
 /** The usage of a run, as the kernel sums it. Every field is a sum. */
@@ -638,6 +640,38 @@ export interface DoneBlock {
   checks?: DoneCheck[] | null;
   attempts?: number;
   timeout?: number;
+}
+
+/** The result of one check of a pass (fw.DoneResult). skipped says why the kernel did not run the check; it counts as passed. */
+export interface DoneResult {
+  name?: string;
+  tool: string;
+  passed: boolean;
+  why?: string;
+  skipped?: string;
+}
+
+/** The state of the definition of done of a run, as the run object shows it (fw.RunDone): checked, fixing, or failed. */
+export interface RunDone {
+  state: 'checked' | 'fixing' | 'failed' | string;
+  /** True for a pass that passed and shows nothing about the work of the run. */
+  weak?: boolean;
+  attempt?: number;
+  attempts?: number;
+  checks?: DoneResult[] | null;
+}
+
+/** The data of fw.done.checked, one pass of the checks of a run (fw.DoneCheckedData). limit names the limit of the budget, such as maxToolCalls, for a pass that ran after the run stopped at it. */
+export interface DoneChecked {
+  passed: boolean;
+  weak?: boolean;
+  checks: DoneResult[] | null;
+  attempt: number;
+  attempts: number;
+  answer: number;
+  continue?: boolean;
+  reason?: string;
+  limit?: string;
 }
 
 /** The switch of the packages of the workers of an agent: on, and whether the agent can ask for a package. */
@@ -958,6 +992,8 @@ export interface NewProfile {
   policy?: Rules;
   budget?: Budget;
   compaction?: { at: number; model?: string };
+  /** The definition of done of the new agent, such as a check of its answer. */
+  done?: DoneBlock;
 }
 
 /** The workers of a new agent: how many work at once, and the template when the settings offer several. */

@@ -39,7 +39,7 @@ import { forgetReads, readCache, useEventRead } from '../state/eventread';
 import { PackagesSection } from './Packages';
 import { poolOfAgent, rulesWithPackages, withPackages } from '../lib/packages';
 import { viewsAll } from '../lib/agents';
-import { checkName, weakCheck, WEAK_WORDS } from '../lib/done';
+import { answerWords, checkName, weakCheck, weakWords } from '../lib/done';
 
 const WORKER_HELP = 'A worker runs the work of one agent, one seat at a time. Keep is how many it keeps ready.';
 /** The tooltip of a worker of an older setup of its agent. */
@@ -550,9 +550,10 @@ export function AgentGone({ agent, quiet }: { agent: string; quiet?: boolean }) 
 /** Profile is the profile of an agent. back is the conversation that a narrow window goes back to. */
 /**
  * DoneSec says how the agent knows that its work is done: the checks of its
- * definition of done. A weak check, one that only reads a file and looks
- * for nothing in it, says so (plan 4.4): a run that did nothing passes it,
- * so Results does not count such a run as checked.
+ * definition of done. A check of the answer says what the answer must hold
+ * and must not hold. A weak check, one that only reads a file or the
+ * answer and looks for nothing in it, says so (plan 4.4): a run that did
+ * nothing passes it, so Results does not count such a run as checked.
  */
 export function DoneSec({ agent, done }: { agent: string; done: DoneBlock }) {
   const checks = done.checks || [];
@@ -568,9 +569,10 @@ export function DoneSec({ agent, done }: { agent: string; done: DoneBlock }) {
         {checks.map((c) => (
           <li>
             <span>{checkName(c)}</span>
+            {answerWords(c) && <p class="prof-answer">{answerWords(c)}</p>}
             {weakCheck(c) && (
               <p class="prof-weak" role="note">
-                <Led tone="amber" word="weak check" still /> {WEAK_WORDS}
+                <Led tone="amber" word="weak check" still /> {weakWords(c)}
               </p>
             )}
           </li>

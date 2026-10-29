@@ -19,7 +19,7 @@ import { hash } from './data.mjs';
 import { identicon } from './faces.mjs';
 
 /** The keys of the profile of the kernel, and workers. Any other key answers 400, as the backend does. */
-const PROFILE_KEYS = ['name', 'description', 'system', 'instructions', 'skills', 'tools', 'model', 'effort', 'timeZone', 'policy', 'budget', 'access', 'outcome', 'compaction', 'workers'];
+const PROFILE_KEYS = ['name', 'description', 'system', 'instructions', 'skills', 'tools', 'model', 'effort', 'timeZone', 'policy', 'budget', 'access', 'outcome', 'compaction', 'done', 'workers'];
 const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
 const NAME = /^[A-Za-z0-9_-][A-Za-z0-9._-]{0,63}$/;
 /** The workers of an agent when the request names no number, as fleet.DefaultWorkers. */
@@ -69,8 +69,9 @@ export function register({ on, refuse, readJson, publish, S, now, AGENTS, FLEET 
     }
     if (known) {
       known.description = body.description || known.description;
+      if (body.done) known.done = body.done;
     } else {
-      AGENTS.push({ name, description: body.description || '', role: 'owner', displayName: name, tagline: body.description || '' });
+      AGENTS.push({ name, description: body.description || '', role: 'owner', displayName: name, tagline: body.description || '', ...(body.done ? { done: body.done } : {}) });
       const svg = identicon(name);
       const face = { agent: name, displayName: name, tagline: body.description || '', svg, hash: hash(svg + name), custom: false };
       S.faces.set(name, face);

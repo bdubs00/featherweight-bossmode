@@ -871,6 +871,7 @@ button.liked-more {
 .prof-done li + li {
   margin-top: var(--s-2);
 }
+.prof-answer,
 .prof-weak {
   margin: var(--s-1) 0 0;
   font-size: var(--t-meta);
