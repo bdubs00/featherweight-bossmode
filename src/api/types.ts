@@ -183,6 +183,12 @@ export interface Bridge {
   members?: Member[];
   /** The short line under the name of a channel: the request in full, when the Manager names the channel in a few words. A server before it sends none. */
   topic?: string;
+  /** For whom the channel waits while needsYou is above 0: "you", or the name of the person who asked for it. Only that person counts it in the one count. */
+  waitsFor?: string;
+  /** The first line of the newest post of an agent in the channel. */
+  summary?: string;
+  /** The people of the channel, with the names that the page shows: who asked for it, the owner of the job that opened it, and who posted lately. */
+  people?: ChannelPerson[];
   /** The seq of the newest entry of the channel. */
   lastSeq: number;
   /** The time of the newest entry of the channel, for the freshness of a row of the list. Absent before the first entry, and from an older workbench. */
@@ -1286,9 +1292,34 @@ export interface InboxItem {
   duty?: string;
   agent?: string;
   bridge?: string;
+  /** The seq of the question of an agent in its channel, and the handle that asks: an answer is a reply to it, and Decline settles it. */
+  question?: number;
+  handle?: string;
   text?: string;
   since?: string;
+  /**
+   * The task of the board that the item stands for. Every item that the one
+   * count counts has one, so the items of a card and the notes equal the
+   * count. A failure and a paused job have none: they wait for no move.
+   */
+  card?: string;
+  /** What the item is about in one line: the question, what a decision asks, or the first line of the result. */
+  summary?: string;
+  /** The title of the channel of an item of a channel. */
+  channel?: string;
+  /** What its task cost so far, in US dollars. */
+  costUSD?: number;
+  /** The ways out of the item, each with its route (docs/CONTRACT.md, section 21). An older front sends none. */
+  actions?: InboxAction[];
 }
+
+/**
+ * A way out of an item of the inbox: looks-right and needs-work (POST
+ * /v1/work/review), answer and decline (a reply to the question, or a settle),
+ * allow and deny (POST /v1/runs/{id}/approvals/{approval}), and keep and refuse
+ * (POST /v1/knowhow/waiting/{id}).
+ */
+export type InboxAction = 'looks-right' | 'needs-work' | 'answer' | 'decline' | 'allow' | 'deny' | 'keep' | 'refuse';
 
 /* ---------- notifications ---------- */
 
@@ -1605,3 +1636,24 @@ export interface TaskPlan {
 
 /** The verdict of a check of a team: up closes the bridge with the verdict accepted, and down posts the note to every seat. */
 export type TeamVerdict = 'up' | 'down';
+
+/**
+ * The answer of POST /v1/work/review. kept is true for a run whose worker the
+ * pool replaced: the front keeps the verdict, and the note of Needs work stays
+ * with the result, because no agent holds the run any more.
+ */
+export interface ReviewAnswer {
+  run?: string;
+  bridge?: string;
+  reaction: string;
+  followUp: boolean;
+  closed?: boolean;
+  kept?: boolean;
+}
+
+/** A person of a channel: the subject, the name that the page shows, and the role: asked, owner, or posted. */
+export interface ChannelPerson {
+  subject: string;
+  display: string;
+  role: 'asked' | 'owner' | 'posted' | string;
+}

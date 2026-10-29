@@ -340,7 +340,7 @@ function summaryOf(agent, days) {
 
 /* ---------- the routes ---------- */
 
-export function register({ on, refuse, readJson, publish, now, AGENTS, writePage }) {
+export function register({ on, refuse, readJson, publish, now, AGENTS, writePage, S }) {
   const N = seedNotes();
   for (const [i, n] of N.entries()) n.revision = i + 1;
   const J = seedJournal(N).map(wired);
@@ -524,6 +524,8 @@ export function register({ on, refuse, readJson, publish, now, AGENTS, writePage
   });
 
   const outOf = ({ pin: _p, ...w }) => w;
+  // The notes that wait for a person, for the one count and the items of GET /v1/inbox (knowhow.Service.WaitingFor).
+  if (S) S.notesFor = (c) => W.filter((w) => canView(w.agent) && sees(c, w.agent, w.subject)).map(outOf);
 
   on('GET', '/v1/knowhow/waiting', (c) => {
     const agent = c.url.searchParams.get('agent') || '';

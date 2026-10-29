@@ -60,9 +60,10 @@ function Nobody({ card, why }: { card?: WorkCard; why?: string }) {
 
 /**
  * SignOff is the card of a result to check: its first lines, and the keys
- * Looks right and Needs work. A run whose worker is gone refuses a verdict
- * with 409 on an older server; the card then says that nobody can answer it
- * any more, with Dismiss.
+ * Looks right and Needs work, the ways out looks-right and needs-work of its
+ * item. The verdict lands also on a run whose worker is gone, and the front
+ * answers kept. An older server refuses such a verdict with 409; the card
+ * then says that nobody can answer it any more, with Dismiss.
  */
 export function SignOff({ run, bridge, card, result, title, brief }: { run?: string; bridge?: string; card?: WorkCard; result?: string; title: string; brief?: boolean }) {
   const [writing, setWriting] = useState(false);
@@ -88,9 +89,13 @@ export function SignOff({ run, bridge, card, result, title, brief }: { run?: str
     setBusy(true);
     try {
       const said = reaction === 'down' ? note.trim() : undefined;
-      if (bridge && !run) await api.reviewTeam(bridge, reaction, said);
-      else await api.reactRun(run || '', 0, reaction, said);
-      markAnswered({ kind: 'verdict', run, bridge, card: card ? card.id : undefined, words: reaction === 'up' ? 'You marked this right' : 'You sent this back with your note' });
+      // The verdict goes to POST /v1/work/review, which lands also on a run
+      // whose worker the pool replaced: the answer then says kept, and the
+      // note of Needs work stays with the result.
+      const ans = bridge && !run ? await api.reviewTeam(bridge, reaction, said) : await api.reviewRun(run || '', reaction, said);
+      const kept = !!(ans && ans.kept);
+      const words = reaction === 'up' ? 'You marked this right' : kept ? 'You sent this back. No agent holds this task any more, so your note stays with the result' : 'You sent this back with your note';
+      markAnswered({ kind: 'verdict', run, bridge, card: card ? card.id : undefined, words });
     } catch (e) {
       if (e instanceof ApiError && e.status === 409) setGone(e.message);
       else if (e instanceof ApiError && e.status === 400) setError(e.message);

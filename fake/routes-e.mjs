@@ -30,8 +30,11 @@
 //   GET    /v1/playbooks/{name}             the playbook whole
 //   PUT    /v1/playbooks/{name}             {"goal", "placement", "seats", "caps", "delegation", "revision"}: 201, 200, 400, or 409
 //   DELETE /v1/playbooks/{name}             204
-//   GET    /v1/inbox                        {"items": [{"kind", "run", "approval", "duty", "agent", "bridge", "text", "since"}],
-//                                            "waiting": {"count", "needsYou", "toCheck", "notes"}}: the one count of the board
+//   GET    /v1/inbox                        {"items": [{"kind", "run", "approval", "duty", "agent", "bridge", "question", "handle",
+//                                            "note", "text", "since", "card", "summary", "channel", "costUSD", "actions"}],
+//                                            "waiting": {"count", "needsYou", "toCheck", "notes"}}: one item per card that the
+//                                            count counts, with its ways out in actions, then the failures and the paused jobs,
+//                                            which wait for no move, then each note that waits, as inbox.fromBoard builds it
 //
 // The header X-Time-Zone gives the zone of a schedule that names none. The
 // fake reads the words of a person with a small grammar, as the front
@@ -1090,15 +1093,47 @@ export function register({ on, refuse, readJson, now, AGENTS, admin, S, publish 
 
   /* ---------- the inbox ---------- */
 
-  // What needs the person from the duties: a paused duty, a failed last run, and a run of a duty that waits for an answer.
+  // The ways out of an item, by its kind (inbox.actionsOf).
+  const ACTIONS = { result: ['looks-right', 'needs-work'], question: ['answer', 'decline'], approval: ['allow', 'deny'], note: ['keep', 'refuse'] };
+  const lowerFirst = (t) => (t.length > 1 && /[A-Z]/.test(t[1]) ? t : t.charAt(0).toLowerCase() + t.slice(1));
+
+  /** holder finds the first unused item that holds a card: a result for To check, a decision or a question for Needs you (inbox.holder). */
+  const holder = (card, items, used) => {
+    const fits = (it) => (card.stage === 'review' ? it.kind === 'result' : it.kind === 'approval' || it.kind === 'question');
+    let i = items.findIndex((it, k) => !used.has(k) && fits(it) && it.run && it.run === card.links.run && (card.kind !== 'bridge' || it.bridge === card.links.bridge));
+    if (i < 0) i = items.findIndex((it, k) => !used.has(k) && fits(it) && ((card.links.bridge && it.bridge === card.links.bridge) || (card.kind !== 'bridge' && it.run && (card.links.runs || []).includes(it.run))));
+    return i;
+  };
+
+  /** cardItem is the item of a card that no record holds (inbox.cardItem). */
+  const cardItem = (card) => {
+    const it = { kind: 'result', run: card.kind === 'bridge' ? '' : card.links.run || '', approval: card.links.approval || '', duty: card.links.duty || '', agent: '', bridge: card.links.bridge || '', since: card.since, text: card.title + ': ' + lowerFirst(card.reason || '') };
+    if (card.stage === 'review' && card.kind !== 'bridge') it.text = /^Found: /.test(card.reason || '') ? card.title + ': it found something.' : card.title + ': a result to check.';
+    if (card.stage === 'needs-you') it.kind = /^Asks|asks: /.test(card.reason || '') ? 'question' : 'approval';
+    return it;
+  };
+
+  // What needs the person: the records of the duties, the runs, and the seats of the channels, then one item per card
+  // that the one count counts, with the details of the record that holds it, as the front builds it (inbox.fromBoard).
   on('GET', '/v1/inbox', (c) => {
-    const items = [];
+    const records = [];
     for (const d of D.values()) {
       const last = d.history[0];
-      if (d.paused) items.push({ kind: 'paused', run: '', approval: '', duty: d.name, agent: d.agent, bridge: '', text: d.state && d.state.pausedReason ? 'The job ' + d.name + ' paused itself: ' + d.state.pausedReason : 'Someone paused the job ' + d.name + '.', since: last ? last.at : now() });
-      else if (last && last.state === 'failed') items.push({ kind: 'failure', run: last.run || '', approval: '', duty: d.name, agent: d.agent, bridge: '', text: last.reason ? 'The job ' + d.name + ': ' + last.reason : 'A run of the job ' + d.name + ' failed.', since: last.at });
+      if (d.paused) records.push({ kind: 'paused', run: '', approval: '', duty: d.name, agent: d.agent, bridge: '', text: d.state && d.state.pausedReason ? 'The job ' + d.name + ' paused itself: ' + d.state.pausedReason : 'Someone paused the job ' + d.name + '.', since: last ? last.at : now() });
+      else if (last && last.state === 'failed') records.push({ kind: 'failure', run: last.run || '', approval: '', duty: d.name, agent: d.agent, bridge: '', text: last.reason ? 'The job ' + d.name + ': ' + last.reason : 'A run of the job ' + d.name + ' failed.', since: last.at });
       const run = last && last.run ? S.runs.get(last.run) : null;
-      if (run && run.state === 'input-required' && run.pending) items.push({ kind: run.pending.schema ? 'question' : 'approval', run: run.id, approval: run.pending.id, duty: d.name, agent: d.agent, bridge: '', text: d.agent + ' waits for your answer.', since: last.at });
+      if (run && run.state === 'input-required' && run.pending) records.push({ kind: run.pending.schema ? 'question' : 'approval', run: run.id, approval: run.pending.id, duty: d.name, agent: d.agent, bridge: '', text: d.agent + ' waits for your answer.', since: last.at });
+    }
+    // The seats of the channels that wait for a person: a question, or a decision of the newest run of the seat.
+    for (const b of S.bridges.values()) {
+      if (b.state !== 'open') continue;
+      for (const m of b.members) {
+        if (m.fired || m.presence !== 'needs-you') continue;
+        const run = m.runs.length ? S.runs.get(m.runs[m.runs.length - 1]) : null;
+        const pend = run && run.pending;
+        if (pend && pend.schema) records.push({ kind: 'question', run: run.id, approval: pend.id, duty: '', agent: m.agent, bridge: b.id, handle: m.handle, text: m.handle + ' asks in ' + b.title + ': ' + (pend.reason || ''), since: pend.requestedAt || run.updatedAt });
+        else if (pend) records.push({ kind: 'approval', run: run.id, approval: pend.id, duty: '', agent: m.agent, bridge: b.id, handle: m.handle, text: m.handle + ' in ' + b.title + ' waits for a decision.', since: pend.requestedAt || run.updatedAt });
+      }
     }
     // A result to check: a run whose owner asked to check each result, until a person reacts. A duty that tells only of
     // what it finds gives the people of notify.result a result that found something.
@@ -1108,15 +1143,33 @@ export function register({ on, refuse, readJson, now, AGENTS, admin, S, publish 
       if (!inReview(r)) continue;
       const found = (r.metadata || {})['workbench.review'] !== '1' && !!foundLine(r);
       const title = r.title || (d && d.title) || 'A result';
-      items.push({ kind: 'result', run: r.id, approval: '', duty, agent: r.agent, bridge: '', text: found ? title + ': it found something.' : title + ' is ready to check.', since: r.updatedAt });
+      records.push({ kind: 'result', run: r.id, approval: '', duty, agent: r.agent, bridge: '', text: found ? title + ': it found something.' : title + ' is ready to check.', since: r.updatedAt });
     }
-    // The one count of the work that needs the person comes from the lanes of the board, and a team whose agents
-    // finished is a result to check, with its bridge and no run.
     const b = board(S, c.person.subject, {});
+    const items = [];
+    const used = new Set();
     for (const card of b.cards) {
-      if (card.kind !== 'bridge' || card.stage !== 'review' || card.next !== 'you') continue;
-      items.push({ kind: 'result', run: '', approval: '', duty: '', agent: card.agents[0] || '', bridge: card.links.bridge, text: card.title + ': the agents finished, and the result waits for a check.', since: card.since });
+      if (card.next !== 'you' || (card.stage !== 'needs-you' && card.stage !== 'review')) continue;
+      const k = holder(card, records, used);
+      const it = k >= 0 ? { ...records[k] } : cardItem(card);
+      if (k >= 0) used.add(k);
+      it.card = card.id;
+      it.costUSD = card.costUSD || 0;
+      it.summary = card.summary || (it.kind === 'question' ? String(it.text || '').replace(/^[^:]*: /, '') : '');
+      if (card.kind === 'bridge') it.channel = card.title;
+      if (!it.agent && card.agents.length) it.agent = card.agents[0];
+      it.actions = ACTIONS[it.kind] || [];
+      items.push(it);
     }
-    return { items, waiting: b.waiting };
+    // A failure and a paused job wait for no move, so the count leaves them out, and they have no way out here.
+    for (const it of records) if (it.kind === 'failure' || it.kind === 'paused') items.push(it);
+    // A note that waits for the person under ask first is an item too, with Keep and Not now.
+    const notes = S.notesFor ? S.notesFor(c) : [];
+    for (const w of notes) {
+      const what = w.what === 'updated' ? `${w.agent} changed its note ${w.subject.note}. Keep the change?` : w.what === 'put-away' ? `${w.agent} wants to put its note ${w.subject.note} away. Put it away?` : `${w.agent} wrote a note, ${w.subject.note}. Keep it?`;
+      items.push({ kind: 'note', run: w.run || '', approval: '', duty: '', agent: w.agent, bridge: '', note: w.id, text: what, since: w.at, actions: ACTIONS.note });
+    }
+    const waiting = { ...b.waiting, notes: notes.length, count: b.waiting.needsYou + b.waiting.toCheck + notes.length };
+    return { items, waiting };
   });
 }

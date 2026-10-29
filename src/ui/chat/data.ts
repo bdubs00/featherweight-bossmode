@@ -15,7 +15,7 @@ import { useDuties, loadDuties, loadInbox } from '../../state/duties';
 import type { Entry } from '../../api/types';
 import { dutyTitle } from '../../lib/duties';
 import { titleOfName } from '../../lib/duties';
-import { needsOf, needsOfCount, type NeedRow } from './needs';
+import { fromItems, needsOf, needsOfCount, needsOfItems, type NeedRow } from './needs';
 
 /** A value that many views read, with the views that follow it. */
 function shared<T>(init: T) {
@@ -70,6 +70,8 @@ export interface Answer {
   bridge?: string;
   approval?: string;
   card?: string;
+  /** The waiting change of a note that the person kept or refused. */
+  note?: string;
   /** The line that stays, such as You marked this right. The time follows it. */
   words: string;
   at: string;
@@ -89,8 +91,10 @@ export function useAnswered(): Answer[] {
 }
 
 /** answers reports whether an answer of the person takes a row off Needs you. */
-export function answers(a: Answer, r: Pick<NeedRow, 'kind' | 'run' | 'bridge' | 'approval' | 'card'>): boolean {
+export function answers(a: Answer, r: Pick<NeedRow, 'kind' | 'run' | 'bridge' | 'approval' | 'card' | 'note'> & { key?: string }): boolean {
   if (a.card && r.card === a.card) return true;
+  // Keep or Not now on a note takes off the row of that note, whichever list holds it.
+  if (a.note) return r.note === a.note || r.key === 'k:' + a.note || r.key === 'n:' + a.note;
   // The answer of a question of a channel takes off the question of that channel, which names no approval.
   if (a.kind === 'decision' && !a.approval) return !!a.bridge && r.kind === 'question' && r.bridge === a.bridge && !r.approval;
   if (a.kind === 'decision') return !!a.approval && r.approval === a.approval && (!a.run || !r.run || r.run === a.run);
@@ -210,6 +214,7 @@ export function useNeeds(): NeedRow[] {
   const cards = useBoard();
   const notes = useWaiting();
   const count = useOneCount();
+  const items = useDuties((s) => s.inbox);
   const { rows } = useInboxRows();
   const faces = useSelect((s) => s.faces);
   const bridges = useSelect((s) => s.bridges);
@@ -217,23 +222,24 @@ export function useNeeds(): NeedRow[] {
   const channels = useSelect((s) => s.channels);
   const list = useDuties((s) => s.list);
   const done = useAnswered();
-  return useMemo(
-    () =>
-      (count ? needsOfCount : needsOf)({
-        cards: cards ? cards.cards : null,
-        rows,
-        waiting: notes,
-        agentName: (a) => agentNameOf({ faces }, a),
-        channelTitle: (id) => (bridges.byId[id] ? bridges.byId[id].title : 'a channel'),
-        jobTitle: (name) => {
-          const d = (list || []).find((x) => x.name === name);
-          return d ? dutyTitle(d) : name;
-        },
-        answerOf: (run) => (runs[run] && runs[run].output) || '',
-        lastPostOf: (bridge) => lastPost(channels[bridge]),
-      }),
-    [cards, notes, count, rows, faces, bridges, list, runs, channels],
-  ).filter((r) => !done.some((a) => answers(a, r)));
+  return useMemo(() => {
+    const input = {
+      cards: cards ? cards.cards : null,
+      rows,
+      waiting: notes,
+      agentName: (a: string) => agentNameOf({ faces }, a),
+      channelTitle: (id: string) => (bridges.byId[id] ? bridges.byId[id].title : 'a channel'),
+      jobTitle: (name: string) => {
+        const d = (list || []).find((x) => x.name === name);
+        return d ? dutyTitle(d) : name;
+      },
+      answerOf: (run: string) => (runs[run] && runs[run].output) || '',
+      lastPostOf: (bridge: string) => lastPost(channels[bridge]),
+    };
+    // A front that names the task and the ways out of each item gives the list as it is, so the rows equal its count.
+    if (count && items && fromItems(items)) return needsOfItems(input, items);
+    return (count ? needsOfCount : needsOf)(input);
+  }, [cards, notes, count, items, rows, faces, bridges, list, runs, channels]).filter((r) => !done.some((a) => answers(a, r)));
 }
 
 /** lastPost is the text of the newest post of an agent in a channel that the page read, or "". */
@@ -255,8 +261,14 @@ export function useNeedsCount(): number {
   const count = useOneCount();
   const rows = useNeeds();
   const done = useAnswered();
+  const items = useDuties((s) => s.inbox);
   // The rows that the person answered here leave the count at once, until the next read of the server agrees.
   const gone = useHiddenCount(done);
+  if (count && items && fromItems(items)) {
+    // The rows are the counted items less those that the person answered here.
+    const counted = items.filter((it) => !!it.card || it.kind === 'note').length;
+    return Math.max(0, count.count - Math.max(0, counted - rows.length));
+  }
   return count ? Math.max(0, count.count - gone) : rows.length;
 }
 

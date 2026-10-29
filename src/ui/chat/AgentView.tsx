@@ -20,7 +20,7 @@ import { attempt, showSaid } from '../notice';
 import { Glyph } from '../icons';
 import { Button, Led, Mark } from '../primitives';
 import { agentStatus, pageWords, type Status } from './channels';
-import { agentNameOf, reloadWaiting, useWaiting } from './data';
+import { agentNameOf, markAnswered, reloadWaiting, useWaiting } from './data';
 import { Clock } from './Sidebar';
 import { chatHref } from './route';
 import { shortTime } from './channels';
@@ -111,6 +111,8 @@ export function AgentView({ name }: { name: string }) {
     const ok = await attempt(() => knowhowApi.decide(id, keep));
     if (!ok) return;
     showSaid(keep ? 'Kept the note.' : 'Left the note out.');
+    // The note leaves Needs you and every count at once, as an answer anywhere does.
+    markAnswered({ kind: 'decision', note: id, words: keep ? 'You kept this note' : 'You left this note out' });
     reloadWaiting();
   };
   const shownNotes = (notes || []).filter((n) => n.state !== 'put-away');

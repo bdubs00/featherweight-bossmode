@@ -13,7 +13,7 @@
 // such as a paused job, which stand on their own.
 
 import type { WaitingChange } from '../../api/knowhow';
-import type { Decision, WorkCard } from '../../api/types';
+import type { Decision, InboxAction, InboxItem, WorkCard } from '../../api/types';
 import type { InboxRow } from '../../state/inbox';
 import { needsPerson } from '../../state/inbox';
 import { briefOf, planOf, verbOf } from '../../lib/decision';
@@ -44,6 +44,13 @@ export interface NeedRow {
   duty?: string;
   /** The task of the board that the row stands for. */
   card?: string;
+  /** The ways out of the row, as the front names them on its item. An older front names none. */
+  actions?: InboxAction[];
+  /** The question of an agent in its channel, by its seq, and the handle that asks. */
+  question?: number;
+  handle?: string;
+  /** The waiting change of a note. */
+  note?: string;
 }
 
 export interface NeedsInput {
@@ -299,3 +306,73 @@ export function needsOfCount(i: NeedsInput): NeedRow[] {
   for (const r of rows) if (r.kind === 'note') out.push(rowOf(i, r));
   return out.sort((a, b) => ms(b.at) - ms(a.at));
 }
+
+/** The kind of a row for the kind of an item of the inbox. */
+const ITEM_KIND: Record<string, NeedKind> = { result: 'check', question: 'question', approval: 'asks', note: 'suggestion' };
+
+/** itemHref is where the person takes a way out of an item: the sign-off at the top of a channel or a task, the cards of a channel, a task, or the agent of a note. */
+function itemHref(it: InboxItem): string {
+  if (it.kind === 'note') return it.agent ? chatHref({ view: 'agent', name: it.agent }) : '#';
+  // A decision or a question of a channel waits on the tab Decisions of the channel, which holds every card that waits.
+  if (it.bridge && (it.kind === 'question' || it.kind === 'approval')) return chatHref({ view: 'channel', id: it.bridge, tab: 'decisions' });
+  if (it.bridge && it.kind === 'result') return chatHref({ view: 'channel', id: it.bridge, tab: 'posts' });
+  if (it.run) return chatHref({ view: 'run', id: it.run });
+  if (it.bridge) return chatHref({ view: 'channel', id: it.bridge, tab: 'decisions' });
+  if (it.duty) return chatHref({ view: 'job', name: it.duty });
+  return '#';
+}
+
+/** itemHead is the first line of a row of an item: its summary, else the answer or the newest post of its result, else its text without the title in front. */
+function itemHead(i: NeedsInput, it: InboxItem): string {
+  if (it.summary) return oneLine(it.summary);
+  if (it.kind === 'result') {
+    const answer = it.run && i.answerOf ? i.answerOf(it.run) : '';
+    if (answer) return oneLine(answer);
+    const post = it.bridge && i.lastPostOf ? i.lastPostOf(it.bridge) : '';
+    if (post) return oneLine(post);
+  }
+  return oneLine(it.text || '') || (it.kind === 'note' ? 'A note waits for you.' : 'It waits for you.');
+}
+
+/**
+ * needsOfItems builds the rows of Needs you from the items of the inbox of
+ * the front: one row per item that the one count counts, the item of a task
+ * of the board (card) and each note that waits, newest first. So the rows
+ * equal the count. Each row keeps the ways out of its item (actions) and
+ * what it is about, so an answer on the page takes it off at once. A failure
+ * and a paused job wait for no move, so they are no row.
+ */
+export function needsOfItems(i: NeedsInput, items: InboxItem[]): NeedRow[] {
+  const out: NeedRow[] = [];
+  for (const it of items) {
+    if (!it.card && it.kind !== 'note') continue;
+    const kind = ITEM_KIND[it.kind] || 'question';
+    const head = itemHead(i, it);
+    const where = it.channel || (it.bridge ? i.channelTitle(it.bridge) : it.duty ? i.jobTitle(it.duty) : '');
+    const who = it.handle || (it.agent ? i.agentName(it.agent) : '');
+    const cost = it.costUSD && it.costUSD > 0 ? costText(it.costUSD) : '';
+    const parts = kind === 'suggestion' ? [who] : [where, who, cost];
+    out.push({
+      key: it.card ? 'card:' + it.card : 'n:' + (it.note || it.since || ''),
+      kind,
+      agent: it.agent || '',
+      head,
+      line: lineOf(head, [ACTION[kind], ...parts]),
+      at: it.since || '',
+      href: itemHref(it),
+      run: it.run || undefined,
+      bridge: it.bridge || undefined,
+      approval: it.approval || undefined,
+      duty: it.duty || undefined,
+      card: it.card || undefined,
+      actions: it.actions || [],
+      question: it.question || undefined,
+      handle: it.handle || undefined,
+      note: it.note || undefined,
+    });
+  }
+  return out.sort((a, b) => ms(b.at) - ms(a.at));
+}
+
+/** fromItems reports whether the items of the inbox come from a front that names the task of each item and its ways out, so Needs you reads them as they are. */
+export const fromItems = (items: InboxItem[] | null | undefined): boolean => !!items && items.some((it) => !!it.card || !!(it.actions && it.actions.length));

@@ -26,6 +26,7 @@ import type {
   WorkBoard,
   RunBudget,
   TeamVerdict,
+  ReviewAnswer,
   Marketplace,
   Member,
   MessagePage,
@@ -358,7 +359,14 @@ export const api = {
    * bridge to every seat, and the bridge stays open.
    */
   reviewTeam: (bridge: string, verdict: TeamVerdict, note?: string) =>
-    call<unknown>('/v1/work/review', { method: 'POST', body: note ? { bridge, verdict, note } : { bridge, verdict } }),
+    call<ReviewAnswer>('/v1/work/review', { method: 'POST', body: note ? { bridge, verdict, note } : { bridge, verdict } }),
+  /**
+   * reviewRun checks the result of a run (POST /v1/work/review). It lands
+   * also on a run whose worker the pool replaced: the answer then says kept,
+   * and the note of Needs work stays with the result.
+   */
+  reviewRun: (run: string, verdict: TeamVerdict, note?: string) =>
+    call<ReviewAnswer>('/v1/work/review', { method: 'POST', body: note ? { run, verdict, note } : { run, verdict } }),
   /** letGo lets a stopped card go (POST /v1/work/letgo). The card moves to Done with the verdict let-go. A second call does nothing. */
   letGo: (card: string) => call<unknown>('/v1/work/letgo', { method: 'POST', body: { card } }),
   /**

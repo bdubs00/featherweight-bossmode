@@ -3,9 +3,10 @@
 //
 //   GET /v1/work?days=7&all=false   {"sentence", "lanes": [{"stage", "count", "yours", "oldest"}], "cards": [<card>], "days",
 //                                   "done", "waiting": {"count", "needsYou", "toCheck", "notes"}}
-//   POST /v1/work/review            {"bridge", "verdict", "note"}: the check of a team. up closes the bridge with
-//                                   the verdict accepted. down posts the note in the bridge to every seat, and the
-//                                   bridge stays open.
+//   POST /v1/work/review            {"bridge" or "run", "verdict", "note"}: the check of a team or of a run. For a
+//                                   team, up closes the bridge with the verdict accepted, and down posts the note in
+//                                   the bridge to every seat, and the bridge stays open. For a run, the verdict is a
+//                                   thumb on its result; on a run whose worker the pool replaced it answers kept.
 //   POST /v1/work/letgo             {"card"}: lets a stopped card go. The card moves to Done with the verdict let-go
 //                                   and the reason "Let go by <name>.". Only the person whose move it is, or an
 //                                   owner of its agent, can. A second call does nothing.
@@ -184,6 +185,30 @@ function settle(card, parts, me) {
   return card;
 }
 
+/** firstLine is the first line of a text with words, without the marks of a heading, at most 200 characters. */
+const firstLine = (t) => (String(t || '').split('\n').map((s) => s.replace(/^#+\s*/, '').replace(/^[-*]\s+/, '').trim()).find(Boolean) || '').slice(0, 200);
+
+/** summaryOf is the line of a card that says what it holds, or "". */
+function summaryOf(S, card) {
+  if (card.stage === 'review') {
+    if (card.kind === 'bridge') {
+      const ch = S.channels.get(card.links.bridge) || [];
+      const e = [...ch].reverse().find((x) => x.from && x.from.kind === 'agent' && x.text);
+      return e ? firstLine(e.text) : '';
+    }
+    const runs = card.links.runs || [];
+    const r = S.runs.get(card.links.run || runs[runs.length - 1] || '');
+    return r && r.output ? firstLine(r.output) : '';
+  }
+  if (card.stage === 'needs-you') {
+    const r = card.links.run ? S.runs.get(card.links.run) : null;
+    if (r && r.pending) return r.pending.schema ? firstLine(r.pending.reason) : 'Asks before it runs ' + (r.pending.tool || 'a tool') + (r.pending.reason ? ': ' + firstLine(r.pending.reason) : '.');
+    const m = /asks: (.*)$/.exec(card.reason || '');
+    return m ? m[1] : '';
+  }
+  return '';
+}
+
 export function board(S, me, { days = 7, all = false } = {}) {
   const now = Date.now();
   const cards = [];
@@ -356,6 +381,12 @@ export function board(S, me, { days = 7, all = false } = {}) {
   }
   const done = shown.filter((c) => c.stage === 'done' && ['accepted', 'checked', 'sent-back', 'unchecked'].includes(c.verdict)).length;
   const yours = (stage) => lanes.find((l) => l.stage === stage).yours;
+  // What each card is about in one line, as the front says it (Card.summary): the question, what a decision asks, the
+  // first line of the result of a run, or for a team the first line of the newest post of an agent in its channel.
+  for (const card of shown) {
+    const s = summaryOf(S, card);
+    if (s) card.summary = s;
+  }
   const waiting = { needsYou: yours('needs-you'), toCheck: yours('review'), notes: 0 };
   waiting.count = waiting.needsYou + waiting.toCheck + waiting.notes;
   return { sentence: sentence(lanes, shown.length, days, now, done), lanes, cards: shown, days, done, waiting };
@@ -384,7 +415,11 @@ export function register({ on, refuse, readJson, S, now, AGENTS, admin, viewerOf
     if (!Number.isInteger(days) || days < 1 || days > 90) refuse(400, 'days is not 1 to 90');
     const all = q.get('all');
     if (all && all !== 'true' && all !== 'false') refuse(400, 'all is true or false');
-    return board(S, c.person.subject, { days, all: all === 'true' });
+    const b = board(S, c.person.subject, { days, all: all === 'true' });
+    // The notes that wait for the person count in the one count, as the front counts them.
+    const notes = S.notesFor ? S.notesFor(c).length : 0;
+    b.waiting = { ...b.waiting, notes, count: b.waiting.needsYou + b.waiting.toCheck + notes };
+    return b;
   });
 
   // The check of a team: up closes the bridge as accepted, and down posts the note to every seat.
@@ -398,7 +433,21 @@ export function register({ on, refuse, readJson, S, now, AGENTS, admin, viewerOf
     if (verdict === 'down' && !note) refuse(400, 'Needs work needs a note that says what must change.');
     if (note.length > 4000) refuse(400, 'the note is at most 4000 bytes of text');
     if (viewerOf(c.person)) refuse(403, 'checking a result needs the operator role');
-    if (!body.bridge) refuse(400, 'the check of a team names its bridge');
+    if (body.run && body.bridge) refuse(400, 'the check names a run or a channel, not both');
+    // The check of a run: a thumb on its result. It lands also on a run whose worker the pool replaced: the front keeps
+    // the verdict there and answers kept, and the note of Needs work stays with the result.
+    if (body.run) {
+      const run = S.runs.get(String(body.run));
+      if (!run) refuse(404, `no run ${body.run}`);
+      run.reactions = { ...(run.reactions || {}), [verdict]: ((run.reactions || {})[verdict] || 0) + 1 };
+      if (note) run.reviewNote = note;
+      run.seq = (run.seq || 0) + 1;
+      run.updatedAt = now();
+      publish('run', run);
+      const kept = !!run.archived;
+      return { run: run.id, reaction: verdict, followUp: verdict === 'down' && !kept, ...(kept ? { kept: true } : {}) };
+    }
+    if (!body.bridge) refuse(400, 'the check names its run or its channel');
     const b = S.bridges.get(String(body.bridge));
     if (!b) refuse(404, `no bridge ${body.bridge}`);
     if (b.operator !== c.person.subject && !admin()) refuse(403, 'only the person who opened the bridge checks its result');
