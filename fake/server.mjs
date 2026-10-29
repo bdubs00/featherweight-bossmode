@@ -801,7 +801,10 @@ function heart(bridgeId, e, person, note) {
   const p = `agents/${agent}/learned.md`;
   const old = live(S.pages.get(p));
   const head = old ? old.text : `# What people liked from ${agent}\n`;
-  const entry = `\n## ${now().slice(0, 10)}, bridge ${bridgeId}, ${e.from.handle || agent}\n\n${person.name} hearted: ${e.text.replace(/\s+/g, ' ').slice(0, 280)}${note ? `\n\nTheir note: ${note}` : ''}\n`;
+  // The heading of the server now: the date, the channel by its title and id, the handle, and the run.
+  const who = e.from.handle || agent;
+  const run = e.mirrors ? e.mirrors.run : '';
+  const entry = `\n## ${now().slice(0, 10)}, channel ${JSON.stringify(b.title || bridgeId)} (${bridgeId}), ${who}${run ? ', run ' + run : ''}\n\n- What ${who} did: ${e.text.replace(/\s+/g, ' ').slice(0, 280)}\n${note ? `- The note of ${person.name}: ${note}\n` : ''}${run ? `- [Open the run](#run/${run})\n` : ''}`;
   writePage(p, (head + entry).slice(-64 * 1024), 'bossmode', 'A heart from ' + person.name.toLowerCase());
 }
 

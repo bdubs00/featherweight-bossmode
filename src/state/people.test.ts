@@ -269,7 +269,8 @@ describe('the profile', () => {
       '',
       'The front adds an entry for each heart. The newest entry comes first.',
       '',
-      '## 2026-10-22, bridge "boss A 20261022-032331" (01m5h7wt3wxph1gxc34gqz2tnq), reviewer, run 01M5H7WXC6MCR0QGT4CM8JAX0B',
+      // The server writes channel in the heading now, and an older page keeps bridge: the page reads both.
+      '## 2026-10-22, channel "boss A 20261022-032331" (01m5h7wt3wxph1gxc34gqz2tnq), reviewer, run 01M5H7WXC6MCR0QGT4CM8JAX0B',
       '',
       '- What token asked: Reply with the single word READY and nothing else. Use no tool.',
       '- What reviewer did: ACK',

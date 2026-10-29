@@ -10,11 +10,13 @@ import { forgetQueued } from '../state/queued';
 let calls: Call[] = [];
 let restore = () => {};
 
-// What people liked, as the front writes it: the newest entry first.
+// What people liked, as the server writes it: the newest entry first. The
+// newest heading says channel, as the server writes it now, and the older
+// one says bridge, as an older page keeps it.
 const LEARNED = [
   '# What people liked from migrator',
   '',
-  '## 2026-10-22, bridge "Migrate Puppet" (b1), migrator-1, run 01RUN1',
+  '## 2026-10-22, channel "Migrate Puppet" (b1), migrator-1, run 01RUN1',
   '',
   '- What alice asked: Migrate the cron module.',
   '- What migrator did: Ran the lint.',
@@ -123,6 +125,9 @@ describe('the profile', () => {
     ]);
     expect(first.querySelector('a.prof-link')!.getAttribute('href')).toBe('#bridge/b1/run/01RUN1/migrator-1');
     expect(el.querySelectorAll('.liked li')[1].querySelector('.liked-note')).toBeNull();
+    // The entry of the older form links its run in its channel too.
+    expect(el.querySelectorAll('.liked li')[1].querySelector('a.prof-link')!.getAttribute('href')).toBe('#bridge/b1/run/01RUN2/migrator-2');
+    expect(el.querySelector('.liked')!.textContent).not.toMatch(/\bbridge\b/);
     expect([...el.querySelectorAll('.prof-link')].map((a) => a.getAttribute('href'))).toContain('#pages/agents/migrator/learned.md');
     expect(el.querySelector('.help-key')!.getAttribute('aria-label')).toBe('What is a worker');
     expect((el.querySelector('.keep input') as HTMLInputElement).value).toBe('1');

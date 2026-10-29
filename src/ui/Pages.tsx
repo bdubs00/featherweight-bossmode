@@ -13,6 +13,7 @@ import { useSelect } from '../state/store';
 import { loadPages } from '../state/actions';
 import { stripFrontMatter } from '../lib/markdown';
 import { INDEX_PATH, byPagePath, pageName, pageReason, withSuffix } from '../lib/pagepath';
+import { isLearnedPath, learnedPageText } from '../lib/learned';
 import { ago, personName, since } from '../lib/words';
 import { go, hrefOf } from '../lib/route';
 import { useRoving } from './keys';
@@ -531,7 +532,8 @@ export function PageView({ path, version }: { path: string; version?: number }) 
         ) : (
           <>
             <Parts page={page} tags={fm!.tags} brief={!!version} n={n} />
-            <Markdown text={withoutTitle(fm!.body, title)} base={path} class="article" />
+            {/* The page of the hearts of an agent shows its headings in the words of the page, with channel and no id. */}
+            <Markdown text={withoutTitle(isLearnedPath(path) ? learnedPageText(fm!.body) : fm!.body, title)} base={path} class="article" />
           </>
         )}
       </div>
