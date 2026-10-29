@@ -872,11 +872,11 @@ the page before the walk.
 | `routines` | The first board of the routines: a routine that needs your sign-off, the list, and the week of triage | 1440 in both themes, 800 in graphite, and 390 in light |
 | `routines-evidence` | The second board: the evidence of that routine | 1440, both |
 | `routines-signed` | The third board: the routine after Sign off, on the tab Runbook | 1440, light |
-| `knowhow` | Know-how of triage: the agents, the four numbers, the held-back line, the switch, two cards Keep this?, and the journal | 1440 in both themes, and 390 in light |
+| `knowhow` | Know-how of triage: the agents, the four numbers, the comparison line, the switch, two cards Keep this?, and the journal | 1440 in both themes, and 390 in light |
 | `knowhow-waiting` | The two cards Keep this? alone | 1440, both |
 | `knowhow-notes` | The tab Notes with the note that is out of date open | 1440, both |
 | `knowhow-routines` | The tab Routines of triage | 1440, both |
-| `knowhow-few` | Identity desk, which held back too few runs for a percentage | 1440, light |
+| `knowhow-few` | Identity desk, which has too few comparison runs for a percentage | 1440, light |
 | `knowhow-changed` | The quiet line after Keep met a note that changed since | 1440, light |
 
 The shots of Know-how keep `FAKE_ADMIN=1 FAKE_A=1 FAKE_QUIET=1`. A headless
@@ -1376,7 +1376,7 @@ The work:
 - The header of the place. It sits on top of every tab: `Last 7 days`,
   then three figures and one line. The figures are cost per job with its
   trend, done by routines with the runs that it counts, and notes
-  corrected. The line compares the held-back runs with the others. Then
+  corrected. The line compares the comparison runs with the others. Then
   comes the switch `Ask me before it keeps what it learns`. A person who
   does not own the agent gets no switch. For that person, a line says `It
   asks an owner before it keeps what it learns.` while the switch is on.
@@ -1385,8 +1385,8 @@ The work:
   it is on, an owner has the quiet key Review now beside the switch. It
   starts the review of the agent at once, and the notice of the page says
   that it started, or why nothing needs a review.
-- The rule of 20. The server applies it to the held-back runs and words
-  the line. Under 20, the line says `Not enough held-back runs yet.` The
+- The rule of 20. The server applies it to the comparison runs and words
+  the line. Under 20, the line says `Not enough comparison runs yet.` The
   page keeps the rule for its own figures. Under 20 runs, the share done
   by routines gives counts, such as `4 of 12`, and the trend keeps only
   its word, such as `down`. Two costs that two decimals write the same
@@ -1459,3 +1459,40 @@ Left out, and why:
   waits.
 - A label for an unchecked note. The contract names three labels, so a
   note without a source that can go out of date has none.
+
+### 11.14 Round 2 of the owner: every place in one shell
+
+The owner looked at the chat-first page live and asked for one look across
+the page. Every place now opens in the shell of `src/ui/chat/ChatApp.tsx`:
+the top bar, the sidebar, the middle, and the pane at the right. No place
+keeps the older app bar.
+
+| Place | Where it lives now | Why |
+|---|---|---|
+| Results | A view of the middle, from the grid | It answers one question, what the work gave, and needs no list. |
+| Agents | A view of the middle, from the grid: one row per agent, and New agent | An agent is a member of the workspace, as a person is in a chat client. |
+| The setup of an agent | The pane at the right of the agent view (`#a/<agent>`), and `#a/<agent>/setup` on a narrow window | The agent view says what the agent does; the setup beside it says how it is set up, as the members of a channel sit beside its posts. |
+| Know-how | Its parts show on the agent: the notes that wait, Notes, the routines of its jobs, the comparison line, the switch, and What it learned | Each part is about one agent, and a person looks for it there. |
+| Skills | The tab Skills of the Library | A skill is something an agent reads, as a page is. |
+| The wiki and the files | The tabs Wiki and Files of the Library | One place for what was written. |
+| Connections, where to reach you, packages, the switch of every job | Settings | A person sets them once. |
+| The board | Gone from the menu | Needs you, the channels, and Jobs answer what it answered. |
+| Appearance | Gone from the menu | The menu of the account holds the theme. |
+
+An older place without a home of its own, such as the editor of a job or
+New agent, shows its list as a column at the start of the middle and its
+details at the right. In the shell, a pane head has the height, the type,
+and the colors of the head of a channel, and no groove band.
+
+The selected row of the sidebar has the ground `--cf-sel` with the bar of
+the accent at its start. `--raised` equals the chrome of the light theme,
+so the first selected row showed only its edge there. The accent marks the
+place that shows, as it marks the tab that shows.
+
+Every scroll area of the shell takes one quiet bar: a thumb of `--line`,
+inset from the edge, with no track, that turns `--muted` under the pointer.
+Chrome draws it with the WebKit pseudo-elements, so the shell sets
+`scrollbar-width` and `scrollbar-color` back to `auto` there. A width of
+`thin` had turned the pseudo-elements off and drawn the light track of the
+system on the dark theme. Firefox takes `scrollbar-width: thin` and
+`scrollbar-color`.

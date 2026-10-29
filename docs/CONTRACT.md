@@ -1951,7 +1951,10 @@ The summary of `summary.go`:
   runs. The page shows the share from 20 runs, such as `2% of 1,817`, and
   counts below that, such as `4 of 12`.
 - `normal` and `heldBack` hold `runs`, `doneWell`, `byRoutine`, and
-  `costPerJobUsd`.
+  `costPerJobUsd`. `heldBack` keeps its old name: it holds the comparison
+  runs, which go without what the agent learned. The setting of their
+  share is `workbench.knowhow.comparisonRuns`; the workbench still reads
+  `heldBack` there as an old name.
 - `compare` holds `enough`, `heldBack`, `normal`, `oneIn`,
   `doneWellWithout`, `doneWellWith`, and `line`. The server applies the
   rule of 20 and words the line. The page shows `line`. With `enough`, it
@@ -2015,7 +2018,7 @@ The summary of triage in the fake:
   "normal": { "runs": 1817, "doneWell": 1653, "byRoutine": 41, "costPerJobUsd": 0.0196 },
   "heldBack": { "runs": 95, "doneWell": 78, "byRoutine": 0, "costPerJobUsd": 0.021 },
   "compare": { "enough": true, "heldBack": 95, "normal": 1311, "oneIn": 15, "doneWellWithout": 0.821, "doneWellWith": 0.91,
-    "line": "Held back 1 in 15 runs. Done well: 82% without what it learned, 91% with it." }
+    "line": "Comparison runs: 1 in 15. Done well: 82% without what it learned, 91% with it." }
 }
 ```
 

@@ -1307,7 +1307,7 @@ again can still say bridge.
 The words of section 2 of `docs/KNOWHOW.md` of the kernel hold here. A
 note is checked, out of date, resting, or put away, and it names its
 sources. The journal is What it learned, and undo takes back one entry.
-The others are the switch, waiting, after-work review, held back, and
+The others are the switch, waiting, after-work review, comparison run, and
 stepped back. These words never show: memory, ledger,
 cache, compile, guard, provenance, pointer, taint, librarian, holdout,
 ablation, manifest, CAS, hash, procedure, rung, shadow, decider,
@@ -1338,8 +1338,8 @@ calibration, receipt, and template. A test reads every tab for them.
 | new | add | the amber count of `Routines`, with `1 routine needs a sign-off` or `N routines need a sign-off` for a screen reader | done |
 | new | add | `Last 7 days` | done |
 | new | add | the figures `$0.02` with `cost per job, down 9%`, `2% of 1,912` with `done by routines`, and `3` with `notes corrected` | done |
-| new | add | `Held back 1 in 20 runs. Done well: 82% without what it learned, 91% with it. Cost per job: $0.021 without, $0.020 with.` | done |
-| new | add | `Not enough held-back runs yet.`, under 20 held-back runs | done |
+| new | add | `Comparison runs: 1 in 20. Done well: 82% without what it learned, 91% with it. Cost per job: $0.021 without, $0.020 with.` | done |
+| new | add | `Not enough comparison runs yet.`, under 20 comparison runs | done |
 | new | add | `No runs in the last 7 days.` | done |
 | new | add | `Ask me before it keeps what it learns`, the switch of an owner | done |
 | new | add | `It asks an owner before it keeps what it learns.`, for a person who does not own the agent | done |
@@ -1347,7 +1347,7 @@ calibration, receipt, and template. A test reads every tab for them.
 | new | add | the question mark `Why Know-how is off`, with the reason of the server | done |
 | new | add | the reason of the server while the after-work review is off, such as `The after-work review is off: no agent is set.` | done |
 | `cost per job, down 16%` | change | the trend of the server: `down` or `up` with the change in percent from 20 runs, and `about the same` for flat | done |
-| `Held back 1 in 20 runs. Done well: …` | change | the line of the server, and from 20 held-back runs the page adds `Cost per job: $0.021 without, $0.020 with.` | done |
+| `Comparison runs: 1 in 20. Done well: …` | change | the line of the server, and from 20 comparison runs the page adds `Cost per job: $0.021 without, $0.020 with.` | done |
 
 ### src/ui/Knowhow.tsx: the changes that wait
 
@@ -1398,3 +1398,24 @@ calibration, receipt, and template. A test reads every tab for them.
 | `manager` (the author of a post of the Manager) | change | `Manager`, also in `to Manager` and `Reply to Manager` | done |
 | `Wrote in its notes` (the line of a call of the memory tool whose change waits for a person) | change | `A note waits for you`. A change that the agent keeps still says `Wrote in its notes`. | done |
 | new | add | Make this a job: the choices `Who runs it`, one per agent of the channel with its handle and the first line of its task; no amount for a job that posts in its channel | done |
+| `held back`, `held-back run` | change | `comparison run`: 1 in 20 runs of a job go without what the agent learned, so you can see what learning is worth. The JSON field `heldBack` keeps its old name. | done |
+
+### src/ui/chat: every place in the shell, round 2 of the owner
+
+The places behind the grid of the sidebar open in the shell of the
+chat-first page, with the head, the type, and the colors of a channel. The
+older app bar and its frame are gone.
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| the grid: `Results`, `Agents`, `Jobs setup`, `Skills`, `Know-how`, `The board`, `Appearance` | change | `Results`, `Agents`, `Settings`. Skills sit in the Library. Know-how shows on each agent. Needs you, the channels, and Jobs replace the board. The theme sits in the menu of the account. | done |
+| `+` beside the name of the workspace | remove | The Manager and the search open a channel. | done |
+| new | add | `Agents` and its count, `New agent`, and one row per agent: its face, its status, what it does, and a tag per channel (`# Release notes for 2.4`) and per job | done |
+| new | add | `Setup`, the pane at the right of an agent: what it can do, its face, its hearts, and its packages. It names no worker and no figures of today. | done |
+| `Ready on 3 of 3 workers.`, `Updating on 1 of 3 workers.` | change | `Ready.`, `Updating now.` in the setup of an agent | done |
+| `The change waits for its worker to wake up.` | change | `The change takes effect at the next run.` | done |
+| `Workers take a change in about a minute. Work in progress does not stop.` | change | `A change takes about a minute. Work in progress does not stop.` | done |
+| new | add | On an agent: `Notes` with `current`, `out of date`, `resting`, or `waits for you`; `Routines of its jobs` with `proposed`, `rehearses`, `live`, `paused`, or `retired`; the comparison line; the switch `Ask me before it keeps a note` for an owner, else `It asks an owner before it keeps a note.` | done |
+| new | add | `Library` with the tabs `Wiki`, `Files`, and `Skills`. Files lists the pages of each channel, with their versions. | done |
+| `Teams` (a group of the wiki tree) | change | `Channels` | done |
+| new | add | `Settings`: `Where to reach you` with `Change where to reach you`, `Connections` with `Open the connections`, `Packages` with one key per agent that the person owns, and for an admin `Every job` with `Pause every job` or `Resume every job` | done |
