@@ -1389,3 +1389,12 @@ calibration, receipt, and template. A test reads every tab for them.
 | new | add | `Put away the note <title>.`, the notice | done |
 | new | add | `The change waits for a decision in What it learned.`, the notice of a write that waits (202) | done |
 | new | add | `Loading the notes.`, `Loading the note.`, `No note yet.` | done |
+
+### src/ui/chat: the chat-first page, round 2
+
+| Now | Verdict | New text | Who |
+|---|---|---|---|
+| `Needs your answer` (the title of a question card in the chat-first page) | change | `Asks you`, beside `Asks first`. The older places keep `Needs your answer`. | done |
+| `manager` (the author of a post of the Manager) | change | `Manager`, also in `to Manager` and `Reply to Manager` | done |
+| `Wrote in its notes` (the line of a call of the memory tool whose change waits for a person) | change | `A note waits for you`. A change that the agent keeps still says `Wrote in its notes`. | done |
+| new | add | Make this a job: the choices `Who runs it`, one per agent of the channel with its handle and the first line of its task; no amount for a job that posts in its channel | done |
