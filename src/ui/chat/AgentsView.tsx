@@ -3,7 +3,7 @@
 // for a person who can make one. An agent opens its view, with its setup at
 // the right.
 
-import { useMemo } from 'preact/hooks';
+import { useMemo, useState } from 'preact/hooks';
 import type { Agent } from '../../api/types';
 import { useSelect } from '../../state/store';
 import { selectAgents } from '../../state/agents';
@@ -57,15 +57,29 @@ function AgentRow({ a, manager }: { a: Agent; manager: boolean }) {
   );
 }
 
+/**
+ * described reports whether an agent says what it does: the tagline of its
+ * face or the description of its profile. An agent that says nothing is a
+ * part of the setup of the server, such as a pool for tests or a hook, and
+ * its lists show it apart, folded, or not at all.
+ */
+export function described(a: Pick<Agent, 'name' | 'description'>, faces: Record<string, { tagline?: string }>): boolean {
+  const f = faces[a.name];
+  return !!((f && f.tagline && f.tagline.trim()) || (a.description && a.description.trim()));
+}
+
 export function AgentsView() {
   const agents = useSelect(selectAgents);
+  const faces = useSelect((s) => s.faces);
   const manager = useSelect((s) => (s.config && s.config.manager ? s.config.manager.agent : ''));
   const make = useSelect((s) => mayCreateAgent(s.me));
-  // The profile default is the front itself, which no person talks to.
-  const list = useMemo(() => {
+  const [others, setOthers] = useState(false);
+  // The profile default is the front itself, which no person talks to. The agents that say what they do come first; the rest wait in Other agents.
+  const { list, rest } = useMemo(() => {
     const all = (agents || []).filter((a) => a.name !== 'default');
-    return [...all.filter((a) => a.name === manager), ...all.filter((a) => a.name !== manager)];
-  }, [agents, manager]);
+    const told = all.filter((a) => a.name === manager || described(a, faces));
+    return { list: [...told.filter((a) => a.name === manager), ...told.filter((a) => a.name !== manager)], rest: all.filter((a) => a.name !== manager && !described(a, faces)) };
+  }, [agents, manager, faces]);
   return (
     <section class="cf-view cf-agents" aria-labelledby="cf-agents-title">
       <header class="cf-head">
@@ -75,7 +89,7 @@ export function AgentsView() {
         <h1 class="cf-title" id="cf-agents-title">
           Agents
         </h1>
-        <span class="cf-head-n">{list.length}</span>
+        <span class="cf-head-n">{list.length + rest.length}</span>
         <span class="grow" />
         {make && (
           <Button size="s" kind="primary" href="#new-agent">
@@ -91,6 +105,25 @@ export function AgentsView() {
               <AgentRow a={a} manager={a.name === manager} />
             ))}
           </ul>
+          {rest.length > 0 && (
+            <section class="cf-asec cf-other-agents">
+              <button type="button" class="group-head cf-other-key" aria-expanded={others} onClick={() => setOthers(!others)}>
+                <Glyph name="back" size={14} />
+                <span>Other agents</span>
+                <span class="cf-sec-n">{rest.length}</span>
+              </button>
+              {others && (
+                <>
+                  <p class="cf-post-quiet">These agents say nothing of what they do. They are parts of the setup of the server, such as tests and hooks.</p>
+                  <ul class="cf-agent-list">
+                    {rest.map((a) => (
+                      <AgentRow a={a} manager={false} />
+                    ))}
+                  </ul>
+                </>
+              )}
+            </section>
+          )}
         </div>
       </div>
     </section>

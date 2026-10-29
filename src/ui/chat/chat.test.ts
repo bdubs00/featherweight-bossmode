@@ -229,7 +229,8 @@ describe('the lines of a channel', () => {
     expect(lineText('ann opened the team')).toBe('ann opened the channel');
     expect(lineText('migrator-1 took the seat')).toBe('migrator-1 joined');
     expect(lineText('ann seated tester again')).toBe('ann started tester again');
-    expect(lineText('tester lost its worker')).toBe('tester lost its run');
+    expect(lineText('tester lost its worker')).toBe('tester stopped: the agent that held its work was replaced');
+    expect(lineText('collector lost its run')).toBe('collector stopped: the agent that held its work was replaced');
   });
 });
 
@@ -382,5 +383,28 @@ describe('the files of the Library', () => {
     expect(parseChat('#library/homelab/proxmox/blanks.md')).toEqual({ view: 'files', path: 'homelab/proxmox/blanks.md' });
     expect(chatHref({ view: 'files', path: 'a b/c.md' })).toBe('#library/a%20b/c.md');
     expect(parseChat('#library')).toEqual({ view: 'files' });
+  });
+});
+
+describe('the words of the last page round', () => {
+  it('reads the answer of an agent to the person without @operator', () => {
+    expect(pageWords('Answer to @operator, on the ca-certificates package')).toBe('About the ca-certificates package');
+    expect(pageWords('@operator, the draft is ready')).toBe('you, the draft is ready');
+    expect(pageWords('The run reached its limit of maxToolCalls.')).toBe('The run reached its limit of tool calls.');
+  });
+  it('says that a job waits for the other app, and keeps a skip short', async () => {
+    const { skipWords } = await import('./Sidebar');
+    expect(skipWords('This job starts on the event of the other app, so the schedule starts nothing.')).toBe('waits for the other app');
+    expect(skipWords('The last run still worked when this time came, so the job skipped it.')).toBe('skipped: the last run still worked when…');
+  });
+  it('names the static token Admin token where a routine or a page names who moved it', async () => {
+    const { whoName } = await import('../../lib/lines');
+    expect(whoName('token', { subject: 'alice@example.com' })).toBe('Admin token');
+  });
+  it('shows the agents that say what they do, and leaves the rest apart', async () => {
+    const { described } = await import('./AgentsView');
+    expect(described({ name: 'scribe' }, { scribe: { tagline: 'What changed.' } })).toBe(true);
+    expect(described({ name: 'writer', description: 'Writes notes.' }, {})).toBe(true);
+    expect(described({ name: 'scratch' }, {})).toBe(false);
   });
 });

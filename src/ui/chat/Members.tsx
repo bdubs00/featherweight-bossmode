@@ -23,6 +23,7 @@ import { entriesOf } from '../../state/reducer';
 import { agentNameOf } from './data';
 import { Clock } from './Sidebar';
 import { MakeJob } from './MakeJob';
+import { described } from './AgentsView';
 import { chatHref } from './route';
 
 /** handleFor makes a free handle for a new agent of a channel: its name, then its name with a number. */
@@ -119,7 +120,8 @@ function AddAgent({ id, taken }: { id: string; taken: string[] }) {
   const manager = useSelect((s) => (s.config && s.config.manager ? s.config.manager.agent : ''));
   const goal = useSelect((s) => (s.bridges.byId[id] ? s.bridges.byId[id].goal || s.bridges.byId[id].title : ''));
   const [busy, setBusy] = useState('');
-  const list = (agents || []).filter((a) => a.name !== 'default' && a.name !== manager && canSeat(a));
+  // Add an agent offers the agents that say what they do: an agent of the setup of the server joins no channel of a person.
+  const list = (agents || []).filter((a) => a.name !== 'default' && a.name !== manager && canSeat(a) && described(a, faces));
   const add = async (agent: string) => {
     if (busy) return;
     setBusy(agent);

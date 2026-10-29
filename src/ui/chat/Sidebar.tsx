@@ -158,6 +158,20 @@ function ChannelRowView({ c, current, open, agent }: { c: ChannelRow; current: b
   );
 }
 
+/**
+ * skipWords says why a job skipped a time, in a few words: a job that starts
+ * on the event of another app waits for that app; another reason keeps its
+ * first words.
+ */
+export function skipWords(reason: string): string {
+  const t = oneLine(reason || '').replace(/\.$/, '');
+  if (!t) return 'skipped';
+  if (/\b(starts on|event|webhook|another app|other app)\b/i.test(t)) return 'waits for the other app';
+  const words = t.split(/\s+/);
+  const short = words.length > 6 ? words.slice(0, 6).join(' ') + '…' : t;
+  return 'skipped: ' + short.charAt(0).toLowerCase() + short.slice(1);
+}
+
 /** lastWords says the last result of a job in one or two words. */
 export function lastWords(d: Duty): string {
   const r = d.state && d.state.lastRun;
@@ -169,7 +183,7 @@ export function lastWords(d: Duty): string {
   if (r.state === 'failed') return 'last failed';
   if (r.state === 'retrying') return 'trying again';
   // A skip says why, such as the last run still worked.
-  if (r.state === 'skipped') return r.reason ? 'skipped: ' + oneLine(r.reason).replace(/\.$/, '').replace(/^./, (x) => x.toLowerCase()) : 'skipped';
+  if (r.state === 'skipped') return skipWords(r.reason || '');
   if (r.state === 'running' || r.state === 'queued') return 'running';
   if (r.state === 'input-required') return 'needs you';
   return r.state ? 'last ' + r.state.replace(/-/g, ' ') : '';

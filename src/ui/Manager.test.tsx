@@ -244,7 +244,7 @@ describe('the thread', () => {
       { seq: 7, time: T, kind: 'assistant', text: 'Three.' },
     ];
     const blocks = blocksOf(items);
-    expect(blocks[1].kind === 'steps' && blocks[1].steps.map((x) => x.text)).toEqual(['Checked its notes', 'Looked at the agents']);
+    expect(blocks[1].kind === 'steps' && blocks[1].steps.map((x) => x.text)).toEqual(['Read its notes', 'Looked at the agents']);
     expect(blocks[1].kind === 'steps' && blocks[1].steps.map((x) => x.key)).toEqual(['step-m', 'step-a']);
   });
 

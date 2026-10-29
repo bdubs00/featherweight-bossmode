@@ -15,7 +15,7 @@ import { useDuties, loadDuties, loadInbox } from '../../state/duties';
 import type { Entry } from '../../api/types';
 import { dutyTitle } from '../../lib/duties';
 import { titleOfName } from '../../lib/duties';
-import { fromItems, needsOf, needsOfCount, needsOfItems, type NeedRow } from './needs';
+import { countsFailure, fromItems, needsOf, needsOfCount, needsOfItems, type NeedRow } from './needs';
 
 /** A value that many views read, with the views that follow it. */
 function shared<T>(init: T) {
@@ -72,6 +72,8 @@ export interface Answer {
   card?: string;
   /** The waiting change of a note that the person kept or refused. */
   note?: string;
+  /** The job whose failure the person answered with Run again or Pause. */
+  duty?: string;
   /** The line that stays, such as You marked this right. The time follows it. */
   words: string;
   at: string;
@@ -91,8 +93,10 @@ export function useAnswered(): Answer[] {
 }
 
 /** answers reports whether an answer of the person takes a row off Needs you. */
-export function answers(a: Answer, r: Pick<NeedRow, 'kind' | 'run' | 'bridge' | 'approval' | 'card' | 'note'> & { key?: string }): boolean {
+export function answers(a: Answer, r: Pick<NeedRow, 'kind' | 'run' | 'bridge' | 'approval' | 'card' | 'note'> & { key?: string; duty?: string }): boolean {
   if (a.card && r.card === a.card) return true;
+  // Run again or Pause on a failed job takes off the failure of that job.
+  if (a.duty) return r.kind === 'failed' && r.duty === a.duty;
   // Keep or Not now on a note takes off the row of that note, whichever list holds it.
   if (a.note) return r.note === a.note || r.key === 'k:' + a.note || r.key === 'n:' + a.note;
   // The answer of a question of a channel takes off the question of that channel, which names no approval.
@@ -265,9 +269,10 @@ export function useNeedsCount(): number {
   // The rows that the person answered here leave the count at once, until the next read of the server agrees.
   const gone = useHiddenCount(done);
   if (count && items && fromItems(items)) {
-    // The rows are the counted items less those that the person answered here.
-    const counted = items.filter((it) => !!it.card || it.kind === 'note').length;
-    return Math.max(0, count.count - Math.max(0, counted - rows.length));
+    // The rows are the counted items less those that the person answered here. A failed job that the server does not count yet counts here.
+    const counted = items.filter((it) => !!it.card || it.kind === 'note' || countsFailure(it)).length;
+    const extra = rows.filter((r) => r.kind === 'failed' && !items.some((it) => it.kind === 'failure' && it.duty === r.duty && countsFailure(it))).length;
+    return Math.max(0, count.count - Math.max(0, counted - (rows.length - extra))) + extra;
   }
   return count ? Math.max(0, count.count - gone) : rows.length;
 }

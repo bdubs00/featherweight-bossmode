@@ -58,6 +58,7 @@ export function RunView({ id }: { id: string }) {
   usePoll(id);
   const board = useBoard();
   const answered_ = useAnswered();
+  const me = useSelect((s) => (s.me && s.me.principal ? s.me.principal.subject : ''));
   const card = board ? board.cards.find((c) => c.links.run === id || (c.links.runs || []).includes(id)) : undefined;
   if (!run) {
     return (
@@ -78,7 +79,9 @@ export function RunView({ id }: { id: string }) {
   const duty = (run.metadata && run.metadata[DUTY_KEY]) || '';
   // A reply makes sense in a conversation of a person that nobody judged yet: a run of a job, a run that the archive keeps, and a result with a verdict take none.
   const judged = (!!card && (card.verdict === 'accepted' || card.verdict === 'sent-back' || card.verdict === 'let-go')) || answered_.some((a) => a.run === id && a.kind !== 'decision');
-  const reply = !run.archived && (!run.can || run.can.operate) && !duty && !judged;
+  // A reply makes sense only in a conversation that this person asked for: a run of a job, of another person, or of the setup of the server takes none.
+  const mine = !!me && (run.principal === me || (!!card && card.from.kind === 'person' && card.from.name === me));
+  const reply = !run.archived && (!run.can || run.can.operate) && !duty && !judged && mine;
   const asked = card && card.from ? (card.from.kind === 'duty' ? 'From the job ' + dutyLabel(duty || card.from.name || '') : card.from.display ? 'Asked by ' + card.from.display : '') : duty ? 'From the job ' + dutyLabel(duty) : '';
   return (
     <section class="cf-view cf-run" aria-labelledby="cf-run-title">

@@ -215,6 +215,18 @@ export function shortTime(iso: string, now = new Date()): string {
  */
 export function pageWords(text: string): string {
   return String(text || '')
+    // The address of the person in an answer of an agent: Answer to @operator, on the package reads About the package.
+    .replace(/^(\**)Answer to @operator,?\s*on\s+/i, '$1About ')
+    .replace(/^(\**)Answer to @operator\b[,:]?\s*/i, '$1')
+    .replace(/@operator\b/g, 'you')
+    // A worker that the pool replaced is the agent that held the work.
+    .replace(/\b[Ii]ts worker was replaced\b/g, 'the agent that held it was replaced')
+    // The names of the limits of a budget read as words.
+    .replace(/\blimit of maxTurns\b/g, 'limit of turns')
+    .replace(/\blimit of maxToolCalls\b/g, 'limit of tool calls')
+    .replace(/\blimit of maxCallsPerTurn\b/g, 'limit of tool calls in one turn')
+    .replace(/\blimit of maxTokens\b/g, 'limit of tokens')
+    .replace(/\blimit of maxCostUSD\b/g, 'limit of cost')
     .replace(/\bbridges\b/g, 'channels')
     .replace(/\bBridges\b/g, 'Channels')
     .replace(/\bbridge\b/g, 'channel')
@@ -245,7 +257,8 @@ export function lineText(text: string): string {
       .replace(/^The change waits for (its worker|\d+ workers) to wake up\.$/, 'The change takes effect at the next run.')
       .replace(/^Workers take a change in about a minute\./, 'A change takes about a minute.')
       .replace(/^The workers of (\S+) lose /, '$1 loses ')
-      .replace(/\blost its worker\b/g, 'lost its run')
+      // A run that the fleet lost: the agent that held its work was replaced.
+      .replace(/^(\S+) lost its (?:worker|run)\b.*$/, '$1 stopped: the agent that held its work was replaced')
       .replace(/\btook the seat\b/g, 'joined')
       .replace(/\bseated (\S+) again\b/g, 'started $1 again')
       .replace(/\bseated\b/g, 'added'),

@@ -38,10 +38,13 @@ describe('Needs you from the items of the front', () => {
     expect(fromItems(null)).toBe(false);
   });
 
-  it('gives one row per counted item, each with its ways out and a place that offers them, and no row for a failure or a paused job', () => {
+  it('gives one row per counted item and per failed job, each with its ways out and a place that offers them, and no row for a paused job', () => {
     const rows = needsOfItems(input, ITEMS);
     // The count of the front counts six cards and the note: so do the rows.
-    expect(rows.length).toBe(6);
+    // A failed job waits for the person too: Run again or Pause, on the page of the job.
+    expect(rows.length).toBe(7);
+    const failed = rows.find((r) => r.kind === 'failed')!;
+    expect([failed.href, failed.actions, failed.head, failed.duty]).toEqual(['#j/review-after-close', ['run-again', 'pause'], 'The queue did not take the run.', 'review-after-close']);
     for (const r of rows) expect(r.actions && r.actions.length).toBeGreaterThan(0);
     const by = (card: string) => rows.find((r) => r.card === card)!;
     // A decision of a job waits on its task, a decision and a question of a channel on its tab Decisions.

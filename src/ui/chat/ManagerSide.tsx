@@ -1,7 +1,8 @@
 // The pane at the right of the Manager: what it does, the channels it
 // opened for the person, and its conversations, newest first, with New.
 
-import { useEffect, useMemo } from 'preact/hooks';
+import { useEffect, useMemo, useState } from 'preact/hooks';
+import { api } from '../../api/routes';
 import { useSelect } from '../../state/store';
 import { loadManagerChats } from '../../state/actions';
 import { managerRunOf } from '../../state/reducer';
@@ -22,12 +23,24 @@ export function ManagerSide() {
   const runs = useSelect((s) => s.runs);
   const current = useSelect(managerRunOf);
   const open = useSelect((s) => (current ? s.runs[current] : undefined));
-  // The cap of each run of the Manager, from its profile, where the server says it.
-  const cap = useSelect((s) => {
-    const m = s.config && s.config.manager ? (s.agents || []).find((a) => a.name === s.config!.manager!.agent) : undefined;
-    const b = m ? (m as { budget?: { maxCostUSD?: number } }).budget : undefined;
-    return b && typeof b.maxCostUSD === 'number' ? b.maxCostUSD : null;
-  });
+  // The cap of each run of the Manager, from its profile (GET /v1/agents/<manager>, budget). A profile that names none shows no line.
+  const agent = useSelect((s) => (s.config && s.config.manager ? s.config.manager.agent : ''));
+  const [cap, setCap] = useState<number | null>(null);
+  useEffect(() => {
+    let live = true;
+    setCap(null);
+    if (agent)
+      api.agent(agent).then(
+        (a) => {
+          const b = (a as { budget?: { maxCostUSD?: number } }).budget;
+          if (live) setCap(b && typeof b.maxCostUSD === 'number' && b.maxCostUSD > 0 ? b.maxCostUSD : null);
+        },
+        () => {},
+      );
+    return () => {
+      live = false;
+    };
+  }, [agent]);
   const list = useMemo(
     () =>
       ids
@@ -55,8 +68,12 @@ export function ManagerSide() {
         <section class="cf-msec">
           <p class="cf-mrow-line">{(face && face.tagline) || 'Ask it for work. It opens a channel and puts agents on it.'}</p>
           <dl class="cf-facts cf-mgr-cost">
-            <dt>Cap per run</dt>
-            <dd>{cap !== null ? costText(cap) : 'The server does not say.'}</dd>
+            {cap !== null && (
+              <>
+                <dt>Cap per run</dt>
+                <dd>{costText(cap)}</dd>
+              </>
+            )}
             {open && (
               <>
                 <dt>This one</dt>

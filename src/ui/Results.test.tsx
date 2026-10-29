@@ -214,7 +214,7 @@ describe('Results', () => {
     over = { people: { actions: 5, noPerson: 9, reworked: 1, waitSeconds: 7200, waitingNow: 0, handled: 3 } };
     const box = mount(<Results />);
     await flush();
-    expect(box.textContent).toContain('5 actions of people, 1 followed up after they ended, 3 decisions without a named person');
+    expect(box.textContent).toContain('5 actions of people, 1 followed up after they ended, 3 decisions by the admin token or the server');
     expect(box.textContent).not.toContain('waiting for');
   });
 

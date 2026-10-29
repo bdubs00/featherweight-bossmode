@@ -270,7 +270,7 @@ function Figures({ v, unit, toCheck, mine, measured, onSaved }: { v: Value; unit
             </p>
           )}
           <p class="t-meta">
-            {costText(v.spend.failedUSD)} on failed work, {costText(v.spend.coordinationUSD)} on coordination
+            {costText(v.spend.failedUSD)} on failed work, {costText(v.spend.coordinationUSD)} on the Manager
           </p>
           {v.spend.unpriced > 0 && <Led tone="grey" word={unpricedWords(v.spend.unpriced)} label="Their model has no price, so their cost is unknown." />}
         </Tile>
@@ -282,7 +282,7 @@ function Figures({ v, unit, toCheck, mine, measured, onSaved }: { v: Value; unit
         >
           <p class="t-meta">
             {v.people.actions === 1 ? '1 action of a person' : v.people.actions.toLocaleString() + ' actions of people'}, {v.people.reworked} followed up after they ended
-            {(v.people.handled || 0) > 0 && <>, {v.people.handled} {v.people.handled === 1 ? 'decision' : 'decisions'} without a named person</>}
+            {(v.people.handled || 0) > 0 && <>, {v.people.handled} {v.people.handled === 1 ? 'decision' : 'decisions'} by the admin token or the server</>}
           </p>
           {mine.n > 0 ? (
             <a class="rs-now" href={activityHref(mine)}>
@@ -311,19 +311,22 @@ function Figures({ v, unit, toCheck, mine, measured, onSaved }: { v: Value; unit
             </>
           )}
         </Tile>
-        <Tile
-          label="Hours of a person"
-          figure={v.estimated ? hours(v.estimated.minutes) : 'Not set'}
-          unit={v.estimated ? 'est.' : ''}
-          muted={!v.estimated}
-          help="Nothing measures the time that people spend. The owner of an agent sets the minutes that a person takes for one task of a job or an agent, in Work by job and agent. The page multiplies them by the done tasks that nobody sent back."
-        >
-          {v.estimated && (
-            <p class="t-meta">
-              {v.estimated.pieces === 1 ? '1 task' : v.estimated.pieces + ' tasks'} of {v.estimated.lines} {v.estimated.lines === 1 ? 'job or agent' : 'jobs or agents'}, {v.work.done - v.estimated.pieces} without an estimate
-            </p>
-          )}
-        </Tile>
+        {/* Hours of a person shows only once an owner set the minutes of a task: until then it says nothing. */}
+        {v.estimated && (
+          <Tile
+            label="Hours of a person"
+            figure={v.estimated ? hours(v.estimated.minutes) : 'Not set'}
+            unit={v.estimated ? 'est.' : ''}
+            muted={!v.estimated}
+            help="Nothing measures the time that people spend. The owner of an agent sets the minutes that a person takes for one task of a job or an agent, in Work by job and agent. The page multiplies them by the done tasks that nobody sent back."
+          >
+            {v.estimated && (
+              <p class="t-meta">
+                {v.estimated.pieces === 1 ? '1 task' : v.estimated.pieces + ' tasks'} of {v.estimated.lines} {v.estimated.lines === 1 ? 'job or agent' : 'jobs or agents'}, {v.work.done - v.estimated.pieces} without an estimate
+              </p>
+            )}
+          </Tile>
+        )}
       </div>
       <section class="rs-sec" aria-labelledby="rs-chart">
         <div class="rs-sec-head">

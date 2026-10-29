@@ -1617,3 +1617,29 @@ a.cf-mrow:hover .cf-mrow-top strong {
   flex: none;
   white-space: nowrap;
 }
+
+/* ---------- Other agents, folded under Agents ---------- */
+.cf-other-agents {
+  margin-top: var(--s-4);
+  border-top: 1px solid var(--line-soft);
+  padding-top: var(--s-2);
+}
+.cf .cf-other-key {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  width: 100%;
+  padding: var(--s-2) 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.cf-other-key .glyph {
+  transform: rotate(180deg);
+}
+.cf-other-key[aria-expanded='true'] .glyph {
+  transform: rotate(-90deg);
+}

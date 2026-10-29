@@ -105,7 +105,7 @@ const NAMED: Record<string, [string, string, string]> = {
 
 /** memoryWords words a call of the memory tool by its command: a read of the notes, or a change. */
 function memoryWords(command: string): string {
-  if (command === 'view') return 'Checked its notes';
+  if (command === 'view') return 'Read its notes';
   if (command === 'delete' || command === 'rename') return 'Tidied its notes';
   if (command) return 'Wrote in its notes';
   return 'Used its notes';
@@ -155,7 +155,7 @@ export function stepWords(tool: string | undefined, input?: unknown, said?: stri
     case 'bridge_read':
       return 'Read the channel';
     case 'bridge_list':
-      return 'Listed the teams';
+      return 'Listed the channels';
     case 'bridge_open':
       return str('title') ? 'Opened the team ' + str('title') : 'Opened a team';
     case 'fleet':

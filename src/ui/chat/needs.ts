@@ -308,7 +308,13 @@ export function needsOfCount(i: NeedsInput): NeedRow[] {
 }
 
 /** The kind of a row for the kind of an item of the inbox. */
-const ITEM_KIND: Record<string, NeedKind> = { result: 'check', question: 'question', approval: 'asks', note: 'suggestion' };
+const ITEM_KIND: Record<string, NeedKind> = { result: 'check', question: 'question', approval: 'asks', note: 'suggestion', failure: 'failed' };
+
+/** The ways out of a failed job, while the server names none: Run again and Pause. */
+export const FAILED_ACTIONS: InboxAction[] = ['run-again', 'pause'];
+
+/** countsFailure reports whether the one count of the server counts a failure: such a failure names its ways out. A failure with none is a row that the page adds to the count. */
+export const countsFailure = (it: Pick<InboxItem, 'kind' | 'actions'>): boolean => it.kind === 'failure' && !!it.actions && it.actions.length > 0;
 
 /** itemHref is where the person takes a way out of an item: the sign-off at the top of a channel or a task, the cards of a channel, a task, or the agent of a note. */
 function itemHref(it: InboxItem): string {
@@ -345,27 +351,30 @@ function itemHead(i: NeedsInput, it: InboxItem): string {
 export function needsOfItems(i: NeedsInput, items: InboxItem[]): NeedRow[] {
   const out: NeedRow[] = [];
   for (const it of items) {
-    if (!it.card && it.kind !== 'note') continue;
+    // A failed job waits for the person too: Run again or Pause.
+    const failed = it.kind === 'failure' && !!it.duty;
+    if (!it.card && it.kind !== 'note' && !failed) continue;
     const kind = ITEM_KIND[it.kind] || 'question';
-    const head = itemHead(i, it);
+    const why = failed ? oneLine(String(it.summary || it.text || '').replace(/^The job \S+:\s*/, '').replace(/^The run failed:\s*/i, '')) : '';
+    const head = failed ? (why ? why.charAt(0).toUpperCase() + why.slice(1) : 'Its last run failed.') : itemHead(i, it);
     const where = it.channel || (it.bridge ? i.channelTitle(it.bridge) : it.duty ? i.jobTitle(it.duty) : '');
     const who = it.handle || (it.agent ? i.agentName(it.agent) : '');
     const cost = it.costUSD && it.costUSD > 0 ? costText(it.costUSD) : '';
     const parts = kind === 'suggestion' ? [who] : [where, who, cost];
     out.push({
-      key: it.card ? 'card:' + it.card : 'n:' + (it.note || it.since || ''),
+      key: it.card ? 'card:' + it.card : failed ? 'f:' + it.duty : 'n:' + (it.note || it.since || ''),
       kind,
       agent: it.agent || '',
       head,
       line: lineOf(head, [ACTION[kind], ...parts]),
       at: it.since || '',
-      href: itemHref(it),
+      href: failed ? chatHref({ view: 'job', name: it.duty! }) : itemHref(it),
       run: it.run || undefined,
       bridge: it.bridge || undefined,
       approval: it.approval || undefined,
       duty: it.duty || undefined,
       card: it.card || undefined,
-      actions: it.actions || [],
+      actions: it.actions && it.actions.length ? it.actions : failed ? FAILED_ACTIONS : [],
       question: it.question || undefined,
       handle: it.handle || undefined,
       note: it.note || undefined,

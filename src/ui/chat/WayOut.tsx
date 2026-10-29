@@ -18,9 +18,40 @@ import { Markdown } from '../common';
 import { Button, LineLed, TextArea } from '../primitives';
 import { answerFor, markAnswered, useAnswered, useBoard } from './data';
 import { pageWords } from './channels';
+import { moreRoom, roomOf } from '../MoreRoom';
+import { pauseDuty, runDutyNow, useDuties } from '../../state/duties';
+import { dutyLabel } from '../../lib/duties';
 
 /** The lines of a result that the card shows before More. */
 const RESULT_CHARS = 600;
+
+/**
+ * signsChannel names the channel that a verdict goes to, or "" for a verdict
+ * on a run. A card of a channel (kind bridge) checks its channel, also when
+ * it names the run of one of its agents in links.run; a run goes to its run.
+ * Without a card, a channel without a run is a channel.
+ */
+export function signsChannel(card: Pick<WorkCard, 'kind' | 'links'> | undefined, bridge?: string, run?: string): string {
+  if (card) return card.kind === 'bridge' ? card.links.bridge || bridge || '' : '';
+  return bridge && !run ? bridge : '';
+}
+
+/** The words of a limit of the budget, by the name that the server gives it. */
+const LIMIT_WORDS: Record<string, string> = { maxTurns: 'turns', maxToolCalls: 'tool calls', maxCallsPerTurn: 'tool calls in one turn', maxTokens: 'tokens', maxCostUSD: 'cost', deadline: 'working time' };
+
+/**
+ * stoppedWords says why a task stopped in plain words, such as Stopped
+ * after 1 step: it reached its limit of turns. The names of the server,
+ * such as maxTurns, never show.
+ */
+export function stoppedWords(reason: string, error: string, steps: number | undefined): string {
+  const said = (error || '') + ' ' + (reason || '');
+  const m = /\b(maxTurns|maxToolCalls|maxCallsPerTurn|maxTokens|maxCostUSD|deadline)\b/.exec(said) || (/\bturn limit\b/i.test(said) ? ['', 'maxTurns'] : /\btool call limit\b/i.test(said) ? ['', 'maxToolCalls'] : null);
+  const after = typeof steps === 'number' ? (steps === 0 ? 'Stopped before its first step' : 'Stopped after ' + steps + (steps === 1 ? ' step' : ' steps')) : 'Stopped';
+  if (m) return after + ': it reached its limit of ' + LIMIT_WORDS[m[1]] + '.';
+  const why = pageWords(String(reason || '').trim()).replace(/\.$/, '');
+  return why ? after + ': ' + why.charAt(0).toLowerCase() + why.slice(1) + '.' : after + '.';
+}
 
 /** Done is the line that stays after an answer of the person. */
 function Done({ words, at }: { words: string; at: string }) {
@@ -66,6 +97,8 @@ function Nobody({ card, why }: { card?: WorkCard; why?: string }) {
  * then says that nobody can answer it any more, with Dismiss.
  */
 export function SignOff({ run, bridge, card, result, title, brief }: { run?: string; bridge?: string; card?: WorkCard; result?: string; title: string; brief?: boolean }) {
+  // The verdict of a channel goes to the channel, also when its card names the run of one of its agents.
+  const channel = signsChannel(card, bridge, run);
   const [writing, setWriting] = useState(false);
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
@@ -73,7 +106,7 @@ export function SignOff({ run, bridge, card, result, title, brief }: { run?: str
   const [gone, setGone] = useState('');
   const [more, setMore] = useState(false);
   const box = useRef<HTMLTextAreaElement>(null);
-  const done = answerFor(useAnswered(), { run, bridge: run ? undefined : bridge, card: card ? card.id : undefined });
+  const done = answerFor(useAnswered(), { run: channel ? undefined : run, bridge: channel || undefined, card: card ? card.id : undefined });
   if (done) return <Done words={done.words} at={done.at} />;
   if (gone) return <Nobody card={card} why={gone} />;
   const send = async (reaction: 'up' | 'down') => {
@@ -92,10 +125,10 @@ export function SignOff({ run, bridge, card, result, title, brief }: { run?: str
       // The verdict goes to POST /v1/work/review, which lands also on a run
       // whose worker the pool replaced: the answer then says kept, and the
       // note of Needs work stays with the result.
-      const ans = bridge && !run ? await api.reviewTeam(bridge, reaction, said) : await api.reviewRun(run || '', reaction, said);
+      const ans = channel ? await api.reviewTeam(channel, reaction, said) : await api.reviewRun(run || '', reaction, said);
       const kept = !!(ans && ans.kept);
       const words = reaction === 'up' ? 'You marked this right' : kept ? 'You sent this back. No agent holds this task any more, so your note stays with the result' : 'You sent this back with your note';
-      markAnswered({ kind: 'verdict', run, bridge, card: card ? card.id : undefined, words });
+      markAnswered({ kind: 'verdict', run: channel ? undefined : run, bridge: channel || bridge, card: card ? card.id : undefined, words });
     } catch (e) {
       if (e instanceof ApiError && e.status === 409) setGone(e.message);
       else if (e instanceof ApiError && e.status === 400) setError(e.message);
@@ -174,14 +207,37 @@ export function SignOff({ run, bridge, card, result, title, brief }: { run?: str
   );
 }
 
-/** LetGo is the way out of a stopped task: why it stopped, and Let it go. */
+/**
+ * LetGo is the way out of a stopped task: why it stopped, in plain words,
+ * Give it more room for a task at a limit that the page can measure, and
+ * Dismiss, which lets the task go.
+ */
 function LetGo({ card }: { card: WorkCard }) {
   const [busy, setBusy] = useState(false);
+  const run = useSelect((s) => (card.links.run ? s.runs[card.links.run] : undefined));
+  const room = run ? roomOf(run) : null;
+  const steps = run && run.usage ? run.usage.toolCalls : undefined;
+  const more = async () => {
+    if (busy || !run || !room || !room.change) return;
+    setBusy(true);
+    try {
+      await moreRoom(run.id, room.change);
+      markAnswered({ kind: 'dismiss', card: card.id, run: card.links.run, bridge: card.links.bridge, words: 'You gave it ' + (room.words || 'more room') });
+    } catch (e) {
+      showError(e);
+    }
+    setBusy(false);
+  };
   return (
     <div class="cf-wayout cf-stopped">
       <p class="cf-wayout-head">Stopped</p>
-      <p>{pageWords(card.reason || 'It stopped before it finished.')}</p>
+      <p>{stoppedWords(card.reason || '', (run && run.error) || '', steps)}</p>
       <div class="cf-wayout-keys">
+        {room && room.change && (
+          <Button size="s" kind="primary" aria-disabled={busy || undefined} title={room.words ? 'It gets ' + room.words + '.' : undefined} onClick={more}>
+            Give it more room
+          </Button>
+        )}
         <Button
           size="s"
           aria-disabled={busy || undefined}
@@ -190,15 +246,60 @@ function LetGo({ card }: { card: WorkCard }) {
             setBusy(true);
             try {
               await api.letGo(card.id);
-              markAnswered({ kind: 'dismiss', card: card.id, run: card.links.run, bridge: card.links.bridge, words: 'You let this go' });
+              markAnswered({ kind: 'dismiss', card: card.id, run: card.links.run, bridge: card.links.bridge, words: 'You dismissed this' });
             } catch (e) {
               showError(e);
             }
             setBusy(false);
           }}
         >
-          Let it go
+          Dismiss
         </Button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * FailedJob is the way out of a job whose run failed: why, Run again, and
+ * Pause. The item of the inbox names its ways out in actions; an older
+ * server names none, and the page offers both.
+ */
+export function FailedJob({ duty }: { duty: string }) {
+  const item = useDuties((s) => (s.inbox || []).find((it) => it.kind === 'failure' && it.duty === duty));
+  const answered = useAnswered();
+  const [busy, setBusy] = useState(false);
+  if (!item) return null;
+  const done = answered.find((a) => a.duty === duty && a.kind === 'dismiss');
+  if (done) return <Done words={done.words} at={done.at} />;
+  const acts = item.actions && item.actions.length ? item.actions : ['run-again', 'pause'];
+  const act = async (what: 'run-again' | 'pause') => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      if (what === 'run-again') await runDutyNow(duty);
+      else await pauseDuty(duty, true);
+      markAnswered({ kind: 'dismiss', duty, run: item.run || undefined, words: what === 'run-again' ? 'You ran it again' : 'You paused the job' });
+    } catch (e) {
+      showError(e);
+    }
+    setBusy(false);
+  };
+  return (
+    <div class="cf-wayout cf-stopped">
+      <p class="cf-wayout-head">Failed</p>
+      <p>{pageWords(String(item.text || '').replace(/^The job \S+:\s*/, '')) || 'Its last run failed.'}</p>
+      <div class="cf-wayout-keys">
+        {acts.includes('pause') && (
+          <Button size="s" aria-disabled={busy || undefined} aria-label={'Pause ' + dutyLabel(duty)} onClick={() => act('pause')}>
+            Pause
+          </Button>
+        )}
+        {acts.includes('run-again') && (
+          <Button size="s" kind="primary" aria-disabled={busy || undefined} onClick={() => act('run-again')}>
+            Run again
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -225,11 +326,13 @@ export function WayOut({ run, bridge, duty, result, brief }: { run?: string; bri
   const lost = useSelect((s) => s.lost);
   const items = cards.map((c) => {
     const r = c.links.run || '';
-    const done = answerFor(answered, { card: c.id, run: r || undefined, bridge: r ? undefined : c.links.bridge });
+    const channel = signsChannel(c);
+    const done = answerFor(answered, { card: c.id, run: channel ? undefined : r || undefined, bridge: channel || undefined });
     if (done) return <Done words={done.words} at={done.at} />;
     if (c.stage === 'review') {
-      const text = result || (r && runs[r] && runs[r].output) || c.summary || '';
-      return <SignOff run={r || undefined} bridge={c.links.bridge} card={c} result={text} title={c.title} brief={brief} />;
+      // The result of a channel is its newest post, not the answer of the run of one agent.
+      const text = result || (!channel && r && runs[r] && runs[r].output) || c.summary || '';
+      return <SignOff run={channel ? undefined : r || undefined} bridge={c.links.bridge} card={c} result={text} title={c.title} brief={brief} />;
     }
     if (c.stage === 'stopped') return <LetGo card={c} />;
     // A decision whose run is gone, or that the archive keeps, waits for nobody.
@@ -239,9 +342,11 @@ export function WayOut({ run, bridge, duty, result, brief }: { run?: string; bri
   });
   // The answers of this page about this place stay as lines after the task leaves the board.
   const left = answered.filter((a) => !cards.some((c) => a.card === c.id) && ((run && a.run === run) || (bridge && !run && a.bridge === bridge && a.kind !== 'decision')));
-  if (!items.some(Boolean) && !left.length) return null;
+  const failed = duty ? <FailedJob duty={duty} /> : null;
+  if (!items.some(Boolean) && !left.length && !failed) return null;
   return (
     <div class="cf-wayouts">
+      {failed}
       {items}
       {left.map((a) => (
         <Done words={a.words} at={a.at} />

@@ -39,7 +39,7 @@ describe('stepWords', () => {
     expect(stepWords('front.duty_pause', { name: 'nightly', paused: false })).toBe('Resumed the duty nightly');
     expect(stepWords('front.faces_put', { agent: 'tester', svg: '<svg/>' })).toBe('Drew a picture of tester');
     expect(stepWords('front.run', { agent: 'tester', input: 'Go.' })).toBe('Gave work to tester');
-    expect(stepWords('memory', { command: 'view', path: '/memories' })).toBe('Checked its notes');
+    expect(stepWords('memory', { command: 'view', path: '/memories' })).toBe('Read its notes');
     expect(stepWords('memory', { command: 'str_replace', path: '/memories/a.md' })).toBe('Wrote in its notes');
     expect(stepWords('memory', { command: 'delete', path: '/memories/a.md' })).toBe('Tidied its notes');
     expect(stepWords('recall', { query: 'x' })).toBe('Searched its memory');
