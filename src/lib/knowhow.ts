@@ -78,12 +78,19 @@ export function canChangeScope(sc: NoteScope, me: Me, role: Role): boolean {
 
 /**
  * canEditNote reports whether the page offers Edit and Put away on a
- * note: a note of the own scope of the person, or a note that the person
- * wrote, where the server lets them change it.
+ * note: a note of the own scope of the person, a note that the person
+ * wrote, or a note that went out of date, where the server lets them
+ * change it. An out-of-date note has no undo, so an owner corrects it in
+ * place: a new text, or Put away.
  */
-export function canEditNote(n: Pick<NoteItem, 'scope' | 'by'>, me: Me, role: Role): boolean {
+export function canEditNote(n: Pick<NoteItem, 'scope' | 'by'> & { state?: NoteState }, me: Me, role: Role): boolean {
   if (isOwnScope(n.scope, me)) return runs(role);
-  return isMine(n.by, me) && canChangeScope(n.scope, me, role);
+  return (isMine(n.by, me) || n.state === 'out-of-date') && canChangeScope(n.scope, me, role);
+}
+
+/** canUndo reports whether an entry offers Undo: the server can take it back, nobody did yet, and it is no move to out of date, which would make the agent trust the note over its source again. */
+export function canUndo(e: Pick<JournalEntry, 'undo' | 'undoneBy' | 'what' | 'subject'>, me: Me, role: Role): boolean {
+  return !!e.undo && !e.undoneBy && e.what !== 'out-of-date' && canDecide(e.subject, me, role);
 }
 
 /** subjectScope is the scope of the note of an entry or of a change. */
@@ -265,10 +272,21 @@ export function undoRefusal(s: { note?: string; routine?: string }): string {
   return s && s.routine && !s.note ? 'A later change touched this routine. Take that one back first.' : 'A later change touched this note. Take that one back first.';
 }
 
-/** runLinks names the runs of an entry: The run for one, else Run 1, Run 2, and so on. */
+/** runLinks names the runs of an entry: The run for one, else Run 1, Run 2, and so on. Each opens on this page. */
 export function runLinks(runs: string[] | undefined): { label: string; href: string; run: string }[] {
   const list = (runs || []).filter(Boolean);
-  return list.map((run, i) => ({ label: list.length === 1 ? 'The run' : 'Run ' + (i + 1), href: '/ui#run/' + encodeURIComponent(run), run }));
+  return list.map((run, i) => ({ label: list.length === 1 ? 'The run' : 'Run ' + (i + 1), href: runHref(run), run }));
+}
+
+/**
+ * undoRefusalOf says in place why an undo did not happen. The server
+ * answers outOfDate for a note that went out of date since: an undo would
+ * make the agent trust it again, so the sentence points to Notes, whose
+ * name the page links, where the person corrects the note.
+ */
+export function undoRefusalOf(s: { note?: string; routine?: string }, outOfDate: boolean): Sentence {
+  if (outOfDate && s && s.note) return { head: 'This note went out of date since. Edit it or put it away in ', name: 'Notes', tail: '.' };
+  return { head: undoRefusal(s), name: '', tail: '' };
 }
 
 /* ---------- the four numbers ---------- */

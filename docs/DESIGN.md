@@ -1400,21 +1400,30 @@ The work:
 - What it learned. The journal, newest first, under a quiet heading per
   day. An entry holds its clock time and its sentence, with the name of
   its note or routine in bold. Under them come its reason, who made it,
-  and links to its runs.
+  and links to its runs. A run opens in its chat on this page, as a card
+  of Work opens it.
   An entry that the server can take back has Undo, once. Undo shows to a
-  person who can change its note or routine. A 409
+  person who can change its note or routine. An entry that says a note
+  went out of date has no Undo: it would make the agent trust the note
+  over its source again. A 409
   says under the entry `A later change touched this note. Take that one
-  back first.` An undo that works puts `Undone:` and the sentence in the
-  notice of the page. `Show older` reads the next 50 entries.
+  back first.` When the note went out of date since, it says `This note
+  went out of date since. Edit it or put it away in Notes.`, with Notes as
+  a link to the tab. An undo that works puts `Undone:` and the sentence in
+  the notice of the page. `Show older` reads the next 50 entries.
 - Notes. The notes in groups by scope: `Your notes`, `Agent notes`, then
   each duty. Inside a group, a note that is out of date comes first. A row
   holds the first line of the note and its label: `checked` in green, `out
   of date` in amber that holds still, or `resting` in grey. The meta line
   holds its title, who wrote it, its time, and how often runs used it. A
   row opens in place: the text, the source that put it out of date with
-  its link, and the sources. The notes of the person have Edit and Put
-  away: an operator changes the notes of their own scope, and an owner
-  also a note that they wrote for the agent. A change that waits for a
+  its link, and the sources. A source page is a link only for a person
+  who may read the wiki; for anyone else it is words. The notes of the
+  person have Edit and Put away: an operator changes the notes of their
+  own scope, and an owner also a note that they wrote for the agent. An
+  owner also corrects a note of the agent or of a duty that went out of
+  date, with the same Edit and Put away, because such a note has no
+  undo. A change that waits for a
   decision (202) says so in the notice of the page. A 412 reads the note
   again and shows its newer text above the
   draft, which stays. A quiet line says `This note changed since. Read it

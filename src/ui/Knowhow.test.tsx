@@ -51,7 +51,8 @@ const WAIT: WaitingChange = { id: pid(1), at: at(30), agent: 'triage', what: 'le
 
 const JOURNAL: JournalEntry[] = [
   { id: pid(11), at: at(20), agent: 'triage', what: 'stepped-back', subject: { routine: 'acknowledge-a-new-ticket' }, why: 'A canary run disagreed with the agent on the team.', runs: ['r7'], by: '' },
-  { id: pid(12), at: at(40), agent: 'triage', what: 'out-of-date', subject: { note: 'gotchas/gitea-labels.md', scope: 'agent' }, why: 'The page agents/triage/labels.md changed.', by: '' },
+  // An older server gave a move to out of date an undo. The page offers none: it would make the agent trust the note over its source.
+  { id: pid(12), at: at(40), agent: 'triage', what: 'out-of-date', subject: { note: 'gotchas/gitea-labels.md', scope: 'agent' }, why: 'The page agents/triage/labels.md changed.', by: '', undo: { revision: 3, after: 4 } },
   { id: pid(13), at: at(60 * 30), agent: 'triage', what: 'learned', subject: { note: 'gotchas/gitea-labels.md', scope: 'agent' }, why: 'Two runs failed on a label with a space and passed without it.', runs: ['r3', 'r4'], by: 'review', undo: { revision: 0, after: 3 } },
   // An entry that was taken back already offers no second undo.
   { id: pid(14), at: at(60 * 31), agent: 'triage', what: 'learned', subject: { note: 'gotchas/old.md', scope: 'agent' }, why: 'One run passed.', by: 'review', undo: { revision: 0, after: 1 }, undoneBy: pid(15) },
@@ -86,6 +87,7 @@ function routes(more: Record<string, unknown> = {}): Record<string, unknown> {
     'GET /v1/knowhow/journal?agent=identity-desk&limit=50': { entries: [] },
     'GET /v1/knowhow/notes?agent=triage': { notes: NOTES },
     'GET /v1/knowhow/notes/triage/agent/gotchas/gitea-labels.md': OOD,
+    'GET /v1/knowhow/notes/triage/agent/places/team-labels.md': { ...NOTES[1], text: 'The team labels live under team/ in Gitea.', sources: [{ ref: 'run:r5' }] },
     'GET /v1/knowhow/notes/triage/principal/mine/escalation.md?principal=alice%40example.com': MINE,
     'GET /v1/routines': { routines: ROUTINES },
     'GET /v1/routines/summary': { runs: 0, byRoutine: 0, byAgent: 0, withPerson: 0, costUSD: { routine: 0, agent: 0 }, sentBack: 0 },
@@ -256,9 +258,10 @@ describe('the changes that wait', () => {
     expect(text(card.querySelector('.kh-what'))).toBe('A new note: VPN portal');
     expect(text(card.querySelector('.kh-text'))).toBe('The VPN portal answers only on its full domain, vpn.corp.example.com.');
     expect(text(card.querySelector('.kh-why'))).toBe('Three runs failed on the short name of the portal and passed with the full one.');
+    // A run opens in its chat on this page, not on the dashboard at /ui.
     expect([...card.querySelectorAll('.kh-runs a')].map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
-      ['Run 1', '/ui#run/r1'],
-      ['Run 2', '/ui#run/r2'],
+      ['Run 1', '#chat/r1'],
+      ['Run 2', '#chat/r2'],
     ]);
     expect([...card.querySelectorAll('.card-actions button')].map(text)).toEqual(['Not now', 'Keep']);
     expect(card.querySelector('.key-primary')!.textContent).toBe('Keep');
@@ -355,6 +358,18 @@ describe('What it learned', () => {
     expect(currentSaid()).toBe('Undone: Learned the note Gitea labels.');
     expect(api.calls.filter((c) => c.path === '/v1/knowhow/journal?agent=triage&limit=50')).toHaveLength(2);
   });
+
+  it('points to Notes when the note of an entry went out of date since, where the owner corrects it', async () => {
+    api = fakeApi(routes({ ['POST /v1/knowhow/journal/' + J3 + '/undo']: () => ({ status: 409, body: { detail: 'the note went out of date after this change', outOfDate: true } }) }) as never);
+    const el = mount(<KnowhowMain agent="triage" tab="learned" />);
+    await settle();
+    const row = el.querySelectorAll('.kh-entry')[2];
+    click(keyNamed(row, 'Undo'));
+    await settle();
+    expect(text(row.querySelector('.kh-refused'))).toBe('This note went out of date since. Edit it or put it away in Notes.');
+    expect(row.querySelector('.kh-refused a')!.getAttribute('href')).toBe('#knowhow/triage/notes');
+    expect(currentNotice()).toBe('');
+  });
 });
 
 describe('Notes', () => {
@@ -381,7 +396,50 @@ describe('Notes', () => {
     expect(text(body.querySelector('.kh-ood'))).toBe('Out of date since ' + dateWords(OOD.outOfDate!.since) + ': the page agents/triage/labels.md changed.');
     expect(body.querySelector('.kh-ood a')!.getAttribute('href')).toBe('#pages/agents/triage/labels.md');
     expect(text(body.querySelector('.kh-sources'))).toBe('Sources: a run the page agents/triage/labels.md');
-    // A note that the person did not write has no key.
+    expect(body.querySelector('.kh-sources a')!.getAttribute('href')).toBe('#chat/r3');
+    // The note went out of date, so its owner corrects it: Edit and Put away, and no undo.
+    expect([...body.querySelectorAll('button')].map(text)).toEqual(['Edit', 'Put away']);
+    // A note of the agent that the person did not write, and that is not out of date, has no key.
+    click(agentRows[1]);
+    await settle();
+    const team = notes.querySelector('.kh-note-body')!;
+    expect(text(team.querySelector('.kh-text'))).toBe('The team labels live under team/ in Gitea.');
+    expect(team.querySelector('button')).toBeNull();
+  });
+
+  it('lets an owner correct an out-of-date note of the agent with its sources, and an operator not', async () => {
+    const path = '/v1/knowhow/notes/triage/agent/gotchas/gitea-labels.md';
+    api = fakeApi(routes({ ['PUT ' + path]: { note: { ...NOTES[0], state: 'checked' } } }) as never);
+    const el = mount(<KnowhowMain agent="triage" tab="notes" />);
+    await settle();
+    click(el.querySelectorAll('.kh-group')[1].querySelector('.kh-note-head'));
+    await settle();
+    const body = el.querySelector('.kh-note-body')!;
+    click(keyNamed(body, 'Edit'));
+    typeIn(body.querySelector('textarea'), 'Gitea refuses a space or a slash in a label name.');
+    click(keyNamed(body, 'Save'));
+    await settle();
+    expect(api.calls.find((c) => c.method === 'PUT')!.body).toEqual({ text: 'Gitea refuses a space or a slash in a label name.', ifHash: OOD.hash, sources: OOD.sources });
+    unmountAll();
+    act(() => store.dispatch({ type: 'me', me: { ...OWNER, roles: { triage: 'operator' } } }));
+    const op = mount(<KnowhowMain agent="triage" tab="notes" />);
+    await settle();
+    click(op.querySelectorAll('.kh-group')[1].querySelector('.kh-note-head'));
+    await settle();
+    expect(op.querySelector('.kh-note-body button')).toBeNull();
+  });
+
+  it('gives a viewer whom the wiki refuses the source page as words, not as a link', async () => {
+    act(() => store.dispatch({ type: 'me', me: { ...OWNER, roles: { triage: 'viewer', 'identity-desk': 'viewer', ops: 'viewer' } } }));
+    api = fakeApi(routes() as never);
+    const el = mount(<KnowhowMain agent="triage" tab="notes" />);
+    await settle();
+    click(el.querySelectorAll('.kh-group')[1].querySelector('.kh-note-head'));
+    await settle();
+    const body = el.querySelector('.kh-note-body')!;
+    expect(text(body.querySelector('.kh-ood'))).toBe('Out of date since ' + dateWords(OOD.outOfDate!.since) + ': the page agents/triage/labels.md changed.');
+    expect(body.querySelector('.kh-ood a')).toBeNull();
+    expect([...body.querySelectorAll('.kh-sources a')].map((a) => a.getAttribute('href'))).toEqual(['#chat/r3']);
     expect(body.querySelector('button')).toBeNull();
   });
 

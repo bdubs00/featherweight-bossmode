@@ -13,7 +13,8 @@
 //   DELETE /v1/knowhow/notes/{agent}/{scope}/{name…}     ?ifHash=: puts the note away, 200 {"note"}. 412 as PUT.
 //   GET    /v1/knowhow/journal?agent=&limit=&before=     {"agent", "entries": [entry]}, newest first. before is the id of an entry.
 //   POST   /v1/knowhow/journal/{id}/undo                 {"entry", "undone"}. 409 when a later entry touched the same note,
-//                                                        or the entry was taken back already.
+//                                                        or the entry was taken back already. 409 with outOfDate for a move
+//                                                        to out of date, and for a note that went out of date since.
 //   GET    /v1/knowhow/settings/{agent}                  {"agent", "askFirst", "review"}
 //   PUT    /v1/knowhow/settings/{agent}                  {"askFirst"}, for an owner of the agent
 //   GET    /v1/knowhow/waiting?agent=                    {"waiting": [change]}. Without agent, every agent that the person views.
@@ -476,9 +477,12 @@ export function register({ on, refuse, readJson, publish, now, AGENTS, writePage
     if (!e || !canView(e.agent) || !sees(c, e.agent, e.subject)) refuse(404, 'no entry of the journal has the id ' + raw);
     changeSubject(c, e.agent, e.subject);
     if (e.undoneBy) refuse(409, 'this change was taken back already');
+    const ood = 'an undo cannot make the agent trust a note over its source again; edit the note or put it away';
+    if (e.what === 'out-of-date') refuse(409, ood, { outOfDate: true });
     if (!e.undo) refuse(400, 'this entry cannot be taken back');
     if (!e.subject.note) refuse(409, 'the fake takes back no move of a routine');
     const later = J.find((x) => x !== e && x.agent === e.agent && x.at > e.at && sameNote(x.subject, e.subject));
+    if (later && later.what === 'out-of-date' && !later.undoneBy) refuse(409, ood, { outOfDate: true });
     if (later) refuse(409, `a later change touched it: the note ${e.subject.note}`);
     const sc = scopeOfSubject(e.subject);
     const n = N.find((x) => x.agent === e.agent && x.name === e.subject.note && x.scope.kind === sc.kind && (x.scope.principal || '') === (sc.principal || ''));
